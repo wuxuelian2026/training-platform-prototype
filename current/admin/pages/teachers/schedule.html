@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>师资中心 · 教师时间表</title>
+  <link rel="stylesheet" href="../../../shared/css/tokens.css" />
+  <link rel="stylesheet" href="../../../shared/css/shell.css" />
+  <link rel="stylesheet" href="../../../shared/css/teacher-center.css" />
+</head>
+<body>
+  <div data-admin-shell data-title="教师时间表" data-active="teachers" data-teacher-page="schedule">
+    <div id="page-content">
+      <div class="page-head"><div><h1>教师时间表</h1><p>按月查看教师已排课次，用于识别时间冲突。</p></div><div class="month-switcher"><button class="button" data-month-action="prev" aria-label="上个月">‹</button><strong id="schedule-month">2026年9月</strong><button class="button" data-month-action="next" aria-label="下个月">›</button></div></div>
+      <form class="card filter-panel" id="schedule-filter"><div class="filter-head"><strong>筛选条件</strong><span>月视图 · 已排课次</span></div><div class="filter-grid schedule-filter-grid"><label class="form-field"><span>教师姓名</span><select name="teacher"><option value="">全部教师</option><option>王玥</option><option>陈晨</option><option>刘佳</option></select></label><label class="form-field"><span>工作校区</span><select name="campus"><option value="">全部校区</option><option>龙泉校区</option><option>南湖校区</option></select></label><label class="form-field"><span>课次状态</span><select name="status"><option value="">全部状态</option><option value="待上课">待上课</option><option value="上课中">上课中</option><option value="已完成">已完成</option><option value="已取消">已取消</option></select></label></div><div class="filter-actions"><button type="reset" class="button">重置</button><button type="submit" class="button primary">查询</button></div></form>
+      <div class="card toolbar"><div class="schedule-summary"><span id="schedule-count"><strong>本月共4个课次</strong> · 冲突1个</span><span>提示：冲突课次需在排班管理中处理</span></div><a class="button" href="../academic/scheduling.html">进入排班管理</a></div>
+      <div class="table-wrap schedule-table-wrap"><table><thead><tr><th>日期</th><th>时间</th><th>教师</th><th>课程</th><th>班级</th><th>校区</th><th>场地</th><th>课次状态</th><th>排课提示</th></tr></thead><tbody>
+        <tr data-schedule-id="schedule-1" data-teacher="王玥" data-campus="龙泉校区" data-status="待上课" data-conflict="false"><td>09-08 周二</td><td>09:00-10:30</td><td>王玥</td><td>舞蹈基本功</td><td>少儿舞蹈基础班</td><td>龙泉校区</td><td>综合楼302</td><td><span class="tag brand">待上课</span></td><td>—</td></tr>
+        <tr data-schedule-id="schedule-2" data-teacher="陈晨" data-campus="南湖校区" data-status="已完成" data-conflict="false"><td>09-08 周二</td><td>14:00-15:30</td><td>陈晨</td><td>声乐基础</td><td>成人声乐班</td><td>南湖校区</td><td>音乐楼201</td><td><span class="tag green">已完成</span></td><td>—</td></tr>
+        <tr data-schedule-id="schedule-3" data-teacher="王玥" data-campus="龙泉校区" data-status="待上课" data-conflict="true"><td>09-12 周六</td><td>09:00-10:30</td><td>王玥</td><td>中国舞身韵训练</td><td>成人中国舞班</td><td>龙泉校区</td><td>综合楼302</td><td><span class="tag brand">待上课</span></td><td><span class="schedule-conflict">与09:30课次时间冲突</span></td></tr>
+        <tr data-schedule-id="schedule-4" data-teacher="刘佳" data-campus="南湖校区" data-status="上课中" data-conflict="false"><td>09-15 周二</td><td>18:30-20:00</td><td>刘佳</td><td>少儿绘画</td><td>少儿美术启蒙班</td><td>南湖校区</td><td>美术楼103</td><td><span class="tag amber">上课中</span></td><td>—</td></tr>
+        <tr class="schedule-empty-row" hidden><td colspan="9"><div class="empty">暂无符合条件的课次，请调整筛选条件后重试。</div></td></tr>
+      </tbody></table></div>
+      <div class="pagination-bar"><span>共4个课次</span><button class="button" disabled>上一页</button><button class="button primary">1</button><button class="button" disabled>下一页</button></div>
+      <div class="toast" data-teacher-toast role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
+  <script type="module" src="../../../shared/js/admin-shell.js"></script>
+  <script type="module" src="../../../shared/js/teachers.js"></script>
+</body>
+</html>

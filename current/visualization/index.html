@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#09111b" />
+  <title>继续教育运营驾驶舱</title>
+  <link rel="stylesheet" href="../shared/css/tokens.css" />
+  <link rel="stylesheet" href="../shared/css/visualization.css" />
+</head>
+<body class="visualization-body">
+  <main class="visualization-screen" id="visualization-screen">
+    <header class="visualization-header">
+      <div class="visualization-brand">
+        <div class="visualization-mark">艺</div>
+        <div><strong>继续教育运营驾驶舱</strong><span>湖北艺术职业学院 · 培训业务数据中心</span></div>
+      </div>
+      <div class="visualization-header-center"><span class="live-dot"></span><span>实时运营数据</span><span class="header-divider"></span><span id="current-date">2026年度 · 截至09月09日</span></div>
+      <div class="visualization-controls">
+        <div class="dimension-control" role="group" aria-label="统计周期维度">
+          <span>统计周期</span>
+          <div class="range-switch"><button type="button" class="active" data-dimension="year">年度</button><button type="button" data-dimension="batch">批次</button></div>
+        </div>
+        <button type="button" class="screen-icon-button" data-action="refresh" title="刷新数据" aria-label="刷新数据"><span class="refresh-icon">↻</span></button>
+        <button type="button" class="screen-icon-button" data-action="fullscreen" title="全屏查看" aria-label="全屏查看"><span class="fullscreen-icon">⌗</span></button>
+      </div>
+    </header>
+
+    <section class="headline-band" aria-label="核心经营指标">
+      <article class="headline-item">
+        <div class="headline-label"><span class="metric-mark red-mark">人</span><span>有效报名人数</span><em>有效报名人次</em></div>
+        <strong id="metric-enrollments">12,864<small>人次</small></strong>
+        <span class="headline-change positive">同比 <b id="metric-enrollments-change">+14.8%</b></span>
+      </article>
+      <article class="headline-item">
+        <div class="headline-label"><span class="metric-mark gold-mark">转</span><span>缴费转化率</span><em>面授订单 / 有效线索</em></div>
+        <strong id="metric-conversion">25.8<small>%</small></strong>
+        <span class="headline-change positive">同比 <b id="metric-conversion-change">+3.2个百分点</b></span>
+      </article>
+      <article class="headline-item">
+        <div class="headline-label"><span class="metric-mark cyan-mark">¥</span><span>实收营收</span><em>已到账 - 已完成退款</em></div>
+        <strong id="metric-revenue">742.8<small>万</small></strong>
+        <span class="headline-change positive">同比 <b id="metric-revenue-change">+12.6%</b></span>
+      </article>
+      <aside class="headline-note"><span class="note-kicker">DATA RULE</span><strong>数据口径已锁定</strong><p>排除已取消、已退款订单；当年同比按截至当前日期的同期数据计算。</p><span class="note-updated">更新时间 <time id="updated-time">09:32:18</time></span></aside>
+    </section>
+
+    <section class="dashboard-grid analysis-grid">
+      <article class="screen-panel trend-panel">
+        <div class="panel-heading">
+          <div><span class="panel-kicker">BUSINESS TREND</span><h2 id="trend-title">年度经营趋势</h2></div>
+          <div class="panel-legend"><span class="legend-item"><i class="legend-bar"></i>实收营收</span><span class="legend-item"><i class="legend-line enrollment-line"></i>报名人数</span><span class="legend-item"><i class="legend-line conversion-line"></i>转化率</span></div>
+        </div>
+        <div class="trend-summary"><strong id="trend-summary">2026年实收营收 ¥742.8万，报名 12,864 人次</strong><span id="trend-period">年度维度 · 近6年</span></div>
+        <div class="trend-chart" aria-label="年度收入、报名人数和缴费转化率趋势图">
+          <div class="chart-y-axis chart-y-left"><span data-axis-left>800万</span><span data-axis-left>600万</span><span data-axis-left>400万</span><span data-axis-left>200万</span><span data-axis-left>0</span></div>
+          <div class="chart-y-axis chart-y-right"><span data-axis-right>32%</span><span data-axis-right>24%</span><span data-axis-right>16%</span><span data-axis-right>8%</span><span data-axis-right>0%</span></div>
+          <svg viewBox="0 0 720 230" preserveAspectRatio="none" role="img" aria-label="年度收入、报名人数和缴费转化率趋势">
+            <g class="chart-grid-lines"><line x1="0" y1="20" x2="720" y2="20" /><line x1="0" y1="67" x2="720" y2="67" /><line x1="0" y1="114" x2="720" y2="114" /><line x1="0" y1="161" x2="720" y2="161" /><line x1="0" y1="208" x2="720" y2="208" /></g>
+            <g class="revenue-bars" data-chart-bars></g>
+            <path class="enrollment-path" data-chart-enrollment d="M0 173 L144 157 L288 142 L432 129 L576 115 L720 96" />
+            <path class="conversion-path" data-chart-conversion d="M0 156 L144 144 L288 132 L432 137 L576 121 L720 108" />
+            <g class="chart-points enrollment-points" data-chart-enrollment-points><circle cx="0" cy="173" r="4" /><circle cx="144" cy="157" r="4" /><circle cx="288" cy="142" r="4" /><circle cx="432" cy="129" r="4" /><circle cx="576" cy="115" r="4" /><circle cx="720" cy="96" r="4" /></g>
+            <g class="chart-points conversion-points" data-chart-conversion-points><circle cx="0" cy="156" r="3" /><circle cx="144" cy="144" r="3" /><circle cx="288" cy="132" r="3" /><circle cx="432" cy="137" r="3" /><circle cx="576" cy="121" r="3" /><circle cx="720" cy="108" r="3" /></g>
+          </svg>
+          <div class="chart-x-axis" id="trend-labels"><span>2021</span><span>2022</span><span>2023</span><span>2024</span><span>2025</span><span>2026</span></div>
+        </div>
+      </article>
+
+      <article class="screen-panel insight-panel">
+        <div class="panel-heading"><div><span class="panel-kicker">OPERATION INSIGHT</span><h2>经营洞察</h2></div><span class="insight-rule">规则识别</span></div>
+        <div class="insight-block insight-best"><span class="insight-label">最佳批次</span><strong id="best-batch">春季批次</strong><span id="best-batch-detail">报名 3,842 人 · 转化率 31.6%</span></div>
+        <div class="insight-block insight-watch"><span class="insight-label">待提升批次</span><strong id="watch-batch">寒假批次</strong><span id="watch-batch-detail">转化率 18.9% · 低于均值 6.4 个百分点</span></div>
+        <div class="insight-reason"><span class="insight-label">关键判断</span><p id="insight-reason-text">春季批次报名规模与缴费转化均领先，说明艺术类基础课程的招生承接更稳定。</p></div>
+        <div class="insight-action"><span class="insight-label">经营建议</span><p id="insight-action-text">复用春季课程组合和顾问话术，提前为寒假批次配置试听场次。</p></div>
+      </article>
+    </section>
+
+    <section class="dashboard-grid ranking-grid">
+      <article class="screen-panel major-panel">
+        <div class="panel-heading"><div><span class="panel-kicker">MAJOR RANKING</span><h2>专业排行</h2></div><div class="mini-tabs" role="group" aria-label="专业排行指标"><button class="active" type="button" data-major-metric="revenue">收入</button><button type="button" data-major-metric="enrollments">报名</button><button type="button" data-major-metric="conversion">转化</button></div></div>
+        <div class="ranking-axis"><span>专业</span><span id="major-axis-label">实收营收（万元）</span></div>
+        <div class="major-ranking" id="major-ranking" aria-label="专业排行横向柱状图"></div>
+      </article>
+
+      <article class="screen-panel table-panel course-panel">
+        <div class="panel-heading"><div><span class="panel-kicker">COURSE RANKING</span><h2>课程排行</h2></div><span class="panel-period">报名 Top5</span></div>
+        <div class="table-scroll"><table class="ranking-table" aria-label="课程报名排行"><thead><tr><th>排名</th><th>课程</th><th>类型</th><th>报名</th><th>识别</th></tr></thead><tbody id="course-ranking"></tbody></table></div>
+        <div class="table-footnote">课程类型独立展示，爆款标记基于报名量与转化率综合识别。</div>
+      </article>
+
+      <article class="screen-panel table-panel teacher-panel">
+        <div class="panel-heading"><div><span class="panel-kicker">TEACHER RANKING</span><h2>教师排行</h2></div><span class="panel-period">有效课时 Top5</span></div>
+        <div class="table-scroll"><table class="ranking-table" aria-label="教师有效授课课时排行"><thead><tr><th>排名</th><th>教师</th><th>授课专业</th><th>课时</th><th>识别</th></tr></thead><tbody id="teacher-ranking"></tbody></table></div>
+        <div class="table-footnote">按有效授课课时排序，不直接用课程收入替代教师绩效。</div>
+      </article>
+    </section>
+
+    <section class="dashboard-grid support-grid">
+      <article class="screen-panel alert-panel">
+        <div class="panel-heading"><div><span class="panel-kicker">ACTION CENTER</span><h2>运营提醒</h2></div><span class="alert-count">6</span></div>
+        <div class="alert-tabs" role="tablist"><button type="button" class="active" data-alert-tab="todo">待处理 <b>4</b></button><button type="button" data-alert-tab="risk">风险预警 <b>2</b></button></div>
+        <div class="alert-list" data-alert-list="todo">
+          <a class="alert-row" href="../admin/pages/teachers/certificates.html?status=待审核"><i class="alert-dot red-dot"></i><span><strong>教师证书待审核</strong><small>陈晨等 6 条资质材料等待处理</small></span><b>处理</b></a>
+          <a class="alert-row" href="../admin/pages/academic/graduation.html"><i class="alert-dot gold-dot"></i><span><strong>结业申请待复核</strong><small>3 个班级，共 18 名学员</small></span><b>处理</b></a>
+          <a class="alert-row" href="../admin/pages/finance/salary.html"><i class="alert-dot cyan-dot"></i><span><strong>工资草稿待发布</strong><small>2026年08月，共 16 位教师</small></span><b>处理</b></a>
+          <a class="alert-row" href="../admin/pages/teachers/contracts.html"><i class="alert-dot mint-dot"></i><span><strong>合同即将到期</strong><small>未来 30 天内有 3 份合同</small></span><b>查看</b></a>
+        </div>
+        <div class="alert-list" data-alert-list="risk" hidden>
+          <a class="alert-row" href="../admin/pages/teachers/certificates.html?validity=即将过期"><i class="alert-dot red-dot"></i><span><strong>教师证书即将过期</strong><small>未来 30 天内有 3 张证书</small></span><b>查看</b></a>
+          <a class="alert-row" href="../admin/pages/academic/attendance.html"><i class="alert-dot gold-dot"></i><span><strong>考勤待补录</strong><small>本周有 5 条课次记录待处理</small></span><b>查看</b></a>
+        </div>
+      </article>
+
+      <article class="screen-panel category-panel">
+        <div class="panel-heading"><div><span class="panel-kicker">COURSE CATALOG</span><h2>课程结构</h2></div><span class="panel-period">共 86 门</span></div>
+        <div class="category-layout"><div class="donut-chart" aria-label="课程结构占比"><div class="donut-hole"><strong>86</strong><span>课程总数</span></div></div><div class="category-legend"><div><i class="swatch swatch-red"></i><span>舞蹈类</span><strong>28 <small>32.6%</small></strong></div><div><i class="swatch swatch-gold"></i><span>音乐类</span><strong>24 <small>27.9%</small></strong></div><div><i class="swatch swatch-cyan"></i><span>美术类</span><strong>19 <small>22.1%</small></strong></div><div><i class="swatch swatch-mint"></i><span>戏剧及其他</span><strong>15 <small>17.4%</small></strong></div></div></div>
+      </article>
+
+      <article class="screen-panel attendance-panel">
+        <div class="panel-heading"><div><span class="panel-kicker">TEACHING QUALITY</span><h2>教学执行</h2></div><span class="panel-period">本月</span></div>
+        <div class="attendance-main"><div class="gauge" aria-label="综合出勤率 94.8%"><svg viewBox="0 0 160 160"><circle class="gauge-bg" cx="80" cy="80" r="62" /><circle class="gauge-value" cx="80" cy="80" r="62" /></svg><div><strong>94.8<small>%</small></strong><span>综合出勤率</span></div></div><div class="attendance-stats"><div><span>应出勤人次</span><strong>8,426</strong></div><div><span>实际出勤</span><strong class="mint-text">7,988</strong></div><div><span>待补录</span><strong class="gold-text">18</strong></div></div></div>
+        <div class="progress-row"><span>作业提交率</span><div class="mini-progress"><i style="width:91.6%"></i></div><strong>91.6%</strong></div>
+      </article>
+    </section>
+
+    <footer class="visualization-footer"><span>数据范围：培训业务全量数据</span><span>自动刷新 <b id="refresh-countdown">30</b>s</span><span>© 湖北艺术职业学院继续教育服务平台</span></footer>
+    <div class="refresh-indicator" id="refresh-indicator" hidden>数据已刷新</div>
+  </main>
+  <script type="module" src="../shared/js/visualization.js"></script>
+</body>
+</html>

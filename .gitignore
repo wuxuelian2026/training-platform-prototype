@@ -1,0 +1,8 @@
+.DS_Store
+current/node_modules/
+current/dist/
+current/.vite/
+current/legacy/
+.env
+.env.*
+!.env.example

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>师资中心 · 教师列表</title>
+  <link rel="stylesheet" href="../../../shared/css/tokens.css" />
+  <link rel="stylesheet" href="../../../shared/css/shell.css" />
+  <link rel="stylesheet" href="../../../shared/css/teacher-center.css" />
+</head>
+<body>
+  <div data-admin-shell data-title="教师列表" data-active="teachers" data-teacher-page="list">
+    <div id="page-content" class="teacher-page">
+      <div class="page-head"><div><h1>教师列表</h1><p>按档案、资质、合同和账号状态管理授课教师。</p></div><a class="button primary" href="create.html">新增教师</a></div>
+      <div class="card-grid compact-metrics">
+        <a class="card stat-link" href="#status=待完善"><div class="metric-label">待完善档案</div><div class="metric-value">3</div><div class="metric-note">需要补齐必填资料</div></a>
+        <a class="card stat-link" href="#status=审核中"><div class="metric-label">审核中</div><div class="metric-value">5</div><div class="metric-note">待教务完成档案审核</div></a>
+        <a class="card stat-link" href="#status=已入职"><div class="metric-label">已入职</div><div class="metric-value">18</div><div class="metric-note">当前可安排授课</div></a>
+        <a class="card stat-link" href="#status=已冻结"><div class="metric-label">已冻结</div><div class="metric-value">2</div><div class="metric-note">账号暂不可登录</div></a>
+      </div>
+      <form class="card filter-panel" id="teacher-filter">
+        <div class="filter-head"><strong>筛选条件</strong><span>默认按入职日期降序</span></div>
+        <div class="filter-grid">
+          <label class="form-field"><span>档案状态</span><select name="status"><option value="">全部状态</option><option>待完善</option><option>审核中</option><option>审核通过</option><option>已入职</option><option>已离职</option><option>已冻结</option></select></label>
+          <label class="form-field"><span>所属专业</span><select name="category"><option value="">全部专业</option><option value="音乐类">音乐类</option><option value="舞蹈类">舞蹈类</option><option value="美术类">美术类</option><option value="戏剧类">戏剧类</option></select></label>
+          <label class="form-field"><span>入职日期</span><div class="date-range"><input name="start" type="date" aria-label="入职开始日期" /><span>至</span><input name="end" type="date" aria-label="入职结束日期" /></div></label>
+          <label class="form-field"><span>关键词</span><input name="keyword" placeholder="姓名 / 手机号 / 工号" /></label>
+        </div>
+        <div class="filter-actions"><button type="reset" class="button">重置</button><button type="submit" class="button primary">查询</button></div>
+      </form>
+      <div class="table-note" id="teacher-count">共28名教师 · 当前页显示20条 · 状态标签按 PRD 数据字典展示</div>
+      <div class="table-wrap"><table><thead><tr><th>工号</th><th>姓名</th><th>手机号</th><th>所属专业</th><th>档案状态</th><th>证书状态摘要</th><th>合同状态</th><th>账号状态</th><th>入职日期</th><th>操作</th></tr></thead><tbody>
+        <tr data-teacher-id="teacher-wang" data-teacher="王玥" data-employee-no="JS20260901" data-phone="1382026" data-category="舞蹈类" data-profile-status="已入职" data-account-status="已激活" data-contract-status="已签署" data-hired-at="2026-01-03"><td>JS20260901</td><td><a class="link" href="profile.html?teacher=王玥">王玥</a></td><td>138****2026</td><td>舞蹈表演 / 中国舞</td><td data-cell="profile-status"><span class="tag green">已入职</span></td><td><span class="tag green">全部有效</span></td><td><span class="tag green">已签署</span></td><td data-cell="account-status"><span class="tag green">已激活</span></td><td>2026-01-03</td><td class="action-cell" data-cell="actions"></td></tr>
+        <tr data-teacher-id="teacher-chen" data-teacher="陈晨" data-employee-no="JS20260902" data-phone="1393098" data-category="音乐类" data-profile-status="审核中" data-account-status="未激活" data-contract-status="无合同" data-hired-at="2026-09-05"><td>JS20260902</td><td><a class="link" href="profile.html?teacher=陈晨&amp;mode=review">陈晨</a></td><td>139****3098</td><td>音乐表演 / 声乐演唱</td><td data-cell="profile-status"><span class="tag amber">审核中</span></td><td><span class="tag amber">待审核</span></td><td><span class="tag gray">无合同</span></td><td data-cell="account-status"><span class="tag gray">未激活</span></td><td>2026-09-05</td><td class="action-cell" data-cell="actions"></td></tr>
+        <tr data-teacher-id="teacher-liu" data-teacher="刘佳" data-employee-no="JS20260903" data-phone="1364418" data-category="美术类" data-profile-status="待完善" data-account-status="未激活" data-contract-status="无合同" data-hired-at="2026-09-07"><td>JS20260903</td><td><a class="link" href="profile.html?teacher=刘佳">刘佳</a></td><td>136****4418</td><td>美术教育 / 绘画</td><td data-cell="profile-status"><span class="tag gray">待完善</span></td><td><span class="tag gray">无证书</span></td><td><span class="tag gray">无合同</span></td><td data-cell="account-status"><span class="tag gray">未激活</span></td><td>2026-09-07</td><td class="action-cell" data-cell="actions"></td></tr>
+        <tr data-teacher-id="teacher-zhou" data-teacher="周晓" data-employee-no="JS20250418" data-phone="1377812" data-category="戏剧类" data-profile-status="已冻结" data-account-status="冻结" data-contract-status="已到期" data-hired-at="2025-04-18"><td>JS20250418</td><td><a class="link" href="profile.html?teacher=周晓">周晓</a></td><td>137****7812</td><td>戏剧类 / 表演</td><td data-cell="profile-status"><span class="tag gray">已冻结</span></td><td><span class="tag amber">部分过期</span></td><td><span class="tag amber">已到期</span></td><td data-cell="account-status"><span class="tag gray">冻结</span></td><td>2025-04-18</td><td class="action-cell" data-cell="actions"></td></tr>
+        <tr class="teacher-empty-row" hidden><td colspan="10"><div class="empty">暂无符合条件的教师，请调整筛选条件后重试。</div></td></tr>
+      </tbody></table></div>
+      <div class="pagination-bar"><span>共28条</span><button class="button" disabled>上一页</button><button class="button primary">1</button><button class="button">2</button><button class="button">下一页</button><select aria-label="每页条数"><option>20条 / 页</option><option>50条 / 页</option><option>100条 / 页</option></select></div>
+      <dialog id="teacher-action-dialog" class="modal-dialog small-dialog teacher-action-dialog"><div class="modal-card"><div class="modal-header"><div><h2 id="teacher-action-title">更新教师状态</h2><p>状态变更会影响教师登录和后续业务操作。</p></div><button type="button" class="icon-button" data-dialog-close title="关闭" aria-label="关闭">×</button></div><div class="teacher-action-summary"><strong id="teacher-action-teacher">—</strong><span id="teacher-action-copy">—</span></div><div class="modal-actions"><button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" id="teacher-action-confirm">确认</button></div></div></dialog>
+      <div class="toast" data-teacher-toast role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
+  <script type="module" src="../../../shared/js/admin-shell.js"></script>
+  <script type="module" src="../../../shared/js/teachers.js"></script>
+</body>
+</html>

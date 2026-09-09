@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>师资中心 · 新增教师</title>
+  <link rel="stylesheet" href="../../../shared/css/tokens.css" />
+  <link rel="stylesheet" href="../../../shared/css/shell.css" />
+  <link rel="stylesheet" href="../../../shared/css/teacher-center.css" />
+  <link rel="stylesheet" href="../../../shared/css/rich-editor.css" />
+</head>
+<body>
+  <div data-admin-shell data-title="新增教师" data-active="teachers" data-teacher-page="create">
+    <div id="page-content">
+      <div class="page-head">
+        <div><h1>新增教师</h1><p>创建教师档案，保存草稿后可继续完善，提交后进入档案完整性审核。</p></div>
+        <a class="button" href="list.html">返回教师列表</a>
+      </div>
+
+      <form class="card form-card teacher-form" id="teacher-form">
+        <div class="form-section first-form-section"><h2>基本信息</h2><div class="form-grid">
+          <label class="form-field"><span>工号</span><input value="JS20260909-003" readonly class="readonly-field" /><small>系统自动生成，提交后不可修改</small></label>
+          <label class="form-field"><span>姓名 *</span><input required placeholder="请输入教师姓名" /></label>
+          <div class="form-field"><span>人员类型 *</span><div class="choice-group"><label class="choice"><input type="radio" name="person-type" required />在编</label><label class="choice"><input type="radio" name="person-type" />签约</label><label class="choice"><input type="radio" name="person-type" />外聘</label></div></div>
+          <div class="form-field"><span>性别 *</span><div class="choice-group"><label class="choice"><input type="radio" name="gender" required />男</label><label class="choice"><input type="radio" name="gender" />女</label></div></div>
+          <label class="form-field"><span>出生年月 *</span><input type="date" required /></label>
+          <label class="form-field"><span>政治面貌</span><select><option>请选择</option><option>中共党员</option><option>预备党员</option><option>共青团员</option><option>民主党派</option><option>群众</option></select></label>
+          <label class="form-field"><span>民族 *</span><select required><option>请选择</option><option>汉族</option><option>回族</option><option>满族</option><option>其他</option></select></label>
+          <label class="form-field"><span>最高学历 *</span><select required><option>请选择</option><option>博士</option><option>硕士</option><option>本科</option><option>大专</option><option>中专</option><option>高中及以下</option></select></label>
+          <div class="form-field wide"><span>授课专业 *</span><div class="cascade-controls" data-professional-picker><select name="professional-category" aria-label="授课门类" required><option value="">选择门类</option><option value="音乐类">音乐类</option><option value="舞蹈类">舞蹈类</option><option value="美术类">美术类</option><option value="戏剧类">戏剧类</option></select><select name="professional-group" aria-label="授课分类" required disabled><option value="">请先选择门类</option></select><select name="professional" aria-label="授课专业" disabled><option value="">请先选择分类</option></select><button type="button" class="button" data-action="add-professional">添加专业</button></div><div class="selected-professionals" data-selected-professionals hidden></div><small>支持多选；全系统课程、资源和排课均引用该专业目录</small></div>
+          <label class="form-field"><span>从教年限 *</span><input type="number" min="0" required placeholder="单位：年" /></label>
+          <label class="form-field"><span>职称</span><select><option>请选择</option><option>教授</option><option>副教授</option><option>讲师</option><option>助教</option><option>高级教师</option><option>一级教师</option><option>二级教师</option><option>无</option></select></label>
+        </div></div>
+
+        <div class="form-section"><h2>联系方式</h2><div class="form-grid">
+          <label class="form-field"><span>手机号 *</span><input name="phone" required pattern="[0-9]{11}" placeholder="11位手机号，需唯一" /></label>
+          <label class="form-field"><span>邮箱</span><input type="email" placeholder="请输入邮箱" /></label>
+          <label class="form-field"><span>身份证号 *</span><input name="idCard" required placeholder="18位身份证号，需唯一" /></label>
+          <label class="form-field"><span>紧急联系人姓名 *</span><input required placeholder="请输入姓名" /></label>
+          <label class="form-field"><span>紧急联系人电话 *</span><input required pattern="[0-9]{11}" placeholder="11位手机号" /></label>
+        </div></div>
+
+        <div class="form-section"><h2>财务信息</h2><div class="form-grid">
+          <label class="form-field"><span>收款户名</span><input placeholder="请输入收款户名" /></label>
+          <label class="form-field"><span>银行卡号</span><input placeholder="请输入银行卡号" /></label>
+          <label class="form-field"><span>开户行</span><select><option>请选择开户行</option><option>中国工商银行</option><option>中国建设银行</option><option>中国银行</option><option>中国农业银行</option></select></label>
+          <label class="form-field"><span>车牌号</span><input placeholder="选填" /></label>
+        </div></div>
+
+        <div class="form-section"><h2>经历信息</h2><div class="form-grid">
+          <label class="form-field wide"><span>学习经历</span><textarea placeholder="填写毕业院校、专业和学习时间"></textarea></label>
+          <label class="form-field wide"><span>工作经历</span><textarea placeholder="填写任职单位、岗位和任职时间"></textarea></label>
+          <label class="form-field wide"><span>获奖情况</span><textarea placeholder="填写艺术或教学相关获奖经历"></textarea></label>
+        </div></div>
+
+        <div class="form-section"><h2>展示信息</h2><div class="form-grid">
+          <label class="form-field wide"><span>一句话简介</span><textarea maxlength="200" placeholder="用于教师详情、课程介绍和小程序展示，限200字"></textarea><small>0 / 200</small></label>
+          <div class="form-field wide"><span>简介</span><div data-rich-editor data-name="introduction" data-aria-label="教师简介" data-placeholder="请输入教师艺术经历、教学特色和代表成果" data-min-height="200px"></div></div>
+        </div></div>
+
+        <div class="form-section"><div class="section-title-row"><div><h2>证书信息</h2><p>后台录入证书默认为“已录入”，证书内容和真实性由教研主管独立审核。</p></div><button type="button" class="button" data-action="add-certificate">新增证书</button></div><div class="table-wrap subtable-wrap"><table class="subtable"><thead><tr><th>证书名称 *</th><th>证书编号 *</th><th>证书类型 *</th><th>发证机构 *</th><th>颁发日期</th><th>有效期截止</th><th>永久有效</th><th>证书文件 *</th><th>审核状态</th><th>操作</th></tr></thead><tbody data-certificate-list><tr><td><input placeholder="证书名称" /></td><td><input placeholder="证书编号" /></td><td><select><option>选择类型</option><option>学历证书</option><option>教师资格证</option><option>艺术等级证</option><option>其他</option></select></td><td><input placeholder="发证机构" /></td><td><input type="date" /></td><td><input type="date" /></td><td><input type="checkbox" aria-label="永久有效" /></td><td><label class="upload-control"><input type="file" />上传文件</label></td><td><span class="tag green">已录入</span></td><td><button type="button" class="text-button danger-link" data-action="remove-certificate">删除</button></td></tr></tbody></table></div></div>
+
+        <div class="form-section"><h2>系统信息</h2><div class="form-grid">
+          <label class="form-field"><span>登录账号 *</span><input required placeholder="唯一登录账号" /></label>
+          <label class="form-field"><span>登录密码 *</span><input type="password" required placeholder="请输入初始密码" /></label>
+          <label class="form-field wide"><span>备注</span><textarea placeholder="请输入内部备注"></textarea></label>
+        </div></div>
+
+        <div class="form-actions"><a class="button" href="list.html">取消</a><button type="button" class="button" data-action="save-draft">保存草稿</button><button type="submit" class="button primary">提交审核</button></div>
+      </form>
+      <div class="toast" data-teacher-toast role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
+  <script type="module" src="../../../shared/js/admin-shell.js"></script>
+  <script type="module" src="../../../shared/js/teachers.js"></script>
+</body>
+</html>

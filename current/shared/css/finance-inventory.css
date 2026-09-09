@@ -1,0 +1,46 @@
+.ops-page { min-width: 0; }
+.ops-filter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ops-filter-grid .wide { grid-column: span 2; }
+.ops-table table { min-width: 1120px; }
+.ops-table.compact table { min-width: 920px; }
+.ops-table td { vertical-align: top; }
+.ops-table .muted { color: var(--muted); font-size: 12px; }
+.ops-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ops-actions .text-button { white-space: nowrap; }
+.ops-note { margin: -8px 0 16px; padding: 10px 12px; border-left: 3px solid var(--info); background: #f0f7ff; color: #345; font-size: 13px; }
+.ops-note.warning { border-color: var(--warning); background: #fffaf0; }
+.ops-amount { color: var(--brand); font-weight: 600; }
+.ops-detail-list { display: grid; gap: 0; }
+.ops-detail-list > div { display: flex; justify-content: space-between; gap: 20px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+.ops-detail-list > div:last-child { border-bottom: 0; }
+.ops-detail-list span { color: var(--muted); }
+.ops-detail-list strong { text-align: right; }
+.ops-detail-subtable { margin-top: 18px; overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+.ops-detail-subtable table { min-width: 620px; }
+.ops-detail-subtable th, .ops-detail-subtable td { padding: 10px 12px; }
+.ops-danger { margin: 0; padding: 12px 14px; border: 1px solid #ffccc7; border-radius: 6px; background: #fff1f0; color: var(--danger); }
+.ops-warning { margin: 0; padding: 12px 14px; border: 1px solid #ffe7ba; border-radius: 6px; background: #fffaf0; color: #7a4b00; }
+.ops-status-inline { display: inline-flex; align-items: center; gap: 8px; }
+.ops-dialog { width: min(820px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 0; border-radius: 8px; background: transparent; box-shadow: var(--shadow); }
+.ops-dialog::backdrop { background: rgba(31, 31, 31, .42); }
+.ops-dialog-card { max-height: calc(100vh - 32px); overflow: auto; padding: 24px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+.ops-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+.ops-dialog-header h2 { margin: 0; font-size: 18px; }
+.ops-dialog-header p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+.ops-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.ops-dialog-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
+.ops-dialog-grid .wide { grid-column: 1 / -1; }
+.ops-radio-line { display: flex; flex-wrap: wrap; gap: 16px; min-height: 38px; align-items: center; }
+.ops-radio-line label { display: inline-flex; align-items: center; gap: 6px; }
+.ops-radio-line input { width: 16px; height: 16px; }
+.ops-amount-editor { display: grid; grid-template-columns: 160px 1fr; gap: 10px; align-items: center; }
+.ops-amount-editor input { width: 100%; }
+.ops-amount-editor output { color: var(--brand); font-weight: 700; }
+.ops-progress { min-width: 120px; }
+.ops-progress-bar { height: 6px; margin-top: 6px; overflow: hidden; border-radius: 3px; background: #f0f0f0; }
+.ops-progress-bar span { display: block; height: 100%; background: var(--brand); }
+.ops-low-stock { background: #fffaf0; }
+.ops-zero-stock { background: #fafafa; }
+.ops-form-help { margin: -2px 0 0; color: var(--muted); font-size: 12px; }
+@media (max-width: 900px) { .ops-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ops-filter-grid .wide { grid-column: span 2; } }
+@media (max-width: 640px) { .ops-filter-grid, .ops-dialog-grid { grid-template-columns: 1fr; } .ops-filter-grid .wide, .ops-dialog-grid .wide { grid-column: auto; } .ops-dialog-card { padding: 18px; } .ops-amount-editor { grid-template-columns: 1fr; } }

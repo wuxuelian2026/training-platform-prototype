@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>师资中心 · 证书列表</title>
+  <link rel="stylesheet" href="../../../shared/css/tokens.css" />
+  <link rel="stylesheet" href="../../../shared/css/shell.css" />
+</head>
+<body>
+  <div data-admin-shell data-title="证书列表" data-active="teachers">
+    <div id="page-content">
+      <div class="page-head">
+        <div>
+          <h1>证书列表</h1>
+          <p>独立审核教师证书，按有效期截止日期升序优先处理临期资质。</p>
+        </div>
+        <a class="button" href="list.html">教师档案列表</a>
+      </div>
+
+      <div class="card-grid compact-metrics">
+        <a class="card stat-link" href="?status=待审核"><div class="metric-label">待审核</div><div class="metric-value" id="metric-pending">6</div><div class="metric-note">教研主管待处理</div></a>
+        <a class="card stat-link" href="?status=审核不通过"><div class="metric-label">审核不通过</div><div class="metric-value" id="metric-rejected">2</div><div class="metric-note">需要重新上传材料</div></a>
+        <a class="card stat-link" href="?validity=即将过期"><div class="metric-label">即将过期</div><div class="metric-value" id="metric-expiring">3</div><div class="metric-note">有效期内需安排续期</div></a>
+        <a class="card stat-link" href="?validity=已过期"><div class="metric-label">已过期</div><div class="metric-value" id="metric-expired">1</div><div class="metric-note">当前不可作为有效资质</div></a>
+      </div>
+
+      <form class="card filter-panel" id="certificate-filter">
+        <div class="filter-head"><strong>筛选条件</strong><span>默认按有效期截止升序</span></div>
+        <div class="filter-grid certificate-filter-grid">
+          <label class="form-field"><span>证书审核状态</span><select id="certificate-status"><option value="">全部状态</option><option>已录入</option><option>待审核</option><option>审核通过</option><option>审核不通过</option></select></label>
+          <label class="form-field"><span>证书有效性</span><select id="certificate-validity"><option value="">全部有效性</option><option>有效</option><option>即将过期</option><option>已过期</option></select></label>
+          <label class="form-field"><span>证书类型</span><select id="certificate-type"><option value="">全部类型</option><option>学历证书</option><option>教师资格证</option><option>艺术等级证</option><option>其他</option></select></label>
+          <label class="form-field"><span>教师姓名</span><input id="certificate-teacher" placeholder="请输入教师姓名" /></label>
+          <label class="form-field"><span>有效期范围</span><div class="date-range"><input id="certificate-date-start" type="date" aria-label="有效期开始日期" /><span>至</span><input id="certificate-date-end" type="date" aria-label="有效期结束日期" /></div></label>
+          <label class="form-field"><span>录入来源</span><select id="certificate-source"><option value="">全部来源</option><option>后台录入</option><option>教师端上传</option></select></label>
+        </div>
+        <div class="filter-actions"><button type="reset" class="button">重置</button><button type="submit" class="button primary">查询</button></div>
+      </form>
+
+      <div class="table-note" id="certificate-count">共4条证书 · 当前页显示4条 · 证书审核状态与有效性分开展示</div>
+      <div class="table-wrap certificate-table-wrap">
+        <table id="certificates-table">
+          <thead><tr><th>教师姓名</th><th>证书名称</th><th>证书编号</th><th>证书类型</th><th>发证机构</th><th>有效期截止</th><th>证书审核状态</th><th>证书有效性</th><th>来源</th><th>录入人</th><th>证书文件</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr data-certificate-id="cert-chen" data-teacher="陈晨" data-name="教师资格证" data-number="JSZG-2024-0921" data-type="教师资格证" data-issuer="湖北省教育厅" data-expiry="2034-06-30" data-status="待审核" data-validity="有效" data-source="教师端上传" data-entered-by="陈晨" data-file="教师资格证-JSZG-2024-0921.pdf" data-uploaded-at="2026-09-05 10:24">
+              <td><a class="link" href="profile.html?teacher=陈晨">陈晨</a></td><td>教师资格证</td><td>JSZG-2024-0921</td><td><span class="tag brand">教师资格证</span></td><td>湖北省教育厅</td><td>2034-06-30</td><td data-cell="review"><span class="tag amber">待审核</span></td><td><span class="tag green">有效</span></td><td>教师端上传</td><td>陈晨</td><td class="file-actions"><button type="button" class="icon-button" data-action="preview" title="预览证书" aria-label="预览证书">⌕</button><button type="button" class="icon-button" data-action="download" title="下载证书" aria-label="下载证书">↓</button></td><td class="action-cell" data-cell="actions"><button type="button" class="text-button" data-action="review">审核</button><button type="button" class="text-button" data-action="view">查看</button><button type="button" class="text-button danger-link" data-action="delete">删除</button></td>
+            </tr>
+            <tr data-certificate-id="cert-zhou" data-teacher="周晓" data-name="高级教师职称证" data-number="HBJS-2018-0712" data-type="其他" data-issuer="湖北省人力资源和社会保障厅" data-expiry="2026-08-31" data-status="审核不通过" data-validity="已过期" data-source="教师端上传" data-entered-by="周晓" data-file="高级教师职称证-HBJS-2018-0712.jpg" data-uploaded-at="2026-08-18 14:08" data-review-note="证书照片边缘缺失，且证书已超过有效期，请补充最新证书文件。">
+              <td><a class="link" href="profile.html?teacher=周晓">周晓</a></td><td>高级教师职称证</td><td>HBJS-2018-0712</td><td><span class="tag gray">其他</span></td><td>湖北省人力资源和社会保障厅</td><td class="expiry-danger">2026-08-31</td><td data-cell="review"><span class="tag red">审核不通过</span></td><td><span class="tag red">已过期</span></td><td>教师端上传</td><td>周晓</td><td class="file-actions"><button type="button" class="icon-button" data-action="preview" title="预览证书" aria-label="预览证书">⌕</button><button type="button" class="icon-button" data-action="download" title="下载证书" aria-label="下载证书">↓</button></td><td class="action-cell" data-cell="actions"><button type="button" class="text-button" data-action="reupload">重新上传</button><button type="button" class="text-button" data-action="view">查看</button><button type="button" class="text-button danger-link" data-action="delete">删除</button></td>
+            </tr>
+            <tr data-certificate-id="cert-liu" data-teacher="刘佳" data-name="美术教师资格证" data-number="MSZG-2025-1108" data-type="教师资格证" data-issuer="湖北省教育厅" data-expiry="2026-09-20" data-status="已录入" data-validity="即将过期" data-source="后台录入" data-entered-by="李教务" data-file="美术教师资格证-MSZG-2025-1108.pdf" data-uploaded-at="2026-09-07 09:16">
+              <td><a class="link" href="profile.html?teacher=刘佳">刘佳</a></td><td>美术教师资格证</td><td>MSZG-2025-1108</td><td><span class="tag brand">教师资格证</span></td><td>湖北省教育厅</td><td class="expiry-warning">2026-09-20</td><td data-cell="review"><span class="tag gray">已录入</span></td><td><span class="tag amber">即将过期</span></td><td>后台录入</td><td>李教务</td><td class="file-actions"><button type="button" class="icon-button" data-action="preview" title="预览证书" aria-label="预览证书">⌕</button><button type="button" class="icon-button" data-action="download" title="下载证书" aria-label="下载证书">↓</button></td><td class="action-cell" data-cell="actions"><button type="button" class="text-button" data-action="view">查看</button><button type="button" class="text-button danger-link" data-action="delete">删除</button></td>
+            </tr>
+            <tr data-certificate-id="cert-wang" data-teacher="王玥" data-name="中国舞教师资格证" data-number="WD-2019-0028" data-type="艺术等级证" data-issuer="中国舞蹈家协会" data-expiry="2027-09-30" data-status="审核通过" data-validity="有效" data-source="后台录入" data-entered-by="李教务" data-file="中国舞教师资格证-WD-2019-0028.pdf" data-uploaded-at="2026-01-03 15:42" data-reviewer="李教研" data-reviewed-at="2026-01-04 09:12" data-review-note="证书编号、发证机构和文件内容已核验。">
+              <td><a class="link" href="profile.html?teacher=王玥">王玥</a></td><td>中国舞教师资格证</td><td>WD-2019-0028</td><td><span class="tag brand">艺术等级证</span></td><td>中国舞蹈家协会</td><td>2027-09-30</td><td data-cell="review"><span class="tag green">审核通过</span></td><td><span class="tag green">有效</span></td><td>后台录入</td><td>李教务</td><td class="file-actions"><button type="button" class="icon-button" data-action="preview" title="预览证书" aria-label="预览证书">⌕</button><button type="button" class="icon-button" data-action="download" title="下载证书" aria-label="下载证书">↓</button></td><td class="action-cell" data-cell="actions"><button type="button" class="text-button" data-action="view">查看</button><button type="button" class="text-button danger-link" data-action="delete">删除</button></td>
+            </tr>
+            <tr class="certificate-empty" hidden><td colspan="12"><div class="empty">暂无符合条件的证书，请调整筛选条件后重试。</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination-bar"><span id="certificate-pagination-count">共4条</span><button class="button" disabled>上一页</button><button class="button primary">1</button><button class="button" disabled>下一页</button><select aria-label="每页条数"><option>20条 / 页</option><option>50条 / 页</option><option>100条 / 页</option></select></div>
+
+      <dialog id="review-dialog" class="modal-dialog" aria-labelledby="review-title">
+        <div class="modal-card">
+          <div class="modal-header"><div><h2 id="review-title">审核证书</h2><p id="review-subtitle">核对证书文件和证书信息，审核结果会记录在证书审核记录中。</p></div><button type="button" class="icon-button modal-close" data-dialog-close title="关闭" aria-label="关闭">×</button></div>
+          <div class="modal-summary"><div><span>教师</span><strong id="review-teacher">—</strong></div><div><span>证书</span><strong id="review-name">—</strong></div><div><span>编号</span><strong id="review-number">—</strong></div></div>
+          <div class="certificate-review-layout"><div class="certificate-document compact-document"><div class="document-seal">艺</div><div class="document-kicker">湖北艺术职业学院继续教育服务平台</div><h3 id="review-document-name">教师资格证</h3><p>证书编号：<span id="review-document-number">—</span></p><p>发证机构：<span id="review-document-issuer">—</span></p><p>有效期截止：<span id="review-document-expiry">—</span></p><div class="document-file"><span class="file-icon">PDF</span><span id="review-document-file">—</span></div></div><div class="review-form"><label class="form-field"><span>审核意见</span><textarea id="review-note" placeholder="通过时可填写核验备注；驳回时必须填写原因"></textarea></label><p class="form-error" id="review-error" role="alert" hidden>驳回时必须填写原因。</p></div></div>
+          <div class="modal-actions"><button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" data-review-result="reject">驳回</button><button type="button" class="button primary" data-review-result="pass">通过</button></div>
+        </div>
+      </dialog>
+
+      <dialog id="detail-dialog" class="modal-dialog" aria-labelledby="detail-title">
+        <div class="modal-card"><div class="modal-header"><div><h2 id="detail-title">证书详情</h2><p>查看证书完整信息和审核记录。</p></div><button type="button" class="icon-button modal-close" data-dialog-close title="关闭" aria-label="关闭">×</button></div><div class="detail-grid modal-detail-grid"><section><h3>证书信息</h3><dl class="info-grid"><div><dt>教师姓名</dt><dd id="detail-teacher">—</dd></div><div><dt>证书名称</dt><dd id="detail-name">—</dd></div><div><dt>证书编号</dt><dd id="detail-number">—</dd></div><div><dt>证书类型</dt><dd id="detail-type">—</dd></div><div><dt>发证机构</dt><dd id="detail-issuer">—</dd></div><div><dt>颁发日期</dt><dd id="detail-issued">2026-01-03</dd></div><div><dt>有效期截止</dt><dd id="detail-expiry">—</dd></div><div><dt>来源</dt><dd id="detail-source">—</dd></div><div><dt>录入人</dt><dd id="detail-entered-by">—</dd></div><div><dt>录入时间</dt><dd id="detail-uploaded-at">—</dd></div></dl></section><section><h3>状态与文件</h3><div class="detail-status-block"><div><span>审核状态</span><strong id="detail-status">—</strong></div><div><span>证书有效性</span><strong id="detail-validity">—</strong></div><div><span>证书文件</span><strong id="detail-file">—</strong></div></div><div class="audit-note"><span>审核记录</span><p id="detail-audit">暂无审核记录。</p></div></section></div><div class="modal-actions"><button type="button" class="button" data-dialog-close>关闭</button><button type="button" class="button primary" id="detail-preview">预览证书</button></div></div>
+      </dialog>
+
+      <dialog id="reupload-dialog" class="modal-dialog" aria-labelledby="reupload-title">
+        <form class="modal-card" id="reupload-form"><div class="modal-header"><div><h2 id="reupload-title">重新上传证书</h2><p id="reupload-subtitle">审核不通过或已过期的证书需要重新提交文件。</p></div><button type="button" class="icon-button modal-close" data-dialog-close title="关闭" aria-label="关闭">×</button></div><div class="modal-summary"><div><span>教师</span><strong id="reupload-teacher">—</strong></div><div><span>证书</span><strong id="reupload-name">—</strong></div><div><span>当前状态</span><strong id="reupload-status">—</strong></div></div><label class="form-field"><span>证书文件 *</span><label class="upload-control upload-control-wide"><input id="reupload-file" type="file" accept=".jpg,.jpeg,.png,.pdf,.doc,.docx" required />选择文件<span id="reupload-file-name">未选择文件</span></label><small>支持 JPG、PNG、PDF、DOC、DOCX；图片不超过10MB，文档不超过50MB。</small></label><label class="form-field"><span>上传说明</span><textarea id="reupload-note" placeholder="可填写本次重新上传的说明"></textarea></label><p class="form-error" id="reupload-error" role="alert" hidden>请选择证书文件。</p><div class="modal-actions"><button type="button" class="button" data-dialog-close>取消</button><button type="submit" class="button primary">提交审核</button></div></form>
+      </dialog>
+
+      <dialog id="delete-dialog" class="modal-dialog small-dialog" aria-labelledby="delete-title">
+        <div class="modal-card"><div class="modal-header"><div><h2 id="delete-title">删除证书</h2><p>删除后将移除该证书记录，请确认操作。</p></div><button type="button" class="icon-button modal-close" data-dialog-close title="关闭" aria-label="关闭">×</button></div><div class="delete-summary"><strong id="delete-name">—</strong><span id="delete-number">—</span></div><div class="modal-actions"><button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" id="delete-confirm">确认删除</button></div></div>
+      </dialog>
+
+      <dialog id="preview-dialog" class="modal-dialog preview-dialog" aria-labelledby="preview-title">
+        <div class="modal-card"><div class="modal-header"><div><h2 id="preview-title">证书文件预览</h2><p id="preview-file-name">—</p></div><button type="button" class="icon-button modal-close" data-dialog-close title="关闭" aria-label="关闭">×</button></div><div class="certificate-document full-document"><div class="document-seal">艺</div><div class="document-kicker">湖北艺术职业学院继续教育服务平台</div><h3 id="preview-name">教师资格证</h3><p>证书编号：<span id="preview-number">—</span></p><p>发证机构：<span id="preview-issuer">—</span></p><p>有效期截止：<span id="preview-expiry">—</span></p><div class="document-signature"><span>证书文件预览</span><span>仅用于原型展示</span></div></div><div class="modal-actions"><button type="button" class="button" data-dialog-close>关闭</button><button type="button" class="button primary" data-action="download-current">下载文件</button></div></div>
+      </dialog>
+      <div class="toast" id="certificate-toast" role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
+  <script type="module" src="../../../shared/js/admin-shell.js"></script>
+  <script type="module" src="../../../shared/js/certificates.js"></script>
+</body>
+</html>

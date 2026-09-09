@@ -1,0 +1,47 @@
+.teacher-page .metric-value { color: var(--brand); }
+.teacher-form { max-width: 1180px; }
+.teacher-form .form-section { scroll-margin-top: 90px; }
+.teacher-form .form-error { margin-top: 4px; }
+.teacher-form .certificate-row-invalid td { background: #fff7f7; }
+.teacher-form .certificate-row-invalid input,
+.teacher-form .certificate-row-invalid select { border-color: #ff7875; }
+.teacher-form .form-actions { position: sticky; bottom: 0; z-index: 3; background: rgba(255,255,255,.96); }
+.teacher-action-dialog { width: min(520px, calc(100vw - 32px)); }
+.teacher-action-dialog .modal-card { max-height: calc(100vh - 32px); }
+.teacher-action-summary { display: grid; gap: 6px; padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: #fafafa; }
+.teacher-action-summary strong { font-size: 16px; }
+.teacher-action-summary span { color: var(--muted); font-size: 13px; }
+.contract-filter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.contract-table-wrap table { min-width: 1180px; }
+.contract-status { min-width: 72px; justify-content: center; }
+.contract-document { min-height: 250px; padding: 24px; border: 1px solid #eadfb7; border-radius: 4px; background: #fffdf5; }
+.contract-document h3 { margin: 16px 0 8px; text-align: center; font-size: 18px; }
+.contract-document p { margin: 8px 0; color: #595959; line-height: 1.8; }
+.contract-document .document-seal { width: 44px; height: 44px; display: grid; place-items: center; margin: 0 auto; border: 2px solid var(--brand); border-radius: 50%; color: var(--brand); font-weight: 700; }
+.contract-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
+.contract-form-grid .wide { grid-column: 1 / -1; }
+.schedule-toolbar { align-items: flex-end; }
+.schedule-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.schedule-summary { display: flex; flex-wrap: wrap; gap: 8px 20px; color: var(--muted); font-size: 13px; }
+.schedule-summary strong { color: var(--ink); }
+.schedule-table-wrap table { min-width: 980px; }
+.selected-professionals { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.selected-professional { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 3px 8px 3px 10px; border: 1px solid #ffccc7; border-radius: 4px; background: var(--brand-soft); color: var(--brand); font-size: 12px; }
+.selected-professional-remove { width: 18px; height: 18px; padding: 0; border: 0; background: transparent; color: var(--brand); font-size: 16px; line-height: 1; }
+.cascade-controls select:disabled { background: #fafafa; color: #bfbfbf; cursor: not-allowed; }
+.schedule-conflict { display: inline-flex; align-items: center; gap: 5px; color: var(--danger); font-size: 12px; }
+.schedule-conflict::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ""; }
+.month-switcher { display: inline-flex; align-items: center; gap: 8px; }
+.month-switcher strong { min-width: 104px; text-align: center; }
+.teacher-empty-row td { padding: 0; }
+.teacher-empty-row .empty { padding: 48px 20px; }
+@media (max-width: 900px) {
+  .contract-filter-grid, .schedule-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .contract-form-grid { grid-template-columns: 1fr; }
+  .contract-form-grid .wide { grid-column: auto; }
+}
+@media (max-width: 640px) {
+  .teacher-form .form-actions { margin: 20px -16px -16px; padding: 12px 16px; overflow-x: auto; justify-content: flex-start; }
+  .contract-filter-grid, .schedule-filter-grid { grid-template-columns: 1fr; }
+  .month-switcher { width: 100%; justify-content: space-between; }
+}
