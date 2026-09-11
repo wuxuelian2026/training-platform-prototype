@@ -2,6 +2,7 @@ import { relativePath } from './paths.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
 import { demoId, demoTime, getCurrentAccountId, readDemoState, upsertDemoRecord } from './demo-store.js';
+import { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } from './course-seed.js';
 
 const teacherMain = document.querySelector('.mobile-main');
 const teacherPath = location.pathname;
@@ -299,12 +300,17 @@ function bindClassDetailEvents() {
     bindTeacherClassStudentRows();
   });
 }
-const teacherApplications = [
-  { id: 'application-001', name: '舞蹈基本功', professional: '舞蹈表演', type: '面授课程', date: '2026-09-08', status: '审核中', hours: 16, intro: '围绕基本功、身韵和组合训练建立系统化面授课程。', file: '舞蹈基本功教学计划.pdf' },
-  { id: 'application-002', name: '声乐演唱技巧', professional: '音乐表演', type: '视频课程', date: '2026-09-02', status: '已通过', intro: '通过气息、共鸣与作品训练，提升学员稳定演唱和舞台表达能力。', file: '声乐演唱技巧课程大纲.pdf', reviewedAt: '2026-09-05 15:30' },
-  { id: 'application-003', name: '少儿舞蹈启蒙', professional: '舞蹈表演', type: '面授课程', date: '2026-08-25', status: '已驳回', hours: 12, intro: '面向少儿开展舞蹈基本动作、节奏和身体协调训练。', file: '少儿舞蹈启蒙教学计划.pdf', reason: '课程简介需补充教学目标和适龄说明', reviewedAt: '2026-08-28 10:20' },
-  { id: 'application-004', name: '音乐欣赏入门', professional: '音乐学', type: '视频课程', date: '2026-08-18', status: '草稿', intro: '从作品背景、音乐结构和听辨方法入门，建立基础音乐欣赏能力。', file: '' }
-];
+// I1-DEC-19: the teacher app and the admin course center share one application seed and one id set.
+const teacherApplications = applicationSeed();
+function currentTeacher() {
+  const requested = new URLSearchParams(location.search).get('teacher') || sessionStorage.getItem('hbyx-teacher-id') || defaultTeacherId();
+  return teacherAccounts.find(item => item.id === requested) || teacherAccounts[0];
+}
+function nextApplicationId() {
+  const used = teacherApplicationRecords().map(item => Number((item.id.match(/^CR-\d{4}-(\d{4})$/) || [])[1])).filter(Number.isFinite);
+  const next = (used.length ? Math.max(...used) : 0) + 1;
+  return `CR-${new Date().getFullYear()}-${String(next).padStart(4, '0')}`;
+}
 function applicationTone(status) { return status === '已通过' ? 'green' : status === '审核中' ? 'amber' : 'gray'; }
 function teacherApplicationRecords() {
   const shared = readDemoState().applications || [];
@@ -318,18 +324,19 @@ function currentApplication() {
 }
 function renderApplications() {
   const applications = teacherApplicationRecords();
-  tLayout(tStack(`<section class="teacher-application-header"><div><span class="mp-eyebrow">教学内容</span><h2>课程申报</h2><p>发起新课程，查看教研审核进度和结果。</p></div>${tButton('发起申报', 'data-teacher-action="new-application"')}</section>`, `<section class="teacher-application-summary"><div><strong>${applications.length}</strong><span>全部申报</span></div><div><strong>${applications.filter(item => item.status === '审核中').length}</strong><span>审核中</span></div><div><strong>${applications.filter(item => item.status === '已通过').length}</strong><span>已通过</span></div></section>`, `<section class="teacher-application-list"><div class="teacher-application-list-head"><h3>我的申报</h3><span>共 ${applications.length} 条</span></div>${applications.map(item => `<a class="teacher-application-card" href="${relativePath(`/teacher/pages/application-detail.html?application=${item.id}`)}"><div class="teacher-application-card-head"><div><span>${tEsc(item.date)} 提交</span><h3>${tEsc(item.name)}</h3></div>${tPill(item.status, applicationTone(item.status))}</div><p>${tEsc(item.type)} · ${tEsc(item.professional)}${item.hours ? ` · ${item.hours}课时` : ''}</p>${item.reason && item.status === '已驳回' ? `<div class="teacher-application-reason">驳回原因：${tEsc(item.reason)}</div>` : ''}<div class="teacher-application-card-foot"><span class="teacher-application-action">查看详情</span><span aria-hidden="true">›</span></div></a>`).join('')}</section>`));
+  tLayout(tStack(`<section class="teacher-application-header"><div><span class="mp-eyebrow">教学内容</span><h2>课程申报</h2><p>发起新课程，查看教研审核进度和结果。</p></div>${tButton('发起申报', 'data-teacher-action="new-application"')}</section>`, `<section class="teacher-application-summary"><div><strong>${applications.length}</strong><span>全部申报</span></div><div><strong>${applications.filter(item => item.status === '审核中').length}</strong><span>审核中</span></div><div><strong>${applications.filter(item => item.status === '已通过').length}</strong><span>已通过</span></div></section>`, `<section class="teacher-application-list"><div class="teacher-application-list-head"><h3>我的申报</h3><span>共 ${applications.length} 条</span></div>${applications.map(item => `<a class="teacher-application-card" href="${relativePath(`/teacher/pages/application-detail.html?application=${item.id}`)}"><div class="teacher-application-card-head"><div><span>${tEsc(item.date)} 提交 · ${tEsc(item.id)}</span><h3>${tEsc(item.name)}</h3></div>${tPill(item.status, applicationTone(item.status))}</div><p>${tEsc(item.type)} · ${tEsc(item.professional || item.major)}${item.hours ? ` · ${item.hours}课时` : ''}</p>${item.review && item.status === '已驳回' ? `<div class="teacher-application-reason">驳回原因：${tEsc(item.review)}</div>` : ''}<div class="teacher-application-card-foot"><span class="teacher-application-action">查看详情</span><span aria-hidden="true">›</span></div></a>`).join('')}</section>`));
 }
 function renderApplicationCreate() {
   const requestedId = new URLSearchParams(location.search).get('application');
-  const source = requestedId ? currentApplication() : { id: '', name: '', professional: '舞蹈表演', type: '面授课程', hours: 16, intro: '', file: '' };
+  const teacherProfile = currentTeacher();
+  const source = requestedId ? currentApplication() : { id: '', name: '', professional: teacherProfile.professional, type: '面授课程', hours: 16, intro: '', file: '' };
   const editing = Boolean(requestedId);
-  tLayout(tStack(`<section class="teacher-application-detail-head"><div>${tPill(editing ? '编辑中' : '新申报')}<h2>${editing ? '编辑课程申报' : '发起课程申报'}</h2><p>教师资料由系统自动带入，课程信息请完整填写。</p></div></section>`, `<section class="teacher-application-form"><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>系统带入</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>王玥</strong></div><div><span>教学单位</span><strong>湖北艺术职业学院</strong></div><div><span>专业方向</span><strong>舞蹈表演</strong></div><div><span>职称</span><strong>副教授</strong></div></div></div><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>申报内容</h3><span>带 * 为必填</span></div><div class="mp-form"><div class="mp-field"><label for="application-name">课程名称 <b>*</b></label><input id="application-name" value="${tEsc(source.name)}" maxlength="100" placeholder="请输入课程名称"></div><div class="mp-field"><label>所属专业 <b>*</b><small>按门类、分类、专业逐级选择</small></label><div class="teacher-professional-cascade"><select id="application-discipline" aria-label="专业门类"><option>艺术学</option><option>教育学</option></select><select id="application-category" aria-label="专业分类"><option>舞蹈类</option><option>音乐类</option></select><select id="application-professional" aria-label="专业"><option ${source.professional === '舞蹈表演' ? 'selected' : ''}>舞蹈表演</option><option ${source.professional === '音乐表演' ? 'selected' : ''}>音乐表演</option><option ${source.professional === '音乐学' ? 'selected' : ''}>音乐学</option></select></div></div><div class="mp-field"><label>课程类型 <b>*</b></label><div class="teacher-radio-row"><label><input type="radio" name="application-type" value="面授课程" ${source.type === '面授课程' ? 'checked' : ''}>面授课程</label><label><input type="radio" name="application-type" value="视频课程" ${source.type === '视频课程' ? 'checked' : ''}>视频课程</label></div></div><div class="mp-field" id="application-hours-field"><label for="application-hours">总课时 <b>*</b><small>面授课程用于生成课次和工资统计</small></label><input id="application-hours" type="number" min="1" value="${tEsc(source.hours || 16)}" placeholder="请输入总课时"></div><div class="mp-field"><label for="application-intro">课程简介</label><textarea id="application-intro" placeholder="补充课程目标、教学内容和适合人群">${tEsc(source.intro)}</textarea></div><div class="mp-field"><label for="application-file">附加材料</label><button type="button" class="teacher-upload-placeholder" id="application-file">＋ ${source.file ? tEsc(source.file) : '上传教学计划'} <span>可选</span></button></div></div></div><div class="teacher-application-form-actions"><a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">取消</a>${tButton('保存草稿', 'data-application-form-action="save"', 'secondary')}${tButton('提交审核', 'data-application-form-action="submit"')}</div></section>`));
+  tLayout(tStack(`<section class="teacher-application-detail-head"><div>${tPill(editing ? '编辑中' : '新申报')}<h2>${editing ? '编辑课程申报' : '发起课程申报'}</h2><p>教师资料由系统自动带入，课程信息请完整填写。</p></div></section>`, `<section class="teacher-application-form"><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>系统带入</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(teacherProfile.name)}</strong></div><div><span>教师工号</span><strong>${tEsc(teacherProfile.no)}</strong></div><div><span>教学单位</span><strong>${tEsc(teacherProfile.unit)}</strong></div><div><span>专业方向</span><strong>${tEsc(teacherProfile.professional)}</strong></div><div><span>职称</span><strong>${tEsc(teacherProfile.title)}</strong></div></div></div><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>申报内容</h3><span>带 * 为必填</span></div><div class="mp-form"><div class="mp-field"><label for="application-name">课程名称 <b>*</b></label><input id="application-name" value="${tEsc(source.name)}" maxlength="100" placeholder="请输入课程名称"></div><div class="mp-field"><label>所属专业 <b>*</b><small>按门类、分类、专业逐级选择</small></label><div class="teacher-professional-cascade"><select id="application-discipline" aria-label="专业门类"><option>艺术学</option><option>教育学</option></select><select id="application-category" aria-label="专业分类"><option>舞蹈类</option><option>音乐类</option></select><select id="application-professional" aria-label="专业">${[...new Set([teacherProfile.professional, '舞蹈表演', '音乐表演', '音乐学'])].map(name => `<option ${source.professional === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div></div><div class="mp-field"><label>课程类型 <b>*</b></label><div class="teacher-radio-row"><label><input type="radio" name="application-type" value="面授课程" ${source.type === '面授课程' ? 'checked' : ''}>面授课程</label><label><input type="radio" name="application-type" value="视频课程" ${source.type === '视频课程' ? 'checked' : ''}>视频课程</label></div></div><div class="mp-field" id="application-hours-field"><label for="application-hours">总课时 <b>*</b><small>面授课程用于生成课次和工资统计</small></label><input id="application-hours" type="number" min="1" value="${tEsc(source.hours || 16)}" placeholder="请输入总课时"></div><div class="mp-field"><label for="application-intro">课程简介</label><textarea id="application-intro" placeholder="补充课程目标、教学内容和适合人群">${tEsc(source.intro)}</textarea></div><div class="mp-field"><label for="application-file">附加材料</label><button type="button" class="teacher-upload-placeholder" id="application-file">＋ ${source.file ? tEsc(source.file) : '上传教学计划'} <span>可选</span></button></div></div></div><div class="teacher-application-form-actions"><a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">取消</a>${tButton('保存草稿', 'data-application-form-action="save"', 'secondary')}${tButton('提交审核', 'data-application-form-action="submit"')}</div></section>`));
 }
 function applicationReviewCopy(item) {
   if (item.status === '审核中') return ['等待教研审核', '申报已提交，审核期间课程内容不可修改。'];
-  if (item.status === '已通过') return ['审核通过', `教研已于${item.reviewedAt || '近期'}完成审核，课程可进入后续发布流程。`];
-  if (item.status === '已驳回') return ['审核未通过', item.reason || '请根据审核意见修改后重新提交。'];
+  if (item.status === '已通过') return ['审核通过', `教研已于${item.reviewedAt || '近期'}完成审核：${item.review || '审批通过'}`];
+  if (item.status === '已驳回') return ['审核未通过', item.review || '请根据审核意见修改后重新提交。'];
   if (item.status === '已撤销') return ['申报已撤销', '该申报已停止审核，可重新编辑后提交。'];
   return ['尚未提交', '当前内容保存在草稿中，可继续编辑并提交审核。'];
 }
@@ -342,7 +349,7 @@ function applicationDetailActions(item) {
 function renderApplicationDetail() {
   const item = currentApplication();
   const [reviewTitle, reviewText] = applicationReviewCopy(item);
-  tLayout(tStack(`<section class="teacher-application-view-head"><div><span>${tEsc(item.date)} 提交</span><h2>${tEsc(item.name)}</h2><p>申报编号 ${tEsc(item.id.toUpperCase())}</p></div>${tPill(item.status, applicationTone(item.status))}</section>`, `<section class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>只读</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>王玥</strong></div><div><span>教学单位</span><strong>湖北艺术职业学院</strong></div><div><span>专业方向</span><strong>舞蹈表演</strong></div><div><span>职称</span><strong>副教授</strong></div></div></section>`, `<section class="teacher-form-section teacher-application-view-content"><div class="teacher-form-section-head"><h3>申报内容</h3><span>只读</span></div><dl class="teacher-application-view-rows"><div><dt>课程名称</dt><dd>${tEsc(item.name)}</dd></div><div><dt>所属专业</dt><dd>艺术学 · ${tEsc(item.professional)}</dd></div><div><dt>课程类型</dt><dd>${tEsc(item.type)}</dd></div>${item.type === '面授课程' ? `<div><dt>总课时</dt><dd>${tEsc(item.hours)}课时</dd></div>` : ''}<div class="wide"><dt>课程简介</dt><dd>${tEsc(item.intro)}</dd></div><div class="wide"><dt>附加材料</dt><dd>${item.file ? tEsc(item.file) : '未上传'}</dd></div></dl></section>`, `<section class="teacher-application-review ${item.status === '已驳回' ? 'rejected' : ''}"><div>${tPill(item.status, applicationTone(item.status))}<h3>${reviewTitle}</h3></div><p>${tEsc(reviewText)}</p>${item.reviewedBy ? `<small>审核人：${tEsc(item.reviewedBy)} · 审核时间：${tEsc(item.reviewedAt || '待记录')}</small>` : ''}</section>`, `<div class="teacher-application-detail-actions">${applicationDetailActions(item)}</div>`));
+  tLayout(tStack(`<section class="teacher-application-view-head"><div><span>${tEsc(item.date)} 提交</span><h2>${tEsc(item.name)}</h2><p>申报编号 ${tEsc(item.id)}</p></div>${tPill(item.status, applicationTone(item.status))}</section>`, `<section class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>只读</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(item.teacher || '—')}</strong></div><div><span>教师工号</span><strong>${tEsc(item.teacherNo || '—')}</strong></div><div><span>教学单位</span><strong>${tEsc(item.teacherUnit || '—')}</strong></div><div><span>专业方向</span><strong>${tEsc(item.teacherProfessional || item.professional || item.major || '—')}</strong></div><div><span>职称</span><strong>${tEsc(item.teacherTitle || '—')}</strong></div></div></section>`, `<section class="teacher-form-section teacher-application-view-content"><div class="teacher-form-section-head"><h3>申报内容</h3><span>只读</span></div><dl class="teacher-application-view-rows"><div><dt>申报编号</dt><dd>${tEsc(item.id)}</dd></div><div><dt>派生课程编号</dt><dd>${tEsc(item.courseId || courseIdForApplication(item.id))}</dd></div><div><dt>课程名称</dt><dd>${tEsc(item.name)}</dd></div><div><dt>所属专业</dt><dd>艺术学 · ${tEsc(item.professional)}</dd></div><div><dt>课程类型</dt><dd>${tEsc(item.type)}</dd></div>${item.type === '面授课程' ? `<div><dt>总课时</dt><dd>${tEsc(item.hours)}课时</dd></div>` : ''}<div class="wide"><dt>课程简介</dt><dd>${tEsc(item.intro)}</dd></div><div class="wide"><dt>附加材料</dt><dd>${item.file ? tEsc(item.file) : '未上传'}</dd></div></dl></section>`, `<section class="teacher-application-review ${item.status === '已驳回' ? 'rejected' : ''}"><div>${tPill(item.status, applicationTone(item.status))}<h3>${reviewTitle}</h3></div><p>${tEsc(reviewText)}</p>${item.reviewedBy ? `<small>审核人：${tEsc(item.reviewedBy)} · 审核时间：${tEsc(item.reviewedAt || '待记录')}</small>` : ''}</section>`, `<div class="teacher-application-detail-actions">${applicationDetailActions(item)}</div>`));
 }
 function validateApplication() {
   const name = document.querySelector('#application-name')?.value.trim();
@@ -367,12 +374,13 @@ function initApplicationForm() {
     if (status === '审核中' && !validateApplication()) return;
     const id = new URLSearchParams(location.search).get('application');
     const existing = id ? currentApplication() : null;
-    const recordId = id || `CR-${new Date().getFullYear()}-${demoId('APP').split('-').pop().toUpperCase()}`;
-    const professional = document.querySelector('#application-professional')?.value || existing?.professional || '舞蹈表演';
+    const teacherProfile = currentTeacher();
+    const professional = document.querySelector('#application-professional')?.value || existing?.professional || teacherProfile.professional;
     const type = document.querySelector('[name="application-type"]:checked')?.value || existing?.type || '面授课程';
+    const applicationId = id || nextApplicationId();
     const record = {
       ...(existing || {}),
-      id: recordId,
+      id: applicationId,
       name: document.querySelector('#application-name')?.value.trim() || existing?.name || '',
       professional,
       major: professional,
@@ -384,9 +392,14 @@ function initApplicationForm() {
       intro: document.querySelector('#application-intro')?.value.trim() || '',
       file: existing?.file || '',
       attachment: existing?.attachment || existing?.file || '',
-      teacher: '王玥',
-      teacherInfo: '王玥 · 本科 · 舞蹈表演 · 湖北艺术职业学院 · 8年教龄',
-      courseId: existing?.courseId || `COURSE-${recordId}`,
+      // I1-DEC-23: identity comes from the signed-in teacher profile, never a hardcoded name.
+      teacher: existing?.teacher || teacherProfile.name,
+      teacherNo: existing?.teacherNo || teacherProfile.no,
+      teacherUnit: existing?.teacherUnit || teacherProfile.unit,
+      teacherTitle: existing?.teacherTitle || teacherProfile.title,
+      teacherProfessional: existing?.teacherProfessional || teacherProfile.professional,
+      teacherInfo: `${teacherProfile.name} · ${teacherProfile.title} · ${teacherProfile.professional} · ${teacherProfile.unit}`,
+      courseId: existing?.courseId || courseIdForApplication(applicationId),
       accountId: getCurrentAccountId()
     };
     upsertDemoRecord('applications', record);

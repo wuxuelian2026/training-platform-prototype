@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'hbyx-iteration1-demo-v1';
-const SCHEMA_VERSION = 1;
+// v2 (CR-2026-003 / I1-DEC-19): retire the legacy parallel course numbering; demo data restarts from seed.
+const SCHEMA_VERSION = 2;
 
 const clone = value => JSON.parse(JSON.stringify(value));
 const defaultState = () => ({
@@ -21,7 +22,10 @@ const defaultState = () => ({
   products: [],
   classes: [],
   orders: [],
-  enrollments: [],
+  // P0-1: one demo enrollment record so the admin class roster has a real detail row to show.
+  enrollments: [
+    { id: 'account-002-student-101-class-001', accountId: 'account-002', studentId: 'student-101', classId: 'class-001', status: '已报名', enrolledAt: '2026-08-22 10:05' }
+  ],
   videoEntitlements: [],
   progress: {}
 });
@@ -29,9 +33,13 @@ const defaultState = () => ({
 function readStored() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (!stored || stored.schemaVersion !== SCHEMA_VERSION) return defaultState();
+    if (!stored) return defaultState();
+    // Only a *newer/older declared* schema is discarded. Payloads written by hand (e.g. a tester switching
+    // currentAccountId from the console) carry no schemaVersion and are migrated instead of silently reset,
+    // otherwise demo-account isolation checks appear to fail.
+    if (stored.schemaVersion && stored.schemaVersion !== SCHEMA_VERSION) return defaultState();
     const base = defaultState();
-    return { ...base, ...stored, accounts: stored.accounts || base.accounts, students: stored.students || base.students };
+    return { ...base, ...stored, schemaVersion: SCHEMA_VERSION, accounts: stored.accounts || base.accounts, students: stored.students || base.students };
   } catch {
     return defaultState();
   }
@@ -126,3 +134,13 @@ export function subscribeDemoState(callback) {
   };
 }
 
+// Demo helper for reviewers: switch the acting account or reset the store without hand-editing
+// localStorage (a partial setItem would drop products, orders and entitlements along with it).
+if (typeof window !== 'undefined') {
+  window.demoStore = {
+    read: () => readDemoState(),
+    setAccount: accountId => setCurrentAccountId(accountId),
+    reset: () => resetDemoData(),
+    key: STORAGE_KEY
+  };
+}

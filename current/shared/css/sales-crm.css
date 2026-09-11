@@ -38,5 +38,14 @@
 .sales-detail-list div:last-child { border-bottom: 0; }
 .sales-detail-list span { color: var(--muted); }
 .sales-danger-note { margin: 0; color: var(--danger) !important; font-size: 12px; }
+.sales-form-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.sales-conflict-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.sales-conflict-hint.conflict { color: var(--danger); }
+.sales-class-roster { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.sales-class-roster h3 { margin: 0 0 12px; font-size: 15px; }
+.sales-roster-meta { margin: 0 0 10px; font-size: 12px; }
+.sales-class-roster table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sales-class-roster th, .sales-class-roster td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+.sales-class-roster th { color: var(--muted); font-weight: 500; }
 @media (max-width: 900px) { .sales-page .sales-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .sales-page .sales-filter-grid { grid-template-columns: 1fr; } .sales-page .sales-filter-grid .wide { grid-column: auto; } .sales-dialog-card { padding: 18px; } .sales-dialog-summary, .sales-dialog-grid { grid-template-columns: 1fr; } .sales-dialog-grid .wide { grid-column: auto; } .sales-switch-field { grid-template-columns: 1fr; align-items: start; gap: 6px; } }

@@ -1,5 +1,6 @@
 import { relativePath } from './paths.js';
 import { demoId, demoTime, readDemoState, removeDemoRecord, updateDemoRecord, upsertDemoRecord } from './demo-store.js';
+import { applicationSeed, courseIdForApplication } from './course-seed.js';
 
 const courseRoot = document.querySelector('[data-course-page]');
 
@@ -10,14 +11,7 @@ const professionalTree = {
   '戏剧类': { '表演': ['戏剧表演', '朗诵与主持'] }
 };
 
-const applications = [
-  { id: 'CR-2026-0001', name: '舞蹈基本功', type: '面授课程', teacher: '王玥', major: '中国舞', submittedAt: '2026-09-08 09:14', status: '审核中', intro: '从身体控制、节奏训练到基本舞姿，建立少儿中国舞的基础训练体系。', hours: 16, attachment: '课程申报说明.pdf', teacherInfo: '王玥 · 本科 · 舞蹈学 · 武汉艺术培训中心 · 8年教龄', review: '' },
-  { id: 'CR-2026-0002', name: '声乐演唱技巧', type: '视频课程', teacher: '陈晨', major: '声乐演唱', submittedAt: '2026-09-07 15:36', status: '已通过', intro: '围绕气息、共鸣、咬字与作品处理，帮助学习者建立完整演唱方法。', hours: 12, attachment: '声乐课程大纲.docx', teacherInfo: '陈晨 · 硕士 · 音乐表演 · 湖北艺术职业学院 · 10年教龄', review: '课程目标清晰，建议按章节补充示范视频。' },
-  { id: 'CR-2026-0003', name: '少儿国画入门', type: '面授课程', teacher: '李青', major: '中国画', submittedAt: '2026-09-06 11:20', status: '审核中', intro: '以笔墨体验和传统题材临摹为主，适合零基础少儿建立国画兴趣。', hours: 20, attachment: '', teacherInfo: '李青 · 本科 · 美术教育 · 武汉美术馆 · 6年教龄', review: '' },
-  { id: 'CR-2026-0004', name: '古筝基础与乐曲赏析', type: '视频课程', teacher: '周宁', major: '古筝', submittedAt: '2026-09-05 16:08', status: '已驳回', intro: '从坐姿、指法、节拍到入门乐曲，配合慢速示范建立演奏习惯。', hours: 10, attachment: '古筝课程说明.pdf', teacherInfo: '周宁 · 本科 · 古筝 · 湖北艺术职业学院 · 5年教龄', review: '需补充课程适用年龄和完整课时规划后重新提交。' },
-  { id: 'CR-2026-0005', name: '戏剧表演基础', type: '面授课程', teacher: '赵可', major: '戏剧表演', submittedAt: '2026-09-03 10:32', status: '草稿', intro: '通过台词、形体、即兴练习建立舞台表达与团队协作能力。', hours: 16, attachment: '', teacherInfo: '赵可 · 硕士 · 戏剧影视表演 · 武汉传媒学院 · 7年教龄', review: '' },
-  { id: 'CR-2026-0006', name: '青少年芭蕾基础', type: '面授课程', teacher: '王玥', major: '芭蕾舞', submittedAt: '2026-08-28 14:12', status: '已撤销', intro: '面向青少年设计的芭蕾基础训练，重视体态、柔韧与节奏感。', hours: 18, attachment: '', teacherInfo: '王玥 · 本科 · 舞蹈学 · 武汉艺术培训中心 · 8年教龄', review: '教师主动撤销申报。' }
-];
+const applications = applicationSeed();
 
 const contentCourses = [
   { id: 'COURSE-001', name: '舞蹈基本功', type: '面授课程', major: '中国舞', teacher: '王玥', hours: 16, status: '编排中', updatedAt: '2026-09-08 10:06', chapters: [{ name: '第一章：身体基础', desc: '站姿、脚位与身体控制。', lessons: [{ name: '站姿与脚位', target: '掌握基本站姿与一位脚', duration: 45, kind: '示范', description: '完成站姿、脚位和重心练习。', resources: [] }, { name: '身体协调训练', target: '完成基础协调组合', duration: 45, kind: '练习', description: '通过组合练习建立身体协调性。', resources: ['res-002'] }] }, { name: '第二章：节奏训练', desc: '节拍感与动作连接。', lessons: [{ name: '节奏模仿', target: '能跟随八拍节奏完成动作', duration: 45, kind: '练习', description: '完成节奏模仿和动作连接。', resources: [] }] }] },
@@ -68,17 +62,53 @@ const catalog = {
   ]
 };
 
+// I1-DEC-19: seed courses adopt the application-derived course id, and the course library keeps
+// its sourceCourseId bound to that same id so both ends share one primary key.
+contentCourses.forEach(course => {
+  const application = applications.find(item => item.name === course.name && !course.applicationId);
+  if (application) {
+    const previousId = course.id;
+    course.applicationId = application.id;
+    course.id = application.courseId || courseIdForApplication(application.id);
+    library.forEach(record => { if (record.sourceCourseId === previousId) record.sourceCourseId = course.id; });
+  }
+  // I1-DEC-22 seed hygiene: a video course lesson must reference a teaching video.
+  if (course.type !== '视频课程') return;
+  course.chapters.flatMap(chapter => chapter.lessons).forEach(lesson => {
+    const hasVideo = lesson.resources.some(resourceId => resources.find(resource => resource.id === resourceId)?.type === '教学视频');
+    if (hasVideo) return;
+    const fallback = resources.find(resource => resource.type === '教学视频' && resource.major === course.major) || resources.find(resource => resource.type === '教学视频');
+    if (fallback) lesson.resources = [...lesson.resources, fallback.id];
+  });
+});
+
 const sharedDemo = readDemoState();
 const appendShared = (target, records) => (records || []).filter(record => !target.some(item => item.id === record.id)).forEach(record => target.push(record));
 appendShared(applications, sharedDemo.applications);
 appendShared(contentCourses, sharedDemo.courses);
 appendShared(resources, sharedDemo.resources);
 appendShared(library, sharedDemo.library);
+syncResourceReferences();
 function applicationCourseId(item) {
-  return !item.courseId || item.courseId === 'COURSE-NEW' ? `COURSE-${item.id}` : item.courseId;
+  return !item.courseId || item.courseId === 'COURSE-NEW' ? courseIdForApplication(item.id) : item.courseId;
 }
 function persistApplication(item) { upsertDemoRecord('applications', { ...item, courseId: applicationCourseId(item) }); }
-function persistCourse(item) { upsertDemoRecord('courses', item); }
+function persistCourse(item) { upsertDemoRecord('courses', item); syncResourceReferences(); }
+// I1-C-11: resource "引用次数" is derived from real lesson references (distinct courses) instead of
+// static seed values, so the resource list stays in step with course arrangement.
+function syncResourceReferences() {
+  const usage = new Map();
+  contentCourses.forEach(course => (course.chapters || []).forEach(chapter => (chapter.lessons || []).forEach(lesson => (lesson.resources || []).forEach(resourceId => {
+    if (!usage.has(resourceId)) usage.set(resourceId, new Set());
+    usage.get(resourceId).add(course.id);
+  }))));
+  resources.forEach(resource => {
+    const next = usage.get(resource.id)?.size || 0;
+    if (Number(resource.references || 0) === next) return;
+    resource.references = next;
+    persistResource(resource);
+  });
+}
 function persistLibrary(item) { upsertDemoRecord('library', item); }
 function persistResource(item) { upsertDemoRecord('resources', item); }
 function courseFromApplication(item) {
@@ -172,6 +202,28 @@ function renderResources(page) {
 function renderLibrary(page) {
   const filtered = library.filter(item => !state.libraryFilters.archive || item.archive === state.libraryFilters.archive).filter(item => !state.libraryFilters.type || item.type === state.libraryFilters.type).filter(item => !state.libraryFilters.major || item.major === state.libraryFilters.major).filter(item => !state.libraryFilters.keyword || `${item.name}${item.teacher}`.includes(state.libraryFilters.keyword));
   page.innerHTML = `<div class="course-page">${pageShell('课程库', '统一管理完整课程和轻量课程档案，维护学员端展示信息。', '<button class="button primary" type="button" data-action="new-lightweight">新建轻量课程档案</button>')}<div class="course-summary"><div class="course-summary-item"><strong>${library.length}</strong><span>课程档案</span></div><div class="course-summary-item success"><strong>${library.filter(item => item.archive === '完整课程').length}</strong><span>完整课程</span></div><div class="course-summary-item brand"><strong>${library.filter(item => item.archive === '轻量课程档案').length}</strong><span>轻量课程档案</span></div><div class="course-summary-item warning"><strong>${library.filter(item => item.cover === '未配置').length}</strong><span>待完善展示信息</span></div></div><section class="course-surface"><form class="course-filter" data-form="library-filter"><div class="course-filter-head"><strong>筛选条件</strong><span>完整课程需完成编排，轻量档案只用于快速报名班级</span></div><div class="course-filter-grid">${filterField('课程档案类型', selectWithValues('archive', ['完整课程', '轻量课程档案'], state.libraryFilters.archive || '', '全部类型'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.libraryFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.libraryFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.libraryFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>课程档案</strong><span> 当前显示 ${filtered.length} 条</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程名称</th><th>课程档案类型</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>编排状态</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">展示信息：${item.cover === '已配置' ? '已配置' : '待完善'}</span></td><td>${tag(item.archive)}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${item.hours} 课时</td><td>${tag(item.status)}</td><td><div class="course-actions">${item.type === '视频课程' && item.archive === '完整课程' && item.status === '已完成' ? button('发布商品', 'publish-product', `data-id="${item.id}"`) : ''}${item.type === '面授课程' ? button('发布班级', 'publish-class', `data-id="${item.id}"`) : ''}${button(item.archive === '完整课程' ? '查看编排' : '查看/编辑', 'library-edit', `data-id="${item.id}"`)}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无课程档案</strong><span>审核通过并完成编排的完整课程，或新建的轻量档案会出现在这里。</span></div>'}</div>${pagination(filtered.length, '个课程档案')}</section></div>`;
+  appendLibraryCourseIdColumn(page, filtered);
+}
+
+// I1-DEC-19: surface the course number so the teacher application, course center and library
+// share one visible primary key.
+function appendLibraryCourseIdColumn(page, rows) {
+  const table = page?.querySelector('.course-table-wrap table');
+  if (!table || !rows?.length) return;
+  const headerRow = table.querySelector('thead tr');
+  if (headerRow) {
+    const header = document.createElement('th');
+    header.textContent = '课程编号';
+    headerRow.insertBefore(header, headerRow.firstElementChild);
+  }
+  table.querySelectorAll('tbody tr').forEach((row, index) => {
+    const item = rows[index];
+    if (!item) return;
+    const number = item.archive === '完整课程' ? item.sourceCourseId : item.id;
+    const cell = document.createElement('td');
+    cell.innerHTML = `<span class="primary-cell">${escapeHtml(number || '—')}</span><span class="sub-cell">${item.archive === '完整课程' ? '来源课程主体' : '轻量档案'}</span>`;
+    row.insertBefore(cell, row.firstElementChild);
+  });
 }
 
 function renderCatalog(page) {
@@ -192,7 +244,7 @@ function renderCatalog(page) {
 function openApplicationDetail(id, reviewMode = false) {
   const item = applications.find(record => record.id === id);
   if (!item) return;
-  const dialog = modal(reviewMode ? '审批课程申报' : '课程申报详情', `${item.id} · ${item.name}`, `<div class="course-detail-grid"><section class="course-detail-section wide"><h3>教师信息</h3><dl class="course-detail-list"><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>联系方式</dt><dd>138****4921</dd></div><div><dt>教学单位</dt><dd>${escapeHtml(item.teacherInfo.split(' · ')[3] || '湖北艺术职业学院')}</dd></div><div><dt>专业方向</dt><dd>${escapeHtml(item.major)}</dd></div></dl></section><section class="course-detail-section wide"><h3>课程信息</h3><dl class="course-detail-list"><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>总课时</dt><dd>${item.hours ? `${item.hours} 课时` : '未填写'}</dd></div><div class="wide"><dt>课程简介</dt><dd>${escapeHtml(item.intro)}</dd></div><div><dt>附件</dt><dd>${item.attachment ? escapeHtml(item.attachment) : '未上传附件'}</dd></div><div><dt>申报时间</dt><dd>${escapeHtml(item.submittedAt)}</dd></div></dl></section>${item.review ? `<section class="course-detail-section wide"><h3>审核记录</h3><div class="course-review-box">${tag(item.status)}<p>${escapeHtml(item.review)}</p>${item.reviewedBy ? `<small>审核人：${escapeHtml(item.reviewedBy)} · 审核时间：${escapeHtml(item.reviewedAt || '待记录')}</small>` : ''}</div></section>` : ''}${reviewMode ? `<form class="course-detail-section wide" data-form="application-review-form" data-id="${item.id}"><h3>审核决定</h3><div class="choice-group"><label class="choice"><input type="radio" name="result" value="approved" checked />通过</label><label class="choice"><input type="radio" name="result" value="rejected" />驳回</label></div><div class="course-field" style="margin-top:12px"><label for="review-opinion">审批意见 <span class="sub-cell">驳回时必填</span></label><textarea id="review-opinion" name="opinion" placeholder="填写审批意见或驳回原因">${escapeHtml(item.review || '')}</textarea><p class="course-error" data-error></p></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">提交审批</button></div></form>` : '<div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div>'}</div>`, { large: true });
+  const dialog = modal(reviewMode ? '审批课程申报' : '课程申报详情', `${item.id} · ${item.name}`, `<div class="course-detail-grid"><section class="course-detail-section wide"><h3>教师信息</h3><dl class="course-detail-list"><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>教师工号</dt><dd>${escapeHtml(item.teacherNo || '—')}</dd></div><div><dt>教学单位</dt><dd>${escapeHtml(item.teacherUnit || '—')}</dd></div><div><dt>职称</dt><dd>${escapeHtml(item.teacherTitle || '—')}</dd></div><div><dt>专业方向</dt><dd>${escapeHtml(item.teacherProfessional || item.major)}</dd></div></dl></section><section class="course-detail-section wide"><h3>课程信息</h3><dl class="course-detail-list"><div><dt>申报编号</dt><dd>${escapeHtml(item.id)}</dd></div><div><dt>派生课程编号</dt><dd>${escapeHtml(applicationCourseId(item))}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>总课时</dt><dd>${item.hours ? `${item.hours} 课时` : '未填写'}</dd></div><div class="wide"><dt>课程简介</dt><dd>${escapeHtml(item.intro)}</dd></div><div><dt>附件</dt><dd>${item.attachment ? escapeHtml(item.attachment) : '未上传附件'}</dd></div><div><dt>申报时间</dt><dd>${escapeHtml(item.submittedAt)}</dd></div></dl></section>${item.review ? `<section class="course-detail-section wide"><h3>审核记录</h3><div class="course-review-box">${tag(item.status)}<p>${escapeHtml(item.review)}</p>${item.reviewedBy ? `<small>审核人：${escapeHtml(item.reviewedBy)} · 审核时间：${escapeHtml(item.reviewedAt || '待记录')}</small>` : ''}</div></section>` : ''}${reviewMode ? `<form class="course-detail-section wide" data-form="application-review-form" data-id="${item.id}"><h3>审核决定</h3><div class="choice-group"><label class="choice"><input type="radio" name="result" value="approved" checked />通过</label><label class="choice"><input type="radio" name="result" value="rejected" />驳回</label></div><div class="course-field" style="margin-top:12px"><label for="review-opinion">审批意见 <span class="sub-cell">驳回时必填</span></label><textarea id="review-opinion" name="opinion" placeholder="填写审批意见或驳回原因">${escapeHtml(item.review || '')}</textarea><p class="course-error" data-error></p></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">提交审批</button></div></form>` : '<div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div>'}</div>`, { large: true });
   if (reviewMode) dialog.querySelector('[name=result]').addEventListener('change', event => { const error = dialog.querySelector('[data-error]'); if (event.target.value === 'approved') error.textContent = ''; });
 }
 
@@ -219,7 +271,26 @@ function openWorkbench(id) {
     if (action === 'delete-lesson') { if (window.confirm('确认删除该课时？')) { item.chapters[Number(target.dataset.chapter)].lessons.splice(Number(target.dataset.index), 1); persistCourse(item); renderWorkbench(); showToast('课时已删除'); } }
     if (action === 'resource') openResourcePicker(item, Number(target.dataset.chapter), Number(target.dataset.index), () => { persistCourse(item); renderWorkbench(); });
     if (action === 'save') { item.status = '编排中'; item.updatedAt = demoTime(); persistCourse(item); renderWorkbench(); showToast('编排草稿已保存'); }
-    if (action === 'complete') { const complete = item.type !== '视频课程' || item.chapters.length > 0 && item.chapters.every(current => current.lessons.length > 0 && current.lessons.every(lesson => lesson.resources.some(resourceId => resources.find(resource => resource.id === resourceId)?.type === '教学视频'))); if (!complete) { showToast('视频课程每个课时都必须关联至少一个教学视频', 'error'); return; } if (!item.chapters.length || item.chapters.some(current => !current.lessons.length || current.lessons.some(lesson => !lesson.name || !lesson.target || !lesson.duration))) { showToast('请补齐章节和课时必填信息', 'error'); return; } item.status = '已完成'; item.updatedAt = demoTime(); persistCourse(item); syncLibraryCourse(item); renderWorkbench(); renderContent(root()); showToast('课程编排已完成，可进入课程库'); }
+    if (action === 'complete') {
+      const lessons = item.chapters.flatMap(current => current.lessons);
+      if (!item.chapters.length || item.chapters.some(current => !current.lessons.length || current.lessons.some(lesson => !lesson.name || !lesson.target || !lesson.duration))) { showToast('请补齐章节和课时必填信息', 'error'); return; }
+      // I1-DEC-22: 面授课程校验课时数等于申报总课时；视频课程只校验每个课时都有教学视频。
+      if (item.type === '视频课程') {
+        const videoReady = item.chapters.every(current => current.lessons.every(lesson => lesson.resources.some(resourceId => resources.find(resource => resource.id === resourceId)?.type === '教学视频')));
+        if (!videoReady) { showToast('视频课程每个课时都必须关联至少一个教学视频', 'error'); return; }
+      } else if (lessons.length !== Number(item.hours)) {
+        const gap = Number(item.hours) - lessons.length;
+        showToast(gap > 0 ? `面授课程课时数需等于申报总课时 ${item.hours} 课时，当前 ${lessons.length} 课时，请再补齐 ${gap} 个课时` : `面授课程课时数需等于申报总课时 ${item.hours} 课时，当前 ${lessons.length} 课时，请删除 ${Math.abs(gap)} 个课时`, 'error');
+        return;
+      }
+      item.status = '已完成';
+      item.updatedAt = demoTime();
+      persistCourse(item);
+      syncLibraryCourse(item);
+      renderWorkbench();
+      renderContent(root());
+      showToast('课程编排已完成，可进入课程库');
+    }
   });
   renderWorkbench();
 }
@@ -227,13 +298,42 @@ function openWorkbench(id) {
 function openChapterForm(course, index, onDone) {
   const current = index === null ? { name: '', desc: '' } : course.chapters[index];
   const dialog = modal(index === null ? '添加章节' : '编辑章节', '章节名称为必填项', `<form data-form="chapter-form"><div class="course-detail-grid"><div class="course-field"><label>章节名称 <span class="sub-cell">必填</span></label><input name="name" required value="${escapeHtml(current.name)}" placeholder="如：第一章：身韵元素训练" /></div><div class="course-field"><label>排序</label><input name="sort" type="number" min="1" value="${index === null ? course.chapters.length + 1 : index + 1}" /></div><div class="course-field wide"><label>章节描述</label><textarea name="desc" placeholder="填写章节的教学重点">${escapeHtml(current.desc || '')}</textarea></div></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存章节</button></div></form>`);
-  dialog.querySelector('form').addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); if (!data.get('name').trim()) return; const chapter = { name: data.get('name').trim(), desc: data.get('desc').trim(), lessons: current.lessons || [] }; if (index === null) course.chapters.push(chapter); else course.chapters[index] = chapter; closeModal(); onDone(); showToast('章节已保存'); });
+  dialog.querySelector('form').addEventListener('submit', event => {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    if (!data.get('name').trim()) return;
+    const chapter = { name: data.get('name').trim(), desc: data.get('desc').trim(), lessons: current.lessons || [] };
+    // I1-C-08: the chapter order field is honoured instead of being collected and dropped.
+    const fallback = index === null ? course.chapters.length + 1 : index + 1;
+    const order = Math.max(1, Math.min(course.chapters.length + (index === null ? 1 : 0), Number(data.get('sort')) || fallback));
+    if (index !== null) course.chapters.splice(index, 1);
+    course.chapters.splice(order - 1, 0, chapter);
+    closeModal();
+    onDone();
+    showToast('章节已保存');
+  });
 }
 
 function openLessonForm(course, chapterIndex, lessonIndex, onDone) {
   const current = lessonIndex === null ? { name: '', target: '', duration: 45, kind: '理论', description: '', resources: [] } : course.chapters[chapterIndex].lessons[lessonIndex];
-  const dialog = modal(lessonIndex === null ? '添加课时' : '编辑课时', '课时名称、课时目标和课时时长为必填项', `<form data-form="lesson-form"><div class="course-detail-grid"><div class="course-field"><label>课时名称 <span class="sub-cell">必填</span></label><input name="name" required value="${escapeHtml(current.name)}" placeholder="如：站姿与脚位" /></div><div class="course-field"><label>课时目标 <span class="sub-cell">必填</span></label><input name="target" required value="${escapeHtml(current.target)}" placeholder="填写本课时可达成的目标" /></div><div class="course-field"><label>课时时长（分钟） <span class="sub-cell">必填</span></label><input name="duration" required type="number" min="1" value="${current.duration}" /></div><div class="course-field"><label>课时类型 <span class="sub-cell">必填</span></label>${selectWithValues('kind', ['理论', '示范', '练习', '综合'], current.kind, '')}</div><div class="course-field wide"><label>内容描述</label><textarea name="description" placeholder="填写教学内容和执行提示">${escapeHtml(current.description || '')}</textarea></div></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存课时</button></div></form>`);
-  dialog.querySelector('form').addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); if (!data.get('name').trim() || !data.get('target').trim() || Number(data.get('duration')) <= 0) return; const lesson = { name: data.get('name').trim(), target: data.get('target').trim(), duration: Number(data.get('duration')), kind: data.get('kind'), description: data.get('description').trim(), resources: current.resources || [] }; if (lessonIndex === null) course.chapters[chapterIndex].lessons.push(lesson); else course.chapters[chapterIndex].lessons[lessonIndex] = lesson; closeModal(); onDone(); showToast('课时已保存'); });
+  const lessonCount = course.chapters[chapterIndex].lessons.length;
+  const defaultOrder = lessonIndex === null ? lessonCount + 1 : lessonIndex + 1;
+  const dialog = modal(lessonIndex === null ? '添加课时' : '编辑课时', '课时名称、课时目标和课时时长为必填项', `<form data-form="lesson-form"><div class="course-detail-grid"><div class="course-field"><label>课时名称 <span class="sub-cell">必填</span></label><input name="name" required value="${escapeHtml(current.name)}" placeholder="如：站姿与脚位" /></div><div class="course-field"><label>课时序号 <span class="sub-cell">必填</span></label><input name="order" required type="number" min="1" value="${defaultOrder}" /></div><div class="course-field"><label>课时目标 <span class="sub-cell">必填</span></label><input name="target" required value="${escapeHtml(current.target)}" placeholder="填写本课时可达成的目标" /></div><div class="course-field"><label>课时时长（分钟） <span class="sub-cell">必填</span></label><input name="duration" required type="number" min="1" value="${current.duration}" /></div><div class="course-field"><label>课时类型 <span class="sub-cell">必填</span></label>${selectWithValues('kind', ['理论', '示范', '练习', '综合'], current.kind, '')}</div><div class="course-field wide"><label>内容描述</label><textarea name="description" placeholder="填写教学内容和执行提示">${escapeHtml(current.description || '')}</textarea></div></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存课时</button></div></form>`);
+  dialog.querySelector('form').addEventListener('submit', event => {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    if (!data.get('name').trim() || !data.get('target').trim() || Number(data.get('duration')) <= 0) return;
+    const lesson = { name: data.get('name').trim(), target: data.get('target').trim(), duration: Number(data.get('duration')), kind: data.get('kind'), description: data.get('description').trim(), resources: current.resources || [] };
+    const lessons = course.chapters[chapterIndex].lessons;
+    // I1-C-09: lessons keep an explicit order instead of always appending to the end.
+    const fallback = lessonIndex === null ? lessons.length + 1 : lessonIndex + 1;
+    const order = Math.max(1, Math.min(lessons.length + (lessonIndex === null ? 1 : 0), Number(data.get('order')) || fallback));
+    if (lessonIndex !== null) lessons.splice(lessonIndex, 1);
+    lessons.splice(order - 1, 0, lesson);
+    closeModal();
+    onDone();
+    showToast('课时已保存');
+  });
 }
 
 function openResourcePicker(course, chapterIndex, lessonIndex, onDone) {
@@ -300,7 +400,7 @@ function handleClick(event) {
     const route = action === 'publish-product' ? '/admin/pages/mall/products.html' : '/admin/pages/crm/classes.html';
     if (item?.sourceCourseId) window.location.href = relativePath(`${route}?courseId=${encodeURIComponent(item.sourceCourseId)}`);
   }
-  if (action === 'library-edit') { const item = library.find(record => record.id === target.dataset.id); if (item?.archive === '完整课程') window.location.href = `content.html?courseId=${encodeURIComponent(contentCourses.find(course => course.name === item.name)?.id || '')}`; else openLightweightForm(target.dataset.id); }
+  if (action === 'library-edit') { const item = library.find(record => record.id === target.dataset.id); if (item?.archive === '完整课程') window.location.href = `content.html?courseId=${encodeURIComponent(contentCourses.find(course => course.id === item.sourceCourseId)?.id || item.sourceCourseId || '')}`; else openLightweightForm(target.dataset.id); }
   if (action === 'catalog-add') openCatalogForm(target.dataset.type);
   if (action === 'catalog-select-group') { state.selectedGroup = target.dataset.value; state.selectedCategory = catalog.categories.find(item => item.parent === state.selectedGroup)?.name || ''; renderCatalog(root()); }
   if (action === 'catalog-select-category') { state.selectedCategory = target.dataset.value; renderCatalog(root()); }
@@ -317,14 +417,42 @@ function handleSubmit(event) {
   const form = event.target;
   if (!form.matches('[data-form]')) return;
   if (form.dataset.form === 'application-filter' || form.dataset.form === 'content-filter' || form.dataset.form === 'resource-filter' || form.dataset.form === 'library-filter') { event.preventDefault(); const data = Object.fromEntries(new FormData(form)); const key = form.dataset.form.replace('-filter', 'Filters').replace('applicationFilters', 'applicationFilters'); if (form.dataset.form === 'application-filter') state.applicationFilters = data; if (form.dataset.form === 'content-filter') state.contentFilters = data; if (form.dataset.form === 'resource-filter') state.resourceFilters = data; if (form.dataset.form === 'library-filter') state.libraryFilters = data; renderPage(); }
-  if (form.dataset.form === 'application-review-form') { event.preventDefault(); const result = form.querySelector('[name=result]:checked')?.value; const opinion = form.querySelector('[name=opinion]').value.trim(); const error = form.querySelector('[data-error]'); if (result === 'rejected' && !opinion) { error.textContent = '驳回时必须填写审批意见或原因'; return; } const item = applications.find(record => record.id === form.dataset.id); if (item) { item.status = result === 'approved' ? '已通过' : '已驳回'; item.review = opinion || '审批通过'; item.reviewedBy = '教研管理员'; item.reviewedAt = demoTime(); persistApplication(item); if (result === 'approved') { const course = contentCourses.find(record => record.applicationId === item.id || record.id === item.courseId) || courseFromApplication(item); if (!contentCourses.some(record => record.id === course.id)) contentCourses.unshift(course); persistCourse(course); } closeModal(); renderApplications(root()); showToast(result === 'approved' ? '申报已通过，课程进入编排列表' : '申报已驳回，教师可修改后重新提交'); } }
+  if (form.dataset.form === 'application-review-form') {
+    event.preventDefault();
+    const result = form.querySelector('[name=result]:checked')?.value;
+    const opinion = form.querySelector('[name=opinion]').value.trim();
+    const error = form.querySelector('[data-error]');
+    if (result === 'rejected' && !opinion) { error.textContent = '驳回时必须填写审批意见或原因'; return; }
+    const item = applications.find(record => record.id === form.dataset.id);
+    if (!item) return;
+    item.status = result === 'approved' ? '已通过' : '已驳回';
+    // I1-DEC-20: a single review field is shared by both ends; approval defaults to 审批通过.
+    item.review = opinion || '审批通过';
+    item.reviewedBy = '教研管理员';
+    item.reviewedAt = demoTime();
+    persistApplication(item);
+    if (result === 'approved') {
+      // I1-DEC-21: keyed by application/course id, an existing course entity is reused and updated.
+      const targetId = item.courseId || courseIdForApplication(item.id);
+      const existing = contentCourses.find(record => record.applicationId === item.id || record.id === targetId);
+      const course = existing || courseFromApplication(item);
+      if (existing) Object.assign(course, { applicationId: item.id, name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: Number(item.hours) || course.hours });
+      else contentCourses.unshift(course);
+      persistCourse(course);
+    }
+    closeModal();
+    renderApplications(root());
+    showToast(result === 'approved' ? '申报已通过，课程进入编排列表' : '申报已驳回，教师可修改后重新提交');
+  }
 }
 
 function deleteResource(id) {
   const item = resources.find(record => record.id === id);
   if (!item) return;
-  const prompt = item.references ? `该资源被${item.references}门课程引用，删除后将影响这些课程展示，确认删除？` : '该资源暂未被课程引用，确认删除？';
-  if (window.confirm(prompt)) { resources.splice(resources.indexOf(item), 1); removeDemoRecord('resources', id); renderResources(root()); showToast('资源已删除'); }
+  // E-17: referenced resources cannot be physically deleted; unbind them from lessons first.
+  const references = Number(item.references || 0);
+  if (references > 0) { showToast(`该资源已被 ${references} 门课程引用，请先在课程编排中解除引用后再删除`, 'error'); return; }
+  if (window.confirm('该资源暂未被课时引用，确认删除？')) { resources.splice(resources.indexOf(item), 1); removeDemoRecord('resources', id); renderResources(root()); showToast('资源已删除'); }
 }
 
 function toggleCatalog(type, id, value) {

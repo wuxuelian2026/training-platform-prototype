@@ -1,5 +1,6 @@
 import { relativePath } from './paths.js';
 import { getCurrentAccountId, setCurrentAccountId } from './demo-store.js';
+import { teacherAccounts } from './course-seed.js';
 
 const roleKey = 'hbyx-mini-role';
 const roleButtons = document.querySelectorAll('[data-role]');
@@ -11,6 +12,17 @@ const loginPanels = document.querySelectorAll('[data-login-panel]');
 const loginMessage = document.querySelector('#login-message');
 const accountSelect = document.querySelector('#demo-account');
 if (accountSelect) accountSelect.value = getCurrentAccountId();
+// I1-DEC-23: the login page offers two teacher seed accounts so identity carrying can be demoed.
+const learnerAccountOptions = accountSelect ? [...accountSelect.options].map(option => ({ value: option.value, label: option.textContent })) : [];
+const fillDemoAccounts = role => {
+  if (!accountSelect) return;
+  const options = role === 'teacher'
+    ? teacherAccounts.map(teacher => ({ value: teacher.id, label: `${teacher.name} · ${teacher.no} · ${teacher.professional}` }))
+    : learnerAccountOptions;
+  accountSelect.innerHTML = options.map(item => `<option value="${item.value}">${item.label}</option>`).join('');
+  const stored = role === 'teacher' ? sessionStorage.getItem('hbyx-teacher-id') : getCurrentAccountId();
+  accountSelect.value = options.some(item => item.value === stored) ? stored : options[0]?.value || '';
+};
 const safeRedirect = (redirect, role) => {
   const target = redirect && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : role === 'teacher' ? '/teacher/index.html' : '/learner/index.html';
   return relativePath(target);
@@ -18,10 +30,11 @@ const safeRedirect = (redirect, role) => {
 
 if (roleButtons.length && roleInput) {
   const initialRole = new URLSearchParams(location.search).get('role') || sessionStorage.getItem(roleKey) || 'learner';
-  const updateRole = role => {
+ const updateRole = role => {
     roleInput.value = role;
     roleButtons.forEach(button => button.classList.toggle('active', button.dataset.role === role));
     if (roleCopy) roleCopy.textContent = role === 'teacher' ? '登录后进入课表、班级、申报、工资和我的' : '登录后进入课程、学习、订单和我的';
+    fillDemoAccounts(role);
   };
   updateRole(initialRole);
   roleButtons.forEach(button => button.addEventListener('click', () => updateRole(button.dataset.role)));
@@ -55,7 +68,8 @@ if (roleButtons.length && roleInput) {
     event.preventDefault();
     if (!loginForm.reportValidity()) return;
     const role = roleInput.value;
-    if (accountSelect) setCurrentAccountId(accountSelect.value);
+    if (role === 'teacher') sessionStorage.setItem('hbyx-teacher-id', accountSelect?.value || teacherAccounts[0].id);
+    else if (accountSelect) setCurrentAccountId(accountSelect.value);
     sessionStorage.setItem(roleKey, role);
     sessionStorage.setItem('hbyx-mini-logged-in', '1');
     const redirect = new URLSearchParams(location.search).get('redirect');
@@ -63,7 +77,8 @@ if (roleButtons.length && roleInput) {
   });
   document.querySelector('[data-wechat-login]')?.addEventListener('click', () => {
     const role = roleInput.value;
-    if (accountSelect) setCurrentAccountId(accountSelect.value);
+    if (role === 'teacher') sessionStorage.setItem('hbyx-teacher-id', accountSelect?.value || teacherAccounts[0].id);
+    else if (accountSelect) setCurrentAccountId(accountSelect.value);
     sessionStorage.setItem(roleKey, role);
     sessionStorage.setItem('hbyx-mini-logged-in', '1');
     const redirect = new URLSearchParams(location.search).get('redirect');
