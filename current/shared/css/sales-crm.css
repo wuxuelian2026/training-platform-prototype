@@ -23,6 +23,13 @@
 .sales-dialog-summary span, .sales-dialog-summary strong { display: block; }
 .sales-dialog-summary span { color: var(--muted); font-size: 12px; }
 .sales-dialog-summary strong { margin-top: 4px; }
+.sales-dialog-summary small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+.sales-course-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.required-mark { margin-left: 3px; color: var(--danger); font-weight: 400; }
+.sales-switch-field { display: grid; grid-template-columns: minmax(120px, .35fr) minmax(0, 1fr); align-items: center; }
+.sales-switch-control { display: flex; min-height: 36px; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.sales-switch-control input { width: 18px; height: 18px; accent-color: var(--brand); }
+.sales-switch-control em { font-style: normal; }
 .sales-dialog-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
 .sales-dialog-grid .wide { grid-column: 1 / -1; }
 .sales-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
@@ -32,4 +39,4 @@
 .sales-detail-list span { color: var(--muted); }
 .sales-danger-note { margin: 0; color: var(--danger) !important; font-size: 12px; }
 @media (max-width: 900px) { .sales-page .sales-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .sales-page .sales-filter-grid { grid-template-columns: 1fr; } .sales-page .sales-filter-grid .wide { grid-column: auto; } .sales-dialog-card { padding: 18px; } .sales-dialog-summary, .sales-dialog-grid { grid-template-columns: 1fr; } .sales-dialog-grid .wide { grid-column: auto; } }
+@media (max-width: 640px) { .sales-page .sales-filter-grid { grid-template-columns: 1fr; } .sales-page .sales-filter-grid .wide { grid-column: auto; } .sales-dialog-card { padding: 18px; } .sales-dialog-summary, .sales-dialog-grid { grid-template-columns: 1fr; } .sales-dialog-grid .wide { grid-column: auto; } .sales-switch-field { grid-template-columns: 1fr; align-items: start; gap: 6px; } }

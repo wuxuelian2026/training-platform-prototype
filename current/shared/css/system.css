@@ -43,5 +43,18 @@
 .system-detail-list > div:last-child { border-bottom: 0; }
 .system-detail-list span { color: var(--muted); }
 .system-detail-list strong { text-align: right; }
+.system-role-chip { display: inline-flex; align-items: center; min-height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 12px; }
+.system-state-card { display: grid; justify-items: start; gap: 12px; min-height: 180px; align-content: center; }
+.system-state-card strong { font-size: 18px; }
+.system-state-card p { margin: 0; color: var(--muted); }
+.system-state-error { border-color: #ffccc7; background: #fffafa; }
+.system-skeleton { width: min(100%, 720px); height: 14px; border-radius: 3px; background: #f0f0f0; }
+.system-skeleton-title { width: 220px; height: 24px; }
+.system-state-caption { font-size: 13px; }
+.system-user-cell > div { min-width: 0; }
+.system-user-cell small { display: block; margin-top: 4px; }
+.student-subtable-wrap { overflow-x: auto; }
+.student-subtable, .student-audit-table { min-width: 1180px; }
+.student-subtable th, .student-subtable td, .student-audit-table th, .student-audit-table td { white-space: nowrap; }
 @media (max-width: 900px) { .system-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .system-filter-grid .wide { grid-column: span 2; } .settings-layout { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .system-filter-grid, .system-dialog-grid, .permission-items { grid-template-columns: 1fr; } .system-filter-grid .wide, .system-dialog-grid .wide { grid-column: auto; } .system-dialog-card { padding: 18px; } }
