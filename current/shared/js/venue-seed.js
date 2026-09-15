@@ -11,8 +11,8 @@ export const venueSeed = [
   { id: 'venue-401', name: '综合楼401', campus: '龙泉校区', building: '综合楼', type: '普通教室', capacity: 40, tags: '投影 / 白板', status: '停用' },
   // PM-B10：南湖校区补登记两间教室（产品 2026-09-16 裁定），供学员端与 CRM 引用，
   // 使「舞蹈类→舞蹈房、美术/国画类→画室」的专业与场地类型匹配。房间号沿用既有命名约定写入 name。
-  { id: 'venue-dance201', name: '舞蹈房201', campus: '南湖校区', building: '艺术楼', type: '舞蹈房', capacity: 20, tags: '把杆 / 镜面墙', status: '启用' },
-  { id: 'venue-art103', name: '画室103', campus: '南湖校区', building: '艺术楼', type: '画室', capacity: 25, tags: '画架 / 洗笔池', status: '启用' }
+  { id: 'venue-art201', name: '艺术楼201', campus: '南湖校区', building: '艺术楼', type: '舞蹈房', capacity: 20, tags: '把杆 / 镜面墙', status: '启用' },
+  { id: 'venue-art103', name: '艺术楼103', campus: '南湖校区', building: '艺术楼', type: '画室', capacity: 25, tags: '画架 / 洗笔池', status: '启用' }
 ];
 
 export function cloneVenueSeed() {

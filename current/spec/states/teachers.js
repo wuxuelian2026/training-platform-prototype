@@ -10,8 +10,7 @@ export const STATE_MACHINES = [
     "pages": [
       "teachers/list",
       "teacher/profile",
-      "teachers/profile",
-      "system/users"
+      "teachers/profile"
     ],
     "states": [
       [

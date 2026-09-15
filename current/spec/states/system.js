@@ -39,6 +39,41 @@ export const STATE_MACHINES = [
     ]
   },
   // CR-2026-017：后台角色启用/禁用两态（不出图），承载页面 system/roles。
+  // 05-状态字典 §12.3：后台用户账号与角色状态是两个对象，独立登记，不与教师账号共用（原 system/users 误挂 SM-TEACHER-ACCOUNT 已修正）。
+  {
+    "id": "SM-ADMIN-ACCOUNT",
+    "object": "后台用户账号",
+    "diagram": false,
+    "pages": [
+      "system/users"
+    ],
+    "states": [
+      [
+        "active",
+        "启用",
+        false
+      ],
+      [
+        "inactive",
+        "禁用",
+        false
+      ]
+    ],
+    "transitions": [
+      [
+        "启用",
+        "禁用用户",
+        "禁用",
+        "超级管理员"
+      ],
+      [
+        "禁用",
+        "启用用户",
+        "启用",
+        "超级管理员"
+      ]
+    ]
+  },
   {
     "id": "SM-ROLE",
     "object": "后台角色",

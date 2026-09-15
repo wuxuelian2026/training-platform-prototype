@@ -224,9 +224,9 @@ if (existsSync(dictionaryPath)) {
     const end = index + 1 < matches.length ? matches[index + 1].index : dictionary.length;
     sections.set(match[1], dictionary.slice(start, end));
   });
-  // CR-2026-017 补登记的两台（两态、不出图）由变更单 + 产品数据件登记，未写入 05-状态字典正文；
-  // 除这两台外，其余状态机仍必须能在字典找到小节，出图标记仍需与字典一致。
-  const DICTIONARY_EXEMPT = new Set(['SM-ROLE', 'SM-BANNER']);
+  // 2026-09-16：SM-ROLE / SM-BANNER / SM-ADMIN-ACCOUNT 均已写入 05-状态字典 §12（见 §12.3 与 §12.5），
+  // 原具名豁免已取消；所有状态机必须能在字典找到小节，出图标记仍需与字典一致。
+  const DICTIONARY_EXEMPT = new Set();
   for (const machine of STATE_MACHINES) {
     if (!sections.has(machine.id)) {
       if (!DICTIONARY_EXEMPT.has(machine.id)) problems.push(`[状态图] ${machine.id}：05-状态字典中找不到该状态机小节`);
