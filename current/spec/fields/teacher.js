@@ -73,6 +73,25 @@ export const TEACHER_APP_FIELD_SPEC = {
         '申报状态只有审核中、已通过、已驳回、已撤销，不设草稿状态。',
         '申报不校验证书与合同；申报通过后进入课程编排。'
       ]
+    },
+
+    // G1 覆盖收尾：教师端设置页承载账号级操作，按“结构化”口径补字段表。
+    'teacher/settings': {
+      groups: [
+        { heading: '教师端设置项', fields: [
+          { id: 'FD-TAPP-023', label: '登录手机号', type: '只读', length: '11 位数字（脱敏）', required: '系统展示', note: '按当前教师账号读取并脱敏展示，不支持直接编辑', constraints: { readOnly: true, system: true, masked: true } },
+          { id: 'FD-TAPP-024', label: '新手机号', type: '文本', length: '11 位数字', required: '换绑时必填', note: '换绑手机号时填写，须与当前手机号不同', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
+          { id: 'FD-TAPP-025', label: '验证码', type: '文本', length: '4–6 位数字', required: '换绑时必填', note: '点击获取，60 秒倒计时内不可重复获取', constraints: { maxLength: 6, pattern: '^\\d{4,6}$' } },
+          { id: 'FD-TAPP-026', label: '新密码', type: '文本（密码）', length: '6–20 位', required: '改密时必填', note: '两次输入一致方可提交，修改成功后需重新登录', constraints: { minLength: 6, maxLength: 20, secret: true } },
+          { id: 'FD-TAPP-027', label: '微信授权', type: '开关', length: '已授权 / 未授权', required: '否', note: '授权后可使用微信快捷登录，不影响课表、考勤与工资数据', constraints: { boolean: true } },
+          { id: 'FD-TAPP-028', label: '退出登录', type: '按钮', length: '—', required: '是', note: '二次确认后清除登录态并回到登录页', constraints: { action: true } }
+        ] }
+      ],
+      notes: [
+        '设置项只影响当前教师账号在教师端的登录与通知，不改变档案、证书、合同与课表数据。',
+        '教师档案、证书与合同的维护入口在教师端对应页面或后台，不在设置页提供编辑入口。',
+        '改密与换绑手机号须通过验证码或二次确认，成功后原凭据失效。'
+      ]
     }
   }
 };

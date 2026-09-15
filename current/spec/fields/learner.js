@@ -73,6 +73,43 @@ export const LEARNER_APP_FIELD_SPEC = {
         '支付成功后最终占用名额失败时，订单进入“退款中”并自动全额原路退款，不生成报名与分班记录，不自动调班。',
         '页面中的“支付结果”为原型演示控件，不代表真实支付能力，不进入业务字段口径。'
       ]
+    },
+
+    // G1 覆盖收尾：提交作业是学员端唯一写入动作页，按“结构化”口径补字段表。
+    'learner/homework': {
+      groups: [
+        { heading: '作业提交字段', fields: [
+          { id: 'FD-LAPP-018', label: '作业说明', type: '文本', length: '≤ 500 字', required: '条件必填', note: '与附件至少填写一项；与附件同时为空时不可提交', constraints: { maxLength: 500 } },
+          { id: 'FD-LAPP-019', label: '附件', type: '文件', length: '图片 / 视频 / 音频', required: '条件必填', note: '与作业说明至少填写一项；原型只记录文件名，不上传真实文件', constraints: { fileTypes: ['图片', '视频', '音频'] } },
+          { id: 'FD-LAPP-020', label: '提交状态', type: '只读', length: '未提交 / 草稿 / 已提交', required: '系统展示', note: '保存草稿不进入批阅；提交后进入教师批阅队列', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-021', label: '教师评语', type: '只读', length: '≤ 500 字', required: '系统展示', note: '批阅完成后展示，学员端不提供编辑入口', constraints: { readOnly: true, system: true } }
+        ] }
+      ],
+      notes: [
+        '作业标题、作业要求与截止时间来自教师端发布记录，学员端不可修改。',
+        '作业说明与附件至少填写一项；保存草稿不校验、不进入批阅；截止时间后不可提交。',
+        '未提交的必交作业影响结业判定；提交后由授课教师批阅并给出评语。',
+        '原型只记录所选附件文件名，不做真实文件上传与内容校验。'
+      ]
+    },
+
+    'learner/settings': {
+      groups: [
+        { heading: '账号设置项', fields: [
+          { id: 'FD-LAPP-022', label: '登录手机号', type: '只读', length: '11 位数字（脱敏）', required: '系统展示', note: '按当前账号读取并脱敏展示，不支持直接编辑', constraints: { readOnly: true, system: true, masked: true } },
+          { id: 'FD-LAPP-023', label: '新手机号', type: '文本', length: '11 位数字', required: '换绑时必填', note: '换绑手机号时填写，须与当前手机号不同', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
+          { id: 'FD-LAPP-024', label: '验证码', type: '文本', length: '4–6 位数字', required: '换绑时必填', note: '点击获取，60 秒倒计时内不可重复获取', constraints: { maxLength: 6, pattern: '^\\d{4,6}$' } },
+          { id: 'FD-LAPP-025', label: '微信授权', type: '开关', length: '已授权 / 未授权', required: '否', note: '授权后可使用微信快捷登录；解除授权不影响已购课程与学习进度', constraints: { boolean: true } },
+          { id: 'FD-LAPP-026', label: '用户协议与隐私政策', type: '只读', length: '文本条款', required: '系统展示', note: '仅查看，不提供编辑入口；协议版本由后台协议管理维护', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-027', label: '退出登录', type: '按钮', length: '—', required: '是', note: '二次确认后清除登录态并回到登录页', constraints: { action: true } }
+        ] }
+      ],
+      notes: [
+        '设置项只影响当前登录账号在学员端的展示与通知，不影响账号下的学员、订单与学习记录。',
+        '换绑手机号需校验新手机号格式、验证码与当前手机号不同；换绑成功后原手机号不再作为登录凭据。',
+        '修改密码需两次输入一致，修改成功后需重新登录；密码长度为 6–20 位。',
+        '退出登录只清除本机登录态，不删除账号数据。'
+      ]
     }
   }
 };

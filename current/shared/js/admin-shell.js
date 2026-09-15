@@ -1,6 +1,6 @@
 import { normalizePrototypeLinks, relativePath } from './paths.js';
 import { FIELD_PAGE_COLUMNS, PAGE_FIELD_TABLES } from './page-help-fields.js';
-import { applyFieldConstraints } from './field-constraints.js';
+import { mountFieldConstraints } from './field-constraints.js';
 import { MODULE_HELP_CONTENT, PAGE_HELP_CONTENT, SECTION_TEMPLATES, pageTypeOf } from '../../spec/pages/page-types.js';
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 import { ADMIN_LOGIN_PATH, ADMIN_ROLE_LABELS, clearAdminSession, readAdminSession } from './admin-auth.js';
@@ -215,7 +215,8 @@ const createPageHelp = () => {
 const ensurePageHelp = () => {
   createPageHelp();
   // 页面说明与输入约束同源：规格里声明的长度/格式在这里落到实际控件上。
-  applyFieldConstraints(root, currentPath.replace(/^\/admin\/pages\//, '').replace(/\.html$/, ''));
+  // 与小程序两端一致使用带 DOM 监听的挂载入口，保证运行时弹出的表单（新增/编辑/导入）同样受约束。
+  mountFieldConstraints(currentPath.replace(/^\/admin\/pages\//, '').replace(/\.html$/, ''), root);
   const trigger = root.querySelector('[data-page-help-trigger]');
   if (!trigger) {
     const button = document.createElement('button');
