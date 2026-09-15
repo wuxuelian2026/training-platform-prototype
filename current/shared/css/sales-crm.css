@@ -49,3 +49,12 @@
 .sales-class-roster th { color: var(--muted); font-weight: 500; }
 @media (max-width: 900px) { .sales-page .sales-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .sales-page .sales-filter-grid { grid-template-columns: 1fr; } .sales-page .sales-filter-grid .wide { grid-column: auto; } .sales-dialog-card { padding: 18px; } .sales-dialog-summary, .sales-dialog-grid { grid-template-columns: 1fr; } .sales-dialog-grid .wide { grid-column: auto; } .sales-switch-field { grid-template-columns: 1fr; align-items: start; gap: 6px; } }
+
+/* CR-2026-012：发布商品 / 发布班级表单里的课程展示信息（课程级存储）区块。 */
+.sales-display-section { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: #fafafa; }
+.sales-display-section > span { display: flex; align-items: center; gap: 8px; color: #595959; font-size: 13px; }
+.sales-display-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.sales-display-grid .form-field { display: grid; gap: 6px; }
+.sales-display-grid textarea { min-height: 86px; resize: vertical; }
+.sales-display-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.sales-display-warning { margin: 0; color: var(--muted); font-size: 12px; }

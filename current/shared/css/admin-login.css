@@ -1,0 +1,37 @@
+/* 后台登录页（admin/login.html）
+   视觉沿用后台控制台口径：品牌色左侧信息区 + 右侧登录表单，单一面板，不叠加卡片。 */
+.admin-login-page { display: grid; min-height: 100vh; padding: 40px 20px; background: var(--page); place-items: center; }
+.admin-login-shell { display: grid; width: min(920px, 100%); overflow: hidden; background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); grid-template-columns: minmax(0, 1fr) minmax(0, 400px); }
+
+.admin-login-brand { display: grid; gap: 20px; align-content: center; padding: 34px 32px; background: var(--brand); color: #fff; }
+.admin-login-brand-head { display: flex; gap: 12px; align-items: center; }
+.admin-login-brand-head .brand-mark { background: rgba(255, 255, 255, .18); }
+.admin-login-brand-head strong { display: block; font-size: 16px; }
+.admin-login-brand-head small { display: block; margin-top: 2px; color: rgba(255, 255, 255, .74); font-size: 12px; }
+
+.admin-login-demo { display: grid; gap: 12px; margin: 0; }
+.admin-login-demo div { display: grid; gap: 3px; }
+.admin-login-demo dt { color: rgba(255, 255, 255, .72); font-size: 12px; }
+.admin-login-demo dd { margin: 0; font-size: 13px; line-height: 1.6; }
+.admin-login-brand-note { margin: 0; color: rgba(255, 255, 255, .72); font-size: 12px; line-height: 1.6; }
+
+.admin-login-form { display: grid; gap: 14px; align-content: start; padding: 32px; }
+.admin-login-head h1 { margin: 0; font-size: 20px; }
+.admin-login-head p { margin: 6px 0 2px; color: var(--muted); font-size: 13px; }
+
+.admin-login-captcha { display: grid; gap: 8px; align-items: center; grid-template-columns: minmax(0, 1fr) auto auto; }
+.admin-login-captcha-code { display: grid; min-width: 72px; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px; background: #fafafa; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; font-weight: 700; cursor: pointer; place-items: center; }
+.admin-login-captcha .button { white-space: nowrap; }
+
+.admin-login-error { margin: 0; padding: 10px 12px; border: 1px solid #f2d4cf; border-radius: 6px; background: #fff8f6; color: #8b3d32; font-size: 13px; }
+.admin-login-agreement { display: flex; gap: 8px; align-items: flex-start; color: #595959; font-size: 13px; }
+.admin-login-agreement input { width: 16px; min-height: 16px; height: 16px; margin: 2px 0 0; }
+.admin-login-submit { width: 100%; min-height: 40px; }
+
+@media (max-width: 880px) {
+  /* 右侧悬浮“页面说明”按钮固定在右下角，移动端给表单留出可点击的安全区。 */
+  .admin-login-page { padding: 22px 14px 96px; }
+  .admin-login-shell { grid-template-columns: minmax(0, 1fr); }
+  .admin-login-brand { align-content: start; padding: 22px 20px; }
+  .admin-login-form { padding: 24px 20px; }
+}

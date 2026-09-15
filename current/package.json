@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "check:page-spec": "node scripts/check-page-spec.mjs",
+    "build:prd-fields": "node scripts/build-prd-fields.mjs",
+    "check:prd-fields": "node scripts/build-prd-fields.mjs --check",
+    "check:spec": "npm run check:page-spec && npm run check:prd-fields",
+    "audit:alignment": "node scripts/audit-field-alignment.mjs"
   },
   "devDependencies": {
     "vite": "^6.1.0"

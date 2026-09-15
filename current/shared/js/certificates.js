@@ -15,12 +15,62 @@ const statusClass = (value) => ({
   已录入: 'gray',
   待审核: 'amber',
   审核通过: 'green',
-  审核不通过: 'red'
+  审核不通过: 'red',
+  未提交: 'gray',
+  已归档: 'gray'
 }[value] || 'gray');
 
 const validityClass = (value) => ({有效: 'green', 即将过期: 'amber', 已过期: 'red'}[value] || 'gray');
 
 rows.slice().sort((a, b) => a.dataset.expiry.localeCompare(b.dataset.expiry)).forEach((row) => table.tBodies[0].append(row));
+
+// 9.2 可自动化复现：撤回/归档使用标准 dialog，确认按钮带 data-confirm-action 便于测试定位提交结果。
+function openStatusConfirm(row, action) {
+  activeRow = row;
+  const withdraw = action === 'withdraw';
+  text('certificate-status-title', withdraw ? '撤回证书' : '归档证书');
+  text('certificate-status-copy', withdraw
+    ? '撤回后该证书回到未提交状态，可修改后重新提交；已审核或已被课程、排课引用的证书不能撤回。'
+    : '归档后该证书不再参与资质校验，历史版本、审核结论与操作记录只读保留。');
+  text('certificate-status-teacher', row.dataset.teacher);
+  text('certificate-status-name', `${row.dataset.name} · ${row.dataset.number}`);
+  text('certificate-status-current', `${row.dataset.status} / ${row.dataset.validity || '—'}`);
+  const error = document.querySelector('#certificate-status-error');
+  if (error) { error.hidden = true; error.textContent = ''; }
+  const confirmButton = document.querySelector('#certificate-status-confirm');
+  if (confirmButton) {
+    confirmButton.dataset.confirmAction = withdraw ? 'certificate-withdraw' : 'certificate-archive';
+    confirmButton.textContent = withdraw ? '确认撤回' : '确认归档';
+  }
+  openDialog('certificate-status-dialog');
+}
+
+function confirmCertificateStatus(action) {
+  const row = activeRow;
+  if (!row) return;
+  if (action === 'certificate-withdraw') {
+    if (!['已录入', '待审核'].includes(row.dataset.status) || row.dataset.referenced === '是') {
+      const error = document.querySelector('#certificate-status-error');
+      if (error) { error.hidden = false; error.textContent = '该证书已审核或已被课程、排课引用，不能撤回，请改用归档。'; }
+      return;
+    }
+    row.dataset.status = '未提交';
+    updateStatusCell(row);
+    updateActionCell(row);
+    updateMetrics();
+    applyFilters();
+    closeDialog('certificate-status-dialog');
+    showToast(`已撤回证书：${row.dataset.name}，可重新提交。`);
+    return;
+  }
+  row.dataset.status = '已归档';
+  updateStatusCell(row);
+  updateActionCell(row);
+  updateMetrics();
+  applyFilters();
+  closeDialog('certificate-status-dialog');
+  showToast(`已归档证书：${row.dataset.name}，历史版本与审核结论保留。`);
+}
 
 function openDialog(id) {
   const current = dialog(id);
@@ -70,9 +120,14 @@ function updateStatusCell(row) {
 function updateActionCell(row) {
   const cell = row.querySelector('[data-cell="actions"]');
   if (!cell) return;
-  const reupload = row.dataset.status === '审核不通过' || row.dataset.validity === '已过期';
+  // UI v1.2：审核通过可直接重传（新版本独立审核，旧结论归属旧版本）；驳回与已过期同样可重传。
+  const reupload = ['审核通过', '审核不通过'].includes(row.dataset.status) || row.dataset.validity === '已过期';
   const review = row.dataset.status === '待审核';
-  cell.innerHTML = `${review ? '<button type="button" class="text-button" data-action="review">审核</button>' : ''}${reupload ? '<button type="button" class="text-button" data-action="reupload">重新上传</button>' : ''}<button type="button" class="text-button" data-action="view">查看</button><button type="button" class="text-button danger-link" data-action="delete">删除</button>`;
+  // UI v1.2 状态—操作矩阵：未引用且未审核可撤回；已审核或已被课程/排课引用只能归档。
+  const archived = row.dataset.status === '已归档';
+  const withdraw = ['已录入', '待审核'].includes(row.dataset.status) && row.dataset.referenced !== '是';
+  const archive = ['审核通过', '审核不通过'].includes(row.dataset.status) || row.dataset.referenced === '是';
+  cell.innerHTML = `${review ? '<button type="button" class="text-button" data-action="review">审核</button>' : ''}${reupload && !archived ? '<button type="button" class="text-button" data-action="reupload">重新上传</button>' : ''}<button type="button" class="text-button" data-action="view">查看</button>${withdraw ? '<button type="button" class="text-button" data-action="withdraw">撤回</button>' : ''}${archive && !archived ? '<button type="button" class="text-button" data-action="archive">归档</button>' : ''}<button type="button" class="text-button danger-link" data-action="delete">删除</button>`;
 }
 
 function updateMetrics() {
@@ -192,10 +247,27 @@ function handleReview(result) {
   if (!activeRow) return;
   const note = document.querySelector('#review-note')?.value.trim() || '';
   const error = document.querySelector('#review-error');
-  if (result === 'reject' && !note) {
-    if (error) error.hidden = false;
+  // UI v1.1：驳回原因必填且 10–200 字，不通过不落库。
+  if (result === 'reject' && (note.length < 10 || note.length > 200)) {
+    if (error) {
+      error.textContent = note ? '驳回原因需 10–200 字，请补充具体说明。' : '驳回原因必填（10–200 字），请填写后重新提交。';
+      error.hidden = false;
+    }
     return;
   }
+  // UI v1.2 §3.1-4：新版本被驳回时回退到最近一次审核通过版本；没有通过版本则不再满足准入，按目标专业重算资质校验。
+  if (result === 'reject' && activeRow.dataset.previousStatus === '审核通过') {
+    activeRow.dataset.status = '审核通过';
+    activeRow.dataset.rejectedFileVersion = activeRow.dataset.fileVersion || '';
+    activeRow.dataset.reviewNote = note;
+    activeRow.dataset.reviewer = '李教研';
+    activeRow.dataset.reviewedAt = '';
+    updateStatusCell(activeRow); updateActionCell(activeRow); updateMetrics(); applyFilters();
+    closeDialog('review-dialog');
+    showToast('新版本被驳回，已回退到最近审核通过版本，发布与排课按该版本重算资质。');
+    return;
+  }
+  const noApprovedVersion = result === 'reject' && activeRow.dataset.previousStatus !== '审核通过';
   activeRow.dataset.status = result === 'pass' ? '审核通过' : '审核不通过';
   activeRow.dataset.reviewNote = note || '证书文件和证书信息已核验。';
   activeRow.dataset.reviewer = '李教研';
@@ -205,7 +277,7 @@ function handleReview(result) {
   updateMetrics();
   applyFilters();
   closeDialog('review-dialog');
-  showToast(result === 'pass' ? '证书审核通过，列表已更新。' : '证书已驳回，已保留驳回原因。');
+  showToast(result === 'pass' ? '证书审核通过，列表已更新。' : (noApprovedVersion ? '证书已驳回；无审核通过版本，该证书不再满足资质要求，发布与排课按目标专业重新校验。' : '证书已驳回，已保留驳回原因。'));
 }
 
 filterForm?.addEventListener('submit', (event) => { event.preventDefault(); applyFilters(); });
@@ -220,7 +292,7 @@ document.addEventListener('click', (event) => {
   if (actionElement && actionElement.dataset.action !== 'download-current') {
     const row = actionElement.closest('tr[data-certificate-id]');
     if (row) {
-      ({preview: openPreview, download: () => showToast(`已准备下载：${row.dataset.file}`), review: openReview, reupload: openReupload, view: openDetail, delete: openDelete}[actionElement.dataset.action])?.(row);
+      ({preview: openPreview, download: () => showToast(`已准备下载：${row.dataset.file}`), review: openReview, reupload: openReupload, view: openDetail, delete: openDelete, withdraw: (target) => openStatusConfirm(target, 'withdraw'), archive: (target) => openStatusConfirm(target, 'archive')}[actionElement.dataset.action])?.(row);
     }
   }
   if (event.target.closest('[data-dialog-close]')) {
@@ -238,6 +310,7 @@ document.addEventListener('click', (event) => {
     applyFilters();
     showToast(`已删除证书：${deletedName}`);
   }
+  if (event.target.id === 'certificate-status-confirm') confirmCertificateStatus(event.target.dataset.confirmAction);
   if (event.target.matches('[data-action="download-current"]') && activeRow) showToast(`已准备下载：${activeRow.dataset.file}`);
 });
 
@@ -250,10 +323,17 @@ document.querySelector('#reupload-form')?.addEventListener('submit', (event) => 
     if (error) error.hidden = false;
     return;
   }
+  activeRow.dataset.previousStatus = activeRow.dataset.status;
   activeRow.dataset.status = '待审核';
   activeRow.dataset.source = '教师端上传';
+  activeRow.dataset.previousFile = activeRow.dataset.file || '';
   activeRow.dataset.file = file.name;
   activeRow.dataset.uploadedAt = '2026-09-08 15:20';
+  // 驳回重传：生成新 file_version，旧文件/旧审批结论/旧来源只读保留（原型以版本递增与留痕字段体现）。
+  const currentVersion = Number(String(activeRow.dataset.fileVersion || 'v1').replace(/[^0-9]/g, '')) || 1;
+  activeRow.dataset.previousReview = activeRow.dataset.reviewNote || '';
+  activeRow.dataset.fileVersion = `v${currentVersion + 1}`;
+  if (activeRow.children[10]) activeRow.children[10].textContent = activeRow.dataset.fileVersion;
   if (activeRow.children[8]) activeRow.children[8].textContent = activeRow.dataset.source;
   updateStatusCell(activeRow);
   updateActionCell(activeRow);

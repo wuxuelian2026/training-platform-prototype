@@ -1,6 +1,34 @@
+import { toCanonicalCourseId } from './course-seed.js';
+
 const STORAGE_KEY = 'hbyx-iteration1-demo-v1';
 // v2 (CR-2026-003 / I1-DEC-19): retire the legacy parallel course numbering; demo data restarts from seed.
 const SCHEMA_VERSION = 2;
+
+// I1-DEF-008: data written before I1-DEC-19 still points at the retired course numbering, which made
+// products unresolvable (学员端视频课程 0 门、后台关联课程为空) on any browser with history. Rewriting the
+// course references on read keeps those browsers usable without asking reviewers to clear localStorage.
+const COURSE_REFERENCE_COLLECTIONS = ['courses', 'library', 'products', 'classes', 'orders', 'applications', 'videoEntitlements'];
+
+function migrateCourseReferences(state) {
+  let changed = false;
+  COURSE_REFERENCE_COLLECTIONS.forEach(collection => {
+    (state[collection] || []).forEach(record => {
+      if (!record || typeof record !== 'object') return;
+      ['courseId', 'sourceCourseId'].forEach(field => {
+        const canonical = toCanonicalCourseId(record[field]);
+        if (canonical === record[field]) return;
+        record[field] = canonical;
+        changed = true;
+      });
+      if (collection !== 'courses') return;
+      const canonicalId = toCanonicalCourseId(record.id);
+      if (canonicalId === record.id) return;
+      record.id = canonicalId;
+      changed = true;
+    });
+  });
+  return changed;
+}
 
 const clone = value => JSON.parse(JSON.stringify(value));
 const defaultState = () => ({
@@ -20,6 +48,7 @@ const defaultState = () => ({
   resources: [],
   library: [],
   products: [],
+  featuredTeacherIds: ['teacher-wang', 'teacher-chen'],
   classes: [],
   orders: [],
   // P0-1: one demo enrollment record so the admin class roster has a real detail row to show.
@@ -39,7 +68,12 @@ function readStored() {
     // otherwise demo-account isolation checks appear to fail.
     if (stored.schemaVersion && stored.schemaVersion !== SCHEMA_VERSION) return defaultState();
     const base = defaultState();
-    return { ...base, ...stored, schemaVersion: SCHEMA_VERSION, accounts: stored.accounts || base.accounts, students: stored.students || base.students };
+    const merged = { ...base, ...stored, schemaVersion: SCHEMA_VERSION, accounts: stored.accounts || base.accounts, students: stored.students || base.students };
+    // The repaired payload is written back once so the migrated ids are what the browser actually holds.
+    if (migrateCourseReferences(merged)) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* private mode: in-memory migration still applies. */ }
+    }
+    return merged;
   } catch {
     return defaultState();
   }
@@ -118,6 +152,11 @@ export function removeDemoRecord(collection, id) {
 }
 
 export function resetDemoData() {
+  // I1-DEF-008: 学员端 keeps its own per-tab demo cache, so "恢复初始数据" has to clear it as well or a
+  // reset browser would still merge stale course and order copies back in.
+  try {
+    sessionStorage.removeItem('hbyx-mini-learner-demo');
+  } catch { /* storage may be unavailable; the shared store reset still applies. */ }
   return save(defaultState());
 }
 

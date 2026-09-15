@@ -1,19 +1,22 @@
 import { relativePath } from './paths.js';
+import { mountFieldConstraints } from './field-constraints.js';
+import { mountPageHelp } from './page-help.js';
+import { toLocalDateTimeString, toLocalMonthString } from './date-utils.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
 import { accountStudents, demoId, demoTime, getCurrentAccountId, readDemoState, subscribeDemoState, upsertDemoRecord, updateDemoRecord, writeDemoState } from './demo-store.js';
 import { classSeed } from './class-seed.js';
+import { resolveHomeBanners } from './banner-seed.js';
+import { toCanonicalCourseId } from './course-seed.js';
 import { allProducts, productForCourse } from './product-seed.js';
+import { courseAgesText, courseArchiveFor, courseDisplayTags } from './course-display.js';
 
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
 const params = new URLSearchParams(location.search);
 const STORAGE_KEY = 'hbyx-mini-learner-demo';
-const homeBanners = [
-  { kicker: '本周精选', title: '让练习成为看得见的成长', text: '精选声乐、舞蹈和器乐课程，找到适合自己的学习节奏。', mark: '艺' },
-  { kicker: '秋季招生', title: '面授班级正在招生', text: '查看教师、校区、课时和剩余名额，选择合适的班级。', mark: '课' },
-  { kicker: '视频课程', title: '随时打开一节好课', text: '支持断点续播，利用碎片时间完成你的艺术训练。', mark: '学' }
-];
+// D-03：首页轮播与后台「轮播图管理」同一份种子，只展示状态为「已启用」的轮播图。
+const homeBanners = resolveHomeBanners(readDemoState());
 
 // P0-1 / P0-2: learner classes are projected from the canonical class seed, so the admin CRM and the
 // learner app always show the same class key, name, enrollment count and 快速报名 switch value.
@@ -26,6 +29,7 @@ const learnerClassCourses = classSeed.filter(item => item.display === '已展示
   const remaining = Math.max(0, Number(item.capacity || 0) - Number(item.enrolled || 0));
   return {
     id: item.id, type: 'class', name: item.name, className: item.className, courseName: item.courseName,
+    courseId: item.courseId,
     teacher: item.teacher, category: item.category, discipline: item.discipline, field: item.field, professional: item.professional,
     level: item.level, age: item.age, hours: item.lessons, lessons: item.lessons, price: Number(item.price),
     season: item.season, campus: item.campus, classroom: item.classroom, schedule: item.schedule,
@@ -44,9 +48,9 @@ const demo = {
     ...learnerClassCourses
   ],
   teachers: [
-    { id: 'teacher-001', name: '陈晨', title: '声乐教师', years: 12, tags: ['声乐演唱', '艺术歌曲'], tagline: '让每一位学员找到自然、稳定且有表现力的声音。', intro: '专注声乐发声与作品演唱训练，擅长建立循序渐进的练习路径。', profile: [{ type: 'text', text: '陈晨老师长期从事声乐教学与舞台实践，注重气息、共鸣和作品表达的协调训练，并根据学员基础设计阶段性练习目标。' }, { type: 'image', title: '声乐课堂教学记录', caption: '课堂中针对气息控制与作品处理进行示范指导' }, { type: 'text', text: '课程强调听辨、示范、练习与反馈的完整闭环，帮助学员在稳定发声的基础上建立个人演唱表达。' }, { type: 'video', title: '声乐发声训练示范', caption: '教师示范视频 · 03:20' }] },
-    { id: 'teacher-002', name: '王玥', title: '舞蹈教师', years: 8, tags: ['中国舞', '身韵训练'], tagline: '从基本功到舞台表达，让身体真正理解动作。', intro: '关注基本功、身韵和舞台表现，帮助学员建立稳定的身体控制。', profile: [{ type: 'text', text: '王玥老师坚持基本功与舞蹈表达并重，通过分解练习、组合训练和课堂展示，帮助学员建立动作规范与身体意识。' }, { type: 'image', title: '中国舞课堂训练', caption: '少儿中国舞课堂组合训练现场' }, { type: 'text', text: '教学过程关注学员年龄特点与身体条件，在安全训练的前提下逐步提升柔韧、协调和节奏表现。' }, { type: 'video', title: '身韵组合教学示范', caption: '教师示范视频 · 02:45' }] },
-    { id: 'teacher-003', name: '李老师', title: '钢琴教师', years: 10, tags: ['钢琴启蒙', '视奏'], tagline: '用清晰的方法建立兴趣，也建立扎实的演奏习惯。', intro: '从兴趣启蒙到基础演奏，重视节奏感与音乐表达的培养。', profile: [{ type: 'text', text: '李老师擅长钢琴启蒙与基础演奏教学，通过节奏、识谱、手型和作品练习，帮助学员形成稳定的练琴习惯。' }, { type: 'image', title: '钢琴一对一课堂', caption: '课堂中进行手型与视奏指导' }, { type: 'text', text: '教学内容兼顾技术训练和音乐理解，鼓励学员通过小型展示积累舞台经验与学习信心。' }, { type: 'video', title: '钢琴启蒙课堂片段', caption: '课堂视频 · 03:05' }] }
+    { id: 'teacher-chen', sourceTeacherId: 'teacher-chen', name: '陈晨', title: '声乐教师', years: 12, tags: ['声乐演唱', '艺术歌曲'], tagline: '让每一位学员找到自然、稳定且有表现力的声音。', intro: '专注声乐发声与作品演唱训练，擅长建立循序渐进的练习路径。', profile: [{ type: 'text', text: '陈晨老师长期从事声乐教学与舞台实践，注重气息、共鸣和作品表达的协调训练，并根据学员基础设计阶段性练习目标。' }, { type: 'image', title: '声乐课堂教学记录', caption: '课堂中针对气息控制与作品处理进行示范指导' }, { type: 'text', text: '课程强调听辨、示范、练习与反馈的完整闭环，帮助学员在稳定发声的基础上建立个人演唱表达。' }, { type: 'video', title: '声乐发声训练示范', caption: '教师示范视频 · 03:20' }] },
+    { id: 'teacher-wang', sourceTeacherId: 'teacher-wang', name: '王玥', title: '舞蹈教师', years: 8, tags: ['中国舞', '身韵训练'], tagline: '从基本功到舞台表达，让身体真正理解动作。', intro: '关注基本功、身韵和舞台表现，帮助学员建立稳定的身体控制。', profile: [{ type: 'text', text: '王玥老师坚持基本功与舞蹈表达并重，通过分解练习、组合训练和课堂展示，帮助学员建立动作规范与身体意识。' }, { type: 'image', title: '中国舞课堂训练', caption: '少儿中国舞课堂组合训练现场' }, { type: 'text', text: '教学过程关注学员年龄特点与身体条件，在安全训练的前提下逐步提升柔韧、协调和节奏表现。' }, { type: 'video', title: '身韵组合教学示范', caption: '教师示范视频 · 02:45' }] },
+    { id: 'teacher-li', sourceTeacherId: 'teacher-li', name: '李老师', title: '钢琴教师', years: 10, tags: ['钢琴启蒙', '视奏'], tagline: '用清晰的方法建立兴趣，也建立扎实的演奏习惯。', intro: '从兴趣启蒙到基础演奏，重视节奏感与音乐表达的培养。', profile: [{ type: 'text', text: '李老师擅长钢琴启蒙与基础演奏教学，通过节奏、识谱、手型和作品练习，帮助学员形成稳定的练琴习惯。' }, { type: 'image', title: '钢琴一对一课堂', caption: '课堂中进行手型与视奏指导' }, { type: 'text', text: '教学内容兼顾技术训练和音乐理解，鼓励学员通过小型展示积累舞台经验与学习信心。' }, { type: 'video', title: '钢琴启蒙课堂片段', caption: '课堂视频 · 03:05' }] }
   ],
   orders: [
     { id: 'OD202609080001', courseId: 'COURSE-CR-2026-0002', status: '已支付', amount: 1280, studentId: 'student-001', createdAt: '2026-09-08 14:20', paidAt: '2026-09-08 14:22' },
@@ -81,6 +85,24 @@ const demo = {
   currentStudentId: 'student-001'
 };
 
+// CR-2026-012：展示信息统一来自课程档案（课程级存储），学员端卡片与详情页共用同一份取数。
+function applyCourseDisplay(item) {
+  const courseId = item.type === 'video' ? item.id : item.courseId;
+  const archive = courseArchiveFor(courseId || item.id);
+  if (!archive) return item;
+  const archiveDetail = String(archive.detail || '').split(/\n+/).map(text => text.trim()).filter(Boolean);
+  const agesText = courseAgesText(archive);
+  return {
+    ...item,
+    cover: archive.cover || '',
+    coverFile: archive.coverFile || '',
+    level: archive.difficulty || item.level,
+    age: agesText || item.age,
+    detail: archiveDetail.length ? archiveDetail : item.detail,
+    tags: courseDisplayTags(archive),
+    recommendation: archive.recommendation || ''
+  };
+}
 function sharedLearnerCourses(shared) {
   const validRows = (rows) => (Array.isArray(rows) ? rows : []).filter(item => item && typeof item === 'object');
   const courses = validRows(shared.courses).filter(item => item.status === '已完成').map(item => ({
@@ -91,20 +113,22 @@ function sharedLearnerCourses(shared) {
     const product = products.find(row => row.courseId === item.id);
     return product ? { ...item, price: Number(product.price || 0), status: '可购买', preview: product.preview, previewHours: product.previewHours } : item;
   }).concat(validRows(shared.classes).filter(item => item.display === '已展示').map(item => ({
-    id: item.id, type: 'class', name: item.name, className: item.className || item.name, courseName: item.courseName || item.course, teacher: item.teacher, category: item.category, discipline: item.discipline || item.category, field: item.field || item.category, professional: item.professional || item.category, level: item.level || '初级', age: item.age || '全年龄', hours: Number(item.lessons || item.hours || 0), lessons: Number(item.lessons || item.hours || 0), price: Number(item.price || 0), season: item.batch, campus: item.campus, classroom: item.classroom, schedule: item.schedule, seats: `${Math.max(0, Number(item.capacity || 0) - Number(item.enrolled || 0))}/${item.capacity}`, classStatus: Number(item.enrolled || 0) >= Number(item.capacity || 0) ? '已满员' : item.status || '招生中', deadline: item.deadline, status: '可报名', fast: item.fast || '否', capacity: Number(item.capacity || 0), enrolled: Number(item.enrolled || 0), intro: item.intro || ''
-  })));
+    id: item.id, courseId: item.courseId, type: 'class', name: item.name, className: item.className || item.name, courseName: item.courseName || item.course, teacher: item.teacher, category: item.category, discipline: item.discipline || item.category, field: item.field || item.category, professional: item.professional || item.category, level: item.level || '初级', age: item.age || '全年龄', hours: Number(item.lessons || item.hours || 0), lessons: Number(item.lessons || item.hours || 0), price: Number(item.price || 0), season: item.batch, campus: item.campus, classroom: item.classroom, schedule: item.schedule, seats: `${Math.max(0, Number(item.capacity || 0) - Number(item.enrolled || 0))}/${item.capacity}`, classStatus: Number(item.enrolled || 0) >= Number(item.capacity || 0) ? '已满员' : item.status || '招生中', deadline: item.deadline, status: '可报名', fast: item.fast || '否', capacity: Number(item.capacity || 0), enrolled: Number(item.enrolled || 0), intro: item.intro || ''
+  }))).map(applyCourseDisplay);
 }
 
 function readState() {
   try {
     const stored = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}');
-    const storedCourses = Array.isArray(stored.courses) ? stored.courses : [];
+    // I1-DEF-008: a session started before I1-DEC-19 keeps the retired course numbering, so the stored
+    // copies are matched back onto the canonical seed ids instead of dropping out of the merged list.
+    const storedCourses = (Array.isArray(stored.courses) ? stored.courses : []).filter(item => item && typeof item === 'object').map(item => ({ ...item, id: toCanonicalCourseId(item.id) }));
     const knownCourses = demo.courses.map(item => ({ ...item, ...(storedCourses.find(row => row.id === item.id) || {}) }));
     const additionalCourses = storedCourses.filter(item => !demo.courses.some(row => row.id === item.id));
     const storedTeachers = Array.isArray(stored.teachers) ? stored.teachers : [];
     const knownTeachers = demo.teachers.map(item => ({ ...item, ...(storedTeachers.find(row => row.id === item.id) || {}) }));
     const additionalTeachers = storedTeachers.filter(item => !demo.teachers.some(row => row.id === item.id));
-    const storedOrders = Array.isArray(stored.orders) ? stored.orders : [];
+    const storedOrders = (Array.isArray(stored.orders) ? stored.orders : []).filter(item => item && typeof item === 'object').map(item => ({ ...item, courseId: toCanonicalCourseId(item.courseId) }));
     const knownOrders = demo.orders.map(item => ({ ...item, ...(storedOrders.find(row => row.id === item.id) || {}) }));
     const additionalOrders = storedOrders.filter(item => !demo.orders.some(row => row.id === item.id));
     const storedConsultations = Array.isArray(stored.consultations) ? stored.consultations : [];
@@ -140,7 +164,9 @@ function readState() {
       }
     });
     // Unsellable video courses stay resolvable by id (order detail, deep links) but leave the browse lists.
-    const sellableCourses = mergedCourses.filter(item => item.type !== 'video' || item.sellable !== false);
+    // CR-2026-012：难度、年龄、封面、图文详情、标签与推荐语统一取课程档案，卡片与详情页共用同一份值。
+    const displayCourses = mergedCourses.map(applyCourseDisplay);
+    const sellableCourses = displayCourses.filter(item => item.type !== 'video' || item.sellable !== false);
     // One logical order must appear once: shared-store records win over the local demo copy, otherwise a
     // resumed order can render a stale status while the shared record already moved on.
     const mergedOrders = (() => {
@@ -151,7 +177,9 @@ function readState() {
       accountOrders.forEach(order => byId.set(order.id, { ...(byId.get(order.id) || {}), ...order }));
       return [...byId.values()];
     })();
-    return { ...demo, ...stored, accountId, students: learners.length ? learners : demo.students, currentStudentId: learners.some(item => item.id === stored.currentStudentId) ? stored.currentStudentId : learners[0]?.id || demo.currentStudentId, courses: sellableCourses, allCourses: mergedCourses, teachers: [...knownTeachers, ...additionalTeachers], orders: mergedOrders, consultations: [...knownConsultations, ...additionalConsultations], messages: [...knownMessages, ...additionalMessages] };
+    const featuredTeacherIds = new Set(shared.featuredTeacherIds || []);
+    const featuredTeachers = [...knownTeachers, ...additionalTeachers].filter(item => featuredTeacherIds.has(item.sourceTeacherId || item.id));
+    return { ...demo, ...stored, accountId, students: learners.length ? learners : demo.students, currentStudentId: learners.some(item => item.id === stored.currentStudentId) ? stored.currentStudentId : learners[0]?.id || demo.currentStudentId, courses: sellableCourses, allCourses: displayCourses, teachers: featuredTeachers, allTeachers: [...knownTeachers, ...additionalTeachers], orders: mergedOrders, consultations: [...knownConsultations, ...additionalConsultations], messages: [...knownMessages, ...additionalMessages] };
   } catch (error) { console.warn('学员端演示数据合并失败，回退到内置演示数据。', error); return { ...demo }; }
 }
 let state = readState();
@@ -188,7 +216,10 @@ function courseCard(item) {
   const detailTags = [item.level, isClass ? item.age : ''].filter(Boolean).map(tag => pill(tag, 'gray')).join('');
   const status = isClass ? item.classStatus || '招生中' : '';
   const statusTag = status ? `<span class="mp-course-status">${pill(status, status.includes('满') ? 'gray' : 'green')}</span>` : '';
-  return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${item.id}"><div class="mp-course-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>${isClass ? '面授课程' : '视频课程'}</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">¥${item.price.toLocaleString()}.00</strong></div><div class="mp-course-tags">${professionalTag}${detailTags}${statusTag}</div><div class="mp-course-teacher-row"><div class="mp-course-teacher"><span class="mp-avatar mp-course-avatar" aria-hidden="true">${esc(teacherName.slice(0, 1))}</span><span class="mp-course-teacher-name">${esc(teacherName)}</span></div><span class="mp-course-hours">共${esc(item.hours)}课时</span></div></div></a>`;
+  // CR-2026-012：卡片读取课程档案的课程标签与 C 端推荐语。
+  const archiveTags = (item.tags || []).slice(0, 2).map(value => pill(value, 'gray')).join('');
+  const recommendLine = item.recommendation ? `<p class="mp-course-recommend">${esc(item.recommendation)}</p>` : '';
+  return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${item.id}"><div class="mp-course-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>${isClass ? '面授课程' : '视频课程'}</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">¥${item.price.toLocaleString()}.00</strong></div><div class="mp-course-tags">${professionalTag}${detailTags}${archiveTags}${statusTag}</div><div class="mp-course-teacher-row"><div class="mp-course-teacher"><span class="mp-avatar mp-course-avatar" aria-hidden="true">${esc(teacherName.slice(0, 1))}</span><span class="mp-course-teacher-name">${esc(teacherName)}</span></div><span class="mp-course-hours">共${esc(item.hours)}课时</span></div>${recommendLine}</div></a>`;
 }
 function teacherLink(item) { return `/learner/pages/teacher-detail.html?teacherId=${item.id}`; }
 function isLoggedIn() { return sessionStorage.getItem('hbyx-mini-logged-in') === '1'; }
@@ -207,16 +238,19 @@ function renderHome() {
   const classCourse = state.courses.find(item => item.type === 'class' && !item.isFastRegistration) || state.courses[1];
   // RM-F-02: the home "视频课程推荐" slot follows the product shelf state as well.
   const homeVideoCourse = state.courses.find(item => item.type === 'video' && item.sellable !== false);
-  layout(stack(`<form id="home-search-form" class="mp-home-search" role="search"><input id="home-search" aria-label="搜索课程或老师" placeholder="搜索课程或老师"><button class="mp-search-submit" type="submit" aria-label="搜索">⌕</button></form><section id="home-carousel" class="mp-carousel">${homeBanners.map((banner, index) => `<article class="mp-banner ${index === 0 ? 'active' : ''}" data-banner-index="${index}"><div class="mp-banner-copy"><span class="mp-eyebrow">${banner.kicker}</span><h2>${banner.title}</h2><p>${banner.text}</p></div><span class="mp-banner-mark">${banner.mark}</span></article>`).join('')}<div class="mp-carousel-dots">${homeBanners.map((_, index) => `<button class="mp-carousel-dot ${index === 0 ? 'active' : ''}" data-banner-dot="${index}" aria-label="第${index + 1}张轮播图"></button>`).join('')}</div></section>${card(`<div class="mp-section-head"><h2>分类入口</h2><span class="mp-muted">探索艺术方向</span></div><div class="mp-category-row">${categoryItems.map(([label, icon, category]) => `<a class="mp-category" href="${category ? `/learner/pages/courses.html?category=${encodeURIComponent(category)}` : '/learner/pages/courses.html'}"><span class="mp-category-icon">${icon}</span><span>${label}</span></a>`).join('')}</div>`)}${card(`<div class="mp-section-head"><h2>面授课程招生</h2><a class="mp-link" href="/learner/pages/fast-registration.html">查看全部</a></div>${courseCard(classCourse)}`)}${card(`<div class="mp-section-head"><h2>视频课程推荐</h2><a class="mp-link" href="/learner/pages/courses.html">课程库</a></div>${courseCard(state.courses[0])}`)}${card(`<div class="mp-section-head"><h2>名师推荐</h2><a class="mp-link" href="/learner/pages/teachers.html">更多名师</a></div><div class="mp-scroll-row">${state.teachers.map(teacherCard).join('')}</div>`)}`));
+  // I1-DEF-010: the slot renders the resolved sellable video course, and falls back to an empty state
+  // instead of borrowing a 面授课程 when no video course is on sale.
+  const videoSpotlight = homeVideoCourse ? courseCard(homeVideoCourse) : '<div class="mp-empty">暂无在售视频课程</div>';
+  layout(stack(`<form id="home-search-form" class="mp-home-search" role="search"><input id="home-search" aria-label="搜索课程或老师" placeholder="搜索课程或老师"><button class="mp-search-submit" type="submit" aria-label="搜索">⌕</button></form><section id="home-carousel" class="mp-carousel">${homeBanners.map((banner, index) => `<article class="mp-banner ${index === 0 ? 'active' : ''}" data-banner-index="${index}"><div class="mp-banner-copy"><span class="mp-eyebrow">${banner.kicker}</span><h2>${banner.title}</h2><p>${banner.text}</p></div><span class="mp-banner-mark">${banner.mark}</span></article>`).join('')}<div class="mp-carousel-dots">${homeBanners.map((_, index) => `<button class="mp-carousel-dot ${index === 0 ? 'active' : ''}" data-banner-dot="${index}" aria-label="第${index + 1}张轮播图"></button>`).join('')}</div></section>${card(`<div class="mp-section-head"><h2>分类入口</h2><span class="mp-muted">探索艺术方向</span></div><div class="mp-category-row">${categoryItems.map(([label, icon, category]) => `<a class="mp-category" href="${category ? `/learner/pages/courses.html?category=${encodeURIComponent(category)}` : '/learner/pages/courses.html'}"><span class="mp-category-icon">${icon}</span><span>${label}</span></a>`).join('')}</div>`)}${card(`<div class="mp-section-head"><h2>面授课程招生</h2><a class="mp-link" href="/learner/pages/fast-registration.html">查看全部</a></div>${courseCard(classCourse)}`)}${card(`<div class="mp-section-head"><h2>视频课程推荐</h2><a class="mp-link" href="/learner/pages/courses.html">课程库</a></div>${videoSpotlight}`)}${card(`<div class="mp-section-head"><h2>名师推荐</h2><a class="mp-link" href="/learner/pages/teachers.html">更多名师</a></div><div class="mp-scroll-row">${state.teachers.map(teacherCard).join('')}</div>`)}`));
   const searchForm = document.querySelector('#home-search-form');
   searchForm.addEventListener('submit', event => { event.preventDefault(); const keyword = document.querySelector('#home-search').value.trim(); go(`/learner/pages/courses.html${keyword ? `?q=${encodeURIComponent(keyword)}` : ''}`); });
   const setBanner = index => { document.querySelectorAll('[data-banner-index]').forEach(item => item.classList.toggle('active', Number(item.dataset.bannerIndex) === index)); document.querySelectorAll('[data-banner-dot]').forEach(item => item.classList.toggle('active', Number(item.dataset.bannerDot) === index)); };
-  let bannerIndex = 0; const timer = setInterval(() => { bannerIndex = (bannerIndex + 1) % homeBanners.length; setBanner(bannerIndex); }, 4200);
+  let bannerIndex = 0; const timer = setInterval(() => { if (!homeBanners.length) return; bannerIndex = (bannerIndex + 1) % homeBanners.length; setBanner(bannerIndex); }, 4200);
   document.querySelectorAll('[data-banner-dot]').forEach(dot => dot.addEventListener('click', () => { bannerIndex = Number(dot.dataset.bannerDot); setBanner(bannerIndex); }));
   window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
 }
 function renderTeachers() { layout(stack(card(`<div class="mp-section-head"><h2>名师推荐</h2><span class="mp-muted">专业教师</span></div><p>按教师专业方向查看已发布课程。</p>`), `<div class="mp-list">${state.teachers.map(item => teacherCard(item, 'list')).join('')}</div>`)); }
-function renderTeacherDetail() { const item = state.teachers.find(row => row.id === params.get('teacherId')) || state.teachers[0]; const related = state.courses.filter(row => row.teacher === item.name); layout(stack(card(`<div class="mp-teacher-profile"><div class="mp-teacher-profile-head"><span class="mp-avatar mp-teacher-profile-avatar" aria-hidden="true">${esc(item.name.slice(0, 1))}</span><div class="mp-teacher-profile-identity"><h2>${esc(item.name)}</h2><p>${esc(item.title)} · ${item.years}年教龄</p></div></div><p class="mp-teacher-profile-tagline">${esc(item.tagline || item.intro)}</p><div class="mp-pills mp-teacher-profile-tags">${item.tags.map(tag => pill(tag, 'gray')).join('')}</div></div>`), card(`<h3>教师简介</h3><article class="mp-rich-content">${teacherRichContent(item)}</article>`), card(`<div class="mp-section-head"><h3>已发布课程</h3><span class="mp-muted">${related.length}门</span></div><div class="mp-list" style="margin-top:10px">${related.length ? related.map(row => courseCard(row)).join('') : '<div class="mp-empty">暂无已发布课程</div>'}</div>`))); }
+function renderTeacherDetail() { const teachers = state.allTeachers || state.teachers; const item = teachers.find(row => row.id === params.get('teacherId')) || teachers[0]; if (!item) { layout('<div class="mp-empty">教师信息不存在</div>'); return; } const related = state.courses.filter(row => row.teacher === item.name); layout(stack(card(`<div class="mp-teacher-profile"><div class="mp-teacher-profile-head"><span class="mp-avatar mp-teacher-profile-avatar" aria-hidden="true">${esc(item.name.slice(0, 1))}</span><div class="mp-teacher-profile-identity"><h2>${esc(item.name)}</h2><p>${esc(item.title)} · ${item.years}年教龄</p></div></div><p class="mp-teacher-profile-tagline">${esc(item.tagline || item.intro)}</p><div class="mp-pills mp-teacher-profile-tags">${item.tags.map(tag => pill(tag, 'gray')).join('')}</div></div>`), card(`<h3>教师简介</h3><article class="mp-rich-content">${teacherRichContent(item)}</article>`), card(`<div class="mp-section-head"><h3>已发布课程</h3><span class="mp-muted">${related.length}门</span></div><div class="mp-list" style="margin-top:10px">${related.length ? related.map(row => courseCard(row)).join('') : '<div class="mp-empty">暂无已发布课程</div>'}</div>`))); }
 function renderCourses() {
   const requestedCategory = params.get('category') || '';
   const disciplineOptions = [...new Set(state.courses.map(item => item.discipline).filter(Boolean))];
@@ -438,6 +472,8 @@ function renderCourseDetail(item = course('COURSE-CR-2026-0002')) {
     `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${pill(isClass ? '面授课程' : '精品视频', 'light')}${pill(status, statusTone)}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">${isClass ? '面授课程' : '精品课程'}</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2><strong>¥${item.price.toLocaleString()}.00</strong></div><p class="mp-course-detail-subtitle">${esc(item.teacher)}老师 · ${esc(item.professional || item.category)}</p><dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div>${ageFact}<div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div><dt>授课教师</dt><dd>${esc(item.teacher)}</dd></div></dl></div></section>`,
     teacherSection,
     `<section class="mp-course-detail-tab-section"><div class="mp-tabs mp-course-detail-tabs" role="tablist"><button class="mp-tab ${detailTab === 'intro' ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === 'intro'}" data-course-detail-tab="intro">课程介绍</button>${hasOutline ? `<button class="mp-tab ${detailTab === 'outline' ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === 'outline'}" data-course-detail-tab="outline">课程大纲</button>` : ''}</div>${detailTab === 'outline' ? card(`<div class="mp-section-head"><h3>课程大纲</h3><span class="mp-muted">共${item.outline.length}章</span></div>${outlineContent}`, 'mp-course-detail-section') : card(`<h3>课程介绍</h3><article class="mp-rich-content mp-course-detail-content">${detailParagraphs}<figure class="mp-rich-figure"><div class="mp-rich-image" role="img" aria-label="${esc(item.name)}课程内容图片占位"><span>课程图文</span><strong>${esc(item.professional || item.category)}课堂内容</strong></div><figcaption>课程内容展示，以实际发布内容为准</figcaption></figure></article>`, 'mp-course-detail-section')}</section>`,
+    // CR-2026-012：详情页展示课程档案的封面、标签与 C 端推荐语。
+    `<section class="mp-course-detail-display"><div class="mp-section-head"><h3>展示信息</h3><span class="mp-muted">课程级维护</span></div><dl class="mp-course-detail-facts"><div><dt>课程封面</dt><dd>${esc(item.coverFile || (item.cover === '已配置' ? '已配置' : '未配置'))}</dd></div><div><dt>课程标签</dt><dd>${esc((item.tags || []).join('、') || '—')}</dd></div><div><dt>C 端推荐语</dt><dd>${esc(item.recommendation || '—')}</dd></div></dl></section>`,
     detailActions(item)
   ));
   document.querySelectorAll('[data-course-detail-tab]').forEach(tab => tab.addEventListener('click', () => go(`/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}&tab=${tab.dataset.courseDetailTab}`)));
@@ -803,7 +839,7 @@ function learningRecords() {
   const videoProgress = state.chapterDone.includes('chapter-003') ? 100 : course('COURSE-CR-2026-0002').progress;
   const records = [
     { id: 'learning-class-001', courseId: 'class-001', studentIds: ['student-001'], type: 'class', status: 'ongoing', progress: 50, completedLessons: 8, className: '2026秋季中国舞启蒙一班', teacher: '王玥', classroom: '龙泉校区 · 综合楼302', nextLesson: '09-16 09:00', lessonNo: 9, lessonStatus: '待上课', lessonNote: '09-16 09:00-10:30' },
-    { id: 'learning-class-002-ongoing', courseId: 'class-001', studentIds: ['student-001'], type: 'class', status: 'ongoing', progress: 38, completedLessons: 6, name: '少儿中国舞提高班', className: '2026秋季中国舞提高二班', teacher: '王玥', classroom: '龙泉校区 · 舞蹈楼201', nextLesson: '正在上课', lessonNo: 7, lessonStatus: '上课中', lessonNote: '今日 14:00-15:30' },
+    { id: 'learning-class-002-ongoing', courseId: 'class-001', studentIds: ['student-001'], type: 'class', status: 'ongoing', progress: 38, completedLessons: 6, name: '少儿中国舞提高班', className: '2026秋季中国舞提高二班', teacher: '王玥', classroom: '南湖校区 · 形体教室105', nextLesson: '正在上课', lessonNo: 7, lessonStatus: '上课中', lessonNote: '今日 10:00-11:30' },
     { id: 'learning-class-003-ongoing', courseId: 'class-001', studentIds: ['student-001'], type: 'class', status: 'ongoing', progress: 38, completedLessons: 6, name: '少儿中国舞基础班', className: '2026秋季中国舞基础三班', teacher: '王玥', classroom: '南湖校区 · 形体教室105', nextLesson: '09-20 10:00', lessonNo: 6, lessonStatus: '已完成', lessonNote: '09-13 10:00-11:30' },
     { id: 'learning-class-004-ongoing', courseId: 'class-003', studentIds: ['student-002'], type: 'class', status: 'ongoing', progress: 19, completedLessons: 3, name: '少儿中国舞提高班', className: '2026秋季中国舞提高二班', teacher: '王玥', classroom: '南湖校区 · 形体教室105', nextLesson: '09-20 10:00', lessonNo: 4, lessonStatus: '待上课', lessonNote: '09-20 10:00-11:30' },
     { id: 'learning-class-005-ongoing', courseId: 'class-003', studentIds: ['student-002'], type: 'class', status: 'ongoing', progress: 25, completedLessons: 4, name: '少儿中国舞提高班', className: '2026秋季中国舞提高排练班', teacher: '王玥', classroom: '南湖校区 · 形体教室105', nextLesson: '09-21 10:00', lessonNo: 5, lessonStatus: '待上课', lessonNote: '09-21 10:00-11:30' },
@@ -1009,7 +1045,7 @@ function renderStudentEdit() {
   if (!isLoggedIn()) { layout(stack(`<section class="mp-locked"><strong>登录后维护学员资料</strong><p>登录后可添加、编辑或删除关联学员。</p><a class="mp-button" href="/login.html?redirect=${encodeURIComponent('/learner/pages/student-edit.html')}">去登录</a></section>`)); return; }
   const student = params.get('studentId') ? state.students.find(item => item.id === params.get('studentId')) : null;
   if (params.get('studentId') && !student) { layout(stack(`<div class="mp-empty">未找到该学员</div><a class="mp-button secondary" href="/learner/pages/student-management.html">返回学员管理</a>`)); return; }
-  const maxBirthMonth = new Date().toISOString().slice(0, 7);
+  const maxBirthMonth = toLocalMonthString();
   const isEditing = Boolean(student);
   const gender = student?.gender || (student?.relation === '女儿' ? '女' : student?.relation === '儿子' ? '男' : '');
   const relationOptions = ['女儿', '儿子', '本人', '其他'];
@@ -1062,7 +1098,7 @@ function showConsultDialog() {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
-    state.consultations.unshift({ id: `C${Date.now()}`, courseId: params.get('courseId') || 'COURSE-CR-2026-0002', status: '待回复', text: '已提交 · 等待课程顾问联系。', submittedAt: new Date().toISOString().slice(0, 16).replace('T', ' '), reply: '', replyAt: '', progress: '待跟进', anonymous: !isLoggedIn() });
+    state.consultations.unshift({ id: `C${Date.now()}`, courseId: params.get('courseId') || 'COURSE-CR-2026-0002', status: '待回复', text: '已提交 · 等待课程顾问联系。', submittedAt: toLocalDateTimeString(), reply: '', replyAt: '', progress: '待跟进', anonymous: !isLoggedIn() });
     saveState();
     dialog.close();
     toast('咨询已提交，课程顾问会主动联系');
@@ -1095,6 +1131,8 @@ document.addEventListener('click', event => { const action = event.target.closes
 
 subscribeDemoState(() => {
   state = readState();
+  if (path.endsWith('/index.html') || path.endsWith('/learner/')) renderHome();
+  if (path.endsWith('/teachers.html')) renderTeachers();
   if (path.endsWith('/courses.html')) renderCourses();
   if (path.endsWith('/fast-registration.html')) renderFastRegistration();
   if (path.endsWith('/learning.html')) renderLearning();
@@ -1125,3 +1163,9 @@ else if (path.endsWith('/profile.html')) renderProfile();
 else if (path.endsWith('/student-management.html')) renderStudentManagement();
 else if (path.endsWith('/student-edit.html')) renderStudentEdit();
 else if (path.endsWith('/settings.html')) renderSettings();
+
+// 学员端与后台共用字段规格：按页面路径应用输入约束。
+mountFieldConstraints('learner/' + (path.split('/').pop() || '').replace('.html', ''));
+
+// 页面说明入口：内容来自 spec/fields/，与后台共用同一份字段口径。
+mountPageHelp({ pageKey: 'learner/' + (path.split('/').pop() || '').replace('.html', ''), title: document.title });

@@ -32,7 +32,7 @@ if (agreementRoot) {
   function render() {
     const item = agreements[activeKey];
     agreementRoot.innerHTML = `<div class="agreement-page">
-      <div class="page-head"><div><h1>协议管理</h1><p>维护学员端展示的关于我们、用户协议和隐私政策内容。</p></div></div>
+      <div class="page-head"><div><h1>协议管理</h1></div></div>
       <div class="agreement-workspace">
         <aside class="agreement-tabs" aria-label="协议类型" role="tablist">
           ${Object.entries(agreements).map(([key, value]) => `<button type="button" class="agreement-tab${key === activeKey ? ' active' : ''}" data-agreement-tab="${key}" role="tab" aria-selected="${key === activeKey}"><span>${value.label}</span><small>${key === 'about' ? '平台介绍' : key === 'user' ? '使用规则' : '信息保护'}</small></button>`).join('')}

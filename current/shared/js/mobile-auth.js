@@ -1,4 +1,6 @@
 import { relativePath } from './paths.js';
+import { mountFieldConstraints } from './field-constraints.js';
+import { mountPageHelp } from './page-help.js';
 import { getCurrentAccountId, setCurrentAccountId } from './demo-store.js';
 import { teacherAccounts } from './course-seed.js';
 
@@ -85,3 +87,9 @@ if (roleButtons.length && roleInput) {
     location.href = safeRedirect(redirect, role);
   });
 }
+
+// 登录页与后台共用字段规格：手机号、验证码、密码的校验口径来自 spec/fields/learner.js。
+mountFieldConstraints('learner/login');
+
+// 页面说明入口：内容来自 spec/fields/，与后台共用同一份字段口径。
+mountPageHelp({ pageKey: 'learner/login', title: document.title });

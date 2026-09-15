@@ -1,13 +1,24 @@
 import { relativePath } from './paths.js';
+import { mountFieldConstraints } from './field-constraints.js';
+import { mountPageHelp } from './page-help.js';
+import { toLocalDateString } from './date-utils.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
 import { demoId, demoTime, getCurrentAccountId, readDemoState, upsertDemoRecord } from './demo-store.js';
 import { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } from './course-seed.js';
+import { courseAgesText } from './course-display.js';
 
 const teacherMain = document.querySelector('.mobile-main');
 const teacherPath = location.pathname;
 const teacherKey = 'hbyx-mini-teacher-demo';
 const teacherProfileDefaults = {
+  gender: '女',
+  birthMonth: '1990-05',
+  politicalStatus: '中共党员',
+  ethnicity: '汉族',
+  highestEducation: '本科',
+  teachingYears: '8',
+  professionalTitle: '副教授',
   mobile: '13800138026',
   email: 'wangyue@hbyx.edu.cn',
   emergencyName: '王明远',
@@ -29,17 +40,17 @@ const teacherCertificateDefaults = [
   { id: 'cert-005', name: '中国舞等级考试考官证', number: 'KG-2022-1056', type: '艺术等级证', issuer: '中国舞蹈家协会', issuedAt: '2022-10-01', expiresAt: '2026-10-15', status: '审核通过', validity: '即将过期', source: '教师端上传', file: '中国舞等级考试考官证.pdf', reviewedAt: '2022-10-06', reviewNote: '证书信息已核验，请在有效期结束前办理续期。' }
 ];
 const teacherContractDefaults = [
-  { id: 'contract-2027', name: '2026-2027年度教师合作协议', number: 'CT2026090021', type: '合作协议', status: '待签署', startAt: '2026-10-01', endAt: '2027-09-30', signedAt: '', version: 'v1', rate: 180, campus: '龙泉校区', course: '少儿中国舞基础、中国舞身韵训练', file: 'CT2026090021-教师合作协议.pdf', pushedAt: '2026-09-09', note: '请在2026年9月20日前完成签署。' },
-  { id: 'contract-2026', name: '2026年度教师合作协议', number: 'CT2026010008', type: '合作协议', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', signedAt: '2026-01-03', version: 'v1', rate: 180, campus: '龙泉校区', course: '少儿中国舞基础、中国舞身韵训练', file: 'CT2026010008-教师合作协议.pdf', pushedAt: '2026-01-02', note: '合同已完成双方签署，按有效课次计薪。' },
-  { id: 'contract-2025', name: '2025年度教师合作协议', number: 'CT2025010006', type: '合作协议', status: '已到期', startAt: '2025-01-01', endAt: '2025-12-31', signedAt: '2025-01-02', version: 'v1', rate: 165, campus: '龙泉校区', course: '少儿中国舞基础', file: 'CT2025010006-教师合作协议.pdf', pushedAt: '2024-12-28', note: '合同已到期，仅供历史查询。' },
-  { id: 'contract-2024', name: '2024年度教师合作协议', number: 'CT2024010004', type: '合作协议', status: '已终止', startAt: '2024-01-01', endAt: '2024-12-31', signedAt: '2024-01-03', version: 'v2', rate: 150, campus: '南湖校区', course: '舞蹈基本功', file: 'CT2024010004-教师合作协议.pdf', pushedAt: '2023-12-25', terminatedAt: '2024-10-31', note: '因授课安排调整，双方协商终止本合同。' }
+  { id: 'contract-2027', name: '2026-2027年度教师合作协议', number: 'CT2026090021', type: '合作协议', status: '待教师签署', startAt: '2026-10-01', endAt: '2027-09-30', signedAt: '', version: 'v1', rate: 180, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2026090021-教师合作协议.pdf', pushedAt: '2026-09-09', note: '请在2026年9月20日前完成签署。' },
+  { id: 'contract-2026', name: '2026年度教师合作协议', number: 'CT2026010008', type: '合作协议', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', signedAt: '2026-01-03', version: 'v1', rate: 180, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2026010008-教师合作协议.pdf', pushedAt: '2026-01-02', note: '合同已完成双方签署，按有效课次计薪。' },
+  { id: 'contract-2025', name: '2025年度教师合作协议', number: 'CT2025010006', type: '合作协议', status: '已到期', startAt: '2025-01-01', endAt: '2025-12-31', signedAt: '2025-01-02', version: 'v1', rate: 165, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2025010006-教师合作协议.pdf', pushedAt: '2024-12-28', note: '合同已到期，仅供历史查询。' },
+  { id: 'contract-2024', name: '2024年度教师合作协议', number: 'CT2024010004', type: '合作协议', status: '已终止', startAt: '2024-01-01', endAt: '2024-12-31', signedAt: '2024-01-03', version: 'v2', rate: 150, campus: '南湖校区', course: '舞蹈基本功', file: 'CT2024010004-教师合作协议.pdf', pushedAt: '2023-12-25', terminatedAt: '2024-10-31', terminateReason: '因授课安排调整，双方协商终止本合同。', note: '因授课安排调整，双方协商终止本合同。' }
 ];
 const teacherGraduationDefaults = [
-  { id: 'graduation-001', student: '林知夏', avatar: '林', className: '少儿舞蹈基础班', course: '少儿中国舞基础', professional: '舞蹈表演', completedAt: '2026-09-02', submittedAt: '2026-09-03 10:20', status: '审核中', attendanceRate: 95, homeworkRate: 100, lessons: '20/20', comment: '能够认真完成基本功与组合训练，动作规范性和节奏感均有明显提升。', advice: '继续加强脚背、膝盖控制，并保持每周两次基础训练。', timeline: [{ title: '提交结业申请', time: '2026-09-03 10:20', text: '结业材料已提交教务复核。' }, { title: '教务复核中', time: '2026-09-03 14:10', text: '正在核对考勤、作业和教师评语。' }] },
-  { id: 'graduation-002', student: '周予安', avatar: '周', className: '少儿舞蹈基础班', course: '少儿中国舞基础', professional: '舞蹈表演', completedAt: '2026-09-02', submittedAt: '2026-09-03 10:20', status: '补课中', attendanceRate: 80, homeworkRate: 90, lessons: '18/20', comment: '基本动作掌握较稳，组合衔接仍需加强。', advice: '补齐缺勤课次后重点练习身韵连接和重心转换。', reason: '缺勤2次，当前有效出勤率未达到结业要求。', retakeNote: '补上第6、12次课的核心训练内容，完成后补充教学记录。', retakeSchedule: '2026-09-12 14:00-15:30', retakeCampus: '龙泉校区 · 舞蹈楼201', retakeLesson: '补课第1次 · 身韵连接与组合训练', timeline: [{ title: '提交结业申请', time: '2026-09-03 10:20', text: '结业材料已提交教务复核。' }, { title: '退回补课', time: '2026-09-05 16:40', text: '教务反馈出勤未达标，需完成补课。' }, { title: '补课已安排', time: '2026-09-08 09:30', text: '补课课次已登记，等待完成教学记录。' }] },
-  { id: 'graduation-003', student: '陈一诺', avatar: '陈', className: '少儿舞蹈基础班', course: '少儿中国舞基础', professional: '舞蹈表演', completedAt: '2026-09-02', submittedAt: '2026-09-03 10:20', status: '需补课', attendanceRate: 85, homeworkRate: 75, lessons: '19/20', comment: '课堂参与积极，基础动作完成度较好。', advice: '补交缺失作业，并针对转身稳定性进行集中练习。', reason: '作业提交率未达到结业要求，且有1次缺勤。', retakeNote: '教务正在协调补课时间，安排完成后将通过消息通知。', timeline: [{ title: '提交结业申请', time: '2026-09-03 10:20', text: '结业材料已提交教务复核。' }, { title: '退回补课', time: '2026-09-06 11:15', text: '请等待教务登记补课课次。' }] },
-  { id: 'graduation-004', student: '赵明月', avatar: '赵', className: '成人中国舞提高班', course: '中国舞身韵训练', professional: '舞蹈表演', completedAt: '2026-08-20', submittedAt: '2026-08-21 09:05', reviewedAt: '2026-08-23 15:30', status: '已通过', attendanceRate: 100, homeworkRate: 100, lessons: '16/16', comment: '身韵表达自然，能够准确完成课程组合并形成稳定的舞台表现。', advice: '可继续进行进阶组合训练，提升动作细节与呼吸配合。', result: '数据复核通过，学员结业成果正在生成。', timeline: [{ title: '提交结业申请', time: '2026-08-21 09:05', text: '结业材料已提交教务复核。' }, { title: '复核通过', time: '2026-08-23 15:30', text: '学员已通过结业复核。' }] },
-  { id: 'graduation-005', student: '吴桐', avatar: '吴', className: '舞蹈基本功强化班', course: '舞蹈基本功', professional: '舞蹈表演', completedAt: '2026-07-28', submittedAt: '2026-07-29 13:10', reviewedAt: '2026-07-30 10:00', status: '已取消结业', attendanceRate: 50, homeworkRate: 40, lessons: '5/10', comment: '已完成前半段基础训练。', advice: '如后续恢复学习，建议从柔韧与力量基础重新衔接。', cancelReason: '学员办理退学及剩余课时退款，不再参与本班结业。', timeline: [{ title: '提交结业申请', time: '2026-07-29 13:10', text: '结业材料已提交教务复核。' }, { title: '取消结业', time: '2026-07-30 10:00', text: '因退学退款终止本次结业流程。' }] }
+  { id: 'graduation-001', student: '林知夏', avatar: '林', className: '少儿舞蹈基础班', course: '舞蹈基本功', professional: '舞蹈表演', completedAt: '2026-09-02', submittedAt: '2026-09-03 10:20', status: '审核中', attendanceRate: 95, homeworkRate: 100, lessons: '20/20', comment: '能够认真完成基本功与组合训练，动作规范性和节奏感均有明显提升。', advice: '继续加强脚背、膝盖控制，并保持每周两次基础训练。', timeline: [{ title: '提交结业申请', time: '2026-09-03 10:20', text: '结业材料已提交教务复核。' }, { title: '教务复核中', time: '2026-09-03 14:10', text: '正在核对考勤、作业和教师评语。' }] },
+  { id: 'graduation-002', student: '周予安', avatar: '周', className: '少儿舞蹈基础班', course: '舞蹈基本功', professional: '舞蹈表演', completedAt: '2026-09-02', submittedAt: '2026-09-03 10:20', status: '补课中', attendanceRate: 80, homeworkRate: 90, lessons: '18/20', comment: '基本动作掌握较稳，组合衔接仍需加强。', advice: '补齐缺勤课次后重点练习身韵连接和重心转换。', reason: '缺勤2次，当前有效出勤率未达到结业要求。', retakeNote: '补上第6、12次课的核心训练内容，完成后补充教学记录。', retakeSchedule: '2026-09-12 14:00-15:30', retakeCampus: '龙泉校区 · 艺术楼105', retakeLesson: '补课第1次 · 身韵连接与组合训练', timeline: [{ title: '提交结业申请', time: '2026-09-03 10:20', text: '结业材料已提交教务复核。' }, { title: '退回补课', time: '2026-09-05 16:40', text: '教务反馈出勤未达标，需完成补课。' }, { title: '补课已安排', time: '2026-09-08 09:30', text: '补课课次已登记，等待完成教学记录。' }] },
+  { id: 'graduation-003', student: '陈一诺', avatar: '陈', className: '少儿舞蹈基础班', course: '舞蹈基本功', professional: '舞蹈表演', completedAt: '2026-09-02', submittedAt: '2026-09-03 10:20', status: '需补课', attendanceRate: 85, homeworkRate: 75, lessons: '19/20', comment: '课堂参与积极，基础动作完成度较好。', advice: '补交缺失作业，并针对转身稳定性进行集中练习。', reason: '作业提交率未达到结业要求，且有1次缺勤。', retakeNote: '教务正在协调补课时间，安排完成后将通过消息通知。', timeline: [{ title: '提交结业申请', time: '2026-09-03 10:20', text: '结业材料已提交教务复核。' }, { title: '退回补课', time: '2026-09-06 11:15', text: '请等待教务登记补课课次。' }] },
+  { id: 'graduation-004', student: '赵明月', avatar: '赵', className: '少儿舞蹈提高班', course: '舞蹈基本功', professional: '舞蹈表演', completedAt: '2026-08-20', submittedAt: '2026-08-21 09:05', reviewedAt: '2026-08-23 15:30', status: '已通过', attendanceRate: 100, homeworkRate: 100, lessons: '16/16', comment: '身韵表达自然，能够准确完成课程组合并形成稳定的舞台表现。', advice: '可继续进行进阶组合训练，提升动作细节与呼吸配合。', result: '数据复核通过，学员结业成果正在生成。', timeline: [{ title: '提交结业申请', time: '2026-08-21 09:05', text: '结业材料已提交教务复核。' }, { title: '复核通过', time: '2026-08-23 15:30', text: '学员已通过结业复核。' }] },
+  { id: 'graduation-005', student: '吴桐', avatar: '吴', className: '少儿舞蹈提高班', course: '舞蹈基本功', professional: '舞蹈表演', completedAt: '2026-07-28', submittedAt: '2026-07-29 13:10', reviewedAt: '2026-07-30 10:00', status: '已取消结业', attendanceRate: 50, homeworkRate: 40, lessons: '5/10', comment: '已完成前半段基础训练。', advice: '如后续恢复学习，建议从柔韧与力量基础重新衔接。', cancelReason: '学员办理退学及剩余课时退款，不再参与本班结业。', timeline: [{ title: '提交结业申请', time: '2026-07-29 13:10', text: '结业材料已提交教务复核。' }, { title: '取消结业', time: '2026-07-30 10:00', text: '因退学退款终止本次结业流程。' }] }
 ];
 const teacherLessonDefaults = {
   status: '待上课', started: false, startedAt: '', startedAtMs: 0, endedAt: '',
@@ -48,9 +59,9 @@ const teacherLessonDefaults = {
   attendanceNotes: {}, homework: null
 };
 const teacherMessageDefaults = [
-  { id: 'TMSG20260910001', type: '新增排课通知', title: '今日课程将在09:00开始', summary: '少儿舞蹈基础班第8次课将在龙泉校区综合楼302上课。', body: '教务已为您安排一节少儿中国舞基础课程，请提前到达龙泉校区综合楼302并完成上课准备。', createdAt: '2026-09-10 07:30', read: false, target: '/teacher/pages/class-detail.html?class=class-001&lesson=8', actionLabel: '进入课次详情' },
-  { id: 'TMSG20260909001', type: '课次调整通知', title: '第7次课上课时间已调整', summary: '少儿舞蹈基础班第7次课因场地检修暂停，补课安排另行通知。', body: '因龙泉校区综合楼302场地检修，原定9月9日的少儿舞蹈基础班第7次课已暂停。教务确认补课安排后将再次通知您。', createdAt: '2026-09-09 17:25', read: false, target: '/teacher/pages/class-detail.html?class=class-001&lesson=7', actionLabel: '查看课次详情' },
-  { id: 'TMSG20260909002', type: '合同签署通知', title: '您有一份合同待签署', summary: '2026-2027年度教师合作协议请于9月20日前完成签署。', body: '新的教师合作协议已推送，请核对授课范围、课时单价和有效期，并在2026年9月20日前完成签署。', createdAt: '2026-09-09 16:10', read: false, target: '/teacher/pages/contract-detail.html?contract=contract-2027', actionLabel: '查看合同' },
+  { id: 'TMSG20260910001', type: '新增排课通知', title: '今日课程将在09:00开始', summary: '少儿舞蹈基础班第8次课将在龙泉校区综合楼302上课。', body: '教务已为您安排一节舞蹈基本功课程，请提前到达龙泉校区综合楼302并完成上课准备。', createdAt: '2026-09-12 07:30', read: false, target: '/teacher/pages/class-detail.html?class=class-001&lesson=8', actionLabel: '进入课次详情' },
+  { id: 'TMSG20260909001', type: '课次调整通知', title: '第12次课已停课', summary: '少儿舞蹈提高班第12次课因场地检修停课，补课安排另行通知。', body: '因龙泉校区综合楼302场地检修，原定9月12日的少儿舞蹈提高班第12次课已停课。教务确认补课安排后将再次通知您。', createdAt: '2026-09-11 17:25', read: false, target: '/teacher/pages/class-detail.html?class=class-002&lesson=12', actionLabel: '查看课次详情' },
+  { id: 'TMSG20260909002', type: '合同签署通知', title: '您有一份合同待教师签署', summary: '2026-2027年度教师合作协议请于9月20日前完成签署。', body: '新的教师合作协议已推送，请核对授课范围、课时单价和有效期，并在2026年9月20日前完成签署。', createdAt: '2026-09-09 16:10', read: false, target: '/teacher/pages/contract-detail.html?contract=contract-2027', actionLabel: '查看合同' },
   { id: 'TMSG20260908003', type: '工资已发放', title: '2026年7月工资已发放', summary: '本期实际核发5483.20元，已发放至尾号2866账户。', body: '2026年7月工资已完成发放，实际核发5483.20元，已于2026年8月5日发放至中国建设银行尾号2866账户。', createdAt: '2026-09-08 10:20', read: true, target: '/teacher/pages/salary-detail.html?month=2026-07', actionLabel: '查看工资明细' },
   { id: 'TMSG20260908004', type: '工资单已发布', title: '2026年6月工资单已发布', summary: '本期实际核发5024.40元，等待财务发放。', body: '2026年6月工资单已发布，本期共计28课时，实际核发5024.40元。当前状态为待发放，资金到账后将另行通知。', createdAt: '2026-09-08 09:40', read: true, target: '/teacher/pages/salary-detail.html?month=2026-06', actionLabel: '查看工资明细' },
   { id: 'TMSG20260907003', type: '作业提交提醒', title: '有学员提交了作业', summary: '林知夏已提交“节奏练习视频”，请及时批改并填写文字评语。', body: '学员林知夏已完成“节奏练习视频”作业提交，请进入班级课次详情查看作业内容并完成文本评语。', createdAt: '2026-09-07 18:30', read: false, target: '/teacher/pages/class-detail.html?class=class-001&lesson=8', actionLabel: '查看作业' },
@@ -80,15 +91,20 @@ function tStack(...content) { return `<div class="mp-stack">${content.join('')}<
 function tToast(message) { const node = document.createElement('div'); node.className = 'mp-toast'; node.textContent = message; document.body.appendChild(node); setTimeout(() => node.remove(), 2200); }
 function tLayout(content) { teacherMain.innerHTML = content; }
 const scheduleDays = [
-  { key: '09-07', weekday: '一', date: '7', label: '9月7日 周一', lessons: [{ className: '成人中国舞提高班', courseName: '中国舞身韵训练', lessonNo: 3, time: '14:00-15:30', campus: '龙泉校区', room: '舞蹈楼201', students: 16, status: '已完成' }] },
+  { key: '09-07', weekday: '一', date: '7', label: '9月7日 周一', lessons: [] },
   { key: '09-08', weekday: '二', date: '8', label: '9月8日 周二', lessons: [] },
-  { key: '09-09', weekday: '三', date: '9', label: '9月9日 周三', lessons: [{ className: '少儿舞蹈基础班', courseName: '少儿中国舞基础', lessonNo: 7, time: '09:00-10:30', campus: '龙泉校区', room: '综合楼302', students: 20, status: '已停课', note: '因场地检修停课，补课时间另行通知' }] },
-  { key: '09-10', weekday: '四', date: '10', label: '9月10日 周四', today: true, lessons: [{ id: 'current', className: '少儿舞蹈基础班', courseName: '少儿中国舞基础', lessonNo: 8, time: '09:00-10:30', campus: '龙泉校区', room: '综合楼302', students: 20 }, { className: '成人中国舞提高班', courseName: '中国舞身韵训练', lessonNo: 4, time: '14:00-15:30', campus: '龙泉校区', room: '舞蹈楼201', students: 16, status: '待上课' }] },
+  { key: '09-09', weekday: '三', date: '9', label: '9月9日 周三', lessons: [] },
+  { key: '09-10', weekday: '四', date: '10', label: '9月10日 周四', lessons: [] },
   { key: '09-11', weekday: '五', date: '11', label: '9月11日 周五', lessons: [] },
-  { key: '09-12', weekday: '六', date: '12', label: '9月12日 周六', lessons: [{ className: '舞蹈基本功强化班', courseName: '舞蹈基本功', lessonNo: 5, time: '10:00-11:30', campus: '南湖校区', room: '形体教室105', students: 18, status: '已取消', note: '本课次已由教务取消' }] },
-  { key: '09-13', weekday: '日', date: '13', label: '9月13日 周日', lessons: [{ className: '少儿舞蹈基础班', courseName: '少儿中国舞基础', lessonNo: 9, time: '09:00-10:30', campus: '龙泉校区', room: '综合楼302', students: 20, status: '待上课' }] }
+  // B2-UI-01：教师端课次与后台课表同源——班级、教室、楼栋、校区、上课日全部取后台教务口径
+  // （排班管理「少儿舞蹈基础班 / 少儿舞蹈提高班」＋场地档案「综合楼302 · 龙泉校区 · 综合楼」）。
+  { key: '09-12', weekday: '六', date: '12', label: '9月12日 周六', today: true, lessons: [
+    { id: 'current', className: '少儿舞蹈基础班', courseName: '舞蹈基本功', lessonNo: 8, time: '09:00-10:30', campus: '龙泉校区', room: '综合楼302', students: 20 },
+    { className: '少儿舞蹈提高班', courseName: '舞蹈基本功', lessonNo: 12, time: '11:00-12:30', campus: '龙泉校区', room: '综合楼302', students: 16, status: '已停课', note: '本课次已由教务停课，补课安排另行通知' }
+  ] },
+  { key: '09-13', weekday: '日', date: '13', label: '9月13日 周日', lessons: [] }
 ];
-const calendarToday = '2026-09-10';
+const calendarToday = '2026-09-12';
 let selectedScheduleDay = calendarToday;
 let calendarYear = 2026;
 let calendarMonth = 8;
@@ -123,6 +139,7 @@ function lessonTone(status) { return status === '上课中' ? 'amber' : status =
 function scheduleLessonCard(lesson) {
   const status = lessonStatus(lesson);
   const href = relativePath('/teacher/pages/class-detail.html');
+  // I1-DEC-44：迭代2内容不删除、入口不禁用——课表卡片保留可用的「开始上课」入口。
   const primaryAction = status === '待上课' ? tButton('开始上课', `data-teacher-action="start-schedule" data-lesson-id="${tEsc(lesson.id || '')}"`) : '';
   return `<article class="teacher-schedule-card status-${status === '上课中' ? 'active' : status === '已完成' ? 'done' : status === '待上课' ? 'pending' : 'inactive'}"><div class="teacher-schedule-time"><strong>${tEsc(lesson.time.split('-')[0])}</strong><span>${tEsc(lesson.time.split('-')[1])}</span></div><div class="teacher-schedule-content"><div class="teacher-schedule-title"><div><h3>${tEsc(lesson.className)}</h3><p>${tEsc(lesson.courseName)} · 第${tEsc(lesson.lessonNo)}次课</p></div>${tPill(status, lessonTone(status))}</div><dl class="teacher-schedule-facts"><div><dt>上课地点</dt><dd>${tEsc(lesson.campus)} · ${tEsc(lesson.room)}</dd></div><div><dt>学员人数</dt><dd>${tEsc(lesson.students)}人</dd></div></dl>${lesson.note ? `<p class="teacher-schedule-note">${tEsc(lesson.note)}</p>` : ''}<div class="teacher-schedule-actions"><a class="mp-button secondary" href="${href}">${status === '已完成' ? '查看记录' : '查看详情'}</a>${primaryAction}</div></div></article>`;
 }
@@ -131,7 +148,7 @@ function renderSchedule() {
   const selected = scheduled || { label: calendarDateLabel(selectedScheduleDay), today: selectedScheduleDay === calendarToday, lessons: [] };
   const today = scheduleDays.find(day => day.today);
   const list = selected.lessons.length ? selected.lessons.map(scheduleLessonCard).join('') : `<section class="teacher-schedule-empty"><strong>当天没有课程</strong><p>可选择其他日期查看已排课次。</p></section>`;
-  tLayout(tStack(`<section class="teacher-schedule-overview"><div class="teacher-schedule-profile"><span class="mp-avatar" aria-hidden="true">王</span><div><span>授课教师</span><h2>王玥</h2></div></div><div class="teacher-schedule-today"><span>2026年9月10日</span><strong>今日 ${today.lessons.length} 节课</strong></div></section>`, renderMobileCalendar(), `<section class="teacher-schedule-list"><div class="teacher-schedule-list-head"><div><h2>${selected.label}${selected.today ? '<small>今天</small>' : ''}</h2><p>${selected.lessons.length ? `共 ${selected.lessons.length} 节课，按上课时间排列` : '暂无已排课次'}</p></div></div>${list}</section>`));
+  tLayout(tStack(`<section class="teacher-schedule-overview"><div class="teacher-schedule-profile"><span class="mp-avatar" aria-hidden="true">王</span><div><span>授课教师</span><h2>王玥</h2></div></div><div class="teacher-schedule-today"><span>2026年9月12日</span><strong>今日 ${today.lessons.length} 节课</strong></div></section>`, renderMobileCalendar(), `<section class="teacher-schedule-list"><div class="teacher-schedule-list-head"><div><h2>${selected.label}${selected.today ? '<small>今天</small>' : ''}</h2><p>${selected.lessons.length ? `共 ${selected.lessons.length} 节课，按上课时间排列` : '暂无已排课次'}</p></div></div>${list}</section>`));
 }
 function lessonTimeLabel() {
   if (teacherState.lesson.status === '已完成') return '本课次已完成';
@@ -165,7 +182,7 @@ function renderLessonExecution() {
     `<section class="teacher-lesson-section"><div class="teacher-lesson-section-head"><div><span>${completed ? '03' : '02'}</span><h2>课后作业</h2></div>${homework ? tPill('已发布', 'green') : tPill('可选', 'gray')}</div>${homework ? `<div class="teacher-homework-published"><div><strong>${tEsc(homework.title)}</strong><p>${tEsc(homework.type)} · ${tEsc(homework.formats.join('、'))}</p><span>截止 ${tEsc(homework.deadline)} · ${homework.required ? '必交' : '选交'}</span></div><button type="button" data-lesson-action="homework-submissions">查看提交</button></div>` : `<div class="teacher-homework-empty"><p>可在课后发布练习任务，发布后推送至学员端作业本。</p><button type="button" class="mp-button secondary" data-lesson-action="open-homework" ${controlsDisabled}>发布作业</button></div>`}</section>`
   ) : `<section class="teacher-lesson-locked"><strong>开始上课后登记课堂信息</strong><p>完成学员考勤后，可结束本课次并填写教学记录。</p><ol><li>登记并提交学员考勤</li><li>结束上课时填写教学记录</li><li>课后作业（可选）</li></ol></section>`;
   tLayout(`<div class="teacher-lesson-page ${active ? 'has-bottom-action' : ''}">${tStack(
-    `<section class="teacher-lesson-hero"><div class="teacher-lesson-hero-head"><div><span>少儿中国舞基础</span><h2>少儿舞蹈基础班 · 第8次课</h2></div>${tPill(lesson.status, lessonTone(lesson.status))}</div><dl><div><dt>上课时间</dt><dd>2026-09-10 09:00-10:30</dd></div><div><dt>上课地点</dt><dd>龙泉校区 · 综合楼302</dd></div></dl></section>`,
+    `<section class="teacher-lesson-hero"><div class="teacher-lesson-hero-head"><div><span>舞蹈基本功</span><h2>少儿舞蹈基础班 · 第8次课</h2></div>${tPill(lesson.status, lessonTone(lesson.status))}</div><dl><div><dt>上课时间</dt><dd>2026-09-12 09:00-10:30</dd></div><div><dt>上课地点</dt><dd>龙泉校区 · 综合楼302</dd></div></dl></section>`,
     `<section class="teacher-lesson-clock"><div class="teacher-lesson-clock-main"><span>${active ? '已上课时长' : completed ? '教师考勤' : '等待开始上课'}</span><strong data-lesson-timer>${lessonTimeLabel()}</strong><small>本课次计薪 2 课时</small></div><dl><div><dt>到达时间</dt><dd>${tEsc(lesson.startedAt || '--:--')}</dd></div><div><dt>离开时间</dt><dd>${tEsc(lesson.endedAt || '--:--')}</dd></div></dl>${lesson.status === '待上课' ? '<button type="button" class="mp-button full" data-lesson-action="start">开始上课</button>' : ''}</section>`,
     active ? `<section class="teacher-lesson-readiness"><div><strong>${lesson.attendanceSubmitted ? '1/1' : '0/1'}</strong><span>上课中必做事项</span></div><ul><li class="${lesson.attendanceSubmitted ? 'done' : ''}"><i aria-hidden="true">${lesson.attendanceSubmitted ? '✓' : ''}</i>学员考勤</li></ul></section>` : '',
     operationPanel,
@@ -177,7 +194,7 @@ function renderStaticClassLesson(classItem, lessonMeta) {
   const completed = status === '已完成';
   const record = teacherClassRecords.find(item => item.number === String(lessonMeta.number));
   tLayout(tStack(
-    `<section class="teacher-lesson-hero"><div class="teacher-lesson-hero-head"><div><span>${tEsc(classItem.course)}</span><h2>${tEsc(classItem.name)} · 第${tEsc(lessonMeta.number)}次课</h2></div>${tPill(status, lessonTone(status))}</div><dl><div><dt>上课时间</dt><dd>${lessonMeta.date.includes('-') ? `2026-${tEsc(lessonMeta.date)}` : tEsc(lessonMeta.date)} ${tEsc(lessonMeta.time)}</dd></div><div><dt>上课地点</dt><dd>${tEsc(classItem.campus)} · ${classItem.id === 'class-002' ? '舞蹈楼201' : classItem.id === 'class-003' ? '美术楼103' : '综合楼302'}</dd></div></dl></section>`,
+    `<section class="teacher-lesson-hero"><div class="teacher-lesson-hero-head"><div><span>${tEsc(classItem.course)}</span><h2>${tEsc(classItem.name)} · 第${tEsc(lessonMeta.number)}次课</h2></div>${tPill(status, lessonTone(status))}</div><dl><div><dt>上课时间</dt><dd>${lessonMeta.date.includes('-') ? `2026-${tEsc(lessonMeta.date)}` : tEsc(lessonMeta.date)} ${tEsc(lessonMeta.time)}</dd></div><div><dt>上课地点</dt><dd>${tEsc(classItem.campus)} · ${tEsc(classItem.classroom)}</dd></div></dl></section>`,
     `<section class="teacher-lesson-clock"><div class="teacher-lesson-clock-main"><span>教师考勤</span><strong>${completed ? '本课次已完成' : '尚未开始'}</strong><small>本课次计薪 2 课时</small></div><dl><div><dt>到达时间</dt><dd>${completed ? '09:00' : '--:--'}</dd></div><div><dt>离开时间</dt><dd>${completed ? '10:30' : '--:--'}</dd></div></dl></section>`,
     completed ? `<section class="teacher-lesson-section"><div class="teacher-lesson-section-head"><div><span>01</span><h2>教学记录</h2></div>${tPill('已完成', 'green')}</div><div class="teacher-static-lesson-record"><div><span>课次主题</span><strong>${tEsc(lessonMeta.theme)}</strong></div><p>${tEsc(record?.goal || '本课次教学内容与课堂完成情况已记录。')}</p><footer><span>${tEsc(record?.attendance || `${Math.max(0, classItem.students - 2)}/${classItem.students}人出勤`)}</span><i></i><span>${tEsc(record?.homework || '教学记录已保存')}</span></footer></div></section>` : `<section class="teacher-lesson-locked"><strong>课次尚未开始</strong><p>到达上课日期后，可从课表进入并开始上课。</p><ol><li>${tEsc(lessonMeta.theme)}</li><li>${tEsc(classItem.campus)}</li></ol></section>`
   ));
@@ -192,10 +209,9 @@ function renderLesson() {
   renderStaticClassLesson(classItem, lessonMeta || fallback);
 }
 const teacherClasses = [
-  { id: 'class-001', name: '少儿舞蹈基础班', course: '少儿中国舞基础', students: 20, completed: 7, total: 16, attendance: 92, homework: 88, status: '进行中', next: '今天 09:00 · 综合楼302', campus: '龙泉校区' },
-  { id: 'class-002', name: '成人中国舞提高班', course: '中国舞身韵训练', students: 16, completed: 3, total: 12, attendance: 95, homework: 91, status: '进行中', next: '今天 14:00 · 舞蹈楼201', campus: '龙泉校区' },
-  { id: 'class-003', name: '少儿美术启蒙班', course: '儿童绘画基础', students: 15, completed: 0, total: 10, attendance: 0, homework: 0, status: '待开课', next: '09月18日 09:00 · 美术楼103', campus: '南湖校区' },
-  { id: 'class-004', name: '舞蹈基本功强化班', course: '舞蹈基本功', students: 18, completed: 16, total: 16, attendance: 90, homework: 86, status: '已结束', next: '教学记录已归档', campus: '南湖校区' }
+  // B2-UI-01：班级名、教室、楼栋、校区与后台教务口径一致（排班管理＋场地档案＋课表矩阵）。
+  { id: 'class-001', name: '少儿舞蹈基础班', course: '舞蹈基本功', students: 20, completed: 7, total: 16, attendance: 92, homework: 88, status: '进行中', next: '09月12日 周六 09:00 · 综合楼302', campus: '龙泉校区', classroom: '综合楼302', building: '综合楼' },
+  { id: 'class-002', name: '少儿舞蹈提高班', course: '舞蹈基本功', students: 16, completed: 12, total: 12, attendance: 95, homework: 91, status: '已结束', next: '教学记录已归档', campus: '龙泉校区', classroom: '综合楼302', building: '综合楼' }
 ];
 const teacherClassStudents = [
   ['林知夏', 95, 90, '正常'], ['周予安', 88, 100, '正常'], ['陈一诺', 82, 75, '需关注'], ['赵明月', 100, 100, '正常'],
@@ -205,23 +221,23 @@ const teacherClassStudents = [
   ['唐若溪', 80, 70, '需关注'], ['邓舒雅', 98, 100, '正常'], ['谢景行', 85, 80, '正常'], ['曹心悦', 92, 90, '正常']
 ].map(([name, attendance, homework, status], index) => ({ id: `student-${String(index + 1).padStart(3, '0')}`, name, attendance, homework, status }));
 const teacherClassLessons = [
-  ['16', '11-05', '09:00-10:30', '期末展示与课程总结', '待上课'], ['15', '11-01', '09:00-10:30', '完整组合排练', '待上课'],
-  ['14', '10-29', '09:00-10:30', '舞台表现训练', '待上课'], ['13', '10-25', '09:00-10:30', '组合细节调整', '待上课'],
-  ['12', '10-18', '09:00-10:30', '身韵组合后半段', '待上课'], ['11', '10-11', '09:00-10:30', '身韵组合前半段', '待上课'],
-  ['10', '09-27', '09:00-10:30', '重心与呼吸配合', '待上课'], ['9', '09-13', '09:00-10:30', '身韵连接训练', '待上课'],
-  ['8', '09-10', '09:00-10:30', '把杆与身韵组合', 'current'], ['7', '09-07', '09:00-10:30', '组合训练', '已完成'],
-  ['6', '09-03', '09:00-10:30', '身韵练习', '已完成'], ['5', '08-30', '09:00-10:30', '基本手位与脚位', '已完成'],
-  ['4', '08-27', '09:00-10:30', '柔韧与控制训练', '已完成'], ['3', '08-23', '09:00-10:30', '把杆基础训练', '已完成'],
-  ['2', '08-20', '09:00-10:30', '体态与站姿训练', '已完成'], ['1', '08-16', '09:00-10:30', '课程导入与基础测评', '已完成']
+  ['16', '11-07', '09:00-10:30', '期末展示与课程总结', '待上课'], ['15', '10-31', '09:00-10:30', '完整组合排练', '待上课'],
+  ['14', '10-24', '09:00-10:30', '舞台表现训练', '待上课'], ['13', '10-17', '09:00-10:30', '组合细节调整', '待上课'],
+  ['12', '10-10', '09:00-10:30', '身韵组合后半段', '待上课'], ['11', '10-03', '09:00-10:30', '身韵组合前半段', '待上课'],
+  ['10', '09-26', '09:00-10:30', '重心与呼吸配合', '待上课'], ['9', '09-19', '09:00-10:30', '身韵连接训练', '待上课'],
+  ['8', '09-12', '09:00-10:30', '把杆与身韵组合', 'current'], ['7', '09-05', '09:00-10:30', '组合训练', '已完成'],
+  ['6', '08-29', '09:00-10:30', '身韵练习', '已完成'], ['5', '08-22', '09:00-10:30', '基本手位与脚位', '已完成'],
+  ['4', '08-15', '09:00-10:30', '柔韧与控制训练', '已完成'], ['3', '08-08', '09:00-10:30', '把杆基础训练', '已完成'],
+  ['2', '08-01', '09:00-10:30', '体态与站姿训练', '已完成'], ['1', '07-25', '09:00-10:30', '课程导入与基础测评', '已完成']
 ].map(([number, date, time, theme, status]) => ({ number, date, time, theme, status }));
 const teacherClassRecords = [
-  ['7', '2026-09-07', '组合训练', '完成组合前半段动作串联，重点练习节奏与方位。', '18/20人出勤', '作业已发布'],
-  ['6', '2026-09-03', '身韵练习', '掌握提沉冲靠基础方法，练习呼吸与动作配合。', '19/20人出勤', '作业已点评'],
-  ['5', '2026-08-30', '基本手位与脚位', '复习七个基本手位，完成脚位转换训练。', '20/20人出勤', '未发布作业'],
-  ['4', '2026-08-27', '柔韧与控制训练', '完成压腿、踢腿和核心控制练习。', '18/20人出勤', '作业已点评'],
-  ['3', '2026-08-23', '把杆基础训练', '完成擦地、蹲和小踢腿基础组合。', '20/20人出勤', '作业已发布'],
-  ['2', '2026-08-20', '体态与站姿训练', '建立正确站姿，练习肩背与核心控制。', '19/20人出勤', '未发布作业'],
-  ['1', '2026-08-16', '课程导入与基础测评', '完成学员基础能力观察并讲解课堂规范。', '20/20人出勤', '未发布作业']
+  ['7', '2026-09-05', '组合训练', '完成组合前半段动作串联，重点练习节奏与方位。', '18/20人出勤', '作业已发布'],
+  ['6', '2026-08-29', '身韵练习', '掌握提沉冲靠基础方法，练习呼吸与动作配合。', '19/20人出勤', '作业已点评'],
+  ['5', '2026-08-22', '基本手位与脚位', '复习七个基本手位，完成脚位转换训练。', '20/20人出勤', '未发布作业'],
+  ['4', '2026-08-15', '柔韧与控制训练', '完成压腿、踢腿和核心控制练习。', '18/20人出勤', '作业已点评'],
+  ['3', '2026-08-08', '把杆基础训练', '完成擦地、蹲和小踢腿基础组合。', '20/20人出勤', '作业已发布'],
+  ['2', '2026-08-01', '体态与站姿训练', '建立正确站姿，练习肩背与核心控制。', '19/20人出勤', '未发布作业'],
+  ['1', '2026-07-25', '课程导入与基础测评', '完成学员基础能力观察并讲解课堂规范。', '20/20人出勤', '未发布作业']
 ].map(([number, date, theme, goal, attendance, homework]) => ({ number, date, theme, goal, attendance, homework }));
 let selectedClassStatus = '全部';
 let selectedClassDetailTab = 'overview';
@@ -245,7 +261,7 @@ function teacherClassProgress(classItem) {
 }
 function teacherClassOverview(classItem) {
   const currentStatus = teacherState.lesson.status;
-  return `<div class="teacher-class-overview"><dl class="teacher-class-core-metrics"><div><dt>学员人数</dt><dd>${classItem.students}<small>人</small></dd></div><div><dt>平均出勤率</dt><dd>${classItem.attendance}<small>%</small></dd></div><div><dt>作业提交率</dt><dd>${classItem.homework}<small>%</small></dd></div></dl>${teacherClassProgress(classItem)}<section class="teacher-class-next-lesson"><div class="teacher-class-detail-section-head"><h3>${classItem.status === '已结束' ? '班级状态' : '下一节课'}</h3>${tPill(classItem.status === '已结束' ? '已结束' : currentStatus, classItem.status === '已结束' ? 'gray' : lessonTone(currentStatus))}</div>${classItem.status === '已结束' ? '<p class="teacher-class-no-next">全部课次已完成，教学记录已归档。</p>' : `<a href="${relativePath(`/teacher/pages/class-detail.html?class=${classItem.id}&lesson=${classItem.completed + 1}`)}"><div class="teacher-class-next-time"><strong>09:00</strong><span>09月10日 周四</span></div><div><strong>第${classItem.completed + 1}次课 · ${classItem.id === 'class-001' ? '把杆与身韵组合' : classItem.course}</strong><p>${tEsc(classItem.campus)} · ${classItem.id === 'class-002' ? '舞蹈楼201' : classItem.id === 'class-003' ? '美术楼103' : '综合楼302'}</p></div><span aria-hidden="true">›</span></a>`}</section>${classItem.completed ? `<section class="teacher-class-recent-record"><div class="teacher-class-detail-section-head"><h3>最近教学记录</h3><span>第${classItem.completed}次课</span></div><strong>${classItem.id === 'class-001' ? '组合训练' : classItem.course}</strong><p>${classItem.id === 'class-001' ? '完成组合前半段动作串联，重点练习节奏与方位。' : '本课次教学目标已完成，考勤与教学记录已同步。'}</p><small>${classItem.students - 2}/${classItem.students}人出勤 · 教学记录已保存</small></section>` : ''}</div>`;
+  return `<div class="teacher-class-overview"><dl class="teacher-class-core-metrics"><div><dt>学员人数</dt><dd>${classItem.students}<small>人</small></dd></div><div><dt>平均出勤率</dt><dd>${classItem.attendance}<small>%</small></dd></div><div><dt>作业提交率</dt><dd>${classItem.homework}<small>%</small></dd></div></dl>${teacherClassProgress(classItem)}<section class="teacher-class-next-lesson"><div class="teacher-class-detail-section-head"><h3>${classItem.status === '已结束' ? '班级状态' : '下一节课'}</h3>${tPill(classItem.status === '已结束' ? '已结束' : currentStatus, classItem.status === '已结束' ? 'gray' : lessonTone(currentStatus))}</div>${classItem.status === '已结束' ? '<p class="teacher-class-no-next">全部课次已完成，教学记录已归档。</p>' : `<a href="${relativePath(`/teacher/pages/class-detail.html?class=${classItem.id}&lesson=${classItem.completed + 1}`)}"><div class="teacher-class-next-time"><strong>09:00</strong><span>09月12日 周六</span></div><div><strong>第${classItem.completed + 1}次课 · ${classItem.id === 'class-001' ? '把杆与身韵组合' : classItem.course}</strong><p>${tEsc(classItem.campus)} · ${tEsc(classItem.classroom)}</p></div><span aria-hidden="true">›</span></a>`}</section>${classItem.completed ? `<section class="teacher-class-recent-record"><div class="teacher-class-detail-section-head"><h3>最近教学记录</h3><span>第${classItem.completed}次课</span></div><strong>${classItem.id === 'class-001' ? '组合训练' : classItem.course}</strong><p>${classItem.id === 'class-001' ? '完成组合前半段动作串联，重点练习节奏与方位。' : '本课次教学目标已完成，考勤与教学记录已同步。'}</p><small>${classItem.students - 2}/${classItem.students}人出勤 · 教学记录已保存</small></section>` : ''}</div>`;
 }
 function teacherClassStudentRows(query = '') {
   const students = teacherClassStudents.slice(0, currentTeacherClass().students).filter(item => item.name.includes(query.trim()));
@@ -315,7 +331,7 @@ function applicationTone(status) { return status === '已通过' ? 'green' : sta
 function teacherApplicationRecords() {
   const shared = readDemoState().applications || [];
   const merged = teacherApplications.map(item => ({ ...item, ...(shared.find(record => record.id === item.id) || {}) }));
-  return [...merged, ...shared.filter(record => !teacherApplications.some(item => item.id === record.id))].map(applicationWithStatus);
+  return [...merged, ...shared.filter(record => !teacherApplications.some(item => item.id === record.id))].map(applicationWithStatus).filter(item => item.status !== '草稿');
 }
 function applicationWithStatus(item) { const shared = readDemoState().applications.some(record => record.id === item.id); return { ...item, status: shared ? item.status : teacherState.applicationUpdates[item.id] || item.status }; }
 function currentApplication() {
@@ -331,25 +347,25 @@ function renderApplicationCreate() {
   const teacherProfile = currentTeacher();
   const source = requestedId ? currentApplication() : { id: '', name: '', professional: teacherProfile.professional, type: '面授课程', hours: 16, intro: '', file: '' };
   const editing = Boolean(requestedId);
-  tLayout(tStack(`<section class="teacher-application-detail-head"><div>${tPill(editing ? '编辑中' : '新申报')}<h2>${editing ? '编辑课程申报' : '发起课程申报'}</h2><p>教师资料由系统自动带入，课程信息请完整填写。</p></div></section>`, `<section class="teacher-application-form"><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>系统带入</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(teacherProfile.name)}</strong></div><div><span>教师工号</span><strong>${tEsc(teacherProfile.no)}</strong></div><div><span>教学单位</span><strong>${tEsc(teacherProfile.unit)}</strong></div><div><span>专业方向</span><strong>${tEsc(teacherProfile.professional)}</strong></div><div><span>职称</span><strong>${tEsc(teacherProfile.title)}</strong></div></div></div><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>申报内容</h3><span>带 * 为必填</span></div><div class="mp-form"><div class="mp-field"><label for="application-name">课程名称 <b>*</b></label><input id="application-name" value="${tEsc(source.name)}" maxlength="100" placeholder="请输入课程名称"></div><div class="mp-field"><label>所属专业 <b>*</b><small>按门类、分类、专业逐级选择</small></label><div class="teacher-professional-cascade"><select id="application-discipline" aria-label="专业门类"><option>艺术学</option><option>教育学</option></select><select id="application-category" aria-label="专业分类"><option>舞蹈类</option><option>音乐类</option></select><select id="application-professional" aria-label="专业">${[...new Set([teacherProfile.professional, '舞蹈表演', '音乐表演', '音乐学'])].map(name => `<option ${source.professional === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div></div><div class="mp-field"><label>课程类型 <b>*</b></label><div class="teacher-radio-row"><label><input type="radio" name="application-type" value="面授课程" ${source.type === '面授课程' ? 'checked' : ''}>面授课程</label><label><input type="radio" name="application-type" value="视频课程" ${source.type === '视频课程' ? 'checked' : ''}>视频课程</label></div></div><div class="mp-field" id="application-hours-field"><label for="application-hours">总课时 <b>*</b><small>面授课程用于生成课次和工资统计</small></label><input id="application-hours" type="number" min="1" value="${tEsc(source.hours || 16)}" placeholder="请输入总课时"></div><div class="mp-field"><label for="application-intro">课程简介</label><textarea id="application-intro" placeholder="补充课程目标、教学内容和适合人群">${tEsc(source.intro)}</textarea></div><div class="mp-field"><label for="application-file">附加材料</label><button type="button" class="teacher-upload-placeholder" id="application-file">＋ ${source.file ? tEsc(source.file) : '上传教学计划'} <span>可选</span></button></div></div></div><div class="teacher-application-form-actions"><a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">取消</a>${tButton('保存草稿', 'data-application-form-action="save"', 'secondary')}${tButton('提交审核', 'data-application-form-action="submit"')}</div></section>`));
+  tLayout(tStack(`<section class="teacher-application-detail-head"><div>${tPill(editing ? '编辑中' : '新申报')}<h2>${editing ? '编辑课程申报' : '发起课程申报'}</h2><p>教师资料由系统自动带入，课程信息请完整填写。</p></div></section>`, `<section class="teacher-application-form"><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>系统带入</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(teacherProfile.name)}</strong></div><div><span>教师工号</span><strong>${tEsc(teacherProfile.no)}</strong></div><div><span>教学单位</span><strong>${tEsc(teacherProfile.unit)}</strong></div><div><span>专业方向</span><strong>${tEsc(teacherProfile.professional)}</strong></div><div><span>职称</span><strong>${tEsc(teacherProfile.title)}</strong></div></div></div><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>申报内容</h3><span>带 * 为必填</span></div><div class="mp-form"><div class="mp-field"><label for="application-name">课程名称 <b>*</b></label><input id="application-name" value="${tEsc(source.name)}" maxlength="100" placeholder="请输入课程名称"></div><div class="mp-field"><label>所属专业 <b>*</b><small>按门类、分类、专业逐级选择</small></label><div class="teacher-professional-cascade"><select id="application-discipline" aria-label="专业门类"><option>艺术学</option><option>教育学</option></select><select id="application-category" aria-label="专业分类"><option>舞蹈类</option><option>音乐类</option></select><select id="application-professional" aria-label="专业">${[...new Set([teacherProfile.professional, '舞蹈表演', '音乐表演', '音乐学'])].map(name => `<option ${source.professional === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div></div><div class="mp-field"><label>课程类型 <b>*</b></label><div class="teacher-radio-row"><label><input type="radio" name="application-type" value="面授课程" ${source.type === '面授课程' ? 'checked' : ''}>面授课程</label><label><input type="radio" name="application-type" value="视频课程" ${source.type === '视频课程' ? 'checked' : ''}>视频课程</label></div></div><div class="mp-field" id="application-hours-field"><label for="application-hours">总课时 <b>*</b><small>面授课程用于生成课次和工资统计</small></label><input id="application-hours" type="number" min="1" value="${tEsc(source.hours || 16)}" placeholder="请输入总课时"></div><div class="mp-field"><label for="application-difficulty">难度等级 <b>*</b><small>学员端卡片与筛选按此展示</small></label><select id="application-difficulty"><option value="">请选择难度等级</option>${['启蒙', '初级', '中级', '高级', '考级冲刺'].map(value => `<option ${source.difficulty === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div><div class="mp-field"><label>适合年龄 <b>*</b><small>可多选</small></label><div class="teacher-radio-row">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label><input type="checkbox" name="application-age" value="${value}" ${(source.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div><div class="mp-field"><label for="application-intro">课程简介</label><textarea id="application-intro" placeholder="补充课程目标、教学内容和适合人群">${tEsc(source.intro)}</textarea></div><div class="mp-field"><label for="application-file">附加材料</label><button type="button" class="teacher-upload-placeholder" id="application-file">＋ ${source.file ? tEsc(source.file) : '上传教学计划'} <span>可选</span></button></div></div></div><div class="teacher-application-form-actions"><a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">取消</a>${tButton('提交审核', 'data-application-form-action="submit"')}</div></section>`));
 }
 function applicationReviewCopy(item) {
   if (item.status === '审核中') return ['等待教研审核', '申报已提交，审核期间课程内容不可修改。'];
   if (item.status === '已通过') return ['审核通过', `教研已于${item.reviewedAt || '近期'}完成审核：${item.review || '审批通过'}`];
   if (item.status === '已驳回') return ['审核未通过', item.review || '请根据审核意见修改后重新提交。'];
   if (item.status === '已撤销') return ['申报已撤销', '该申报已停止审核，可重新编辑后提交。'];
-  return ['尚未提交', '当前内容保存在草稿中，可继续编辑并提交审核。'];
+  return ['状态异常', '当前申报状态无法识别，请返回列表后重试。'];
 }
 function applicationDetailActions(item) {
   const back = `<a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">返回列表</a>`;
-  if (['草稿', '已驳回', '已撤销'].includes(item.status)) return `${back}<button type="button" class="mp-button" data-application-detail-action="edit">${item.status === '已驳回' ? '修改并重新提交' : '编辑申报'}</button>`;
+  if (['已驳回', '已撤销'].includes(item.status)) return `${back}<button type="button" class="mp-button" data-application-detail-action="edit">${item.status === '已驳回' ? '修改并重新提交' : '重新发起申报'}</button>`;
   if (item.status === '审核中') return `${back}<button type="button" class="mp-button secondary teacher-application-withdraw" data-application-detail-action="withdraw">撤销申报</button>`;
   return `<a class="mp-button secondary full" href="${relativePath('/teacher/pages/applications.html')}">返回申报列表</a>`;
 }
 function renderApplicationDetail() {
   const item = currentApplication();
   const [reviewTitle, reviewText] = applicationReviewCopy(item);
-  tLayout(tStack(`<section class="teacher-application-view-head"><div><span>${tEsc(item.date)} 提交</span><h2>${tEsc(item.name)}</h2><p>申报编号 ${tEsc(item.id)}</p></div>${tPill(item.status, applicationTone(item.status))}</section>`, `<section class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>只读</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(item.teacher || '—')}</strong></div><div><span>教师工号</span><strong>${tEsc(item.teacherNo || '—')}</strong></div><div><span>教学单位</span><strong>${tEsc(item.teacherUnit || '—')}</strong></div><div><span>专业方向</span><strong>${tEsc(item.teacherProfessional || item.professional || item.major || '—')}</strong></div><div><span>职称</span><strong>${tEsc(item.teacherTitle || '—')}</strong></div></div></section>`, `<section class="teacher-form-section teacher-application-view-content"><div class="teacher-form-section-head"><h3>申报内容</h3><span>只读</span></div><dl class="teacher-application-view-rows"><div><dt>申报编号</dt><dd>${tEsc(item.id)}</dd></div><div><dt>派生课程编号</dt><dd>${tEsc(item.courseId || courseIdForApplication(item.id))}</dd></div><div><dt>课程名称</dt><dd>${tEsc(item.name)}</dd></div><div><dt>所属专业</dt><dd>艺术学 · ${tEsc(item.professional)}</dd></div><div><dt>课程类型</dt><dd>${tEsc(item.type)}</dd></div>${item.type === '面授课程' ? `<div><dt>总课时</dt><dd>${tEsc(item.hours)}课时</dd></div>` : ''}<div class="wide"><dt>课程简介</dt><dd>${tEsc(item.intro)}</dd></div><div class="wide"><dt>附加材料</dt><dd>${item.file ? tEsc(item.file) : '未上传'}</dd></div></dl></section>`, `<section class="teacher-application-review ${item.status === '已驳回' ? 'rejected' : ''}"><div>${tPill(item.status, applicationTone(item.status))}<h3>${reviewTitle}</h3></div><p>${tEsc(reviewText)}</p>${item.reviewedBy ? `<small>审核人：${tEsc(item.reviewedBy)} · 审核时间：${tEsc(item.reviewedAt || '待记录')}</small>` : ''}</section>`, `<div class="teacher-application-detail-actions">${applicationDetailActions(item)}</div>`));
+  tLayout(tStack(`<section class="teacher-application-view-head"><div><span>${tEsc(item.date)} 提交</span><h2>${tEsc(item.name)}</h2><p>申报编号 ${tEsc(item.id)}</p></div>${tPill(item.status, applicationTone(item.status))}</section>`, `<section class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>只读</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(item.teacher || '—')}</strong></div><div><span>教师工号</span><strong>${tEsc(item.teacherNo || '—')}</strong></div><div><span>教学单位</span><strong>${tEsc(item.teacherUnit || '—')}</strong></div><div><span>专业方向</span><strong>${tEsc(item.teacherProfessional || item.professional || item.major || '—')}</strong></div><div><span>职称</span><strong>${tEsc(item.teacherTitle || '—')}</strong></div></div></section>`, `<section class="teacher-form-section teacher-application-view-content"><div class="teacher-form-section-head"><h3>申报内容</h3><span>只读</span></div><dl class="teacher-application-view-rows"><div><dt>申报编号</dt><dd>${tEsc(item.id)}</dd></div><div><dt>派生课程编号</dt><dd>${tEsc(item.courseId || courseIdForApplication(item.id))}</dd></div><div><dt>课程名称</dt><dd>${tEsc(item.name)}</dd></div><div><dt>所属专业</dt><dd>艺术学 · ${tEsc(item.professional)}</dd></div><div><dt>课程类型</dt><dd>${tEsc(item.type)}</dd></div><div><dt>难度等级</dt><dd>${tEsc(item.difficulty || '—')}</dd></div><div><dt>适合年龄</dt><dd>${tEsc(courseAgesText(item) || '—')}</dd></div>${item.type === '面授课程' ? `<div><dt>总课时</dt><dd>${tEsc(item.hours)}课时</dd></div>` : ''}<div class="wide"><dt>课程简介</dt><dd>${tEsc(item.intro)}</dd></div><div class="wide"><dt>附加材料</dt><dd>${item.file ? tEsc(item.file) : '未上传'}</dd></div></dl></section>`, `<section class="teacher-application-review ${item.status === '已驳回' ? 'rejected' : ''}"><div>${tPill(item.status, applicationTone(item.status))}<h3>${reviewTitle}</h3></div><p>${tEsc(reviewText)}</p>${item.reviewedBy ? `<small>审核人：${tEsc(item.reviewedBy)} · 审核时间：${tEsc(item.reviewedAt || '待记录')}</small>` : ''}</section>`, `<div class="teacher-application-detail-actions">${applicationDetailActions(item)}</div>`));
 }
 function validateApplication() {
   const name = document.querySelector('#application-name')?.value.trim();
@@ -358,6 +374,8 @@ function validateApplication() {
   if (!name) { tToast('请输入课程名称'); return false; }
   if (!document.querySelector('#application-professional')?.value) { tToast('请选择所属专业'); return false; }
   if (type === '面授课程' && hours < 1) { tToast('面授课程请输入有效总课时'); return false; }
+  if (!document.querySelector('#application-difficulty')?.value) { tToast('请选择难度等级'); return false; }
+  if (!document.querySelectorAll('[name="application-age"]:checked').length) { tToast('请选择适合年龄'); return false; }
   return true;
 }
 function initApplicationForm() {
@@ -370,8 +388,8 @@ function initApplicationForm() {
     if (input) input.disabled = !isClass;
   };
   radios.forEach(radio => radio.addEventListener('change', syncHours));
-  const saveApplication = status => {
-    if (status === '审核中' && !validateApplication()) return;
+  const submitApplication = () => {
+    if (!validateApplication()) return;
     const id = new URLSearchParams(location.search).get('application');
     const existing = id ? currentApplication() : null;
     const teacherProfile = currentTeacher();
@@ -385,11 +403,11 @@ function initApplicationForm() {
       professional,
       major: professional,
       type,
-      date: existing?.date || new Date().toISOString().slice(0, 10),
-      submittedAt: existing?.submittedAt || demoTime(),
-      status,
+      date: toLocalDateString(),
+      submittedAt: demoTime(),
+      status: '审核中',
       hours: type === '面授课程' ? Number(document.querySelector('#application-hours')?.value || existing?.hours || 1) : Number(existing?.hours || 0),
-      intro: document.querySelector('#application-intro')?.value.trim() || '',
+      intro: document.querySelector('#application-intro')?.value.trim() || '', difficulty: document.querySelector('#application-difficulty')?.value || existing?.difficulty || '', ages: [...document.querySelectorAll('[name="application-age"]:checked')].map(input => input.value),
       file: existing?.file || '',
       attachment: existing?.attachment || existing?.file || '',
       // I1-DEC-23: identity comes from the signed-in teacher profile, never a hardcoded name.
@@ -400,16 +418,18 @@ function initApplicationForm() {
       teacherProfessional: existing?.teacherProfessional || teacherProfile.professional,
       teacherInfo: `${teacherProfile.name} · ${teacherProfile.title} · ${teacherProfile.professional} · ${teacherProfile.unit}`,
       courseId: existing?.courseId || courseIdForApplication(applicationId),
-      accountId: getCurrentAccountId()
+      accountId: getCurrentAccountId(),
+      review: '',
+      reviewedBy: '',
+      reviewedAt: ''
     };
     upsertDemoRecord('applications', record);
-    teacherState.applicationUpdates[record.id] = status;
-    teacherState.application = status;
+    teacherState.applicationUpdates[record.id] = '审核中';
+    teacherState.application = '审核中';
     saveTeacher();
-    location.href = relativePath(status === '审核中' ? `/teacher/pages/application-detail.html?application=${encodeURIComponent(record.id)}` : '/teacher/pages/applications.html');
+    location.href = relativePath(`/teacher/pages/application-detail.html?application=${encodeURIComponent(record.id)}`);
   };
-  document.querySelector('[data-application-form-action="save"]')?.addEventListener('click', () => saveApplication('草稿'));
-  document.querySelector('[data-application-form-action="submit"]')?.addEventListener('click', () => saveApplication('审核中'));
+  document.querySelector('[data-application-form-action="submit"]')?.addEventListener('click', submitApplication);
   syncHours();
 }
 function initApplicationDetail() {
@@ -437,9 +457,9 @@ function initApplicationDetail() {
   });
 }
 const salaryRecords = [
-  { key: '2026-07', month: '2026年7月', publishedAt: '2026-08-01', paymentStatus: '已发放', paidAt: '2026-08-05', hours: 32, payableTaxIncluded: 5760, paidTaxIncluded: 5520, tax: 36.80, net: 5483.20, attendance: { expected: 18, actual: 16, late: 1, early: 1, absent: 1, leave: 1 }, deductions: { late: 30, early: 30, absent: 180, total: 240 }, account: '中国建设银行 尾号 2866', items: [{ course: '少儿中国舞基础', className: '少儿舞蹈基础班', hours: 20, rate: 180, subtotal: 3600 }, { course: '中国舞身韵训练', className: '成人中国舞提高班', hours: 12, rate: 165, subtotal: 1980 }] },
-  { key: '2026-06', month: '2026年6月', publishedAt: '2026-07-01', paymentStatus: '待发放', paidAt: '', hours: 28, payableTaxIncluded: 5040, paidTaxIncluded: 5040, tax: 15.60, net: 5024.40, attendance: { expected: 15, actual: 14, late: 0, early: 0, absent: 0, leave: 1 }, deductions: { late: 0, early: 0, absent: 0, total: 0 }, account: '中国建设银行 尾号 2866', items: [{ course: '少儿中国舞基础', className: '少儿舞蹈基础班', hours: 18, rate: 180, subtotal: 3240 }, { course: '舞蹈基本功', className: '舞蹈基本功强化班', hours: 10, rate: 180, subtotal: 1800 }] },
-  { key: '2026-05', month: '2026年5月', publishedAt: '2026-06-01', paymentStatus: '发放中', paidAt: '', hours: 26, payableTaxIncluded: 4680, paidTaxIncluded: 4650, tax: 3, net: 4647, attendance: { expected: 14, actual: 13, late: 1, early: 0, absent: 0, leave: 1 }, deductions: { late: 30, early: 0, absent: 0, total: 30 }, account: '中国建设银行 尾号 2866', items: [{ course: '少儿中国舞基础', className: '少儿舞蹈基础班', hours: 16, rate: 180, subtotal: 2880 }, { course: '中国舞身韵训练', className: '成人中国舞提高班', hours: 10, rate: 180, subtotal: 1800 }] }
+  { key: '2026-07', month: '2026年7月', publishedAt: '2026-08-01', paymentStatus: '已发放', paidAt: '2026-08-05', hours: 32, payableTaxIncluded: 5760, paidTaxIncluded: 5520, tax: 36.80, net: 5483.20, attendance: { expected: 18, actual: 16, late: 1, early: 1, absent: 1, leave: 1 }, deductions: { late: 30, early: 30, absent: 180, total: 240 }, account: '中国建设银行 尾号 2866', items: [{ course: '舞蹈基本功', className: '少儿舞蹈基础班', hours: 20, rate: 180, subtotal: 3600 }, { course: '舞蹈基本功', className: '少儿舞蹈提高班', hours: 12, rate: 165, subtotal: 1980 }] },
+  { key: '2026-06', month: '2026年6月', publishedAt: '2026-07-01', paymentStatus: '待发放', paidAt: '', hours: 28, payableTaxIncluded: 5040, paidTaxIncluded: 5040, tax: 15.60, net: 5024.40, attendance: { expected: 15, actual: 14, late: 0, early: 0, absent: 0, leave: 1 }, deductions: { late: 0, early: 0, absent: 0, total: 0 }, account: '中国建设银行 尾号 2866', items: [{ course: '舞蹈基本功', className: '少儿舞蹈基础班', hours: 18, rate: 180, subtotal: 3240 }, { course: '舞蹈基本功', className: '少儿舞蹈提高班', hours: 10, rate: 180, subtotal: 1800 }] },
+  { key: '2026-05', month: '2026年5月', publishedAt: '2026-06-01', paymentStatus: '发放中', paidAt: '', hours: 26, payableTaxIncluded: 4680, paidTaxIncluded: 4650, tax: 3, net: 4647, attendance: { expected: 14, actual: 13, late: 1, early: 0, absent: 0, leave: 1 }, deductions: { late: 30, early: 0, absent: 0, total: 30 }, account: '中国建设银行 尾号 2866', items: [{ course: '舞蹈基本功', className: '少儿舞蹈基础班', hours: 16, rate: 180, subtotal: 2880 }, { course: '舞蹈基本功', className: '少儿舞蹈提高班', hours: 10, rate: 180, subtotal: 1800 }] }
 ];
 function money(value) { return `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; }
 function deductionMoney(value) { return Number(value) ? `-${money(value)}` : money(0); }
@@ -495,21 +515,19 @@ function teacherProfileRow({ mark, title, description, href, value = '', tone = 
 function renderProfile() {
   const graduationPending = teacherState.graduationRecords.filter(item => ['审核中', '需补课', '补课中'].includes(item.status)).length;
   const unreadMessages = teacherState.messages.filter(item => !item.read).length;
-  const archive = teacherProfileRow({ mark: '档', title: '个人档案', description: '联系方式、收款信息与个人简介', href: '/teacher/pages/profile-detail.html', value: '已完善', tone: 'green' });
+  const archive = teacherProfileRow({ mark: '档', title: '个人档案', description: '查看学校维护的本人基础资料', href: '/teacher/pages/profile-detail.html', value: '只读', tone: 'green' });
   const affairs = [
     { mark: '信', title: '消息通知', description: '查看排课、审核与工资通知', href: '/teacher/pages/messages.html', value: unreadMessages ? `${unreadMessages}条未读` : '已读', tone: unreadMessages ? 'amber' : 'green' },
     { mark: '证', title: '我的证书', description: '资格证书与审核记录', href: '/teacher/pages/certificates.html', value: '1项待审核', tone: 'amber' },
-    { mark: '合', title: '我的合同', description: '查看协议、有效期与签署状态', href: '/teacher/pages/contracts.html', value: `${teacherState.contracts.filter(item => item.status === '待签署').length}份待签署`, tone: 'amber' },
+    { mark: '合', title: '我的合同', description: '查看协议、有效期与签署状态', href: '/teacher/pages/contracts.html', value: `${teacherState.contracts.filter(item => item.status === '待教师签署').length}份待教师签署`, tone: 'amber' },
     { mark: '结', title: '结业申请记录', description: '查看复核结果与补课安排', href: '/teacher/pages/graduation.html', value: `${graduationPending}项处理中`, tone: graduationPending ? 'amber' : 'green' }
   ].map(teacherProfileRow).join('');
   const settings = teacherProfileRow({ mark: '设', title: '设置', description: '账号设置、协议与关于我们', href: '/teacher/pages/settings.html' });
-  tLayout(tStack(`<section class="teacher-profile-identity-card"><div class="teacher-profile-identity-main"><span class="teacher-profile-avatar" aria-hidden="true">王</span><div><div class="teacher-profile-name-row"><h2>王玥</h2>${tPill('已激活', 'green')}</div><p>工号 JS20260901</p></div></div></section>`, `<section class="teacher-profile-group"><h3>个人资料</h3><div class="teacher-profile-row-list">${archive}</div></section>`, `<section class="teacher-profile-group"><h3>教师事务</h3><div class="teacher-profile-row-list">${affairs}</div></section>`, `<section class="teacher-profile-group teacher-profile-settings"><div class="teacher-profile-row-list">${settings}</div></section>`));
+  tLayout(tStack(`<section class="teacher-profile-identity-card"><div class="teacher-profile-identity-main"><span class="teacher-profile-avatar" aria-hidden="true">王</span><div><div class="teacher-profile-name-row"><h2>王玥</h2>${tPill('正常', 'green')}</div><p>工号 JS20260901</p></div></div></section>`, `<section class="teacher-profile-group"><h3>个人资料</h3><div class="teacher-profile-row-list">${archive}</div></section>`, `<section class="teacher-profile-group"><h3>教师事务</h3><div class="teacher-profile-row-list">${affairs}</div></section>`, `<section class="teacher-profile-group teacher-profile-settings"><div class="teacher-profile-row-list">${settings}</div></section>`));
 }
-let teacherProfileEditing = false;
-const teacherProfileIdentity = [
+const teacherProfileReadonlyIdentity = [
   ['姓名', '王玥'], ['工号', 'JS20260901'], ['身份证号', '420106********2428'], ['人员类型', '在编'],
-  ['授课专业', '文化艺术 · 表演艺术 · 舞蹈表演'], ['从教年限', '8年'], ['职称', '副教授'],
-  ['性别', '女'], ['出生年月', '1990年5月'], ['政治面貌', '中共党员'], ['民族', '汉族'], ['最高学历', '本科']
+  ['授课专业', '文化艺术 · 表演艺术 · 舞蹈表演']
 ];
 function teacherProfileSection(title, content, note = '') {
   return `<section class="teacher-archive-section"><div class="teacher-archive-section-head"><h2>${tEsc(title)}</h2>${note ? `<span>${tEsc(note)}</span>` : ''}</div>${content}</section>`;
@@ -518,50 +536,12 @@ function teacherArchiveRows(rows) {
   return `<dl class="teacher-archive-rows">${rows.map(([label, value, options = '']) => `<div class="${options}"><dt>${tEsc(label)}</dt><dd>${tEsc(value || '未填写')}</dd></div>`).join('')}</dl>`;
 }
 function renderTeacherProfileDetail() {
-  const profile = teacherState.profile;
-  const identity = teacherArchiveRows(teacherProfileIdentity.map((item, index) => [...item, index === 4 ? 'wide' : '']));
-  if (teacherProfileEditing) {
-    tLayout(tStack(
-      `<section class="teacher-archive-summary"><div class="teacher-archive-person"><span class="teacher-settings-avatar" aria-hidden="true">王</span><div><strong>王玥</strong><span>JS20260901 · 舞蹈表演</span></div></div><span class="teacher-archive-mode">编辑中</span></section>`,
-      teacherProfileSection('联系方式', `<div class="teacher-archive-form"><div class="mp-field"><label for="teacher-profile-mobile">手机号 <b>*</b></label><input id="teacher-profile-mobile" name="mobile" type="tel" inputmode="numeric" maxlength="11" value="${tEsc(profile.mobile)}" placeholder="请输入11位手机号"></div><div class="mp-field"><label for="teacher-profile-email">邮箱</label><input id="teacher-profile-email" name="email" type="email" value="${tEsc(profile.email)}" placeholder="请输入邮箱地址"></div><div class="teacher-archive-form-split"><div class="mp-field"><label for="teacher-profile-emergency-name">紧急联系人 <b>*</b></label><input id="teacher-profile-emergency-name" name="emergencyName" value="${tEsc(profile.emergencyName)}" placeholder="姓名"></div><div class="mp-field"><label for="teacher-profile-emergency-mobile">联系电话 <b>*</b></label><input id="teacher-profile-emergency-mobile" name="emergencyMobile" type="tel" inputmode="numeric" maxlength="11" value="${tEsc(profile.emergencyMobile)}" placeholder="手机号"></div></div></div>`),
-      teacherProfileSection('收款信息', `<div class="teacher-archive-form"><div class="mp-field"><label for="teacher-profile-payee">收款户名</label><input id="teacher-profile-payee" name="payeeName" value="${tEsc(profile.payeeName)}" placeholder="请输入收款户名"></div><div class="mp-field"><label for="teacher-profile-card">银行卡号</label><input id="teacher-profile-card" name="bankCard" inputmode="numeric" maxlength="19" value="${tEsc(profile.bankCard)}" placeholder="请输入银行卡号"></div><div class="mp-field"><label for="teacher-profile-bank">开户行</label><input id="teacher-profile-bank" name="bankName" value="${tEsc(profile.bankName)}" placeholder="请输入开户行"></div></div>`, '仅用于工资发放'),
-      teacherProfileSection('履历与展示', `<div class="teacher-archive-form teacher-archive-long-form"><div class="mp-field"><label for="teacher-profile-education">学习经历</label><textarea id="teacher-profile-education" name="education" placeholder="填写学校、专业及学习时间">${tEsc(profile.education)}</textarea></div><div class="mp-field"><label for="teacher-profile-employment">工作经历</label><textarea id="teacher-profile-employment" name="employment" placeholder="填写任职单位、岗位及时间">${tEsc(profile.employment)}</textarea></div><div class="mp-field"><label for="teacher-profile-awards">获奖情况</label><textarea id="teacher-profile-awards" name="awards" placeholder="填写奖项名称及获奖时间">${tEsc(profile.awards)}</textarea></div><div class="mp-field"><label for="teacher-profile-tagline">一句话简介 <small><span data-profile-tagline-count>${profile.tagline.length}</span>/200</small></label><textarea id="teacher-profile-tagline" name="tagline" maxlength="200" placeholder="用于教师信息展示">${tEsc(profile.tagline)}</textarea></div><div class="mp-field"><label for="teacher-profile-introduction">简介</label><textarea id="teacher-profile-introduction" name="introduction" class="teacher-profile-introduction" placeholder="介绍教学方向和教学经验">${tEsc(profile.introduction)}</textarea></div></div>`),
-      `<div class="teacher-archive-actions"><button type="button" class="mp-button secondary" data-profile-action="cancel">取消</button><button type="button" class="mp-button" data-profile-action="save">保存修改</button></div>`
-    ));
-    return;
-  }
-  const maskedCard = profile.bankCard ? `尾号 ${profile.bankCard.slice(-4)}` : '';
+  const identity = teacherArchiveRows(teacherProfileReadonlyIdentity.map((item, index) => [...item, index === 4 ? 'wide' : '']));
   tLayout(tStack(
-    `<section class="teacher-archive-summary"><div class="teacher-archive-person"><span class="teacher-profile-avatar" aria-hidden="true">王</span><div><strong>王玥</strong><span>${tEsc(profile.tagline)}</span></div></div><button type="button" class="teacher-archive-edit" data-profile-action="edit">编辑</button></section>`,
-    teacherProfileSection('基本信息', `${identity}<p class="teacher-archive-readonly">基本身份和任教信息由学校统一维护</p>`, '只读'),
-    teacherProfileSection('联系方式', teacherArchiveRows([['手机号', profile.mobile], ['邮箱', profile.email], ['紧急联系人', `${profile.emergencyName} · ${profile.emergencyMobile}`, 'wide']])),
-    teacherProfileSection('收款信息', teacherArchiveRows([['收款户名', profile.payeeName], ['银行卡号', maskedCard], ['开户行', profile.bankName, 'wide']])),
-    teacherProfileSection('履历与展示', teacherArchiveRows([['学习经历', profile.education, 'wide long'], ['工作经历', profile.employment, 'wide long'], ['获奖情况', profile.awards, 'wide long'], ['一句话简介', profile.tagline, 'wide long'], ['简介', profile.introduction, 'wide long']]))
+    `<section class="teacher-archive-summary"><div class="teacher-archive-person"><span class="teacher-profile-avatar" aria-hidden="true">王</span><div><strong>王玥</strong><span>本人档案由学校后台统一维护</span></div></div><span class="teacher-archive-mode">只读</span></section>`,
+    teacherProfileSection('本人基础资料', identity, '如需变更请联系学校管理员'),
+    `<p class="teacher-profile-readonly-note">此处仅展示姓名、工号、脱敏身份证号、人员类型和授课专业，不支持教师端编辑或提交审核。</p>`
   ));
-}
-function collectTeacherProfileForm() {
-  return [...document.querySelectorAll('.teacher-archive-form [name]')].reduce((values, field) => ({ ...values, [field.name]: field.value.trim() }), {});
-}
-function saveTeacherProfile() {
-  const values = collectTeacherProfileForm();
-  if (!/^1\d{10}$/.test(values.mobile)) { tToast('请输入正确的11位手机号'); document.querySelector('#teacher-profile-mobile')?.focus(); return; }
-  if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) { tToast('请输入正确的邮箱地址'); document.querySelector('#teacher-profile-email')?.focus(); return; }
-  if (!values.emergencyName) { tToast('请输入紧急联系人姓名'); document.querySelector('#teacher-profile-emergency-name')?.focus(); return; }
-  if (!/^1\d{10}$/.test(values.emergencyMobile)) { tToast('请输入正确的紧急联系人电话'); document.querySelector('#teacher-profile-emergency-mobile')?.focus(); return; }
-  if (values.bankCard && !/^\d{16,19}$/.test(values.bankCard)) { tToast('银行卡号应为16至19位数字'); document.querySelector('#teacher-profile-card')?.focus(); return; }
-  teacherState.profile = values;
-  saveTeacher();
-  teacherProfileEditing = false;
-  renderTeacherProfileDetail();
-  bindTeacherProfileEvents();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  tToast('个人档案已保存');
-}
-function bindTeacherProfileEvents() {
-  document.querySelector('[data-profile-action="edit"]')?.addEventListener('click', () => { teacherProfileEditing = true; renderTeacherProfileDetail(); bindTeacherProfileEvents(); window.scrollTo(0, 0); });
-  document.querySelector('[data-profile-action="cancel"]')?.addEventListener('click', () => { teacherProfileEditing = false; renderTeacherProfileDetail(); bindTeacherProfileEvents(); window.scrollTo(0, 0); });
-  document.querySelector('[data-profile-action="save"]')?.addEventListener('click', saveTeacherProfile);
-  document.querySelector('#teacher-profile-tagline')?.addEventListener('input', event => { const count = document.querySelector('[data-profile-tagline-count]'); if (count) count.textContent = event.target.value.length; });
 }
 let teacherCertificateFilter = '全部';
 function certificateStatusTone(status) {
@@ -584,7 +564,7 @@ function calculateCertificateValidity(expiresAt) {
 function certificateNeedsAction(item) { return item.status === '审核不通过' || item.validity === '即将过期' || item.validity === '已过期'; }
 function teacherCertificateCard(item) {
   const canReupload = item.status === '审核不通过' || item.validity === '已过期';
-  return `<article class="teacher-certificate-card ${certificateNeedsAction(item) ? 'needs-action' : ''}"><div class="teacher-certificate-card-head"><div><span>${tEsc(item.type)}</span><h3>${tEsc(item.name)}</h3></div>${tPill(item.status, certificateStatusTone(item.status))}</div><dl class="teacher-certificate-facts"><div><dt>证书编号</dt><dd>${tEsc(item.number)}</dd></div><div><dt>发证机构</dt><dd>${tEsc(item.issuer)}</dd></div><div><dt>有效期</dt><dd>${item.expiresAt ? `至 ${tEsc(item.expiresAt)}` : '永久有效'}</dd></div><div><dt>有效性</dt><dd>${tPill(item.validity, certificateValidityTone(item.validity))}</dd></div></dl>${item.status === '审核不通过' ? `<p class="teacher-certificate-review-note">审核意见：${tEsc(item.reviewNote)}</p>` : ''}<div class="teacher-certificate-card-foot"><span class="teacher-certificate-file"><b aria-hidden="true">${item.file.toLowerCase().endsWith('.pdf') ? 'PDF' : '图'}</b><span>${tEsc(item.file)}</span></span><div><button type="button" data-certificate-view="${tEsc(item.id)}">查看</button>${canReupload ? `<button type="button" class="primary" data-certificate-reupload="${tEsc(item.id)}">重新上传</button>` : ''}</div></div></article>`;
+  return `<article class="teacher-certificate-card ${certificateNeedsAction(item) ? 'needs-action' : ''}"><div class="teacher-certificate-card-head"><div><span>${tEsc(item.type)}</span><h3>${tEsc(item.name)}</h3></div>${tPill(item.status, certificateStatusTone(item.status))}</div><dl class="teacher-certificate-facts"><div><dt>证书编号</dt><dd>${tEsc(item.number)}</dd></div><div><dt>发证机构</dt><dd>${tEsc(item.issuer)}</dd></div><div><dt>来源</dt><dd>${tEsc(item.source || '—')}</dd></div><div><dt>文件版本</dt><dd>${tEsc(item.fileVersion || 'v1')}</dd></div><div><dt>有效期</dt><dd>${item.expiresAt ? `至 ${tEsc(item.expiresAt)}` : '永久有效'}</dd></div><div><dt>有效性</dt><dd>${tPill(item.validity, certificateValidityTone(item.validity))}</dd></div></dl>${item.status === '审核不通过' ? `<p class="teacher-certificate-review-note">审核意见：${tEsc(item.reviewNote)}</p>` : ''}<div class="teacher-certificate-card-foot"><span class="teacher-certificate-file"><b aria-hidden="true">${item.file.toLowerCase().endsWith('.pdf') ? 'PDF' : '图'}</b><span>${tEsc(item.file)}</span></span><div><button type="button" data-certificate-view="${tEsc(item.id)}">查看</button>${canReupload ? `<button type="button" class="primary" data-certificate-reupload="${tEsc(item.id)}">重新上传</button>` : ''}</div></div></article>`;
 }
 function renderTeacherCertificates() {
   const certificates = [...teacherState.certificates].map(item => ({ ...item, validity: calculateCertificateValidity(item.expiresAt) })).sort((a, b) => (a.expiresAt || '9999-12-31').localeCompare(b.expiresAt || '9999-12-31'));
@@ -650,36 +630,48 @@ function bindTeacherCertificateEvents() {
 let teacherContractFilter = '全部';
 function contractStatusTone(status) {
   if (status === '已签署') return 'green';
-  if (status === '待签署' || status === '即将到期') return 'amber';
+  if (status === '待教师签署' || status === '即将到期') return 'amber';
   if (status === '已到期') return 'red';
   return 'gray';
 }
 function teacherContractCard(contract) {
-  const action = contract.status === '待签署' ? '去签署' : '查看详情';
-  return `<a class="teacher-contract-card ${contract.status === '待签署' ? 'pending' : ''}" href="${relativePath(`/teacher/pages/contract-detail.html?contract=${contract.id}`)}"><div class="teacher-contract-card-head"><div><span>${tEsc(contract.type)} · ${tEsc(contract.version)}</span><h3>${tEsc(contract.name)}</h3></div>${tPill(contract.status, contractStatusTone(contract.status))}</div><dl class="teacher-contract-card-facts"><div><dt>合同编号</dt><dd>${tEsc(contract.number)}</dd></div><div><dt>合同期限</dt><dd>${tEsc(contract.startAt)} 至 ${tEsc(contract.endAt)}</dd></div><div><dt>工作校区</dt><dd>${tEsc(contract.campus)}</dd></div><div><dt>课时费</dt><dd>¥${tEsc(contract.rate)} / 课时</dd></div></dl><div class="teacher-contract-card-foot"><span>${contract.signedAt ? `${tEsc(contract.signedAt)} 签署` : `${tEsc(contract.pushedAt)} 推送`}</span><strong>${action}<i aria-hidden="true">›</i></strong></div></a>`;
+  const action = contract.status === '待教师签署' ? '去签署' : '查看详情';
+  // I1-DEF-012：签署态与期限态分列，期限状态不替换签署状态。
+  const signedContract = Boolean(contract.signedAt);
+  // I1-DEF-014：只有「已到期」合成签署态；「已终止」是签署终态，不能被折叠成已签署。
+  const signingStatus = contract.status === '已到期' && signedContract ? '已签署' : contract.status;
+  const statusLabel = signingStatus === '已签署' && contract.status === '已到期' ? '已签署 · 已到期' : signingStatus;
+  // I1-DEF-014：已终止是签署终态，需可见终止生效日期与终止原因。
+  const terminated = contract.status === '已终止';
+  const terminateFacts = terminated
+    ? `<div><dt>终止生效日期</dt><dd>${tEsc(contract.terminatedAt || '—')}</dd></div><div><dt>终止原因</dt><dd>${tEsc(contract.terminateReason || contract.note || '—')}</dd></div>`
+    : '';
+  return `<a class="teacher-contract-card ${contract.status === '待教师签署' ? 'pending' : ''}" href="${relativePath(`/teacher/pages/contract-detail.html?contract=${contract.id}`)}"><div class="teacher-contract-card-head"><div><span>${tEsc(contract.type)} · ${tEsc(contract.version)}</span><h3>${tEsc(contract.name)}</h3></div>${tPill(statusLabel, contractStatusTone(signingStatus))}</div><dl class="teacher-contract-card-facts"><div><dt>合同编号</dt><dd>${tEsc(contract.number)}</dd></div><div><dt>合同期限</dt><dd>${tEsc(contract.startAt)} 至 ${tEsc(contract.endAt)}</dd></div><div><dt>工作校区</dt><dd>${tEsc(contract.campus)}</dd></div><div><dt>每课次含税单价</dt><dd>¥${Number(contract.rate).toFixed(2)} / 每次课（含税）</dd></div>${terminateFacts}</dl><div class="teacher-contract-card-foot"><span>${contract.signedAt ? `${tEsc(contract.signedAt)} 签署` : `${tEsc(contract.pushedAt)} 推送`}</span><strong>${action}<i aria-hidden="true">›</i></strong></div></a>`;
 }
 function renderTeacherContracts() {
   const contracts = [...teacherState.contracts].sort((a, b) => b.startAt.localeCompare(a.startAt));
-  const pendingCount = contracts.filter(item => item.status === '待签署').length;
-  const visible = contracts.filter(item => teacherContractFilter === '全部' || (teacherContractFilter === '待签署' ? item.status === '待签署' : item.status !== '待签署'));
-  const filters = [['全部', contracts.length], ['待签署', pendingCount], ['历史合同', contracts.length - pendingCount]];
-  tLayout(tStack(`<section class="teacher-contract-overview"><div><strong>${pendingCount}</strong><span>份合同待签署</span></div><p>${pendingCount ? '请在截止日期前阅读并完成签署' : '当前没有待签署合同'}</p></section>`, `<nav class="teacher-contract-filters" role="tablist" aria-label="合同状态筛选">${filters.map(([label, count]) => `<button type="button" role="tab" aria-selected="${teacherContractFilter === label}" class="${teacherContractFilter === label ? 'active' : ''}" data-contract-filter="${label}">${label}<span>${count}</span></button>`).join('')}</nav>`, `<section class="teacher-contract-list" aria-live="polite"><div class="teacher-contract-list-head"><h2>${tEsc(teacherContractFilter)}</h2><span>${visible.length} 份</span></div>${visible.length ? visible.map(teacherContractCard).join('') : `<div class="teacher-contract-empty">暂无${tEsc(teacherContractFilter)}合同</div>`}</section>`));
+  const pendingCount = contracts.filter(item => item.status === '待教师签署').length;
+  const visible = contracts.filter(item => teacherContractFilter === '全部' || (teacherContractFilter === '待教师签署' ? item.status === '待教师签署' : item.status !== '待教师签署'));
+  const filters = [['全部', contracts.length], ['待教师签署', pendingCount], ['历史合同', contracts.length - pendingCount]];
+  tLayout(tStack(`<section class="teacher-contract-overview"><div><strong>${pendingCount}</strong><span>份合同待教师签署</span></div><p>${pendingCount ? '请在截止日期前阅读并完成签署' : '当前没有待教师签署合同'}</p></section>`, `<nav class="teacher-contract-filters" role="tablist" aria-label="合同状态筛选">${filters.map(([label, count]) => `<button type="button" role="tab" aria-selected="${teacherContractFilter === label}" class="${teacherContractFilter === label ? 'active' : ''}" data-contract-filter="${label}">${label}<span>${count}</span></button>`).join('')}</nav>`, `<section class="teacher-contract-list" aria-live="polite"><div class="teacher-contract-list-head"><h2>${tEsc(teacherContractFilter)}</h2><span>${visible.length} 份</span></div>${visible.length ? visible.map(teacherContractCard).join('') : `<div class="teacher-contract-empty">暂无${tEsc(teacherContractFilter)}合同</div>`}</section>`));
 }
 function contractDocument(contract) {
-  return `<article class="teacher-contract-document"><div class="teacher-contract-document-brand">湖北艺术职业学院继续教育服务平台</div><h2>教师${tEsc(contract.type)}</h2><p class="teacher-contract-document-number">合同编号：${tEsc(contract.number)}</p><div class="teacher-contract-parties"><p>甲方：湖北艺术职业学院继续教育学院</p><p>乙方：王玥</p></div><section><h3>第一条 合作事项</h3><p>甲方聘请乙方承担${tEsc(contract.course)}课程教学工作。乙方根据教学计划完成备课、授课、考勤、作业及教学记录。</p></section><section><h3>第二条 合同期限</h3><p>合同期限为${tEsc(contract.startAt)}至${tEsc(contract.endAt)}。课程安排以教务系统发布的课表为准。</p></section><section><h3>第三条 工作地点</h3><p>主要工作地点为${tEsc(contract.campus)}。因教学需要调整校区或教室时，甲方应提前通知乙方。</p></section><section><h3>第四条 课时与报酬</h3><p>课时费标准为人民币${tEsc(contract.rate)}元／课时。有效课时以教师完成上课打卡、学员考勤和教学记录后，由系统确认的数据为准。</p></section><section><h3>第五条 教学要求</h3><p>乙方应遵守教学管理制度，按时到岗，不得擅自调课、停课或委托他人代课。确需调整时，应提前向教务部门申请。</p></section><section><h3>第六条 信息与保密</h3><p>乙方在履约过程中接触的学员信息、教学资料和平台数据仅限教学使用，未经许可不得向无关人员披露。</p></section><section><h3>第七条 合同变更与终止</h3><p>合同内容需要变更时，由双方协商确认。出现严重违反教学管理要求或无法继续履约的情形，可按约定终止合同。</p></section><section><h3>第八条 其他</h3><p>未尽事项由双方协商处理。本合同经双方签署后生效，电子签署文本与纸质文本具有同等效力。</p></section><div class="teacher-contract-document-signatures"><div><span>甲方（盖章）</span><strong>湖北艺术职业学院</strong></div><div><span>乙方（签名）</span><strong>${contract.signedAt ? '王玥' : '待签署'}</strong></div></div></article>`;
+  return `<article class="teacher-contract-document"><div class="teacher-contract-document-brand">湖北艺术职业学院继续教育服务平台</div><h2>教师${tEsc(contract.type)}</h2><p class="teacher-contract-document-number">合同编号：${tEsc(contract.number)}</p><div class="teacher-contract-parties"><p>甲方：湖北艺术职业学院继续教育学院</p><p>乙方：王玥</p></div><section><h3>第一条 合作事项</h3><p>甲方聘请乙方承担${tEsc(contract.course)}课程教学工作。乙方根据教学计划完成备课、授课、考勤、作业及教学记录。</p></section><section><h3>第二条 合同期限</h3><p>合同期限为${tEsc(contract.startAt)}至${tEsc(contract.endAt)}。课程安排以教务系统发布的课表为准。</p></section><section><h3>第三条 工作地点</h3><p>主要工作地点为${tEsc(contract.campus)}。因教学需要调整校区或教室时，甲方应提前通知乙方。</p></section><section><h3>第四条 课时与报酬</h3><p>每课次含税单价为人民币 ${Number(contract.rate).toFixed(2)} 元／每次课（含税）。有效课时以教师完成上课打卡、学员考勤和教学记录后，由系统确认的数据为准。</p></section><section><h3>第五条 教学要求</h3><p>乙方应遵守教学管理制度，按时到岗，不得擅自调课、停课或委托他人代课。确需调整时，应提前向教务部门申请。</p></section><section><h3>第六条 信息与保密</h3><p>乙方在履约过程中接触的学员信息、教学资料和平台数据仅限教学使用，未经许可不得向无关人员披露。</p></section><section><h3>第七条 合同变更与终止</h3><p>合同内容需要变更时，由双方协商确认。出现严重违反教学管理要求或无法继续履约的情形，可按约定终止合同。</p></section><section><h3>第八条 其他</h3><p>未尽事项由双方协商处理。本合同经双方签署后生效，电子签署文本与纸质文本具有同等效力。</p></section><div class="teacher-contract-document-signatures"><div><span>甲方（盖章）</span><strong>湖北艺术职业学院</strong></div><div><span>乙方（签名）</span><strong>${contract.signedAt ? '王玥' : '待教师签署'}</strong></div></div></article>`;
 }
 function currentTeacherContract() {
   const id = new URLSearchParams(location.search).get('contract');
-  return teacherState.contracts.find(item => item.id === id) || teacherState.contracts.find(item => item.status === '待签署') || teacherState.contracts[0];
+  return teacherState.contracts.find(item => item.id === id) || teacherState.contracts.find(item => item.status === '待教师签署') || teacherState.contracts[0];
 }
 function renderTeacherContractDetail() {
   const contract = currentTeacherContract();
-  const readonly = contract.status !== '待签署';
-  const statusNote = contract.status === '待签署' ? contract.note : contract.status === '已终止' ? `终止日期 ${contract.terminatedAt} · ${contract.note}` : contract.note;
-  tLayout(tStack(`<section class="teacher-contract-detail-head"><div><span>${tEsc(contract.type)} · ${tEsc(contract.version)}</span><h2>${tEsc(contract.name)}</h2><p>${tEsc(contract.number)}</p></div>${tPill(contract.status, contractStatusTone(contract.status))}</section>`, `<section class="teacher-contract-info"><div class="teacher-contract-info-head"><h3>合同信息</h3><span>${readonly ? '只读' : '签署前请核对'}</span></div>${teacherArchiveRows([['合同期限', `${contract.startAt} 至 ${contract.endAt}`, 'wide'], ['授课课程', contract.course, 'wide'], ['工作校区', contract.campus], ['课时费标准', `¥${contract.rate} / 课时`], ['签署日期', contract.signedAt || '未签署'], ['合同版本', contract.version]])}</section>`, `<section class="teacher-contract-file"><div class="teacher-contract-file-page"><span>PDF · ${tEsc(contract.file)}</span><strong>教师${tEsc(contract.type)}</strong><p>${tEsc(contract.number)}</p><small>共 8 条</small></div><div><h3>合同全文</h3><p>查看合同期限、授课安排、课时费标准及双方权责。</p><button type="button" class="mp-button secondary full" data-contract-read>${readonly ? '查看合同全文' : '阅读并签署'}</button></div></section>`, `<p class="teacher-contract-status-note ${contract.status === '待签署' ? 'pending' : ''}">${tEsc(statusNote)}</p>`));
+  const readonly = contract.status !== '待教师签署';
+  const statusNote = contract.status === '待教师签署' ? contract.note : contract.status === '已终止' ? `终止日期 ${contract.terminatedAt} · ${contract.note}` : contract.note;
+  // I1-DEF-014：已终止合同的终止生效日期与终止原因在详情同步可见。
+  const terminateRows = contract.status === '已终止' ? [['终止生效日期', contract.terminatedAt || '—'], ['终止原因', contract.terminateReason || contract.note || '—', 'wide']] : [];
+  tLayout(tStack(`<section class="teacher-contract-detail-head"><div><span>${tEsc(contract.type)} · ${tEsc(contract.version)}</span><h2>${tEsc(contract.name)}</h2><p>${tEsc(contract.number)}</p></div>${tPill(contract.status, contractStatusTone(contract.status))}</section>`, `<section class="teacher-contract-info"><div class="teacher-contract-info-head"><h3>合同信息</h3><span>${readonly ? '只读' : '签署前请核对'}</span></div>${teacherArchiveRows([['合同期限', `${contract.startAt} 至 ${contract.endAt}`, 'wide'], ['授课课程', contract.course, 'wide'], ['工作校区', contract.campus], ['每课次含税单价', `¥${Number(contract.rate).toFixed(2)} / 每次课（含税）`], ['签署日期', contract.signedAt || '未签署'], ['合同版本', contract.version], ...terminateRows])}</section>`, `<section class="teacher-contract-file"><div class="teacher-contract-file-page"><span>PDF · ${tEsc(contract.file)}</span><strong>教师${tEsc(contract.type)}</strong><p>${tEsc(contract.number)}</p><small>共 8 条</small></div><div><h3>合同全文</h3><p>查看合同期限、授课安排、每课次含税单价及双方权责。</p><button type="button" class="mp-button secondary full" data-contract-read>${readonly ? '查看合同全文' : '阅读并签署'}</button></div></section>`, `<p class="teacher-contract-status-note ${contract.status === '待教师签署' ? 'pending' : ''}">${tEsc(statusNote)}</p>`));
 }
 function openTeacherContractReader(contract) {
-  const canSign = contract.status === '待签署';
+  const canSign = contract.status === '待教师签署';
   const dialog = document.createElement('dialog');
   dialog.className = 'teacher-contract-reader-dialog';
   dialog.innerHTML = `<div class="teacher-contract-reader"><header><div><span>${canSign ? '签署前阅读' : '合同全文'}</span><strong>${tEsc(contract.number)}</strong></div><button type="button" data-contract-close aria-label="关闭合同全文">×</button></header><div class="teacher-contract-reader-body" data-contract-reader-body>${contractDocument(contract)}</div><footer><span data-contract-read-status>${canSign ? '请阅读至合同末尾' : '只读合同'}</span><button type="button" class="mp-button" data-contract-to-sign ${canSign ? 'disabled' : ''}>${canSign ? '已阅读，去签名' : '关闭全文'}</button></footer></div>`;
@@ -721,7 +713,7 @@ function openTeacherContractSignature(contract) {
   canvas.addEventListener('pointerup', () => { drawing = false; });
   canvas.addEventListener('pointercancel', () => { drawing = false; });
   dialog.querySelector('[data-signature-clear]').addEventListener('click', () => { context.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; syncConfirm(); });
-  confirm.addEventListener('click', () => { if (confirm.disabled) return; teacherState.contracts = teacherState.contracts.map(item => item.id === contract.id ? { ...item, status: '已签署', signedAt: '2026-09-10', note: '合同已完成教师签署，等待归档。' } : item); saveTeacher(); dialog.close(); renderTeacherContractDetail(); bindTeacherContractEvents(); window.scrollTo(0, 0); tToast('合同签署成功'); });
+  confirm.addEventListener('click', () => { if (confirm.disabled) return; teacherState.contracts = teacherState.contracts.map(item => item.id === contract.id ? { ...item, status: '待学校签署', signedAt: '2026-09-10', note: '合同已完成教师签署，等待归档。' } : item); saveTeacher(); dialog.close(); renderTeacherContractDetail(); bindTeacherContractEvents(); window.scrollTo(0, 0); tToast('教师已签署，等待学校签署'); });
   dialog.showModal();
   const rect = canvas.getBoundingClientRect();
   const scale = Math.max(1, window.devicePixelRatio || 1);
@@ -1014,9 +1006,14 @@ else if (teacherPath.endsWith('/graduation.html')) renderTeacherGraduations();
 else if (teacherPath.endsWith('/graduation-detail.html')) renderTeacherGraduationDetail();
 initApplicationForm();
 initApplicationDetail();
-bindTeacherProfileEvents();
 bindTeacherCertificateEvents();
 bindTeacherContractEvents();
 bindTeacherGraduationEvents();
 bindLessonEvents();
 bindTeacherEvents();
+
+// 教师端与后台共用字段规格：按页面路径应用输入约束。
+mountFieldConstraints('teacher/' + (teacherPath.split('/').pop() || '').replace('.html', ''));
+
+// 页面说明入口：内容来自 spec/fields/，与后台共用同一份字段口径。
+mountPageHelp({ pageKey: 'teacher/' + (teacherPath.split('/').pop() || '').replace('.html', ''), title: document.title });
