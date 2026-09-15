@@ -114,24 +114,11 @@ export const COURSE_FIELD_SPEC = {
         '轻量课程档案不进入编排工作台，只能作为快速报名班级的关联课程。'
       ]
     },
-    // 课程展示信息：字段定义见文件顶部 COURSE_TEACHING_FIELDS / COURSE_DISPLAY_FIELDS（只定义一次）。
-    // CR-2026-012 起不再有单独的展示信息页：教学属性在申报与编排维护，运营素材在发布环节维护。
-    'courses/display-info': {
-      groups: [
-        { heading: '课程展示信息字段', fields: [
-          ...courseFieldRows('COURSE', 29, [COURSE_DISPLAY_FIELDS[0]]),
-          ...courseFieldRows('COURSE', 21, COURSE_TEACHING_FIELDS),
-          ...courseFieldRows('COURSE', 23, COURSE_DISPLAY_FIELDS.slice(1))
-        ] }
-      ],
-      notes: [
-        '六个展示字段统一写入课程档案（课程级存储），不写入班级记录或商品记录；后台与学员端读取同一份数据。',
-        '教学属性（难度等级、适合年龄）在教师申报时维护，后台编排阶段可修改；发布环节只读带入，不可在商品或班级表单修改。',
-        '运营素材（课程封面、图文详情、课程标签、C 端推荐语）在发布视频商品或发布面授班级时维护；同一课程二次发布时只读带入，可在“修改展示信息”入口按课程级覆盖。',
-        '完整课程首次发布必须上传课程封面；轻量课程档案的课程封面可选填，其教学属性在课程档案弹窗维护。',
-        '课程详情页优先读取课程档案字段；视频商品的售卖价格仍以商品配置为准。'
-      ]
-    },
+    // 课程展示信息：**不设独立页面键**（GT-12／PC-06：并入两个发布表单，不新增页面）。
+    // 六个展示字段只在文件顶部 COURSE_TEACHING_FIELDS / COURSE_DISPLAY_FIELDS 定义一次，
+    // 由 spec/fields/mall.js（mall/products）与 spec/fields/crm.js（crm/classes）用 courseFieldRows() 引用，
+    // 避免同一字段组三处维护（总控 2026-09-16 v1.40 登记的同源残留）。
+
 
     'courses/library': {
       groups: [

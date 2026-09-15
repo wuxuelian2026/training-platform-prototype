@@ -14,7 +14,7 @@ spec/
 
 尚未迁移的模块，其字段表暂时仍以字面量形式存放在 `shared/js/page-help-fields.js`，属于过渡状态。
 
-规格允许先于原型存在：`courses/display-info`（课程展示信息）目前只有 PRD 字段定义，原型还没有对应入口。检查脚本会把这种情况列为"规格存在但找不到对应页面"，属于提示而非失败，原型补齐后自然消失。
+原孤儿规格 `courses/display-info` 已按 GT-12／PC-06 处置：**不再保留独立页面键**，六个展示字段只在 `spec/fields/courses.js` 顶部定义一次（`COURSE_TEACHING_FIELDS`／`COURSE_DISPLAY_FIELDS`），由 `spec/fields/mall.js`（`mall/products`）与 `spec/fields/crm.js`（`crm/classes`）用 `courseFieldRows()` 引用，避免同一字段组多处维护（总控 2026-09-16 v1.40 登记）。
 
 ## 字段定义约定
 

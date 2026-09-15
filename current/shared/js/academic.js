@@ -88,7 +88,7 @@ function plannerFormState(form) {
   const weekdays = [...form.querySelectorAll('[name=weekdays]:checked')].map(item => item.value);
   const duration = Number(data.get('lessonDuration')) || DEFAULT_LESSON_DURATION; const rawStart = String(data.get('startTime') || ''); const start = rawStart ? snapToStep(rawStart) : '';
   const room = venues.find(item => item.id === data.get('roomId')); const total = Number(course?.hours || 0);
-  const preview = { course, name: String(data.get('name') || '').trim(), batch: data.get('batch') || '', teacher: String(data.get('teacher') || '').trim(), campus: data.get('campus') || '', roomId: room?.id || '', roomName: room?.name || '', capacity: Number(data.get('capacity') || 0), price: Number(data.get('price') || 0), weekdays, rawStart, start, end: start ? lessonEndTime(start, duration) : '', duration, firstLessonDate: String(data.get('firstLessonDate') || ''), deadline: String(data.get('deadline') || ''), total, sessions: plannerSessions(total, weekdays, start, duration, String(data.get('firstLessonDate') || ''), room?.id || '', data.get('batch') === '2026暑假' ? '2026暑期' : '2026秋季') };
+  const preview = { course, name: String(data.get('name') || '').trim(), batch: data.get('batch') || '', teacher: String(data.get('teacher') || '').trim(), campus: data.get('campus') || '', building: String(data.get('building') || ''), roomId: room?.id || '', roomName: room?.name || '', capacity: Number(data.get('capacity') || 0), price: Number(data.get('price') || 0), weekdays, rawStart, start, end: start ? lessonEndTime(start, duration) : '', duration, firstLessonDate: String(data.get('firstLessonDate') || ''), deadline: String(data.get('deadline') || ''), total, sessions: plannerSessions(total, weekdays, start, duration, String(data.get('firstLessonDate') || ''), room?.id || '', data.get('batch') === '2026暑假' ? '2026暑期' : '2026秋季') };
   preview.conflicts = plannerConflicts(preview); preview.withinTimeline = Boolean(start) && isWithinTimeline(start, duration); preview.roomCapacityOk = Boolean(room && preview.capacity > 0 && room.capacity >= preview.capacity);
   return preview;
 }
@@ -105,14 +105,29 @@ function plannerMiniMatrix(preview) {
   if (!room || !preview.weekdays.length) return '<div class="planner-empty">选择上课日和教室后显示预览矩阵。</div>';
   return `<div class="planner-mini-matrix"><div class="planner-mini-head"><span>星期 / 教室</span><strong>${escapeHtml(room.name)}</strong></div>${preview.weekdays.map(weekday => `<div class="planner-mini-row"><span>${weekday}</span><div>${preview.sessions.filter(session => session.weekday === weekday).map(session => `<span class="planner-mini-entry">${session.date}<br>${session.startTime}-${session.endTime}</span>`).join('') || '<em>暂无课次</em>'}</div></div>`).join('')}</div>`;
 }
+// 待补充项与提交守卫使用同一份判定，避免“实时预览显示可发布、提交却被拦”的口径不一致。
+function plannerIssues(preview) {
+  const missing = [];
+  if (!preview.course) missing.push('关联课程');
+  if (!preview.name) missing.push('班级名称');
+  if (!preview.teacher) missing.push('授课教师');
+  if (!preview.campus) missing.push('授课校区');
+  if (!preview.roomId) missing.push(`授课教室（${preview.campus || '所选校区'}${preview.building ? ` · ${preview.building}` : ''} 暂无启用教室，请到「场地管理」启用或新增）`);
+  if (!preview.weekdays.length) missing.push('每周上课日');
+  if (!preview.firstLessonDate) missing.push('首次上课日期');
+  if (!preview.capacity) missing.push('招生人数上限');
+  if (!preview.price) missing.push('招生价格');
+  if (!preview.deadline) missing.push('报名截止时间');
+  return missing;
+}
 function plannerPreviewMarkup(preview) {
-  const recommendations = plannerRecommendationRows(preview); const invalid = !preview.course || !preview.weekdays.length || !preview.start || !preview.firstLessonDate || !preview.total; const issues = [];
+  const recommendations = plannerRecommendationRows(preview); const missing = plannerIssues(preview); const invalid = missing.length > 0 || !preview.start || !preview.total; const issues = [];
   if (preview.start && !preview.withinTimeline) issues.push(`时间需落在 ${TIMELINE_START}–${TIMELINE_END} 内，当前课次结束时间为 ${preview.end}`);
   if (preview.roomId && preview.capacity && !preview.roomCapacityOk) issues.push(`教室容量不足，当前 ${preview.capacity} 人，${preview.roomName}容量不足`);
   if (preview.conflicts.length) issues.push(...preview.conflicts.map(item => `${item.type}冲突：${item.target}与“${item.existing}”在${item.weekday}有重叠课次`));
   const rawNote = preview.rawStart && preview.rawStart !== preview.start ? `开始时间 ${preview.rawStart} 已吸附为 ${preview.start}` : '开始时间已对齐 15 分钟刻度';
   const sessionRows = preview.sessions.slice(0, 8).map(session => `<tr><td>第${session.index}次</td><td>${session.date} ${session.weekday}</td><td>${session.startTime}–${session.endTime}</td><td>${escapeHtml(preview.roomName || '待选教室')}</td></tr>`).join('');
-  return `<div class="planner-preview-panel"><div class="planner-preview-header"><div><strong>排课预览</strong><span>只计算，不写入正式课表</span></div>${tag(issues.length ? '待修正' : invalid ? '待填写' : '可发布')}</div><div class="planner-preview-metrics"><div><span>预计课次</span><strong>${preview.total || 0}</strong></div><div><span>每次时长</span><strong>${preview.duration} 分钟</strong></div><div><span>首课 / 末课</span><strong>${preview.sessions[0]?.date || '—'} / ${preview.sessions.at(-1)?.date || '—'}</strong></div></div><p class="planner-preview-note">${rawNote}；${preview.weekdays.length ? `每周${preview.weekdays.join('、')}` : '尚未选择上课日'}。</p>${issues.length ? `<div class="academic-conflict"><strong>发布前需处理</strong><ul>${issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('')}</ul></div>` : ''}${recommendations.length ? `<div class="planner-recommendations"><div class="planner-section-title"><strong>智能推荐教室</strong><span>按无冲突、容量合适排序</span></div>${recommendations.map(item => `<button type="button" class="planner-recommendation ${item.room.id === preview.roomId ? 'selected' : ''}" data-planner-room="${escapeHtml(item.room.id)}"><span><strong>${escapeHtml(item.room.name)}</strong><small>${escapeHtml(item.room.building)} · 容量 ${item.room.capacity} 人</small></span><em>${item.conflicts.length ? `${item.conflicts.length} 个冲突` : '无冲突'}</em></button>`).join('')}</div>` : ''}${plannerMiniMatrix(preview)}<div class="planner-section-title"><strong>课次清单</strong><span>${preview.sessions.length > 8 ? `展示前 8 条，共 ${preview.sessions.length} 条` : `${preview.sessions.length} 条`}</span></div><div class="planner-session-list"><table><thead><tr><th>课次</th><th>日期</th><th>时间</th><th>教室</th></tr></thead><tbody>${sessionRows || '<tr><td colspan="4"><div class="planner-empty">补充课程、上课日和首课日期后自动生成课次。</div></td></tr>'}</tbody></table></div></div>`;
+  return `<div class="planner-preview-panel"><div class="planner-preview-header"><div><strong>排课预览</strong><span>只计算，不写入正式课表</span></div>${tag(issues.length ? '待修正' : missing.length ? '待填写' : '可发布')}</div><div class="planner-preview-metrics"><div><span>预计课次</span><strong>${preview.total || 0}</strong></div><div><span>每次时长</span><strong>${preview.duration} 分钟</strong></div><div><span>首课 / 末课</span><strong>${preview.sessions[0]?.date || '—'} / ${preview.sessions.at(-1)?.date || '—'}</strong></div></div><p class="planner-preview-note">${rawNote}；${preview.weekdays.length ? `每周${preview.weekdays.join('、')}` : '尚未选择上课日'}。</p>${missing.length ? `<div class="academic-conflict"><strong>待补充项（补齐后才能保存或发布）</strong><ul>${missing.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>` : ''}${issues.length ? `<div class="academic-conflict"><strong>发布前需处理</strong><ul>${issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('')}</ul></div>` : ''}${recommendations.length ? `<div class="planner-recommendations"><div class="planner-section-title"><strong>智能推荐教室</strong><span>按无冲突、容量合适排序</span></div>${recommendations.map(item => `<button type="button" class="planner-recommendation ${item.room.id === preview.roomId ? 'selected' : ''}" data-planner-room="${escapeHtml(item.room.id)}"><span><strong>${escapeHtml(item.room.name)}</strong><small>${escapeHtml(item.room.building)} · 容量 ${item.room.capacity} 人</small></span><em>${item.conflicts.length ? `${item.conflicts.length} 个冲突` : '无冲突'}</em></button>`).join('')}</div>` : ''}${plannerMiniMatrix(preview)}<div class="planner-section-title"><strong>课次清单</strong><span>${preview.sessions.length > 8 ? `展示前 8 条，共 ${preview.sessions.length} 条` : `${preview.sessions.length} 条`}</span></div><div class="planner-session-list"><table><thead><tr><th>课次</th><th>日期</th><th>时间</th><th>教室</th></tr></thead><tbody>${sessionRows || '<tr><td colspan="4"><div class="planner-empty">补充课程、上课日和首课日期后自动生成课次。</div></td></tr>'}</tbody></table></div></div>`;
 }
 function plannerBuildings(campus = '') { return [...new Set(venues.filter(item => item.status === '启用' && (!campus || item.campus === campus)).map(item => item.building))]; }
 function plannerBuildingOptions(campus = '') { return plannerBuildings(campus).map(name => `<option>${name}</option>`).join(''); }
@@ -128,7 +143,8 @@ function openSchedulePlanner(prefill = {}) {
 }
 function saveSchedulePlanner(mode, dialog, preview) {
   const form = dialog.querySelector('#schedule-planner-form'); const originalStart = form.querySelector('[name=startTime]')?.dataset.originalTime || '';
-  if (!preview.course || !preview.name || !preview.teacher || !preview.campus || !preview.roomId || !preview.weekdays.length || !preview.firstLessonDate || !preview.capacity || !preview.price || !preview.deadline) { showToast('请先补充班级、课程、上课日、教室和招生信息。', 'warning'); return; }
+  const missingFields = plannerIssues(preview);
+  if (missingFields.length) { showToast(`请补充：${missingFields.join('、')}`, 'warning'); return; }
   if (!preview.withinTimeline) { showToast(`上课时间需落在 ${TIMELINE_START}–${TIMELINE_END} 内，当前为 ${preview.start}–${preview.end}`, 'error'); return; }
   if (!preview.roomCapacityOk) { showToast('招生人数超过所选教室容量，请更换教室或调整人数。', 'error'); return; }
   if (mode === 'publish' && preview.conflicts.length) { showToast('存在教师或教室冲突，处理冲突后才能发布排班。', 'error'); return; }

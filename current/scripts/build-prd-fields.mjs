@@ -94,11 +94,6 @@ const PRD_TARGETS = [
     file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/04-后台管理端-课程中心.md')
   },
   {
-    pageKey: 'courses/display-info',
-    marker: 'FIELDS courses/display-info',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/04-后台管理端-课程中心.md')
-  },
-  {
     pageKey: 'mall/products',
     marker: 'FIELDS mall/products',
     file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/05-后台管理端-商城运营.md')
