@@ -147,7 +147,11 @@ function renderSchedule() {
   const scheduled = scheduleDay(selectedScheduleDay);
   const selected = scheduled || { label: calendarDateLabel(selectedScheduleDay), today: selectedScheduleDay === calendarToday, lessons: [] };
   const today = scheduleDays.find(day => day.today);
-  const list = selected.lessons.length ? selected.lessons.map(scheduleLessonCard).join('') : `<section class="teacher-schedule-empty"><strong>当天没有课程</strong><p>可选择其他日期查看已排课次。</p></section>`;
+  // PM-B11：默认严格按“今天”，今天无课时给出明确空态与切换入口；不自动跳到最近有课日。
+  const emptyTitle = selected.today ? '今天没有课程' : '当天没有课程';
+  const list = selected.lessons.length
+    ? selected.lessons.map(scheduleLessonCard).join('')
+    : `<section class="teacher-schedule-empty"><strong>${emptyTitle}</strong><p>可在上方月历切换其他日期，查看已排课次。</p></section>`;
   tLayout(tStack(`<section class="teacher-schedule-overview"><div class="teacher-schedule-profile"><span class="mp-avatar" aria-hidden="true">王</span><div><span>授课教师</span><h2>王玥</h2></div></div><div class="teacher-schedule-today"><span>2026年9月12日</span><strong>今日 ${today.lessons.length} 节课</strong></div></section>`, renderMobileCalendar(), `<section class="teacher-schedule-list"><div class="teacher-schedule-list-head"><div><h2>${selected.label}${selected.today ? '<small>今天</small>' : ''}</h2><p>${selected.lessons.length ? `共 ${selected.lessons.length} 节课，按上课时间排列` : '暂无已排课次'}</p></div></div>${list}</section>`));
 }
 function lessonTimeLabel() {
