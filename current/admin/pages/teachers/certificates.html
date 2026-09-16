@@ -25,6 +25,9 @@
         <a class="card stat-link" href="?validity=已过期"><div class="metric-label">已过期</div><div class="metric-value" id="metric-expired">1</div><div class="metric-note">当前不可作为有效资质</div></a>
       </div>
 
+      <!-- 状态页签由 certificates.js 按 spec/states 的 SM-TEACHER-CERTIFICATE 运行时生成，页面不写死状态取值。 -->
+      <nav class="certificate-status-tabs" id="certificate-status-tabs" role="tablist" aria-label="证书审核状态"></nav>
+
       <form class="card filter-panel" id="certificate-filter">
         <div class="filter-head"><strong>筛选条件</strong></div>
         <div class="filter-grid certificate-filter-grid">
@@ -37,8 +40,6 @@
         <div class="filter-actions"><button type="reset" class="button">重置</button><button type="submit" class="button primary">查询</button></div>
       </form>
 
-      <!-- 状态页签由 certificates.js 按 spec/states 的 SM-TEACHER-CERTIFICATE 运行时生成，页面不写死状态取值。 -->
-      <nav class="certificate-status-tabs" id="certificate-status-tabs" role="tablist" aria-label="证书审核状态"></nav>
 
       <div class="table-note" id="certificate-count">共4条证书 · 当前页显示4条 · 证书审核状态与有效性分开展示</div>
       <div class="table-wrap certificate-table-wrap">
