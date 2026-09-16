@@ -3,6 +3,7 @@ import { readAdminSession } from './admin-auth.js';
 import { mountRichEditor } from './rich-editor.js';
 import { readDemoState, writeDemoState } from './demo-store.js';
 import { readXlsxSheetRows } from './xlsx-lite.js';
+import { toLocalDateString } from './date-utils.js';
 import { teacherFactsById } from './teacher-facts.js';
 import { permissionsOfRole } from './permissions.js';
 import { TEACHER_PROFILE_LABELS, teacherProfileMask } from './teacher-profile-fields.js';
@@ -83,7 +84,6 @@ function updateTeacherRow(row, action) {
   }
   if (action === 'resign') {
     row.dataset.departedAt = String(document.querySelector('#teacher-action-date')?.value || '').trim() || new Date().toISOString().slice(0, 10);
-    row.dataset.todos = `${row.dataset.todos || ''},人员离职`;
   }
   renderTeacherCapability(row);
   renderTeacherActions(row, actionCell);
@@ -91,18 +91,37 @@ function updateTeacherRow(row, action) {
 
 // 视图层：教师列表只回答「可授课几个专业、哪些专业有有效资质、档案与账号是否异常」，
 // 不再输出教师级“可排课”结论——那个结论只在具体（专业 × 课次日期）下成立。
+// CR-2026-029／030：授课专业与有效资质合并为一列（专业方向 + 有效资质 x/y）；
+// 当前能力独立成列，展示可申报／可排课／暂停使用，与教师详情页的能力结论同源。
+function renderTeacherCredential(row, summary) {
+  const cell = row.querySelector('[data-cell="credential"]');
+  if (!cell) return;
+  const tone = summary.qualifiedCount === summary.majorCount ? 'green' : summary.qualifiedCount ? 'amber' : 'red';
+  cell.className = `teacher-credential is-${tone}`;
+  cell.textContent = `有效资质 ${summary.qualifiedCount}/${summary.majorCount}`;
+}
 function renderTeacherCapability(row) {
   const cell = row.querySelector('[data-cell="capability"]');
   if (!cell) return;
   const facts = teacherFactsById(row.dataset.teacherId);
   if (!facts) return;
   const summary = summarizeTeacherCapacity(facts);
-  const tags = [`<span class="tag brand">可授课 ${summary.majorCount} 个专业</span>`];
-  const tone = summary.qualifiedCount === summary.majorCount ? 'green' : summary.qualifiedCount ? 'amber' : 'gray';
-  tags.push(`<span class="tag ${tone}">${summary.qualifiedCount}/${summary.majorCount} 有有效资质</span>`);
-  summary.issues.forEach((issue) => tags.push(`<span class="tag red">${issue.text}</span>`));
+  renderTeacherCredential(row, summary);
+  const applyResult = explainTeacherCapacity(facts, { purpose: 'apply' });
+  const today = toLocalDateString();
+  // 任一已配置专业在今天就绪即视为可排课；离职、冻结、资料未完善等阻断项统一显示暂停使用。
+  const schedulable = !summary.blocked && summary.majors.some((item) => explainTeacherCapacity(facts, { purpose: 'schedule', major: item.major, date: today }).status === 'available');
+  const tags = [];
+  if (summary.blocked) {
+    tags.push('<span class="tag gray">暂停使用</span>');
+    (applyResult.blocks || []).slice(0, 1).forEach((block) => tags.push(`<span class="tag red">${block.text}</span>`));
+  } else {
+    tags.push(`<span class="tag ${applyResult.status === 'available' ? 'brand' : 'amber'}">${applyResult.status === 'available' ? '可申报' : '暂不可申报'}</span>`);
+    tags.push(`<span class="tag ${schedulable ? 'green' : 'gray'}">${schedulable ? '可排课' : '暂不可排课'}</span>`);
+  }
   cell.innerHTML = tags.join('');
-  row.dataset.capabilities = summary.blocked ? '暂停使用' : '可授课';
+  row.dataset.capabilities = summary.blocked ? '暂停使用' : (applyResult.status === 'available' ? '可申报' : '暂不可申报');
+  if (schedulable) row.dataset.capabilities += ',可排课';
 }
 
 function renderTeacherActions(row, cell) {
@@ -142,15 +161,15 @@ function updateFeaturedTeacher(row, checked) {
 function applyTeacherFilters() {
   const form = document.querySelector('#teacher-filter');
   const capability = form?.querySelector('[name="capability"]')?.value || '';
-  const todo = form?.querySelector('[name="todo"]')?.value || '';
+  const capabilityFilter = form?.querySelector('[name="capability"]')?.value || '';
   const account = form?.querySelector('[name="account"]')?.value || '';
   const category = form?.querySelector('[name="category"]')?.value || '';
   const keyword = (form?.querySelector('[name="keyword"]')?.value || '').trim();
   const rows = [...document.querySelectorAll('tr[data-teacher-id]')];
   let visible = 0;
   rows.forEach((row) => {
-    const matches = (!capability || row.dataset.capabilities.split(',').includes(capability))
-      && (!todo || row.dataset.todos.includes(todo))
+    // CR-2026-030：教师列表不再以待办筛选；保留账号状态、授课专业、关键词与当前能力。
+    const matches = (!capabilityFilter || row.dataset.capabilities.split(',').includes(capabilityFilter))
       && (!account || row.dataset.accountStatus === account)
       && (!category || row.dataset.category === category)
       && (!keyword || `${row.dataset.teacher}${row.dataset.employeeNo}${row.dataset.phone}`.includes(keyword));
@@ -159,7 +178,7 @@ function applyTeacherFilters() {
   });
   const empty = document.querySelector('.teacher-empty-row');
   if (empty) empty.hidden = visible !== 0;
-  text('teacher-count', `共${28 + importedTeacherCount}名教师 · 当前筛选显示${visible}名 · 待处理事项优先`);
+  text('teacher-count', `共${28 + importedTeacherCount}名教师 · 当前筛选显示${visible}名 · 按最近授课时间倒序`);
 }
 
 function resetTeacherImport() {
@@ -373,7 +392,8 @@ function appendImportedTeachers(rows, results) {
     const inviteFailed = Boolean(results?.[index]?.inviteFailed);
     const no = `JS2026${String(915 + index).padStart(4, '0')}`;
     const phone = importMaskPhone(item.phone);
-    const todos = inviteFailed ? '账号未激活,邀请发送失败' : '账号未激活';
+    // CR-2026-030：待办标签列已下线，导入行只保留资料/账号状态；邀请发送结果通过提示与审计表达。
+
     const row = document.createElement('tr');
     row.dataset.importBatch = 'CR-2026-009-demo';
     row.dataset.teacherId = `teacher-import-${index + 1}`;
@@ -385,8 +405,9 @@ function appendImportedTeachers(rows, results) {
     row.dataset.departedAt = '';
     row.dataset.accountStatus = 'inactive';
     row.dataset.capabilities = '暂停使用';
-    row.dataset.todos = todos;
-    row.innerHTML = `<td><a class="link teacher-name" href="profile.html?teacher_id=${encodeURIComponent(row.dataset.teacherId)}">${importEsc(item.name)}</a><span class="teacher-cell-sub">${no} · ${phone}</span></td><td>${importEsc(item.major)}<br /><span class="teacher-cell-sub">${importEsc(item.personnel)}</span></td><td data-cell="capability"><span class="tag gray">暂停使用</span></td><td><div class="teacher-todo-list"><span class="tag amber">账号未激活</span>${inviteFailed ? '<span class="tag red">邀请发送失败</span>' : ''}</div></td><td data-cell="featured"></td><td>暂无授课</td><td class="action-cell" data-cell="actions"></td>`;
+    // CR-2026-030：导入行按新列集合输出，能力列独立、不再有代办列；邀请结果由提示与审计表达。
+    row.innerHTML = `<td><a class="link teacher-name" href="profile.html?teacher_id=${encodeURIComponent(row.dataset.teacherId)}">${importEsc(item.name)}</a><span class="teacher-cell-sub">${no} · ${phone}</span></td><td data-cell="major">${importEsc(item.major)}<br /><span class="teacher-cell-sub">${importEsc(item.personnel)}</span><br /><span class="teacher-credential" data-cell="credential"></span></td><td data-cell="capability"><span class="tag gray">暂停使用</span></td><td data-cell="featured"></td><td>暂无授课</td><td class="action-cell" data-cell="actions"></td>`;
+    if (inviteFailed) toast(`${item.name} 邀请发送失败，可在操作列重新发送。`, 'error');
     renderTeacherActions(row, row.querySelector('[data-cell="actions"]'));
     renderFeaturedSwitch(row, true);
     empty?.before(row);
