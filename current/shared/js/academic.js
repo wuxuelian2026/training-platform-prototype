@@ -540,7 +540,7 @@ function openMessageForm() {
     + select('目标班级', 'className', ['少儿舞蹈基础班', '成人声乐班', '国画入门工作坊'], false, false)
     + field('通知标题', 'title', 'text', '请输入通知标题')
     + field('发送时间', 'time', 'datetime-local', '', false)
-    + '<label class="form-field wide"><span>通知内容</span><div class="rich-editor-field" data-rich-editor data-name="content" data-aria-label="通知内容" data-placeholder="请输入通知内容（≤2000 字）" data-min-height="180px"></div></label>'
+    + '<label class="form-field wide"><span>通知内容</span><div class="rich-editor-field" data-rich-editor data-name="content" data-aria-label="通知内容" data-placeholder="请输入通知内容（≤2000 字）" data-min-height="180px" data-max-length="2000"></div></label>'
     + '<label class="form-field wide"><span>发送方式</span><div class="choice-group"><label class="choice"><input type="radio" name="sendMode" value="立即发送" checked>立即发送</label><label class="choice"><input type="radio" name="sendMode" value="定时发送">定时发送</label></div></label>';
   const dialog = openSimpleForm('发送班级通知', '停课、调课和上课提醒均会记录发送结果，失败时支持补发。', body, (form) => {
     messages.unshift({ id: `message-${Date.now()}`, title: form.get('title') || '未命名通知', type: form.get('type'), audience: '教师、学员', className: form.get('className'), time: form.get('time') || '立即发送', status: '发送成功', fail: '', content: richTextValue(form.get('content')) });

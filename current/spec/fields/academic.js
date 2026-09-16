@@ -49,7 +49,7 @@ export const ACADEMIC_FIELD_SPEC = {
           { id: 'FD-ACADEMIC-008', label: '通知类型', type: '下拉', length: '预置类型', required: '是', note: '决定通知模板与送达范围' },
           { id: 'FD-ACADEMIC-009', label: '目标班级', type: '下拉', length: '可选班级', required: '是', note: '选定后发送到该班级学员' },
           { id: 'FD-ACADEMIC-010', label: '通知标题', type: '文本', length: '≤ 50 字', required: '是', note: '消息列表标题', constraints: { maxLength: 50 } },
-          { id: 'FD-ACADEMIC-012', label: '通知内容', type: '富文本', length: '≤ 2000 字', required: '是', note: '通知正文，支持富文本排版', constraints: { maxLength: 2000, richText: true } },
+          { id: 'FD-ACADEMIC-012', label: '通知内容', type: '富文本', length: '≤ 2000 字', required: '是', note: '通知正文，支持富文本排版；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 2000, richText: true } },
           { id: 'FD-ACADEMIC-039', label: '发送方式', type: '单选', length: '立即发送 / 定时发送', required: '否', note: '默认立即发送；选择定时发送时必须填写发送时间', constraints: { options: ['立即发送', '定时发送'] } },
           { id: 'FD-ACADEMIC-011', label: '发送时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '定时发送时必填', note: '发送方式为定时发送时必填', constraints: { format: 'YYYY-MM-DD HH:mm', requiredWhen: 'FD-ACADEMIC-039=定时发送' } },
           { id: 'FD-ACADEMIC-013', label: '发送范围', type: '单选', length: '全部学员 / 仅在读学员', required: '是', note: '决定接收人范围' }

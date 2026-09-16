@@ -47,7 +47,7 @@ export const TEACHER_FIELD_SPEC = {
         ] },
         { heading: '展示信息', fields: [
           { id: 'FD-TEACHER-024', label: '一句话简介', type: '多行文本', length: '≤ 200 字', required: '否', note: '用于教师卡片与教师详情展示，学员端按本字段取值', constraints: { maxLength: 200 } },
-          { id: 'FD-TEACHER-025', label: '简介', type: '富文本', length: '≤ 2000 字', required: '否', note: '个人简介正文，作为教师详情与学员端的展示来源；学习经历、工作经历与获奖情况不在学员端展示', constraints: { maxLength: 2000, richText: true } }
+          { id: 'FD-TEACHER-025', label: '简介', type: '富文本', length: '≤ 2000 字', required: '否', note: '个人简介正文，作为教师详情与学员端的展示来源；学习经历、工作经历与获奖情况不在学员端展示；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 2000, richText: true } }
         ] },
         { heading: '证书信息（子表）', fields: [
           { id: 'FD-TEACHER-026', label: '证书名称', type: '文本', length: '≤ 50 字', required: '条件必填', note: '新增一行证书时必填', constraints: { maxLength: 50, requiredWhen: 'certificateRow' } },

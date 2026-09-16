@@ -41,7 +41,7 @@ if (agreementRoot) {
         </aside>
         <section class="agreement-editor-card" aria-labelledby="agreement-editor-title">
           <div class="agreement-editor-header"><div><div class="agreement-kicker">当前编辑</div><h2 id="agreement-editor-title">${item.title}</h2></div><div class="agreement-meta"><span>版本 ${escapeHtml(item.version)}</span><span>最近保存 ${escapeHtml(item.updated)}</span><span class="agreement-save-state" data-agreement-save-state>已保存</span></div></div>
-          <div class="agreement-rich-editor-field" data-rich-editor data-name="content" data-aria-label="${item.title}正文" data-placeholder="请输入协议正文（≤20000 字）" data-min-height="320px" data-value="${escapeHtml(item.content)}"></div>
+          <div class="agreement-rich-editor-field" data-rich-editor data-name="content" data-aria-label="${item.title}正文" data-placeholder="请输入协议正文（≤20000 字）" data-min-height="320px" data-max-length="20000" data-value="${escapeHtml(item.content)}"></div>
           <div class="agreement-editor-footer"><span>内容保存后将同步到学员端对应入口。</span><button type="button" class="button primary" data-agreement-save>保存</button></div>
         </section>
       </div>

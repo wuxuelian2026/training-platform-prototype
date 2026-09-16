@@ -35,3 +35,9 @@
 .rich-editor-shell.is-fullscreen .editor-toolbar { overflow-y: auto; max-height: 96px; }
 @media (max-width: 900px) { .editor-toolbar { flex-wrap: nowrap; overflow-x: auto; } .editor-toolbar-break { display: none; } .editor-more-menu { left: 160px; } }
 @media (max-width: 640px) { .rich-editor-shell.is-fullscreen { inset: 8px; } .editor-toolbar { min-height: 48px; } .rich-editor { min-height: 180px; } }
+
+/* CR-2026-031：富文本字段的字数统计（纯文本）与超限提示。 */
+.editor-meta { display: flex; justify-content: flex-end; gap: 8px; padding: 4px 10px; border-top: 1px solid var(--line); background: #fafafa; color: var(--muted); font-size: 11px; }
+.editor-meta [data-editor-count] { font-variant-numeric: tabular-nums; }
+.editor-meta [data-editor-count].is-over-limit { color: #b3261e; font-weight: 600; }
+.rich-editor-shell.is-over-limit { border-color: #b3261e; box-shadow: 0 0 0 1px rgba(179, 38, 30, .25); }

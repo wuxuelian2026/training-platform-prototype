@@ -85,7 +85,7 @@ export const TEACHER_APP_FIELD_SPEC = {
       groups: [
         { heading: '发布作业字段', fields: [
           { id: 'FD-TAPP-006', label: '作业标题', type: '文本', length: '≤ 50 字', required: '是', note: '学员端作业本展示的标题', constraints: { maxLength: 50 } },
-          { id: 'FD-TAPP-007', label: '作业描述', type: '富文本', length: '≤ 2000 字', required: '是', note: '作业要求与完成说明', constraints: { maxLength: 2000, richText: true } },
+          { id: 'FD-TAPP-007', label: '作业描述', type: '富文本', length: '≤ 2000 字', required: '是', note: '作业要求与完成说明；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 2000, richText: true } },
           { id: 'FD-TAPP-008', label: '作业类型', type: '下拉', length: '练习视频 / 乐谱练习 / 绘画作品 / 文字报告 / 其他', required: '是', note: '决定学员端提交方式与批阅口径', constraints: { options: ['练习视频', '乐谱练习', '绘画作品', '文字报告', '其他'] } },
           { id: 'FD-TAPP-009', label: '提交格式', type: '多选', length: '图片 / 视频 / 音频 / 文字 / PDF', required: '是', note: '至少选择一种允许提交的格式', constraints: { options: ['图片', '视频', '音频', '文字', 'PDF'], minItems: 1, multi: true } },
           { id: 'FD-TAPP-010', label: '截止时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '默认课后 48 小时', constraints: { format: 'YYYY-MM-DD HH:mm' } },

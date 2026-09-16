@@ -35,7 +35,7 @@ export const MALL_FIELD_SPEC = {
         { heading: '协议配置字段', fields: [
           { id: 'FD-MALL-026', label: '协议类型', type: '下拉', length: '用户协议 / 隐私政策 / 报名须知', required: '是', note: '决定协议在学员端出现的位置；三类各保留一条启用版本', constraints: { options: ['用户协议', '隐私政策', '报名须知'] } },
           { id: 'FD-MALL-027', label: '协议标题', type: '文本', length: '≤ 50 字', required: '是', note: '学员端协议页展示标题', constraints: { maxLength: 50 } },
-          { id: 'FD-MALL-028', label: '协议正文', type: '富文本', length: '≤ 20000 字', required: '是', note: '支持段落与列表；不含脚本与外链资源', constraints: { maxLength: 20000, richText: true } },
+          { id: 'FD-MALL-028', label: '协议正文', type: '富文本', length: '≤ 20000 字', required: '是', note: '支持段落与列表；不含脚本与外链资源；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 20000, richText: true } },
           { id: 'FD-MALL-029', label: '版本号', type: '文本', length: '≤ 20 字', required: '是', note: '版本唯一，用于记录用户确认的版本', constraints: { maxLength: 20, unique: true } },
           { id: 'FD-MALL-030', label: '生效时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '到点后新确认记录按新版本', constraints: { format: 'YYYY-MM-DD HH:mm' } },
           { id: 'FD-MALL-031', label: '启用状态', type: '开关', length: '是 / 否', required: '是', note: '关闭后学员端不展示；历史确认记录保留', constraints: { boolean: true } }

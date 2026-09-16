@@ -2,16 +2,28 @@ const DEFAULT_EDITOR_OPTIONS = {
   name: 'content',
   placeholder: '请输入内容',
   ariaLabel: '富文本编辑器',
-  minHeight: '200px'
+  minHeight: '200px',
+  // CR-2026-031 §3.3：长度上限按纯文本字数统计，编辑器内实时提示并在超限时阻止保存。
+  maxLength: 0,
+  counterLabel: '字'
 };
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 // 富文本清洗：去掉脚本、内联事件与 javascript: 伪协议；编辑器、后台只读预览与学员端渲染共用同一份规则。
-export const sanitizeRichText = (markup) => String(markup ?? '')
-  .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-  .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
-  .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-  .replace(/javascript:/gi, '');
+// 白名单之外的标签：脚本、样式表、内嵌框架、嵌入对象与表单控件一律移除（含其内容）。
+const BLOCKED_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'select', 'textarea', 'link', 'meta', 'base'];
+export const sanitizeRichText = (markup) => {
+  let output = String(markup ?? '');
+  BLOCKED_TAGS.forEach((tag) => {
+    output = output
+      .replace(new RegExp('<' + tag + '[\\s\\S]*?>[\\s\\S]*?<\\/' + tag + '>', 'gi'), '')
+      .replace(new RegExp('<' + tag + '\\b[^>]*\\/?>', 'gi'), '');
+  });
+  return output
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\ssrcdoc\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/javascript:/gi, '');
+};
 // 富文本取值：清洗后没有任何文字或媒体（图片／视频／表格）时按未填写处理，编辑器空态常留下 <br>。
 export const richTextValue = (markup) => {
   const cleaned = sanitizeRichText(String(markup ?? '')).trim();
@@ -68,7 +80,6 @@ const toolbarTemplate = `
   <button type="button" class="editor-tool" data-editor-emoji aria-label="插入表情" title="插入表情">☺⌄</button>
   <button type="button" class="editor-tool" data-editor-link aria-label="插入链接" title="插入链接">↗</button>
   <button type="button" class="editor-tool" data-editor-image aria-label="插入图片" title="插入图片">▧</button>
-  <button type="button" class="editor-tool" data-editor-video aria-label="插入视频" title="插入视频">▶</button>
   <button type="button" class="editor-tool" data-editor-table aria-label="插入表格" title="插入表格">▦</button>
   <button type="button" class="editor-tool editor-code" data-editor-code aria-label="查看 HTML 源码" title="查看 HTML 源码">&lt;/&gt;</button>
   <button type="button" class="editor-tool" data-command="insertHorizontalRule" aria-label="分隔线" title="分隔线">☰</button>
@@ -103,6 +114,13 @@ export class RichEditor {
     this.toolbar = this.host.querySelector('.editor-toolbar');
     this.valueField = this.host.querySelector('[data-editor-value]');
     this.editor.style.minHeight = this.options.minHeight;
+    if (this.options.maxLength > 0) {
+      const meta = document.createElement('div');
+      meta.className = 'editor-meta';
+      meta.innerHTML = '<span data-editor-count></span>';
+      this.host.appendChild(meta);
+      this.counter = meta.querySelector('[data-editor-count]');
+    }
     if (initialValue) this.editor.innerHTML = initialValue;
   }
 
@@ -120,7 +138,8 @@ export class RichEditor {
   cleanMarkup(markup) { return sanitizeRichText(markup); }
   syncValue() {
     if (this.valueField) this.valueField.value = this.sourceMode ? this.cleanMarkup(this.editor.textContent || '') : this.cleanMarkup(this.editor.innerHTML || '');
-    this.host.dispatchEvent(new CustomEvent('rich-editor:input', { bubbles: true, detail: { value: this.getValue(), editor: this } }));
+    this.syncCounter();
+    this.host.dispatchEvent(new CustomEvent('rich-editor:input', { bubbles: true, detail: { value: this.getValue(), editor: this, overLimit: this.isOverLimit() } }));
   }
   currentBlock() {
     const selection = window.getSelection(); let node = selection?.anchorNode;
@@ -168,7 +187,17 @@ export class RichEditor {
     on(this.toolbar.querySelector('[data-line-height]'), 'change', (event) => this.execute('lineHeight', event.currentTarget.value));
     this.toolbar.querySelectorAll('input[type="color"]').forEach((control) => on(control, 'input', () => this.execute(control.dataset.command, control.value)));
     on(this.toolbar.querySelector('[data-editor-more-menu]'), 'click', (event) => { if (event.target.closest('button')) this.toolbar.querySelector('[data-editor-more]')?.click(); });
-    on(this.host.closest('form'), 'submit', () => { if (this.sourceMode) this.toggleSource(); this.syncValue(); });
+    on(this.host.closest('form'), 'submit', (event) => {
+      if (this.sourceMode) this.toggleSource();
+      this.syncValue();
+      // 超限时阻止保存，并在编辑器内即时提示（不依赖提交后报错）。
+      if (this.isOverLimit()) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.message(`${this.options.ariaLabel}已超出 ${this.options.maxLength} 字上限（当前 ${this.plainLength()} 字），请精简后再保存。`, 'error');
+        this.editor.focus();
+      }
+    });
   }
   handleToolbarClick(event) {
     const commandButton = event.target.closest('[data-command]');
@@ -180,8 +209,20 @@ export class RichEditor {
     if (event.target.closest('[data-editor-emoji]')) { this.insertText('😊'); return; }
     if (event.target.closest('[data-editor-link]')) { const url = window.prompt('请输入链接地址', 'https://'); if (url && /^https?:\/\//i.test(url)) this.execute('createLink', url); else if (url) this.message('链接地址需以 http:// 或 https:// 开头。', 'error'); return; }
     if (event.target.closest('[data-editor-image]')) { this.insertImage(); return; }
-    if (event.target.closest('[data-editor-video]')) { const url = window.prompt('请输入视频地址', 'https://'); if (url && /^https?:\/\//i.test(url)) this.insertHtml(`<p><a href="${escapeAttribute(url)}" target="_blank" rel="noopener">▶ 查看视频</a></p>`); else if (url) this.message('视频地址需以 http:// 或 https:// 开头。', 'error'); return; }
     if (event.target.closest('[data-editor-table]')) { const rows = Math.min(Math.max(Number(window.prompt('请输入表格行数', '2')) || 0, 1), 8); const columns = Math.min(Math.max(Number(window.prompt('请输入表格列数', '3')) || 0, 1), 8); if (!rows || !columns) return; const body = Array.from({ length: rows }, () => `<tr>${Array.from({ length: columns }, () => '<td> </td>').join('')}</tr>`).join(''); this.insertHtml(`<table style="width:100%;border-collapse:collapse"><tbody>${body}</tbody></table><p><br></p>`); }
+  }
+  // 纯文本字数：去掉标签与首尾空白后计数（CR-2026-031 §3.3.2）。
+  plainLength() { return richTextPlain(this.getValue()).length; }
+  isOverLimit() { return this.options.maxLength > 0 && this.plainLength() > this.options.maxLength; }
+  syncCounter() {
+    if (!this.counter) return;
+    const length = this.plainLength();
+    const limit = this.options.maxLength;
+    this.counter.textContent = limit ? `${length} / ${limit} ${this.options.counterLabel}` : `${length} ${this.options.counterLabel}`;
+    const over = this.isOverLimit();
+    this.host.classList.toggle('is-over-limit', over);
+    this.counter.classList.toggle('is-over-limit', over);
+    return over;
   }
   getValue() { return this.sourceMode ? this.cleanMarkup(this.editor.textContent || '') : this.cleanMarkup(this.editor.innerHTML || ''); }
   setValue(value) { if (this.sourceMode) this.toggleSource(); this.editor.innerHTML = this.cleanMarkup(value); this.syncValue(); }

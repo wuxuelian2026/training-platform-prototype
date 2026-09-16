@@ -13,7 +13,7 @@ export const COURSE_TEACHING_FIELDS = [
 
 export const COURSE_DISPLAY_FIELDS = [
   { label: '课程封面', type: '图片上传', length: '单个图片', required: '完整课程首次发布必填', note: '售卖单元级存储；完整课程首次发布必填，轻量课程档案可选填，未上传时使用系统默认封面', constraints: { maxFiles: 1, image: true } },
-  { label: '图文详情', type: '富文本', length: '≤ 2000 字', required: '否', note: '售卖单元级存储，学员端课程详情展示', constraints: { maxLength: 2000, richText: true } },
+  { label: '图文详情', type: '富文本', length: '≤ 2000 字', required: '否', note: '售卖单元级存储，学员端课程详情展示；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 2000, richText: true } },
   { label: '课程标签', type: '标签输入', length: '单个标签 ≤ 12 字', required: '否', note: '售卖单元级存储，列表卡片与详情页展示' },
   { label: 'C 端推荐语', type: '文本', length: '≤ 30 字', required: '否', note: '售卖单元级存储，学员端展示的推荐语', constraints: { maxLength: 30 } }
 ];
@@ -100,7 +100,7 @@ export const COURSE_FIELD_SPEC = {
           { id: 'FD-COURSE-018', label: '课程类型', type: '文本（只读）', length: '面授课程', required: '系统固定', note: '轻量档案仅用于面授快速报名', constraints: { system: true, readOnly: true } },
           { id: 'FD-COURSE-019', label: '总课时', type: '数字', length: '≥ 1 的整数', required: '是', note: '单位：课次数' },
           { id: 'FD-COURSE-020', label: '简短课程介绍', type: '多行文本', length: '≤ 500 字', required: '是', note: '快速报名详情页展示', constraints: { maxLength: 500 } },
-          { id: 'FD-COURSE-030', label: '课程大纲', type: '富文本', length: '≤ 2000 字', required: '否', note: '可选展示内容，不作为教学执行前置条件；教学执行按课次开展', constraints: { maxLength: 2000, richText: true } }
+          { id: 'FD-COURSE-030', label: '课程大纲', type: '富文本', length: '≤ 2000 字', required: '否', note: '可选展示内容，不作为教学执行前置条件；教学执行按课次开展；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 2000, richText: true } }
         ] },
         // CR-2026-025：全部课程页签的行内查看／编辑拆分与版本号、历史版本入口。
         { heading: '查看与版本字段', fields: [
