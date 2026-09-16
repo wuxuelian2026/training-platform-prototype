@@ -192,3 +192,10 @@
 .course-teaching-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .course-teaching-grid .course-field { display: grid; gap: 6px; }
 .course-teaching-grid .course-field > label { color: #595959; font-size: 13px; }
+
+/* 富文本字段（课程大纲等）在后台的渲染样式。 */
+.course-rich-text > :first-child { margin-top: 0; }
+.course-rich-text > :last-child { margin-bottom: 0; }
+.course-rich-text ul, .course-rich-text ol { padding-left: 20px; }
+.course-rich-text img { max-width: 100%; height: auto; }
+.rich-editor-field { min-width: 0; }

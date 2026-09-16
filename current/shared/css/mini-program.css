@@ -1567,3 +1567,9 @@ body { background: #f7f7f5; }
 .mp-locked strong, .mp-locked p { display: block; }
 .mp-locked p { margin: 8px 0 18px; color: var(--muted); }
 @media (max-width: 360px) { .mobile-main { padding-right: 12px; padding-left: 12px; } .mp-metric-grid { gap: 5px; } .mp-metric { padding: 10px 8px; } .mp-button { padding: 0 12px; } .mp-filter-grid { grid-template-columns: 1fr; } }
+
+/* 教师端课次弹窗里的富文本编辑器（作业描述）：窄屏下工具栏换行、下拉保留可读宽度。 */
+.teacher-lesson-dialog .rich-editor-shell { border-radius: 8px; }
+.teacher-lesson-dialog .editor-toolbar { flex-wrap: wrap; }
+.teacher-lesson-dialog .editor-select { min-width: 88px; }
+.teacher-lesson-dialog .rich-editor { min-height: 140px; font-size: 13px; }

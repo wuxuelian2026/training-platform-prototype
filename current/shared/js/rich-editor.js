@@ -12,6 +12,32 @@ export const sanitizeRichText = (markup) => String(markup ?? '')
   .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
   .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
   .replace(/javascript:/gi, '');
+// 富文本取值：清洗后没有任何文字或媒体（图片／视频／表格）时按未填写处理，编辑器空态常留下 <br>。
+export const richTextValue = (markup) => {
+  const cleaned = sanitizeRichText(String(markup ?? '')).trim();
+  if (!cleaned) return '';
+  return richTextPlain(cleaned) || /<(img|video|table)\b/i.test(cleaned) ? cleaned : '';
+};
+// 富文本转纯文本：用于列表摘要、版本快照等只需要文字的场合。
+export function richTextPlain(markup) {
+  return sanitizeRichText(markup)
+    .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr)[^>]*>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+// 富文本转 HTML：标记值按清洗后的 HTML 返回，纯文本值按换行分段返回段落。
+export function richTextToHtml(value, fallback = '') {
+  const raw = String(value ?? '').trim();
+  if (!raw) return fallback;
+  if (isRichMarkup(raw)) return sanitizeRichText(raw);
+  const paragraphs = raw.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  return paragraphs.length ? paragraphs.map((line) => '<p>' + escapeHtml(line) + '</p>').join('') : fallback;
+}
 // 判定一个字段值是不是富文本标记：纯文本（含换行）继续按段落渲染，标记值按 HTML 渲染。
 export const isRichMarkup = (value) => /<(p|div|br|strong|b|em|i|u|s|h[1-6]|ul|ol|li|blockquote|table|thead|tbody|tr|td|th|img|a|span|figure|figcaption|hr)\b/i.test(String(value ?? ''));
 const escapeAttribute = (value) => escapeHtml(value).replace(/`/g, '&#96;');

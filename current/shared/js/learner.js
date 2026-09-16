@@ -11,7 +11,7 @@ import { toCanonicalCourseId } from './course-seed.js';
 import { allProducts, productForCourse } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, saleUnitDisplay } from './course-display.js';
 import { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } from './teacher-facts.js';
-import { isRichMarkup, sanitizeRichText } from './rich-editor.js';
+import { isRichMarkup, richTextToHtml, sanitizeRichText } from './rich-editor.js';
 
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
@@ -92,11 +92,8 @@ const demo = {
 
 // 富文本字段（图文详情、通知正文等）渲染：标记值按清洗后的 HTML 输出，纯文本值继续按换行分段。
 function richTextBody(value, fallback = '') {
-  const raw = String(value ?? '').trim();
-  if (!raw) return fallback;
-  if (isRichMarkup(raw)) return '<div class="mp-rich-text">' + sanitizeRichText(raw) + '</div>';
-  const paragraphs = raw.split(/\n+/).map((line) => line.trim()).filter(Boolean);
-  return paragraphs.length ? paragraphs.map((line) => '<p>' + esc(line) + '</p>').join('') : fallback;
+  const html = richTextToHtml(value, fallback);
+  return html ? '<div class="mp-rich-text">' + html + '</div>' : '';
 }
 // CR-2026-020：运营四字段按售卖单元取数（视频取商品、面授取班级），教学属性仍取课程档案。
 function applyCourseDisplay(item) {

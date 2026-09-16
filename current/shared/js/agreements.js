@@ -1,3 +1,5 @@
+import { mountRichEditor, richTextValue } from './rich-editor.js';
+
 const agreementRoot = document.querySelector('[data-agreements-page]');
 
 if (agreementRoot) {
@@ -39,13 +41,7 @@ if (agreementRoot) {
         </aside>
         <section class="agreement-editor-card" aria-labelledby="agreement-editor-title">
           <div class="agreement-editor-header"><div><div class="agreement-kicker">当前编辑</div><h2 id="agreement-editor-title">${item.title}</h2></div><div class="agreement-meta"><span>版本 ${escapeHtml(item.version)}</span><span>最近保存 ${escapeHtml(item.updated)}</span><span class="agreement-save-state" data-agreement-save-state>已保存</span></div></div>
-          <div class="agreement-editor-toolbar" role="toolbar" aria-label="富文本工具栏">
-            <button type="button" class="editor-tool editor-tool-bold" data-editor-command="bold" aria-label="加粗">B</button>
-            <button type="button" class="editor-tool editor-tool-italic" data-editor-command="italic" aria-label="斜体">I</button>
-            <button type="button" class="editor-tool" data-editor-command="insertUnorderedList" aria-label="项目符号">&#8226; 列表</button>
-            <button type="button" class="editor-tool" data-editor-command="removeFormat">清除格式</button>
-          </div>
-          <div class="agreement-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="${item.title}内容" data-agreement-editor>${item.content}</div>
+          <div class="agreement-rich-editor-field" data-rich-editor data-name="content" data-aria-label="${item.title}正文" data-placeholder="请输入协议正文（≤20000 字）" data-min-height="320px" data-value="${escapeHtml(item.content)}"></div>
           <div class="agreement-editor-footer"><span>内容保存后将同步到学员端对应入口。</span><button type="button" class="button primary" data-agreement-save>保存</button></div>
         </section>
       </div>
@@ -54,13 +50,26 @@ if (agreementRoot) {
     bindEditor();
   }
 
+  // 协��正文是富文本字段：改用与图文详情、教师简介同源的富文本编辑器组件。
+  function mountAgreementEditor() {
+    const field = agreementRoot.querySelector('[data-rich-editor]');
+    const editor = mountRichEditor(field);
+    agreementRoot.addEventListener('rich-editor:message', (event) => showToast(event.detail.message));
+    return editor;
+  }
+  function agreementContent() {
+    const field = agreementRoot.querySelector('[data-rich-editor]');
+    return richTextValue(field?.richEditor ? field.richEditor.getValue() : (field?.dataset.value || ''));
+  }
   function bindEditor() {
-    const editor = agreementRoot.querySelector('[data-agreement-editor]');
-    editor?.addEventListener('input', () => {
-      agreements[activeKey].content = editor.innerHTML;
-      agreementRoot.querySelector('[data-agreement-save-state]').textContent = '有未保存修改';
-      agreementRoot.querySelector('[data-agreement-save-state]').classList.add('is-dirty');
+    const editor = mountAgreementEditor();
+    agreementRoot.addEventListener('rich-editor:input', () => {
+      const state = agreementRoot.querySelector('[data-agreement-save-state]');
+      if (!state) return;
+      state.textContent = '有未保存修改';
+      state.classList.add('is-dirty');
     });
+    return editor;
   }
 
   function showToast(message) {
@@ -75,21 +84,13 @@ if (agreementRoot) {
   agreementRoot.addEventListener('click', (event) => {
     const tab = event.target.closest('[data-agreement-tab]');
     if (tab) {
-      const editor = agreementRoot.querySelector('[data-agreement-editor]');
-      if (editor) agreements[activeKey].content = editor.innerHTML;
+      agreements[activeKey].content = agreementContent() || agreements[activeKey].content;
       activeKey = tab.dataset.agreementTab;
       render();
       return;
     }
-    const commandButton = event.target.closest('[data-editor-command]');
-    if (commandButton) {
-      document.execCommand(commandButton.dataset.editorCommand, false);
-      agreementRoot.querySelector('[data-agreement-editor]')?.focus();
-      return;
-    }
     if (event.target.closest('[data-agreement-save]')) {
-      const editor = agreementRoot.querySelector('[data-agreement-editor]');
-      if (editor) agreements[activeKey].content = editor.innerHTML;
+      agreements[activeKey].content = agreementContent() || agreements[activeKey].content;
       agreements[activeKey].updated = '刚刚';
       const state = agreementRoot.querySelector('[data-agreement-save-state]');
       state.textContent = '已保存';

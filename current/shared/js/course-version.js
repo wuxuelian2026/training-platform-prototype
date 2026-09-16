@@ -9,6 +9,7 @@
 //      历史版本不做字段级差异对比，也不提供版本回退。
 import { demoTime, readDemoState, upsertDemoRecord } from './demo-store.js';
 import { courseArchiveSeed } from './course-display.js';
+import { richTextPlain } from './rich-editor.js';
 import { toCanonicalCourseId } from './course-seed.js';
 import { classSeed } from './class-seed.js';
 import { allProducts } from './product-seed.js';
@@ -77,7 +78,8 @@ export function courseStructure(chapters) {
 }
 
 export function courseSnapshot(record, structure = null) {
-  const outline = String(record?.outline || '').trim();
+  // 课程大纲是富文本：版本摘要只保留纯文本，避免快照里出现标记。
+  const outline = record?.outline ? richTextPlain(record.outline) : '';
   const shape = record?.archive === '轻量课程档案'
     ? { key: `outline:${outline}`, summary: outline ? `课程大纲：${outline.slice(0, 40)}${outline.length > 40 ? '…' : ''}` : '课程大纲：未填写' }
     : (structure || { key: '', summary: '未编排' });

@@ -6,6 +6,7 @@ import { toLocalDateString } from './date-utils.js';
 import { SEMESTERS, mergeVenues } from './venue-seed.js';
 import { TEACHER_FACTS } from './teacher-facts.js';
 import { explainTeacherCapacity } from './teacher-capacity.js';
+import { mountRichEditor, richTextValue } from './rich-editor.js';
 import { DEFAULT_LESSON_DURATION, HALF_DAY_BOUNDARIES, HALF_DAY_LABELS, LESSON_DURATIONS, TIMELINE_END, TIMELINE_START, TIMELINE_STEP_MINUTES, TIMELINE_TICK_COUNT, halfDayRows, isWithinTimeline, lessonDurationOptions, lessonEndTime, mergeBusyRanges, snapToStep, toMinutes, toTime } from './timetable-settings.js';
 
 const academicRoot = document.querySelector('[data-academic-page]');
@@ -533,6 +534,22 @@ function openSimpleForm(title, subtitle, body, onSubmit, actions = '<button type
   dialog.querySelector('#academic-form')?.addEventListener('submit', (event) => { event.preventDefault(); onSubmit(new FormData(event.currentTarget), dialog); });
   return dialog;
 }
+// 通知内容按富文本字段维护：与图文详情、教师简介复用同一个富文本编辑器组件。
+function openMessageForm() {
+  const body = select('通知类型', 'type', ['停课通知', '调课通知', '上课提醒'], false, false)
+    + select('目标班级', 'className', ['少儿舞蹈基础班', '成人声乐班', '国画入门工作坊'], false, false)
+    + field('通知标题', 'title', 'text', '请输入通知标题')
+    + field('发送时间', 'time', 'datetime-local', '', false)
+    + '<label class="form-field wide"><span>通知内容</span><div class="rich-editor-field" data-rich-editor data-name="content" data-aria-label="通知内容" data-placeholder="请输入通知内容（≤2000 字）" data-min-height="180px"></div></label>'
+    + '<label class="form-field wide"><span>发送方式</span><div class="choice-group"><label class="choice"><input type="radio" name="sendMode" value="立即发送" checked>立即发送</label><label class="choice"><input type="radio" name="sendMode" value="定时发送">定时发送</label></div></label>';
+  const dialog = openSimpleForm('发送班级通知', '停课、调课和上课提醒均会记录发送结果，失败时支持补发。', body, (form) => {
+    messages.unshift({ id: `message-${Date.now()}`, title: form.get('title') || '未命名通知', type: form.get('type'), audience: '教师、学员', className: form.get('className'), time: form.get('time') || '立即发送', status: '发送成功', fail: '', content: richTextValue(form.get('content')) });
+    closeDialog(); renderMessages(); showToast('通知已发送，失败记录可在列表补发。');
+  });
+  mountRichEditor(dialog.querySelector('[data-rich-editor]'));
+  dialog.addEventListener('rich-editor:message', (event) => showToast(event.detail.message, event.detail.kind));
+  return dialog;
+}
 // B2-QA-03：排班详情的学员名单来自报名记录（demo-store enrollments），不再只显示课次进度。
 // 名单入口最终落在排班详情还是面授班级详情由产品确认（I1-QA-CLASS-05）；本实现按“排班详情可查看名单”给出。
 function scheduleRosterMarkup(row) {
@@ -711,7 +728,7 @@ function handleAction(action, row) {
   if (action === 'homework-view') return openDialog(`${row.title} · 作业详情`, '监督提交和文本批阅进度。', `<div class="academic-detail-list"><div><span>作业内容</span><strong>${escapeHtml(row.content)}</strong></div><div><span>提交情况</span><strong>${row.submitted} / ${row.total} 人</strong></div><div><span>批阅进度</span><strong>${row.reviewed} / ${row.submitted} 份</strong></div><div><span>批阅规则</span><strong>仅文本评语，可选批注文件；无分数、无等级</strong></div></div><div class="form-section"><h3>示例文本评语</h3><div class="academic-report-content">动作完成度较好，建议继续保持练习频率。</div></div>`);
   if (action === 'message-view') return detailDialog(row.title, '查看通知正文和发送结果。', [['通知类型', row.type], ['发送对象', row.audience], ['目标班级', row.className], ['发送时间', row.time], ['发送状态', tag(row.status)], ['失败原因', row.fail || '无']]);
   if (action === 'message-resend') { const dialog = openDialog('确认补发通知', '失败消息补发不会改变原消息记录。', `<p>${escapeHtml(row.fail || '将向未成功送达的对象补发该通知。')}</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-confirm-action="message-resend">确认补发</button>'); dialog.dataset.rowId = row.id; return dialog; }
-  if (action === 'message-create') return openSimpleForm('发送班级通知', '停课、调课和上课提醒均会记录发送结果，失败时支持补发。', select('通知类型', 'type', ['停课通知', '调课通知', '上课提醒'], false, false) + select('目标班级', 'className', ['少儿舞蹈基础班', '成人声乐班', '国画入门工作坊'], false, false) + field('通知标题', 'title', 'text', '请输入通知标题') + field('发送时间', 'time', 'datetime-local', '', false) + `<label class="form-field wide"><span>通知内容</span><textarea name="content" placeholder="请输入通知内容"></textarea></label>` + `<label class="form-field wide"><span>发送方式</span><div class="choice-group"><label class="choice"><input type="radio" name="sendMode" value="立即发送" checked>立即发送</label><label class="choice"><input type="radio" name="sendMode" value="定时发送">定时发送</label></div></label>`, (form) => { messages.unshift({ id: `message-${Date.now()}`, title: form.get('title') || '未命名通知', type: form.get('type'), audience: '教师、学员', className: form.get('className'), time: form.get('time') || '立即发送', status: '发送成功', fail: '' }); closeDialog(); renderMessages(); showToast('通知已发送，发送结果已记录。'); });
+  if (action === 'message-create') return openMessageForm();
   if (action === 'graduation-review') return openGraduationDetail(row);
   if (action === 'graduation-export') return showToast('结业审核台账导出任务已创建。');
   if (action === 'report-preview') return openDialog(`学习报告预览 · ${row.student}`, '这是学员端可见的报告样式预览。', `<div class="academic-report-content"><h3>${escapeHtml(row.course)} 学习报告</h3><p><strong>学员：</strong>${escapeHtml(row.student)}　<strong>班级：</strong>${escapeHtml(row.className)}</p><p><strong>出勤数据：</strong>出勤率 100%</p><p><strong>作业数据：</strong>提交率 100%</p><p><strong>教师综合评语：</strong>${escapeHtml(row.comment)}</p><p><strong>成长建议：</strong>继续保持稳定练习。</p>${row.status === '已撤回' ? '<p class="academic-status-callout">报告暂不可查看，教务正在更新。</p>' : ''}</div>`);

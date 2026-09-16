@@ -5,7 +5,7 @@ import { addWeeksLocal, toLocalDateString } from './date-utils.js';
 import { cloneProductSeed } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseDisplayConfigured, courseDisplayTags, persistSaleUnitDisplay, productForCourse, saleUnitDisplay } from './course-display.js';
 import { versionForCourseId } from './course-version.js';
-import { mountRichEditor, sanitizeRichText } from './rich-editor.js';
+import { mountRichEditor, richTextToHtml, richTextValue } from './rich-editor.js';
 import { mergeVenues, resolveVenueId } from './venue-seed.js';
 import { DEFAULT_LESSON_DURATION, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
 
@@ -154,14 +154,6 @@ function courseTeachingRow(course) {
   return `<label class="form-field"><span>难度等级</span><input value="${escapeHtml(archive?.difficulty || '—')}" readonly class="readonly-field" /></label><label class="form-field"><span>适合年龄</span><input value="${escapeHtml(courseAgesText(archive) || '—')}" readonly class="readonly-field" /></label>`;
 }
 // CR-2026-020：运营四字段写在售卖单元自身（商品或班级），不再写入课程档案。
-// 富文本字段取值：清洗标记后若没有任何文字或图片，按未填写处理（编辑器空态会留下 <br>）。
-function richDetailValue(markup) {
-  const cleaned = sanitizeRichText(String(markup || '')).trim();
-  if (!cleaned) return '';
-  const hasMedia = /<(img|video|table)\b/i.test(cleaned);
-  const hasText = cleaned.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim().length > 0;
-  return hasText || hasMedia ? cleaned : '';
-}
 function courseDisplaySection(course, unit = {}, { editDisplay = false, unitLabel = '商品' } = {}) {
   const archive = saleUnitDisplay(unit);
   const configured = courseDisplayConfigured(archive);
@@ -174,7 +166,7 @@ function courseDisplaySection(course, unit = {}, { editDisplay = false, unitLabe
   // 图文详情是富文本字段：编辑态挂 RichEditor，只读态渲染清洗后的 HTML 用隐藏字段原样回存。
   const detailCell = editable
     ? `<div class="rich-editor-field" data-rich-editor data-name="detail" data-display-input data-aria-label="图文详情" data-placeholder="只作用于本单元的对外展示，学员端详情展示，≤2000 字" data-min-height="160px" data-value="${escapeHtml(archive?.detail || '')}"></div>`
-    : `<div class="sales-display-preview" data-display-input><input type="hidden" name="detail" value="${escapeHtml(archive?.detail || '')}" />${sanitizeRichText(archive?.detail || '') || '<span class="sub-cell">未配置</span>'}</div>`;
+    : `<div class="sales-display-preview" data-display-input><input type="hidden" name="detail" value="${escapeHtml(archive?.detail || '')}" />${richTextToHtml(archive?.detail, '<span class="sub-cell">未配置</span>')}</div>`;
   return `<div class="form-field wide sales-display-section"><span>课程展示信息<b class="required-mark">售卖单元级存储</b></span><div class="sales-display-grid"><label class="form-field"><span>课程封面${coverRequired ? ' *' : ''}</span>${coverCell}</label><label class="form-field"><span>C 端推荐语</span><input name="recommendation" maxlength="30" data-display-input ${lockedAttr} value="${escapeHtml(archive?.recommendation || '')}" placeholder="不超过30字" /></label><label class="form-field wide"><span>图文详情</span>${detailCell}</label><label class="form-field wide"><span>课程标签</span><input name="tags" data-display-input ${lockedAttr} value="${escapeHtml(courseDisplayTags(archive).join(','))}" placeholder="多个标签用逗号分隔" /></label></div><div class="sales-display-actions">${editable ? '' : '<button type="button" class="button" data-display-edit>修改展示信息</button>'}<span class="sales-display-warning">${editable ? `修改后只影响${unitLabel}的对外展示：封面、图文详情、标签与 C 端推荐语，不影响同课程的其他售卖单元。` : '已按上次发布的值只读带入；需要调整时点击“修改展示信息”。'}</span></div></div>`;
 }
 function openProductForm(row = null, options = {}) {
@@ -232,7 +224,7 @@ function openProductForm(row = null, options = {}) {
     Object.assign(record, {
       coverFile,
       cover: coverFile ? '已配置' : (displayUnit.cover || COURSE_DISPLAY_UNSET),
-      displayDetail: richDetailValue(data.get('detail')),
+      displayDetail: richTextValue(data.get('detail')),
       tags: String(data.get('tags') || '').split(/[，,、\s]+/).map(value => value.trim()).filter(Boolean),
       recommendation: String(data.get('recommendation') || '').trim()
     });
@@ -349,7 +341,7 @@ function openClassForm(row = null, options = {}) {
         Object.assign(target, {
           coverFile,
           cover: coverFile ? '已配置' : (displayUnit.cover || COURSE_DISPLAY_UNSET),
-          displayDetail: richDetailValue(data.get('detail')),
+          displayDetail: richTextValue(data.get('detail')),
           tags: String(data.get('tags') || '').split(/[，,、\s]+/).map(value => value.trim()).filter(Boolean),
           recommendation: String(data.get('recommendation') || '').trim()
         });
