@@ -6,6 +6,14 @@ const DEFAULT_EDITOR_OPTIONS = {
 };
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+// 富文本清洗：去掉脚本、内联事件与 javascript: 伪协议；编辑器、后台只读预览与学员端渲染共用同一份规则。
+export const sanitizeRichText = (markup) => String(markup ?? '')
+  .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+  .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+  .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  .replace(/javascript:/gi, '');
+// 判定一个字段值是不是富文本标记：纯文本（含换行）继续按段落渲染，标记值按 HTML 渲染。
+export const isRichMarkup = (value) => /<(p|div|br|strong|b|em|i|u|s|h[1-6]|ul|ol|li|blockquote|table|thead|tbody|tr|td|th|img|a|span|figure|figcaption|hr)\b/i.test(String(value ?? ''));
 const escapeAttribute = (value) => escapeHtml(value).replace(/`/g, '&#96;');
 
 const toolbarTemplate = `
@@ -83,12 +91,7 @@ export class RichEditor {
     const selection = window.getSelection();
     selection.removeAllRanges(); selection.addRange(this.savedRange);
   }
-  cleanMarkup(markup) {
-    return String(markup ?? '')
-      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-      .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-      .replace(/javascript:/gi, '');
-  }
+  cleanMarkup(markup) { return sanitizeRichText(markup); }
   syncValue() {
     if (this.valueField) this.valueField.value = this.sourceMode ? this.cleanMarkup(this.editor.textContent || '') : this.cleanMarkup(this.editor.innerHTML || '');
     this.host.dispatchEvent(new CustomEvent('rich-editor:input', { bubbles: true, detail: { value: this.getValue(), editor: this } }));
@@ -130,6 +133,8 @@ export class RichEditor {
   bindEvents() {
     const on = (target, event, handler) => { if (!target) return; target.addEventListener(event, handler); this.listeners.push(() => target.removeEventListener(event, handler)); };
     on(this.editor, 'input', () => this.syncValue()); on(this.editor, 'keyup', () => this.rememberSelection()); on(this.editor, 'mouseup', () => this.rememberSelection()); on(this.editor, 'focus', () => this.rememberSelection());
+    // 粘贴 HTML 时先清洗再插入：避免外部内容把脚本、内联事件或 javascript: 链接带进编辑器。
+    on(this.editor, 'paste', (event) => { const html = event.clipboardData?.getData('text/html'); if (!html) return; event.preventDefault(); this.insertHtml(html); });
     on(document, 'selectionchange', () => { if (this.isInsideEditor(window.getSelection()?.anchorNode)) this.rememberSelection(); });
     on(this.toolbar, 'mousedown', (event) => { if (event.target.closest('button, select')) event.preventDefault(); });
     on(this.toolbar, 'click', (event) => this.handleToolbarClick(event));

@@ -5,6 +5,7 @@ import { addWeeksLocal, toLocalDateString } from './date-utils.js';
 import { cloneProductSeed } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseDisplayConfigured, courseDisplayTags, persistSaleUnitDisplay, productForCourse, saleUnitDisplay } from './course-display.js';
 import { versionForCourseId } from './course-version.js';
+import { mountRichEditor, sanitizeRichText } from './rich-editor.js';
 import { mergeVenues, resolveVenueId } from './venue-seed.js';
 import { DEFAULT_LESSON_DURATION, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
 
@@ -153,6 +154,14 @@ function courseTeachingRow(course) {
   return `<label class="form-field"><span>难度等级</span><input value="${escapeHtml(archive?.difficulty || '—')}" readonly class="readonly-field" /></label><label class="form-field"><span>适合年龄</span><input value="${escapeHtml(courseAgesText(archive) || '—')}" readonly class="readonly-field" /></label>`;
 }
 // CR-2026-020：运营四字段写在售卖单元自身（商品或班级），不再写入课程档案。
+// 富文本字段取值：清洗标记后若没有任何文字或图片，按未填写处理（编辑器空态会留下 <br>）。
+function richDetailValue(markup) {
+  const cleaned = sanitizeRichText(String(markup || '')).trim();
+  if (!cleaned) return '';
+  const hasMedia = /<(img|video|table)\b/i.test(cleaned);
+  const hasText = cleaned.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim().length > 0;
+  return hasText || hasMedia ? cleaned : '';
+}
 function courseDisplaySection(course, unit = {}, { editDisplay = false, unitLabel = '商品' } = {}) {
   const archive = saleUnitDisplay(unit);
   const configured = courseDisplayConfigured(archive);
@@ -162,7 +171,11 @@ function courseDisplaySection(course, unit = {}, { editDisplay = false, unitLabe
   const coverCell = editable
     ? `<input type="file" name="cover" accept="image/*" data-display-input />${archive?.coverFile ? `<small>当前封面：${escapeHtml(archive.coverFile)}</small>` : coverRequired ? '<small>完整课程首次发布必须上传课程封面</small>' : '<small>轻量课程档案可以不上传封面</small>'}`
     : `<input class="readonly-field" readonly value="${escapeHtml(archive?.coverFile || archive?.cover || '未配置')}" />`;
-  return `<div class="form-field wide sales-display-section"><span>课程展示信息<b class="required-mark">售卖单元级存储</b></span><div class="sales-display-grid"><label class="form-field"><span>课程封面${coverRequired ? ' *' : ''}</span>${coverCell}</label><label class="form-field"><span>C 端推荐语</span><input name="recommendation" maxlength="30" data-display-input ${lockedAttr} value="${escapeHtml(archive?.recommendation || '')}" placeholder="不超过30字" /></label><label class="form-field wide"><span>图文详情</span><textarea name="detail" data-display-input ${lockedAttr} placeholder="只作用于本单元的对外展示，学员端详情展示，≤2000字">${escapeHtml(archive?.detail || '')}</textarea></label><label class="form-field wide"><span>课程标签</span><input name="tags" data-display-input ${lockedAttr} value="${escapeHtml(courseDisplayTags(archive).join(','))}" placeholder="多个标签用逗号分隔" /></label></div><div class="sales-display-actions">${editable ? '' : '<button type="button" class="button" data-display-edit>修改展示信息</button>'}<span class="sales-display-warning">${editable ? `修改后只影响${unitLabel}的对外展示：封面、图文详情、标签与 C 端推荐语，不影响同课程的其他售卖单元。` : '已按上次发布的值只读带入；需要调整时点击“修改展示信息”。'}</span></div></div>`;
+  // 图文详情是富文本字段：编辑态挂 RichEditor，只读态渲染清洗后的 HTML 用隐藏字段原样回存。
+  const detailCell = editable
+    ? `<div class="rich-editor-field" data-rich-editor data-name="detail" data-display-input data-aria-label="图文详情" data-placeholder="只作用于本单元的对外展示，学员端详情展示，≤2000 字" data-min-height="160px" data-value="${escapeHtml(archive?.detail || '')}"></div>`
+    : `<div class="sales-display-preview" data-display-input><input type="hidden" name="detail" value="${escapeHtml(archive?.detail || '')}" />${sanitizeRichText(archive?.detail || '') || '<span class="sub-cell">未配置</span>'}</div>`;
+  return `<div class="form-field wide sales-display-section"><span>课程展示信息<b class="required-mark">售卖单元级存储</b></span><div class="sales-display-grid"><label class="form-field"><span>课程封面${coverRequired ? ' *' : ''}</span>${coverCell}</label><label class="form-field"><span>C 端推荐语</span><input name="recommendation" maxlength="30" data-display-input ${lockedAttr} value="${escapeHtml(archive?.recommendation || '')}" placeholder="不超过30字" /></label><label class="form-field wide"><span>图文详情</span>${detailCell}</label><label class="form-field wide"><span>课程标签</span><input name="tags" data-display-input ${lockedAttr} value="${escapeHtml(courseDisplayTags(archive).join(','))}" placeholder="多个标签用逗号分隔" /></label></div><div class="sales-display-actions">${editable ? '' : '<button type="button" class="button" data-display-edit>修改展示信息</button>'}<span class="sales-display-warning">${editable ? `修改后只影响${unitLabel}的对外展示：封面、图文详情、标签与 C 端推荐语，不影响同课程的其他售卖单元。` : '已按上次发布的值只读带入；需要调整时点击“修改展示信息”。'}</span></div></div>`;
 }
 function openProductForm(row = null, options = {}) {
   const course = businessCourse(options.courseId || row?.courseId || businessParams.get('courseId'));
@@ -174,6 +187,9 @@ function openProductForm(row = null, options = {}) {
     : requiredSelect('关联课程', 'courseId', videoCourses.map(item => item.name));
   const body = `<form id="business-dialog-form" class="sales-dialog-grid">${courseField}<label class="form-field"><span>课程名称</span><input value="${escapeHtml(course?.name || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>所属专业</span><input value="${escapeHtml(course?.major || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>总课时数</span><input value="${escapeHtml(String(course?.hours || ''))}" readonly class="readonly-field" /></label>${course ? courseVersionRow(course, row) : ''}${requiredInput('商品名称', 'name', row?.name || course?.name || '', 'text', '请输入商品名称')}${requiredInput('售卖价格', 'price', row?.price || '', 'number', '请输入售价')}<label class="form-field"><span>试看策略<b class="required-mark">*</b></span><select name="preview" id="preview-policy" required><option ${row?.preview !== '允许试看' ? 'selected' : ''}>不允许试看</option><option ${row?.preview === '允许试看' ? 'selected' : ''}>允许试看</option></select></label><label class="form-field"><span>试看课时<b class="required-mark">*</b></span><select name="previewHours" id="preview-hours" required ${row?.preview !== '允许试看' ? 'disabled' : ''}><option ${row?.previewHours === '第1课时' ? 'selected' : ''}>第1课时</option></select></label>${course ? courseTeachingRow(course) : ''}${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '商品' }) : ''}<label class="form-field"><span>上下架时间</span><input name="shelfAt" value="${escapeHtml(row?.shelfAt || '')}" placeholder="YYYY-MM-DD HH:mm"></label><label class="form-field"><span>商品状态</span><input value="${escapeHtml(row?.status || '草稿')}" readonly class="readonly-field" /></label></form>`;
   const dialog = openBusinessDialog(row ? '编辑商品' : '发布商品', '从课程库带入课程主体；视频商品只允许一门课程一个有效商品。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存草稿</button>');
+  // 图文详情使用富文本编辑器组件；与教师简介（teachers/create）复用同一组件。
+  mountRichEditor(dialog.querySelector('[data-rich-editor]'));
+  dialog.addEventListener('rich-editor:message', (event) => showToast(event.detail.message, event.detail.kind));
   // 二次发布时运营四字段只读带入，“修改展示信息”重新打开可编辑表单。
   dialog.querySelector('[data-display-edit]')?.addEventListener('click', () => { closeBusinessDialog(); openProductForm(row, { editDisplay: true }); });
   dialog.querySelector('[data-course-version-sync]')?.addEventListener('click', (event) => {
@@ -216,7 +232,7 @@ function openProductForm(row = null, options = {}) {
     Object.assign(record, {
       coverFile,
       cover: coverFile ? '已配置' : (displayUnit.cover || COURSE_DISPLAY_UNSET),
-      displayDetail: String(data.get('detail') || '').trim(),
+      displayDetail: richDetailValue(data.get('detail')),
       tags: String(data.get('tags') || '').split(/[，,、\s]+/).map(value => value.trim()).filter(Boolean),
       recommendation: String(data.get('recommendation') || '').trim()
     });
@@ -265,6 +281,9 @@ function openClassForm(row = null, options = {}) {
   const startValue = snapToStep(scheduleParts.start || TIMELINE_START);
   const body = `<form id="business-dialog-form" class="sales-dialog-grid">${course ? courseSummary(course, course.archive === '完整课程' ? '展示信息写入本班级；完整课程首次发布必须上传课程封面' : '轻量课程档案：展示信息写入本班级，课程封面选填') : ''}${course ? courseTeachingRow(course) : ''}${course ? courseVersionRow(course, row) : ''}${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '本班级' }) : ''}${requiredInput('课程定价', 'price', row?.price || '', 'number', '请输入课程定价')}<label class="form-field"><span>试听是否收费</span><select name="trialFee"><option>否</option><option>是</option></select></label><label class="form-field"><span>报名开始时间</span><input name="enrollStart" type="datetime-local" value="${escapeHtml(row?.enrollStart || '').replace(' ', 'T')}"></label>${requiredInput('报名截止时间', 'deadline', row?.deadline || '', 'datetime-local', '')}<label class="form-field wide"><span>发布方式</span><select name="publishMode"><option>仅保存</option><option>立即发布</option><option>定时发布</option></select></label><label class="form-field sales-switch-field"><span>快速报名入口</span><span class="sales-switch-control"><input name="fast" type="checkbox" ${row?.fast === '是' ? 'checked' : ''}></span></label><label class="form-field"><span>前台展示状态</span><input class="readonly-field" readonly value="${row?.display || '未发布'}"></label></form>`;
   const dialog = openBusinessDialog(`发布班级 · ${row?.name || ''}`, '在已创建的班级上设置定价、报名窗口与前台展示；班级与排课由教务的「创建班级」维护。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存发布设置</button>');
+  // 图文详情使用富文本编辑器组件；与教师简介（teachers/create）复用同一组件。
+  mountRichEditor(dialog.querySelector('[data-rich-editor]'));
+  dialog.addEventListener('rich-editor:message', (event) => showToast(event.detail.message, event.detail.kind));
   // 二次发布时运营四字段只读带入，可从“修改展示信息”改为可编辑。
   dialog.querySelector('[data-display-edit]')?.addEventListener('click', () => { closeBusinessDialog(); openClassForm(row, { editDisplay: true }); });
   dialog.querySelector('[data-course-version-sync]')?.addEventListener('click', (event) => {
@@ -330,7 +349,7 @@ function openClassForm(row = null, options = {}) {
         Object.assign(target, {
           coverFile,
           cover: coverFile ? '已配置' : (displayUnit.cover || COURSE_DISPLAY_UNSET),
-          displayDetail: String(data.get('detail') || '').trim(),
+          displayDetail: richDetailValue(data.get('detail')),
           tags: String(data.get('tags') || '').split(/[，,、\s]+/).map(value => value.trim()).filter(Boolean),
           recommendation: String(data.get('recommendation') || '').trim()
         });

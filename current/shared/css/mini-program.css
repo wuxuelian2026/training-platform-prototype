@@ -244,6 +244,17 @@ body { background: #f7f7f5; }
 .mp-order-no { display: flex; min-width: 0; align-items: center; gap: 8px; }
 .mp-order-no span { min-width: 0; overflow-wrap: anywhere; }
 .mp-order-no .mp-button { flex: none; min-height: 32px; padding: 0 10px; font-size: 11px; }
+/* 富文本字段（图文详情等）在学员端的渲染样式。 */
+.mp-rich-text { color: inherit; font-size: inherit; line-height: 1.75; }
+.mp-rich-text > :first-child { margin-top: 0; }
+.mp-rich-text > :last-child { margin-bottom: 0; }
+.mp-rich-text h1, .mp-rich-text h2, .mp-rich-text h3 { margin: 12px 0 8px; font-size: 14px; }
+.mp-rich-text p { margin: 0 0 8px; }
+.mp-rich-text ul, .mp-rich-text ol { margin: 0 0 8px; padding-left: 20px; }
+.mp-rich-text blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid #e3ddd8; color: var(--muted); }
+.mp-rich-text img { max-width: 100%; height: auto; border-radius: 6px; }
+.mp-rich-text table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mp-rich-text td, .mp-rich-text th { border: 1px solid #ece7e3; padding: 4px 6px; }
 .mp-order-action { min-height: 34px; padding: 0 11px; font-size: 12px; }
 .mp-order-detail-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .mp-order-status-copy { margin-top: 10px; color: #4d433e; font-size: 13px; line-height: 1.6; }

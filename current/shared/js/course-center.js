@@ -285,9 +285,10 @@ function renderLibraryAllView(page) {
   page.innerHTML = `<div class="course-page">${pageShell('课程库', '', '<button class="button primary" type="button" data-action="new-lightweight">新建轻量课程档案</button>')}<section class="course-surface"><form class="course-filter" data-form="library-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('课程档案类型', selectWithValues('archive', ['完整课程', '轻量课程档案'], state.libraryFilters.archive || '', '全部类型'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.libraryFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.libraryFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.libraryFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>课程档案</strong><span> 当前显示 ${filtered.length} 条</span></div><div class="course-legend"><span class="course-legend-item success">版本号可点击查看历史版本</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程编号</th><th>课程名称</th><th>课程档案类型</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>版本号</th><th>操作</th></tr></thead><tbody>${filtered.map(libraryRow).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无课程档案</strong><span>审核通过并完成编排的完整课程，或新建的轻量档案会出现在这里。</span></div>'}</div>${pagination(filtered.length, '个课程档案')}</section></div>`;
 }
 
-// CR-2026-021：课程内容编排并入课程库，一个页面两个视图（待编排 / 全部课程），视图状态进 URL。
+// CR-2026-021：课程内容编排并入课程库，一个页面两个视图（内容编排 / 全部课程），视图状态进 URL。
+// 2026-09-16：页签名由“待编排”改为“内容编排”；“待编排”仅保留为编排状态取值，不再作为页签名。
 function libraryTabBar() {
-  const tabs = [['arrange', '待编排', contentCourses.length], ['all', '全部课程', library.length]];
+  const tabs = [['arrange', '内容编排', contentCourses.length], ['all', '全部课程', library.length]];
   return `<div class="course-tabs">${tabs.map(([value, label, count]) => `<button type="button" class="course-tab${state.libraryTab === value ? ' active' : ''}" data-action="library-tab" data-value="${value}">${label} <small>(${count})</small></button>`).join('')}</div>`;
 }
 

@@ -11,6 +11,7 @@ import { toCanonicalCourseId } from './course-seed.js';
 import { allProducts, productForCourse } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, saleUnitDisplay } from './course-display.js';
 import { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } from './teacher-facts.js';
+import { isRichMarkup, sanitizeRichText } from './rich-editor.js';
 
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
@@ -89,6 +90,14 @@ const demo = {
   currentStudentId: 'student-001'
 };
 
+// 富文本字段（图文详情、通知正文等）渲染：标记值按清洗后的 HTML 输出，纯文本值继续按换行分段。
+function richTextBody(value, fallback = '') {
+  const raw = String(value ?? '').trim();
+  if (!raw) return fallback;
+  if (isRichMarkup(raw)) return '<div class="mp-rich-text">' + sanitizeRichText(raw) + '</div>';
+  const paragraphs = raw.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  return paragraphs.length ? paragraphs.map((line) => '<p>' + esc(line) + '</p>').join('') : fallback;
+}
 // CR-2026-020：运营四字段按售卖单元取数（视频取商品、面授取班级），教学属性仍取课程档案。
 function applyCourseDisplay(item) {
   const courseId = item.type === 'video' ? item.id : item.courseId;
@@ -96,7 +105,10 @@ function applyCourseDisplay(item) {
   const unit = item.type === 'video' ? productForCourse(readDemoState(), item.id) : classRecordFor(item.id);
   const display = saleUnitDisplay(unit);
   if (!archive && !unit) return item;
-  const displayDetail = String(display.detail || '').split(/\n+/).map(text => text.trim()).filter(Boolean);
+  // 图文详情是富文本字段：标记值走 detailHtml 渲染，纯文本值保持原有的分段数组口径。
+  const rawDetail = String(display.detail || '').trim();
+  const richDetail = isRichMarkup(rawDetail) ? sanitizeRichText(rawDetail) : '';
+  const displayDetail = richDetail ? [] : rawDetail.split(/\n+/).map(text => text.trim()).filter(Boolean);
   const agesText = courseAgesText(archive);
   return {
     ...item,
@@ -104,7 +116,8 @@ function applyCourseDisplay(item) {
     coverFile: display.coverFile,
     level: archive?.difficulty || item.level,
     age: agesText || item.age,
-    detail: displayDetail.length ? displayDetail : item.detail,
+    detail: richDetail ? [] : (displayDetail.length ? displayDetail : item.detail),
+    detailHtml: richDetail || item.detailHtml || '',
     tags: display.tags,
     recommendation: display.recommendation
   };
@@ -478,7 +491,7 @@ function renderCourseDetail(item = course('COURSE-CR-2026-0002')) {
   const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
   const detailTab = params.get('tab') === 'outline' ? 'outline' : 'intro';
   const ageFact = `<div><dt>适合年龄</dt><dd>${esc(item.age || '不限')}</dd></div>`;
-  const detailParagraphs = (item.detail || [item.intro]).filter(Boolean).map(text => `<p>${esc(text)}</p>`).join('');
+  const detailParagraphs = item.detailHtml ? richTextBody(item.detailHtml) : (item.detail || [item.intro]).filter(Boolean).map(text => `<p>${esc(text)}</p>`).join('');
   const hasOutline = Array.isArray(item.outline) && item.outline.length > 0;
   const purchased = hasPurchasedVideo(item);
   const outlineContent = hasOutline ? `<div class="mp-course-detail-outline">${item.outline.map((chapter, index) => {
@@ -667,7 +680,9 @@ function renderFastRegistrationDetail(item = course('class-001')) {
   const status = item.classStatus || (available ? '招生中' : '已满员');
   const statusTone = available ? 'green' : 'gray';
   const coverMark = (item.professional || item.name).slice(0, 1);
-  const detail = item.detail?.length ? item.detail : [item.intro || '本班为线下面授课程，具体教学安排以班级通知为准。'];
+  const detailBody = item.detailHtml
+    ? richTextBody(item.detailHtml)
+    : (item.detail?.length ? item.detail : [item.intro || '本班为线下面授课程，具体教学安排以班级通知为准。']).map(text => `<p>${esc(text)}</p>`).join('');
   const detailTab = params.get('tab') === 'outline' ? 'outline' : 'intro';
   const hasOutline = Array.isArray(item.outline) && item.outline.length > 0;
   const outlineContent = hasOutline
@@ -675,7 +690,7 @@ function renderFastRegistrationDetail(item = course('class-001')) {
     : '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
   const detailContent = detailTab === 'outline'
     ? card(`<div class="mp-section-head"><h3>课程大纲</h3><span class="mp-muted">${hasOutline ? `共${item.outline.length}章` : '待完善'}</span></div>${outlineContent}`, 'mp-fast-detail-section')
-    : card(`<h3>课程简介</h3><article class="mp-rich-content mp-fast-detail-content">${detail.map(text => `<p>${esc(text)}</p>`).join('')}</article>`, 'mp-fast-detail-section');
+    : card(`<h3>课程简介</h3><article class="mp-rich-content mp-fast-detail-content">${detailBody}</article>`, 'mp-fast-detail-section');
   const action = available ? detailActions(item) : `<div class="mp-bottom-actions mp-course-detail-actions"><button class="mp-button secondary" type="button" data-action="consult">咨询</button><button class="mp-button secondary" type="button" data-action="share">分享</button><button class="mp-button mp-course-detail-primary" type="button" disabled>已满员</button></div>`;
   layout(stack(
     `<section class="mp-fast-detail-hero"><div class="mp-fast-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${pill('快速报名', 'light')}${pill(status, statusTone)}</div></div><div class="mp-fast-detail-summary"><h2>${esc(item.className || item.name)}</h2><p>${esc(item.courseName || item.name)} · ${esc(item.professional || item.category)}</p><strong class="mp-fast-detail-price">${money2(item.price)}</strong></div></section>`,
@@ -691,7 +706,9 @@ function classInfoView(item, record) {
   const status = classStatusLabel(record, item);
   const statusTone = status === '学习中' ? 'green' : status === '待开课' ? 'amber' : status === '已结束' ? 'gray' : 'green';
   const coverMark = (item.professional || item.name).slice(0, 1);
-  const intro = (item.detail || [item.intro || '本班为线下面授课程，具体教学安排以班级通知为准。']).map(text => `<p>${esc(text)}</p>`).join('');
+  const intro = item.detailHtml
+    ? richTextBody(item.detailHtml)
+    : (item.detail || [item.intro || '本班为线下面授课程，具体教学安排以班级通知为准。']).map(text => `<p>${esc(text)}</p>`).join('');
   const outline = Array.isArray(item.outline) && item.outline.length ? `<section class="mp-class-detail-block"><div class="mp-section-head"><h3>课程大纲</h3><span class="mp-muted">共${item.outline.length}章</span></div><div class="mp-course-detail-outline">${item.outline.map((chapter, index) => `<div class="mp-course-detail-chapter"><span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></div>`).join('')}</div></section>` : '';
   return `<section class="mp-class-detail-hero"><div class="mp-class-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${pill('面授课程', 'light')}${pill(status, statusTone)}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-class-detail-summary"><span class="mp-course-detail-kicker">班级课程</span><h2>${esc(item.className || item.name)}</h2><p>${esc(item.courseName || item.name)} · 当前学员：${esc(currentStudent().name)}</p></div></section><section class="mp-class-detail-block"><div class="mp-section-head"><h3>课程信息</h3>${pill(status, statusTone)}</div><dl class="mp-class-detail-facts"><div><dt>授课教师</dt><dd>${esc(item.teacher)}老师</dd></div><div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule || '以开课通知为准')}</dd></div><div class="wide"><dt>上课教室</dt><dd>${esc(item.campus)} · ${esc(item.classroom || '待定')}</dd></div><div><dt>班级人数</dt><dd>${esc(item.seats || '待更新')}</dd></div><div><dt>适合年龄</dt><dd>${esc(item.age || '不限')}</dd></div></dl></section><section class="mp-class-detail-block"><h3>课程简介</h3><article class="mp-rich-content mp-class-detail-intro">${intro}</article></section>${outline}`;
 }

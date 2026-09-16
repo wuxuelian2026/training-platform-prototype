@@ -56,5 +56,14 @@
 .sales-display-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .sales-display-grid .form-field { display: grid; gap: 6px; }
 .sales-display-grid textarea { min-height: 86px; resize: vertical; }
+/* CR-2026-026 后续：图文详情改用富文本编辑器组件（发布商品／发布班级共用）。 */
+.sales-display-grid .rich-editor-field { min-width: 0; }
+.sales-display-grid .rich-editor-shell .editor-toolbar { flex-wrap: wrap; }
+.sales-display-preview { min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; color: #4d4d4d; font-size: 13px; line-height: 1.7; }
+.sales-display-preview > :first-child { margin-top: 0; }
+.sales-display-preview > :last-child { margin-bottom: 0; }
+.sales-display-preview img { max-width: 100%; height: auto; }
+.sales-display-preview table { width: 100%; border-collapse: collapse; }
+.sales-display-preview td, .sales-display-preview th { border: 1px solid var(--line); padding: 4px 6px; }
 .sales-display-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .sales-display-warning { margin: 0; color: var(--muted); font-size: 12px; }
