@@ -58,7 +58,7 @@ export const TEACHER_FIELD_SPEC = {
           { id: 'FD-TEACHER-031', label: '有效期截止', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '勾选“永久有效”后不需要填写', constraints: { format: 'YYYY-MM-DD', disabledWhen: 'permanent' } },
           { id: 'FD-TEACHER-032', label: '永久有效', type: '开关', length: '是 / 否', required: '否', note: '勾选后无需填写有效期截止', constraints: { boolean: true } },
           { id: 'FD-TEACHER-033', label: '证书文件', type: '文件上传', length: '单个文件', required: '条件必填', note: '新增一行证书时必填', constraints: { maxFiles: 1, requiredWhen: 'certificateRow' } },
-          { id: 'FD-TEACHER-034', label: '审核状态', type: '只读', length: '—', required: '系统生成', note: '后台录入直接为“审核通过”并记录操作人、时间与来源；教师新增为“待审核”', constraints: { system: true, readOnly: true } }
+          { id: 'FD-TEACHER-034', label: '审核状态', type: '只读', length: '—', required: '系统生成', note: '后台录入直接为“已通过”并记录操作人、时间与来源；教师新增为“待审核”', constraints: { system: true, readOnly: true } }
         ] },
         { heading: '账号邀请', fields: [
           { id: 'FD-TEACHER-035', label: '邀请手机号', type: '只读', length: '11 位数字', required: '系统取值', note: '取联系方式中的手机号，作为教师激活和登录身份', constraints: { readOnly: true, sourceField: 'FD-TEACHER-014' } },
@@ -106,15 +106,15 @@ export const TEACHER_FIELD_SPEC = {
     'teachers/certificates': {
       groups: [
         { heading: '证书审核字段', fields: [
-          { id: 'FD-TEACHER-051', label: '审核结果', type: '单选', length: '审核通过 / 审核不通过', required: '是', note: '决定该证书是否可用于目标专业的资质校验', constraints: { options: ['审核通过', '审核不通过'] } },
-          { id: 'FD-TEACHER-052', label: '审核意见', type: '多行文本', length: '≤ 500 字', required: '审核不通过时必填', note: '填写后同步给上传人，说明需要补充或更正的内容', constraints: { maxLength: 500, requiredWhen: 'FD-TEACHER-051=审核不通过' } },
+          { id: 'FD-TEACHER-051', label: '审核结果', type: '单选', length: '已通过 / 已驳回', required: '是', note: '决定该证书是否可用于目标专业的资质校验', constraints: { options: ['已通过', '已驳回'] } },
+          { id: 'FD-TEACHER-052', label: '审核意见', type: '多行文本', length: '≤ 500 字', required: '已驳回时必填', note: '填写后同步给上传人，说明需要补充或更正的内容', constraints: { maxLength: 500, requiredWhen: 'FD-TEACHER-051=已驳回' } },
           { id: 'FD-TEACHER-053', label: '证书文件', type: '文件上传', length: '单个文件', required: '重传时必填', note: '重传产生新的文件版本，旧版本保留可追溯', constraints: { maxFiles: 1 } },
           { id: 'FD-TEACHER-054', label: '上传说明', type: '多行文本', length: '≤ 200 字', required: '否', note: '说明重传原因或补充材料', constraints: { maxLength: 200 } }
         ] }
       ],
       notes: [
-        '后台录入的证书直接为“审核通过”；教师端上传的证书为“待审核”。',
-        '审核不通过必须填写原因；教师或后台重新上传后状态回到“待审核”。',
+        '后台录入的证书直接为“已通过”；教师端上传的证书为“待审核”。',
+        '已驳回必须填写原因；教师或后台重新上传后状态回到“待审核”。',
         '证书审核状态与证书有效性状态分别维护，有效性按有效期截止日期独立计算。',
         '证书缺失不作为课程申报前置条件，但课程发布、班级发布与排课按目标专业进入资质校验。'
       ]

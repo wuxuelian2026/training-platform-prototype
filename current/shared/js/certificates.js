@@ -15,20 +15,29 @@ const text = (id, value) => {
 
 const statusClass = (value) => ({
   待审核: 'amber',
-  审核通过: 'green',
-  审核不通过: 'red',
+  已通过: 'green',
+  已驳回: 'red',
   已撤销: 'gray'
 }[value] || 'gray');
 
 const validityClass = (value) => ({有效: 'green', 即将过期: 'amber', 已过期: 'red'}[value] || 'gray');
 
-// CR-2026-019 §6 本地旧值兼容：审核状态删除“已录入”后，存量记录按来源迁移，
-// 后台录入直接视为审核通过并补齐操作人／时间／来源，教师端上传回到待审核。
+// 本地旧值兼容：审核状态只取 待审核／已通过／已驳回／已撤销（05-状态字典 §4.1）。
+// 一是 CR-2026-019 删除的“已录入”按来源迁移；二是旧标签“审核通过／审核不通过”改名。
 const LEGACY_RECORDED_STATUS = '已录入';
+const LEGACY_STATUS_LABELS = { 审核通过: '已通过', 审核不通过: '已驳回' };
 rows.forEach((row) => {
-  if (row.dataset.status !== LEGACY_RECORDED_STATUS) return;
+  const legacyRecorded = row.dataset.status === LEGACY_RECORDED_STATUS;
+  const legacyLabel = LEGACY_STATUS_LABELS[row.dataset.status];
+  if (!legacyRecorded && !legacyLabel) return;
+  if (!legacyRecorded) {
+    row.dataset.status = legacyLabel;
+    updateStatusCell(row);
+    updateActionCell(row);
+    return;
+  }
   const backendEntered = row.dataset.source === '后台录入';
-  row.dataset.status = backendEntered ? '审核通过' : '待审核';
+  row.dataset.status = backendEntered ? '已通过' : '待审核';
   if (backendEntered) {
     row.dataset.reviewer = row.dataset.reviewer || row.dataset.enteredBy || '后台录入';
     row.dataset.reviewedAt = row.dataset.reviewedAt || row.dataset.uploadedAt || '';
@@ -126,9 +135,9 @@ function updateStatusCell(row) {
 function updateActionCell(row) {
   const cell = row.querySelector('[data-cell="actions"]');
   if (!cell) return;
-  // UI v1.2：审核通过可直接重传（新版本独立审核，旧结论归属旧版本）；驳回、已过期与已撤销同样可重传，
+  // UI v1.2：已通过可直接重传（新版本独立审核，旧结论归属旧版本）；驳回、已过期与已撤销同样可重传，
   // 已撤销的记录重新上传并提交后回到“待审核”。
-  const reupload = ['审核通过', '审核不通过', '已撤销'].includes(row.dataset.status) || row.dataset.validity === '已过期';
+  const reupload = ['已通过', '已驳回', '已撤销'].includes(row.dataset.status) || row.dataset.validity === '已过期';
   const review = row.dataset.status === '待审核';
   // UI v1.2 状态—操作矩阵 + 2026-09-16 口径：未引用且未审核可撤回（撤回后为“已撤销”）；
   // 证书不设归档状态，已审核的记录通过重新上传生成新版本改变材料。
@@ -139,7 +148,7 @@ function updateActionCell(row) {
 function updateMetrics() {
   const count = (selector) => rows.filter((row) => row.isConnected && row.matches(selector)).length;
   text('metric-pending', count('[data-status="待审核"]'));
-  text('metric-rejected', count('[data-status="审核不通过"]'));
+  text('metric-rejected', count('[data-status="已驳回"]'));
   text('metric-expiring', count('[data-validity="即将过期"]'));
   text('metric-expired', count('[data-validity="已过期"]'));
 }
@@ -295,20 +304,20 @@ function handleReview(result) {
     }
     return;
   }
-  // UI v1.2 §3.1-4：新版本被驳回时回退到最近一次审核通过版本；没有通过版本则不再满足准入，按目标专业重算资质校验。
-  if (result === 'reject' && activeRow.dataset.previousStatus === '审核通过') {
-    activeRow.dataset.status = '审核通过';
+  // UI v1.2 §3.1-4：新版本被驳回时回退到最近一次已通过版本；没有通过版本则不再满足准入，按目标专业重算资质校验。
+  if (result === 'reject' && activeRow.dataset.previousStatus === '已通过') {
+    activeRow.dataset.status = '已通过';
     activeRow.dataset.rejectedFileVersion = activeRow.dataset.fileVersion || '';
     activeRow.dataset.reviewNote = note;
     activeRow.dataset.reviewer = '李教研';
     activeRow.dataset.reviewedAt = '';
     updateStatusCell(activeRow); updateActionCell(activeRow); updateMetrics(); applyFilters();
     closeDialog('review-dialog');
-    showToast('新版本被驳回，已回退到最近审核通过版本，发布与排课按该版本重算资质。');
+    showToast('新版本被驳回，已回退到最近一次已通过版本，发布与排课按该版本重算资质。');
     return;
   }
-  const noApprovedVersion = result === 'reject' && activeRow.dataset.previousStatus !== '审核通过';
-  activeRow.dataset.status = result === 'pass' ? '审核通过' : '审核不通过';
+  const noApprovedVersion = result === 'reject' && activeRow.dataset.previousStatus !== '已通过';
+  activeRow.dataset.status = result === 'pass' ? '已通过' : '已驳回';
   activeRow.dataset.reviewNote = note || '证书文件和证书信息已核验。';
   activeRow.dataset.reviewer = '李教研';
   activeRow.dataset.reviewedAt = '2026-09-08 15:20';
@@ -317,7 +326,7 @@ function handleReview(result) {
   updateMetrics();
   applyFilters();
   closeDialog('review-dialog');
-  showToast(result === 'pass' ? '证书审核通过，列表已更新。' : (noApprovedVersion ? '证书已驳回；无审核通过版本，该证书不再满足资质要求，发布与排课按目标专业重新校验。' : '证书已驳回，已保留驳回原因。'));
+  showToast(result === 'pass' ? '证书已通过审核，列表已更新。' : (noApprovedVersion ? '证书已驳回；无已通过版本，该证书不再满足资质要求，发布与排课按目标专业重新校验。' : '证书已驳回，已保留驳回原因。'));
 }
 
 filterForm?.addEventListener('submit', (event) => { event.preventDefault(); applyFilters(); });

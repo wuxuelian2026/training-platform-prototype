@@ -33,11 +33,11 @@ const teacherProfileDefaults = {
   introduction: '长期从事中国舞基础、身韵及少儿舞蹈教学，注重基本功训练与舞台表现力的结合。'
 };
 const teacherCertificateDefaults = [
-  { id: 'cert-001', name: '中国舞教师资格证', number: 'WD-2019-0028', type: '艺术等级证', issuer: '中国舞蹈家协会', issuedAt: '2019-10-01', expiresAt: '2027-09-30', status: '审核通过', validity: '有效', source: '后台录入', file: '中国舞教师资格证-WD-2019-0028.pdf', reviewedAt: '2026-01-04', reviewNote: '证书编号、发证机构和文件内容已核验。' },
-  { id: 'cert-002', name: '本科学历证书', number: 'HBYS-2014-0618', type: '学历证书', issuer: '湖北艺术学院', issuedAt: '2014-06-20', expiresAt: '', status: '审核通过', validity: '有效', source: '后台录入', file: '本科学历证书.pdf', reviewedAt: '2026-09-07', reviewNote: '后台录入默认通过。' },
+  { id: 'cert-001', name: '中国舞教师资格证', number: 'WD-2019-0028', type: '艺术等级证', issuer: '中国舞蹈家协会', issuedAt: '2019-10-01', expiresAt: '2027-09-30', status: '已通过', validity: '有效', source: '后台录入', file: '中国舞教师资格证-WD-2019-0028.pdf', reviewedAt: '2026-01-04', reviewNote: '证书编号、发证机构和文件内容已核验。' },
+  { id: 'cert-002', name: '本科学历证书', number: 'HBYS-2014-0618', type: '学历证书', issuer: '湖北艺术学院', issuedAt: '2014-06-20', expiresAt: '', status: '已通过', validity: '有效', source: '后台录入', file: '本科学历证书.pdf', reviewedAt: '2026-09-07', reviewNote: '后台录入默认通过。' },
   { id: 'cert-003', name: '少儿舞蹈教师培训证', number: 'SEWD-2026-0902', type: '教师资格证', issuer: '湖北省舞蹈家协会', issuedAt: '2026-08-28', expiresAt: '2029-08-27', status: '待审核', validity: '有效', source: '教师端上传', file: '少儿舞蹈教师培训证.jpg', reviewNote: '已提交，等待教研审核。' },
-  { id: 'cert-004', name: '舞蹈编导专项培训证', number: 'WDBD-2023-0186', type: '其他', issuer: '湖北省艺术教育协会', issuedAt: '2023-07-12', expiresAt: '2028-07-11', status: '审核不通过', validity: '有效', source: '教师端上传', file: '舞蹈编导专项培训证.jpg', reviewedAt: '2026-09-08', reviewNote: '证书照片右下角信息不完整，请重新拍摄清晰完整的证书。' },
-  { id: 'cert-005', name: '中国舞等级考试考官证', number: 'KG-2022-1056', type: '艺术等级证', issuer: '中国舞蹈家协会', issuedAt: '2022-10-01', expiresAt: '2026-10-15', status: '审核通过', validity: '即将过期', source: '教师端上传', file: '中国舞等级考试考官证.pdf', reviewedAt: '2022-10-06', reviewNote: '证书信息已核验，请在有效期结束前办理续期。' }
+  { id: 'cert-004', name: '舞蹈编导专项培训证', number: 'WDBD-2023-0186', type: '其他', issuer: '湖北省艺术教育协会', issuedAt: '2023-07-12', expiresAt: '2028-07-11', status: '已驳回', validity: '有效', source: '教师端上传', file: '舞蹈编导专项培训证.jpg', reviewedAt: '2026-09-08', reviewNote: '证书照片右下角信息不完整，请重新拍摄清晰完整的证书。' },
+  { id: 'cert-005', name: '中国舞等级考试考官证', number: 'KG-2022-1056', type: '艺术等级证', issuer: '中国舞蹈家协会', issuedAt: '2022-10-01', expiresAt: '2026-10-15', status: '已通过', validity: '即将过期', source: '教师端上传', file: '中国舞等级考试考官证.pdf', reviewedAt: '2022-10-06', reviewNote: '证书信息已核验，请在有效期结束前办理续期。' }
 ];
 const teacherContractDefaults = [
   { id: 'contract-2027', name: '2026-2027年度教师合作协议', number: 'CT2026090021', type: '合作协议', status: '待教师签署', startAt: '2026-10-01', endAt: '2027-09-30', signedAt: '', version: 'v1', rate: 180, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2026090021-教师合作协议.pdf', pushedAt: '2026-09-09', note: '请在2026年9月20日前完成签署。' },
@@ -65,8 +65,8 @@ const teacherMessageDefaults = [
   { id: 'TMSG20260908003', type: '工资已发放', title: '2026年7月工资已发放', summary: '本期实际核发5483.20元，已发放至尾号2866账户。', body: '2026年7月工资已完成发放，实际核发5483.20元，已于2026年8月5日发放至中国建设银行尾号2866账户。', createdAt: '2026-09-08 10:20', read: true, target: '/teacher/pages/salary-detail.html?month=2026-07', actionLabel: '查看工资明细' },
   { id: 'TMSG20260908004', type: '工资单已发布', title: '2026年6月工资单已发布', summary: '本期实际核发5024.40元，等待财务发放。', body: '2026年6月工资单已发布，本期共计28课时，实际核发5024.40元。当前状态为待发放，资金到账后将另行通知。', createdAt: '2026-09-08 09:40', read: true, target: '/teacher/pages/salary-detail.html?month=2026-06', actionLabel: '查看工资明细' },
   { id: 'TMSG20260907003', type: '作业提交提醒', title: '有学员提交了作业', summary: '林知夏已提交“节奏练习视频”，请及时批改并填写文字评语。', body: '学员林知夏已完成“节奏练习视频”作业提交，请进入班级课次详情查看作业内容并完成文本评语。', createdAt: '2026-09-07 18:30', read: false, target: '/teacher/pages/class-detail.html?class=class-001&lesson=8', actionLabel: '查看作业' },
-  { id: 'TMSG20260907004', type: '课程申报审核结果', title: '课程申报审核通过', summary: '您申报的《声乐演唱技巧》已通过教研审核。', body: '课程申报资料已通过审核，教务将继续完成课程发布和后续排课安排。', createdAt: '2026-09-07 15:40', read: true, target: '/teacher/pages/applications.html', actionLabel: '查看课程申报' },
-  { id: 'TMSG20260906005', type: '证书审核结果', title: '教师证书审核结果已更新', summary: '中国舞教师资格证已审核通过。', body: '您提交的中国舞教师资格证已完成审核，证书状态已更新为审核通过。', createdAt: '2026-09-06 11:05', read: true, target: '/teacher/pages/certificates.html', actionLabel: '查看我的证书' },
+  { id: 'TMSG20260907004', type: '课程申报审核结果', title: '课程申报已通过', summary: '您申报的《声乐演唱技巧》已通过教研审核。', body: '课程申报资料已通过审核，教务将继续完成课程发布和后续排课安排。', createdAt: '2026-09-07 15:40', read: true, target: '/teacher/pages/applications.html', actionLabel: '查看课程申报' },
+  { id: 'TMSG20260906005', type: '证书审核结果', title: '教师证书审核结果已更新', summary: '中国舞教师资格证已已通过。', body: '您提交的中国舞教师资格证已完成审核，证书状态已更新为已通过。', createdAt: '2026-09-06 11:05', read: true, target: '/teacher/pages/certificates.html', actionLabel: '查看我的证书' },
   { id: 'TMSG20260905006', type: '结业申请审核结果', title: '有3项结业申请待处理', summary: '请查看学员结业复核结果及补课安排。', body: '当前有3项学员结业申请正在处理中，其中包含需补课和审核中的记录，请及时查看并完成相关教学记录。', createdAt: '2026-09-05 09:15', read: true, target: '/teacher/pages/graduation.html', actionLabel: '查看结业记录' }
 ];
 const teacherDefaults = { lesson: teacherLessonDefaults, application: '待审核', applicationUpdates: {}, graduation: '可申请', salary: '已发布', profile: teacherProfileDefaults, certificates: teacherCertificateDefaults, contracts: teacherContractDefaults, graduationRecords: teacherGraduationDefaults, messages: teacherMessageDefaults };
@@ -76,14 +76,16 @@ teacherState.profile = { ...teacherProfileDefaults, ...(teacherState.profile || 
 teacherState.lesson = { ...teacherLessonDefaults, ...(teacherState.lesson || {}), attendance: { ...teacherLessonDefaults.attendance, ...(teacherState.lesson?.attendance || {}) }, attendanceNotes: { ...(teacherState.lesson?.attendanceNotes || {}) } };
 teacherState.certificates = Array.isArray(teacherState.certificates) ? teacherState.certificates : teacherCertificateDefaults.map(item => ({ ...item }));
 // CR-2026-019 §6 本地旧值兼容：会话里遗留的“已录入”按来源迁移，
-// 后台录入直接为审核通过并补齐审核人／时间／来源，教师端上传回到待审核。
+// 后台录入直接为已通过并补齐审核人／时间／来源，教师端上传回到待审核。
 const LEGACY_RECORDED_CERT_STATUS = '已录入';
+const LEGACY_CERT_STATUS_LABELS = { 审核通过: '已通过', 审核不通过: '已驳回' };
 teacherState.certificates = teacherState.certificates.map(item => {
+  if (item?.status && LEGACY_CERT_STATUS_LABELS[item.status]) return { ...item, status: LEGACY_CERT_STATUS_LABELS[item.status] };
   if (item?.status !== LEGACY_RECORDED_CERT_STATUS) return item;
   const backendEntered = item.source === '后台录入';
   return {
     ...item,
-    status: backendEntered ? '审核通过' : '待审核',
+    status: backendEntered ? '已通过' : '待审核',
     reviewedAt: backendEntered ? (item.reviewedAt || item.uploadedAt || '2026-09-07') : '',
     reviewNote: backendEntered ? (item.reviewNote || '后台录入默认通过。') : '已迁移为待审核，等待教研审核。'
   };
@@ -372,7 +374,7 @@ function renderApplicationCreate() {
 }
 function applicationReviewCopy(item) {
   if (item.status === '待审核') return ['等待教研审核', '申报已提交，审核期间课程内容不可修改。'];
-  if (item.status === '已通过') return ['审核通过', `教研已于${item.reviewedAt || '近期'}完成审核：${item.review || '审批通过'}`];
+  if (item.status === '已通过') return ['已通过', `教研已于${item.reviewedAt || '近期'}完成审核：${item.review || '审批通过'}`];
   if (item.status === '已驳回') return ['审核未通过', item.review || '请根据审核意见修改后重新提交。'];
   if (item.status === '已撤销') return ['申报已撤销', '该申报已停止审核，可重新编辑后提交。'];
   return ['状态异常', '当前申报状态无法识别，请返回列表后重试。'];
@@ -566,9 +568,9 @@ function renderTeacherProfileDetail() {
 }
 let teacherCertificateFilter = '全部';
 function certificateStatusTone(status) {
-  if (status === '审核通过') return 'green';
+  if (status === '已通过') return 'green';
   if (status === '待审核') return 'amber';
-  if (status === '审核不通过') return 'red';
+  if (status === '已驳回') return 'red';
   return 'gray';
 }
 function certificateValidityTone(validity) {
@@ -582,10 +584,10 @@ function calculateCertificateValidity(expiresAt) {
   if (remainingDays < 0) return '已过期';
   return remainingDays <= 60 ? '即将过期' : '有效';
 }
-function certificateNeedsAction(item) { return item.status === '审核不通过' || item.validity === '即将过期' || item.validity === '已过期'; }
+function certificateNeedsAction(item) { return item.status === '已驳回' || item.validity === '即将过期' || item.validity === '已过期'; }
 function teacherCertificateCard(item) {
-  const canReupload = item.status === '审核不通过' || item.validity === '已过期';
-  return `<article class="teacher-certificate-card ${certificateNeedsAction(item) ? 'needs-action' : ''}"><div class="teacher-certificate-card-head"><div><span>${tEsc(item.type)}</span><h3>${tEsc(item.name)}</h3></div>${tPill(item.status, certificateStatusTone(item.status))}</div><dl class="teacher-certificate-facts"><div><dt>证书编号</dt><dd>${tEsc(item.number)}</dd></div><div><dt>发证机构</dt><dd>${tEsc(item.issuer)}</dd></div><div><dt>来源</dt><dd>${tEsc(item.source || '—')}</dd></div><div><dt>文件版本</dt><dd>${tEsc(item.fileVersion || 'v1')}</dd></div><div><dt>有效期</dt><dd>${item.expiresAt ? `至 ${tEsc(item.expiresAt)}` : '永久有效'}</dd></div><div><dt>有效性</dt><dd>${tPill(item.validity, certificateValidityTone(item.validity))}</dd></div></dl>${item.status === '审核不通过' ? `<p class="teacher-certificate-review-note">审核意见：${tEsc(item.reviewNote)}</p>` : ''}<div class="teacher-certificate-card-foot"><span class="teacher-certificate-file"><b aria-hidden="true">${item.file.toLowerCase().endsWith('.pdf') ? 'PDF' : '图'}</b><span>${tEsc(item.file)}</span></span><div><button type="button" data-certificate-view="${tEsc(item.id)}">查看</button>${canReupload ? `<button type="button" class="primary" data-certificate-reupload="${tEsc(item.id)}">重新上传</button>` : ''}</div></div></article>`;
+  const canReupload = item.status === '已驳回' || item.validity === '已过期';
+  return `<article class="teacher-certificate-card ${certificateNeedsAction(item) ? 'needs-action' : ''}"><div class="teacher-certificate-card-head"><div><span>${tEsc(item.type)}</span><h3>${tEsc(item.name)}</h3></div>${tPill(item.status, certificateStatusTone(item.status))}</div><dl class="teacher-certificate-facts"><div><dt>证书编号</dt><dd>${tEsc(item.number)}</dd></div><div><dt>发证机构</dt><dd>${tEsc(item.issuer)}</dd></div><div><dt>来源</dt><dd>${tEsc(item.source || '—')}</dd></div><div><dt>文件版本</dt><dd>${tEsc(item.fileVersion || 'v1')}</dd></div><div><dt>有效期</dt><dd>${item.expiresAt ? `至 ${tEsc(item.expiresAt)}` : '永久有效'}</dd></div><div><dt>有效性</dt><dd>${tPill(item.validity, certificateValidityTone(item.validity))}</dd></div></dl>${item.status === '已驳回' ? `<p class="teacher-certificate-review-note">审核意见：${tEsc(item.reviewNote)}</p>` : ''}<div class="teacher-certificate-card-foot"><span class="teacher-certificate-file"><b aria-hidden="true">${item.file.toLowerCase().endsWith('.pdf') ? 'PDF' : '图'}</b><span>${tEsc(item.file)}</span></span><div><button type="button" data-certificate-view="${tEsc(item.id)}">查看</button>${canReupload ? `<button type="button" class="primary" data-certificate-reupload="${tEsc(item.id)}">重新上传</button>` : ''}</div></div></article>`;
 }
 function renderTeacherCertificates() {
   const certificates = [...teacherState.certificates].map(item => ({ ...item, validity: calculateCertificateValidity(item.expiresAt) })).sort((a, b) => (a.expiresAt || '9999-12-31').localeCompare(b.expiresAt || '9999-12-31'));
