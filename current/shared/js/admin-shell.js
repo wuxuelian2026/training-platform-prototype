@@ -59,8 +59,8 @@ const navGroups = [
     icon: '招', label: '面授招生与CRM', items: [
       ['批', '批次管理', '/admin/pages/crm/batches.html', 'crm'],
       ['班', '面授班级', '/admin/pages/crm/classes.html', 'crm'],
-      ['听', '后台登记试听', '/admin/pages/crm/trials.html', 'crm'],
       ['索', '线索跟进', '/admin/pages/crm/leads.html', 'crm'],
+      ['听', '后台登记试听', '/admin/pages/crm/trials.html', 'crm'],
       ['转', '报名转化', '/admin/pages/crm/conversions.html', 'crm']
     ]
   },

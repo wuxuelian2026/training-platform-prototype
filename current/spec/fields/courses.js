@@ -55,7 +55,8 @@ export const COURSE_FIELD_SPEC = {
           { id: 'FD-COURSE-031', label: '申报内容', type: '只读', length: '—', required: '系统展示', note: '展示完整申报信息，含教师信息与课程信息', constraints: { readOnly: true, system: true } },
           { id: 'FD-COURSE-032', label: '审批结果', type: '单选', length: '通过 / 驳回', required: '是', note: '决定课程是否进入课程库', constraints: { options: ['通过', '驳回'] } },
           { id: 'FD-COURSE-006', label: '审批意见', type: '多行文本', length: '≤ 500 字', required: '驳回时必填', note: '填写后同步给申报人', constraints: { maxLength: 500 } },
-          { id: 'FD-COURSE-033', label: '审批备注', type: '文本', length: '≤ 200 字', required: '否', note: '内部备注，不同步给申报人', constraints: { maxLength: 200 } }
+          { id: 'FD-COURSE-051', label: '审批人', type: '只读', length: '—', required: '系统记录', note: '提交审批结论时写入当前操作人，展示在「最近一次审核意见」', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-052', label: '审批时间', type: '只读', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '提交审批结论时写入，与审批人同源展示', constraints: { readOnly: true, system: true } }
         ] }
       ],
       notes: [

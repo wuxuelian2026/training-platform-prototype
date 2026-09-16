@@ -798,6 +798,16 @@ body { background: #f7f7f5; }
 .teacher-application-list { display: grid; gap: 10px; }
 .teacher-application-list-head, .teacher-form-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .teacher-application-list-head { padding: 2px 2px 0; }
+.teacher-application-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: hidden; border: 1px solid #e5dfda; border-radius: 7px; background: #fff; }
+.teacher-application-filters button { display: flex; min-width: 0; min-height: 44px; align-items: center; justify-content: center; gap: 4px; padding: 0 6px; border: 0; border-right: 1px solid #eee9e5; background: #fff; color: #6f6761; font-size: 11px; }
+.teacher-application-filters button:last-child { border-right: 0; }
+.teacher-application-filters button.active { background: #fdf3f3; color: var(--brand); font-weight: 600; }
+.teacher-application-filters button span { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 9px; background: #f1efec; color: #7c746e; font-size: 9px; }
+.teacher-application-empty { padding: 28px 12px; color: var(--muted); font-size: 12px; text-align: center; }
+.teacher-application-review-note { padding: 12px 14px; border: 1px solid #eadfd8; border-left: 3px solid var(--brand); border-radius: 8px; background: #fffaf7; }
+.teacher-application-review-note span { color: var(--muted); font-size: 10px; }
+.teacher-application-review-note p { margin: 6px 0 0; color: #4d433e; font-size: 12px; line-height: 1.6; }
+.teacher-application-review-note small { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; }
 .teacher-application-list-head h3, .teacher-form-section-head h3 { margin: 0; font-size: 15px; }
 .teacher-application-list-head span, .teacher-form-section-head span { color: var(--muted); font-size: 10px; }
 .teacher-application-card { display: block; min-width: 0; padding: 13px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; color: var(--ink); }

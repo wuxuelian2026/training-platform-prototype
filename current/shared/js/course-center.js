@@ -88,7 +88,8 @@ const sharedDemo = readDemoState();
 const appendShared = (target, records) => (records || []).filter(record => !target.some(item => item.id === record.id)).forEach(record => target.push(record));
 // CR-2026-012：课程档案按记录编号合并，存储记录覆盖种子基线，保证展示信息与教学属性的修改在重新进入时仍然生效。
 const mergeSharedRecords = (target, records) => (records || []).forEach(record => { const index = target.findIndex(item => item.id === record.id); if (index < 0) target.push(record); else target[index] = { ...target[index], ...record }; });
-appendShared(applications, sharedDemo.applications);
+// CR-2026-033：申报记录按编号合并存储值，审批结果刷新后必须仍然生效（此前只做追加，存储里的新状态被种子覆盖）。
+mergeSharedRecords(applications, sharedDemo.applications);
 for (let index = applications.length - 1; index >= 0; index -= 1) {
   if (applications[index].status === '草稿') applications.splice(index, 1);
 }
@@ -196,6 +197,7 @@ function renderPage() {
   const page = root();
   if (!page) return;
   if (state.page === 'applications') renderApplications(page);
+  if (state.page === 'review') renderApplicationReview(page);
   if (state.page === 'content') renderContent(page);
   if (state.page === 'resources') renderResources(page);
   if (state.page === 'library') renderLibrary(page);
@@ -204,9 +206,16 @@ function renderPage() {
 
 function renderApplications(page) {
   const tabs = applicationStatusTabs();
+  // CR-2026-033：返回列表时保留页签与筛选条件（页签与筛选写入 URL）。
+  const query = new URLSearchParams(location.search);
+  const tabFromUrl = query.get('tab') || '';
+  if (tabs.some((tab) => tab.value === tabFromUrl)) state.applicationTab = tabFromUrl;
+  ['teacher', 'major', 'keyword', 'status'].forEach((key) => { if (query.get(key) !== null) state.applicationFilters[key] = query.get(key) || ''; });
   const activeTab = tabs.some((tab) => tab.value === state.applicationTab) ? state.applicationTab : '';
   const tabRecords = activeTab ? applications.filter(item => item.status === activeTab) : applications;
-  const filtered = tabRecords.filter(item => !state.applicationFilters.teacher || item.teacher.includes(state.applicationFilters.teacher)).filter(item => !state.applicationFilters.major || item.major === state.applicationFilters.major).filter(item => !state.applicationFilters.keyword || `${item.name}${item.id}`.includes(state.applicationFilters.keyword)).filter(item => !state.applicationFilters.status || item.status === state.applicationFilters.status);
+  const filtered = tabRecords.filter(item => !state.applicationFilters.teacher || item.teacher.includes(state.applicationFilters.teacher)).filter(item => !state.applicationFilters.major || item.major === state.applicationFilters.major).filter(item => !state.applicationFilters.keyword || `${item.name}${item.id}`.includes(state.applicationFilters.keyword)).filter(item => !state.applicationFilters.status || item.status === state.applicationFilters.status)
+    // CR-2026-033 §2.5：待审核按申报时间升序（FIFO），其余页签按业务时间倒序，且显式排序不依赖数据源顺序。
+    .sort((a, b) => activeTab === '待审核' ? String(a.submittedAt || a.date || '').localeCompare(String(b.submittedAt || b.date || '')) : String(b.submittedAt || b.date || '').localeCompare(String(a.submittedAt || a.date || '')));
   // 具体状态页签本身已经限定了状态，只有「全部」页签才需要状态下拉补充筛选。
   const statusFilter = activeTab === ''
     ? filterField('申报状态', selectWithValues('status', tabs.filter(tab => tab.value).map(tab => tab.value), state.applicationFilters.status || '', '全部状态'))
@@ -413,6 +422,36 @@ function renderCatalog(page) {
   page.innerHTML = `<div class="course-page">${pageShell('专业目录维护', '', '<button class="button primary" type="button" data-action="catalog-add" data-type="group">新增目录</button>')}<section class="catalog-panel catalog-tree-panel"><div class="catalog-panel-head"><div><span class="catalog-kicker">CATALOG TREE</span><h2>目录树</h2><p>展开门类查看分类与专业</p></div><div class="catalog-tree-actions"><button class="button" type="button" data-action="catalog-add" data-type="category">新增分类</button><button class="button" type="button" data-action="catalog-add" data-type="major">新增专业</button></div></div><ul class="catalog-tree">${groupNodes}</ul></section></div>`;
 }
 
+// CR-2026-033 §2：后台申报审批页由空壳改为真实审核页（深链、状态源取数、审批区仅在待审核且具备权限时可用）。
+function applicationStatusTone(status) {
+  if (status === '已通过') return 'green';
+  if (status === '已驳回') return 'red';
+  if (status === '待审核') return 'brand';
+  return 'gray';
+}
+function renderApplicationReview(page) {
+  const reviewParams = new URLSearchParams(location.search);
+  const applicationId = reviewParams.get('application_id') || reviewParams.get('id') || '';
+  const returnUrl = reviewParams.get('return') || '/admin/pages/courses/applications.html';
+  const item = applications.find((record) => record.id === applicationId);
+  if (!item) {
+    page.innerHTML = `<div class="course-page">${pageShell('课程申报审批', '', `<a class="button" href="${escapeHtml(returnUrl)}">返回列表</a>`)}<section class="course-surface"><div class="course-empty"><strong>未找到该申报</strong><span>申报编号 ${escapeHtml(applicationId || '未提供')} 不存在或已被撤销，请返回列表重新选择。</span></div></section></div>`;
+    return;
+  }
+  const canReview = window.hbyxPermissions ? window.hbyxPermissions.can('PERM-COURSE-002') : true;
+  const pending = item.status === '待审核';
+  const reviewDisabledReason = !pending
+    ? `当前状态为「${item.status}」，不可提交审批结论。`
+    : (!canReview ? '当前账号未获得审批权限点（PERM-COURSE-002），仅可查看申报内容。' : '');
+  const reviewForm = pending && canReview
+    ? `<form class="course-review-form" data-form="application-review-page" data-id="${escapeHtml(item.id)}"><div class="course-detail-section wide"><h3>审批结论</h3><div class="choice-group"><label class="choice"><input type="radio" name="result" value="approved" checked />通过</label><label class="choice"><input type="radio" name="result" value="rejected" />驳回</label></div><div class="course-field wide"><label for="review-opinion">审批意见 <span class="sub-cell">驳回时必填，≤500 字；将通过消息同步给申报人</span></label><textarea id="review-opinion" name="opinion" maxlength="500" placeholder="填写审批意见或驳回原因">${escapeHtml('')}</textarea></div><p class="course-error" data-error></p></div><div class="course-modal-actions"><button class="button" type="submit" class="button primary">提交审批</button><a class="button" href="${escapeHtml(returnUrl)}">返回列表</a></div></form>`
+    : `<section class="course-detail-section wide"><h3>审批结论</h3><p class="course-hint">${escapeHtml(reviewDisabledReason)}</p></section>`;
+  const lastReview = item.review
+    ? `<section class="course-detail-section wide"><h3>最近一次审核意见</h3><div class="course-review-box">${tag(item.status)}<p>${escapeHtml(item.review)}</p><small>审批人：${escapeHtml(item.reviewedBy || '—')} · 审批时间：${escapeHtml(item.reviewedAt || '—')}</small></div></section>`
+    : '<section class="course-detail-section wide"><h3>最近一次审核意见</h3><p class="course-hint">暂无审核意见。仅展示最近一次，不提供历史意见时间线。</p></section>';
+  page.innerHTML = `<div class="course-page">${pageShell('课程申报审批', `${item.id} · ${item.name}`, `<a class="button" href="${escapeHtml(returnUrl)}">返回列表</a>`)}<section class="course-surface"><div class="course-detail-grid"><section class="course-detail-section wide"><h3>申报概览</h3><dl class="course-detail-list"><div><dt>申报编号</dt><dd>${escapeHtml(item.id)}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>申报状态</dt><dd>${tag(item.status)}</dd></div><div><dt>提交时间</dt><dd>${escapeHtml(item.submittedAt || item.date || '—')}</dd></div></dl></section><section class="course-detail-section wide"><h3>教师信息（只读）</h3><dl class="course-detail-list"><div><dt>姓名</dt><dd>${escapeHtml(item.teacher || '—')}</dd></div><div><dt>工号</dt><dd>${escapeHtml(item.teacherNo || '—')}</dd></div><div><dt>教学单位</dt><dd>${escapeHtml(item.teacherUnit || '—')}</dd></div><div><dt>专业方向</dt><dd>${escapeHtml(item.teacherProfessional || item.major || '—')}</dd></div><div><dt>职称</dt><dd>${escapeHtml(item.teacherTitle || '—')}</dd></div></dl></section><section class="course-detail-section wide"><h3>申报内容（只读）</h3><dl class="course-detail-list"><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>总课时</dt><dd>${item.hours ? `${item.hours} 课时` : '未填写'}</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(item.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(item) || '未填写')}</dd></div><div class="wide"><dt>课程简介</dt><dd>${escapeHtml(item.intro || '未填写')}</dd></div><div class="wide"><dt>附件</dt><dd>${item.attachment ? escapeHtml(item.attachment) : '未上传附件'}</dd></div></dl></section>${lastReview}${reviewForm}</div></section></div>`;
+}
+
 function openApplicationDetail(id, reviewMode = false) {
   const item = applications.find(record => record.id === id);
   if (!item) return;
@@ -592,7 +631,15 @@ function handleClick(event) {
     return;
   }
   if (action === 'close-modal') closeModal();
-  if (action === 'application-tab') { state.applicationTab = target.dataset.value || ''; state.applicationFilters.status = ''; renderApplications(root()); }
+  if (action === 'application-tab') {
+    state.applicationTab = target.dataset.value || '';
+    state.applicationFilters.status = '';
+    const url = new URL(location.href);
+    if (state.applicationTab) url.searchParams.set('tab', state.applicationTab); else url.searchParams.delete('tab');
+    url.searchParams.delete('status');
+    history.replaceState(null, '', url);
+    renderApplications(root());
+  }
   if (action === 'library-tab') {
     state.libraryTab = target.dataset.value === 'all' ? 'all' : 'arrange';
     const url = new URL(location.href);
@@ -602,7 +649,12 @@ function handleClick(event) {
   }
   if (action === 'export-applications') showToast('列表导出任务已创建，数据将按当前权限脱敏');
   if (action === 'application-detail') openApplicationDetail(target.dataset.id);
-  if (action === 'application-review') openApplicationDetail(target.dataset.id, true);
+  if (action === 'application-review') {
+    // CR-2026-033 §2.1：审批动作唯一入口是审批页；列表页不再弹窗审批。
+    const back = new URL(location.href);
+    back.searchParams.set('tab', state.applicationTab || '');
+    location.href = `application-review.html?application_id=${encodeURIComponent(target.dataset.id)}&return=${encodeURIComponent(back.pathname + back.search)}`;
+  }
   if (action === 'content-workbench') openWorkbench(target.dataset.id);
   if (action === 'refresh-content') { renderContent(root()); showToast('课程编排列表已刷新'); }
   if (action === 'upload-resource') openResourceForm();
@@ -637,10 +689,48 @@ function handleChange(event) {
   if (event.target.matches('[data-action=page-size]')) { state.pageSize = Number(event.target.value); renderPage(); }
 }
 
+// CR-2026-033 §2.3：写入审批人与时间；通过后课程主体进入课程库，驳回后可修改重提。
+function applyApplicationReview(item, result, opinion) {
+  item.status = result === 'approved' ? '已通过' : '已驳回';
+  // I1-DEC-20: a single review field is shared by both ends; approval defaults to 审批通过.
+  item.review = opinion || '审批通过';
+  item.reviewedBy = '教研管理员';
+  item.reviewedAt = demoTime();
+  persistApplication(item);
+  if (result !== 'approved') return item;
+  // I1-DEC-21: keyed by application/course id, an existing course entity is reused and updated.
+  const targetId = item.courseId || courseIdForApplication(item.id);
+  const existing = contentCourses.find(record => record.applicationId === item.id || record.id === targetId);
+  const course = existing || courseFromApplication(item);
+  if (existing) Object.assign(course, { applicationId: item.id, name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: Number(item.hours) || course.hours });
+  else contentCourses.unshift(course);
+  persistCourse(course);
+  return item;
+}
 function handleSubmit(event) {
   const form = event.target;
   if (!form.matches('[data-form]')) return;
-  if (form.dataset.form === 'application-filter' || form.dataset.form === 'content-filter' || form.dataset.form === 'resource-filter' || form.dataset.form === 'library-filter') { event.preventDefault(); const data = Object.fromEntries(new FormData(form)); const key = form.dataset.form.replace('-filter', 'Filters').replace('applicationFilters', 'applicationFilters'); if (form.dataset.form === 'application-filter') state.applicationFilters = data; if (form.dataset.form === 'content-filter') state.contentFilters = data; if (form.dataset.form === 'resource-filter') state.resourceFilters = data; if (form.dataset.form === 'library-filter') state.libraryFilters = data; renderPage(); }
+  if (form.dataset.form === 'application-filter' || form.dataset.form === 'content-filter' || form.dataset.form === 'resource-filter' || form.dataset.form === 'library-filter') { event.preventDefault(); const data = Object.fromEntries(new FormData(form)); const key = form.dataset.form.replace('-filter', 'Filters').replace('applicationFilters', 'applicationFilters'); if (form.dataset.form === 'application-filter') {
+    state.applicationFilters = data;
+    const url = new URL(location.href);
+    ['teacher', 'major', 'keyword', 'status'].forEach((key) => { const value = String(data[key] || '').trim(); if (value) url.searchParams.set(key, value); else url.searchParams.delete(key); });
+    if (state.applicationTab) url.searchParams.set('tab', state.applicationTab); else url.searchParams.delete('tab');
+    history.replaceState(null, '', url);
+  } if (form.dataset.form === 'content-filter') state.contentFilters = data; if (form.dataset.form === 'resource-filter') state.resourceFilters = data; if (form.dataset.form === 'library-filter') state.libraryFilters = data; renderPage(); }
+  // CR-2026-033：审批落库逻辑抽成共享函数，审批页与只读详情共用同一口径。
+  if (form.dataset.form === 'application-review-page') {
+    event.preventDefault();
+    const result = form.querySelector('[name=result]:checked')?.value;
+    const opinion = form.querySelector('[name=opinion]').value.trim();
+    const error = form.querySelector('[data-error]');
+    if (result === 'rejected' && !opinion) { error.textContent = '驳回时必须填写审批意见或原因'; return; }
+    const item = applications.find(record => record.id === form.dataset.id);
+    if (!item) return;
+    applyApplicationReview(item, result, opinion);
+    const back = new URLSearchParams(location.search).get('return') || '/admin/pages/courses/applications.html';
+    location.href = back;
+    return;
+  }
   if (form.dataset.form === 'application-review-form') {
     event.preventDefault();
     const result = form.querySelector('[name=result]:checked')?.value;
@@ -649,21 +739,7 @@ function handleSubmit(event) {
     if (result === 'rejected' && !opinion) { error.textContent = '驳回时必须填写审批意见或原因'; return; }
     const item = applications.find(record => record.id === form.dataset.id);
     if (!item) return;
-    item.status = result === 'approved' ? '已通过' : '已驳回';
-    // I1-DEC-20: a single review field is shared by both ends; approval defaults to 审批通过.
-    item.review = opinion || '审批通过';
-    item.reviewedBy = '教研管理员';
-    item.reviewedAt = demoTime();
-    persistApplication(item);
-    if (result === 'approved') {
-      // I1-DEC-21: keyed by application/course id, an existing course entity is reused and updated.
-      const targetId = item.courseId || courseIdForApplication(item.id);
-      const existing = contentCourses.find(record => record.applicationId === item.id || record.id === targetId);
-      const course = existing || courseFromApplication(item);
-      if (existing) Object.assign(course, { applicationId: item.id, name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: Number(item.hours) || course.hours });
-      else contentCourses.unshift(course);
-      persistCourse(course);
-    }
+    applyApplicationReview(item, result, opinion);
     closeModal();
     renderApplications(root());
     showToast(result === 'approved' ? '申报已通过，课程进入编排列表' : '申报已驳回，教师可修改后重新提交');
