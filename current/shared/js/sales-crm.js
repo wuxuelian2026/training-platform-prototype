@@ -21,10 +21,42 @@ const courseCatalog = cloneCourseCatalogSeed();
 const businessParams = new URLSearchParams(window.location.search);
 const dataSets = {
   products: cloneProductSeed(),
+  // CR-2026-032 §5：订单样例补支付记录、退款记录、履约结果与操作日志，覆盖视频已支付／面授待支付／面授退款中三种情形。
   orders: [
-    { id: 'order-video', number: 'OD202609080001', name: '声乐演唱技巧', type: '视频课程', student: '林知夏', amount: '1280.00', status: '已支付', fulfillment: '学习中', linked: '学习权限：生效', time: '2026-09-08 10:18' },
-    { id: 'order-offline', number: 'OD202609060008', name: '少儿中国舞基础班', type: '面授课程', student: '周子涵', amount: '1680.00', status: '待支付', fulfillment: '待分班', linked: '秋季一班', time: '2026-09-06 15:22' },
-    { id: 'order-refund', number: 'OD202609050003', name: '成人声乐班', type: '面授课程', student: '刘女士', amount: '2280.00', status: '退款中', fulfillment: '已分班', linked: '周末班', time: '2026-09-05 11:08' }
+    {
+      id: 'order-video', number: 'OD202609080001', name: '声乐演唱技巧', type: '视频课程', account: '演示家长A', accountPhone: '138****2026', student: '',
+      amount: '1280.00', status: '已支付', fulfillment: '学习中', linked: '学习权限：生效', time: '2026-09-08 10:18',
+      payment: { channel: '微信支付', amount: '1280.00', status: '支付成功', time: '2026-09-08 10:20' },
+      refund: null,
+      fulfillmentDetail: { 学习权限: '已开通', 有效期: '2026-09-08 至 2027-09-07' },
+      logs: [
+        { at: '2026-09-08 10:18', role: '学员端', from: '—', to: '待支付', reason: '学员提交订单' },
+        { at: '2026-09-08 10:20', role: '支付渠道', from: '待支付', to: '已支付', reason: '支付成功' },
+        { at: '2026-09-08 10:21', role: '系统', from: '已支付', to: '已支付', reason: '学习权限已开通' }
+      ]
+    },
+    {
+      id: 'order-offline', number: 'OD202609060008', name: '少儿中国舞基础班', type: '面授课程', account: '演示家长A', accountPhone: '139****2027', student: '周子涵',
+      amount: '1680.00', status: '待支付', fulfillment: '待分班', linked: '未占用名额', time: '2026-09-06 15:22',
+      payment: null, refund: null,
+      fulfillmentDetail: { 班级: '2026秋季中国舞启蒙一班', 校区: '龙泉校区', 分班结果: '待支付后自动分班', 名额占用: '未占用（以支付成功为占用时点）' },
+      logs: [
+        { at: '2026-09-06 15:22', role: '学员端', from: '—', to: '待支付', reason: '学员提交报名' },
+        { at: '2026-09-06 18:00', role: '系统', from: '待支付', to: '待支付', reason: '支付时限内未支付，订单保留' }
+      ]
+    },
+    {
+      id: 'order-refund', number: 'OD202609050003', name: '成人声乐班', type: '面授课程', account: '演示家长B', accountPhone: '139****2027', student: '刘女士',
+      amount: '2280.00', status: '退款中', fulfillment: '已分班', linked: '周末班', time: '2026-09-05 11:08',
+      payment: { channel: '微信支付', amount: '2280.00', status: '支付成功', time: '2026-09-05 11:10' },
+      refund: { number: 'RF202609050012', amount: '2280.00', status: '退款中', reason: '名额占用失败，系统发起免审批全额原路退款', expectedAt: '2026-09-12', method: '原路退回' },
+      fulfillmentDetail: { 班级: '周末成人声乐班', 校区: '南湖校区', 分班结果: '报名未成功，已发起全额原路退款', 名额占用: '未占用（名额分配失败）' },
+      logs: [
+        { at: '2026-09-05 11:08', role: '学员端', from: '—', to: '待支付', reason: '学员提交报名' },
+        { at: '2026-09-05 11:10', role: '支付渠道', from: '待支付', to: '已支付', reason: '支付成功' },
+        { at: '2026-09-05 11:12', role: '系统', from: '已支付', to: '退款中', reason: '名额占用失败，已发起全额原路退款' }
+      ]
+    }
   ],
   batches: [
     { id: 'batch-autumn', name: '2026年秋季艺术培训', season: '秋季', start: '2026-09-01', end: '2027-01-30', classes: '12', status: '进行中' },
@@ -409,14 +441,37 @@ function renderProducts() {
 
 function renderOrders() {
   businessData = dataSets.orders;
-  pageFrame('统一订单管理', '', '<button class="button" data-business-action="order-export">导出订单</button>', metricCards([['今日订单', '26', '视频与面授合计'], ['待支付', '1', '待完成支付'], ['退款中', '1', '仅面授订单允许'], ['已支付', '18', '交易已完成', 70]]) + filterPanel('order-filter', selectField('订单类型', 'type', ['视频课程', '面授课程']) + selectField('订单状态', 'status', ['待支付', '已支付', '已取消', '退款中', '已退款']) + selectField('关联状态', 'fulfillment', ['待分班', '已分班', '已取消', '学习中', '未开始', '已完成']) + inputField('关键词', 'keyword', '订单号 / 课程名称 / 购买账号', true)) + table('<thead><tr><th>订单号</th><th>课程名称</th><th>课程类型</th><th>购买账号 / 学员</th><th>订单金额</th><th>订单状态</th><th>关联状态</th><th>关联班级 / 权限</th><th>下单时间</th><th>操作</th></tr></thead>'));
+  // CR-2026-032 §2：指标卡可点击筛选（再次点击取消）、新增下单时间范围、关联状态并入订单状态列副行。
+  const metricCard = ([label, value, note, progress, metric]) => `<button type="button" class="card metric-card" data-order-metric="${metric}"><span class="metric-label">${label}</span><span class="metric-value">${value}</span><span class="metric-note">${note}</span>${progress ? `<span class="metric-progress"><span style="width:${progress}%"></span></span>` : ''}</button>`;
+  pageFrame('统一订单管理', '', '<button class="button" data-business-action="order-export">导出订单</button>', `<div class="card-grid compact-metrics">${[['今日订单', '26', '视频与面授合计', 0, 'today'], ['待支付', '1', '待完成支付', 0, '待支付'], ['退款中', '1', '仅面授订单允许', 0, '退款中'], ['已支付', '18', '交易已完成', 70, '已支付']].map(metricCard).join('')}</div>` + filterPanel('order-filter', selectField('订单类型', 'type', ['视频课程', '面授课程']) + selectField('订单状态', 'status', ['待支付', '已支付', '已取消', '退款中', '已退款']) + selectField('关联状态', 'fulfillment', ['待分班', '已分班', '已取消', '学习中', '未开始', '已完成']) + `<label class="form-field"><span>下单时间起</span><input name="from" type="date"></label><label class="form-field"><span>下单时间止</span><input name="to" type="date"></label>` + inputField('关键词', 'keyword', '订单号 / 课程名称 / 购买账号', true)) + table('<thead><tr><th>订单号</th><th>课程名称</th><th>课程类型</th><th>购买账号 / 学员</th><th>订单金额</th><th>订单状态 / 关联状态</th><th>关联班级 / 权限</th><th>下单时间</th><th>操作</th></tr></thead>'));
   const params = new URLSearchParams(window.location.search);
   // RM-F-07: video orders name the purchasing account; offline orders keep account + student.
-  const rows = (row) => `<td>${row.number}</td><td>${row.name}</td><td>${row.type}</td><td>${row.type === '视频课程' ? `${row.account || row.student}${row.account ? `<span class="sub-cell">${row.accountPhone || ''}</span>` : ''}` : row.student}</td><td class="amount-cell">¥${row.amount}</td><td>${tag(row.status)}</td><td>${tag(row.fulfillment)}</td><td>${row.linked}</td><td>${row.time}</td><td><button class="text-button" data-business-action="order-view">查看详情</button></td>`;
-  const filterRows = (form) => renderRows(businessData, rows, (row) => (!form.type.value || row.type === form.type.value) && (!form.status.value || row.status === form.status.value) && (!form.fulfillment.value || row.fulfillment === form.fulfillment.value) && (!form.keyword.value.trim() || `${row.number}${row.name}${row.student}${row.account || ''}`.includes(form.keyword.value.trim())));
+  const rows = (row) => `<td>${row.number}</td><td>${row.name}</td><td>${row.type}</td><td>${row.type === '视频课程' ? `${row.account || row.student}${row.account ? `<span class="sub-cell">${row.accountPhone || ''}</span>` : ''}` : row.student}</td><td class="amount-cell">¥${row.amount}</td><td>${tag(row.status)}<span class="sub-cell">${row.fulfillment ? `关联状态：${row.fulfillment}` : '关联状态：—'}</span></td><td>${row.linked}</td><td>${row.time}</td><td><button class="text-button" data-business-action="order-view">查看详情</button></td>`;
+  // 指标卡与筛选条件叠加：指标卡再次点击取消；下单时间范围含起止当天。
+  let metricFilter = '';
+  const inRange = (row, form) => {
+    const day = String(row.time || '').slice(0, 10);
+    const from = form.from?.value || '';
+    const to = form.to?.value || '';
+    if (from && day && day < from) return false;
+    if (to && day && day > to) return false;
+    return true;
+  };
+  const matchesMetric = (row) => {
+    if (!metricFilter) return true;
+    if (metricFilter === 'today') return String(row.time || '').startsWith('2026-09-08');
+    return row.status === metricFilter;
+  };
+  const filterRows = (form) => renderRows(businessData, rows, (row) => matchesMetric(row) && inRange(row, form) && (!form.type.value || row.type === form.type.value) && (!form.status.value || row.status === form.status.value) && (!form.fulfillment.value || row.fulfillment === form.fulfillment.value) && (!form.keyword.value.trim() || `${row.number}${row.name}${row.student}${row.account || ''}`.includes(form.keyword.value.trim())));
   const form = document.querySelector('#order-filter');
   if (form && params.get('type') === 'offline') form.type.value = '面授课程';
-  filterRows(form || { type: { value: '' }, status: { value: '' }, fulfillment: { value: '' }, keyword: { value: '' } });
+  // 指标卡点击筛选：命中同一指标再次点击即取消。
+  document.querySelectorAll('[data-order-metric]').forEach((card) => card.addEventListener('click', () => {
+    metricFilter = metricFilter === card.dataset.orderMetric ? '' : card.dataset.orderMetric;
+    document.querySelectorAll('[data-order-metric]').forEach((item) => item.classList.toggle('is-active', item.dataset.orderMetric === metricFilter));
+    filterRows(form || { type: { value: '' }, status: { value: '' }, fulfillment: { value: '' }, keyword: { value: '' }, from: { value: '' }, to: { value: '' } });
+  }));
+  filterRows(form || { type: { value: '' }, status: { value: '' }, fulfillment: { value: '' }, keyword: { value: '' }, from: { value: '' }, to: { value: '' } });
   form?.addEventListener('submit', (event) => { event.preventDefault(); filterRows(event.currentTarget); });
 }
 
@@ -484,6 +539,40 @@ function appendClassRosterSection(row) {
   card.insertAdjacentHTML('beforeend', `<section class="sales-class-roster"><h3>课次与班级名单</h3><div class="sales-dialog-summary"><div><span>课次</span><strong>${sessions.length}</strong></div><div><span>已报名 / 容量</span><strong>${Number(row.enrolled || 0)} / ${Number(row.capacity || 0)}</strong></div><div><span>剩余名额</span><strong>${remaining}</strong></div></div><p class="sales-roster-meta">上课规则：${escapeHtml(row.schedule || '—')} · 课次：${escapeHtml(sessionLine)}</p>${aggregateNote}<div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>登录账号</th><th>报名时间</th><th>状态</th></tr></thead><tbody>${roster}</tbody></table></div></section>`);
 }
 
+// CR-2026-032 §3：订单详情由通用弹窗改为订单专用分区详情（五分区，无数据的分区不渲染，不展示渠道侧标识与回调结果）。
+function openOrderDetail(row) {
+  const isVideo = row.type === '视频课程';
+  const fulfillment = row.fulfillmentDetail || {};
+  const fulfillmentRows = Object.entries(fulfillment).map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value || '—'))}</dd></div>`).join('');
+  const baseRows = [
+    ['订单号', row.number],
+    ['订单类型', row.type],
+    ['课程名称', row.name],
+    isVideo ? ['购买账号', `${row.account || '—'}（${row.accountPhone || '—'}）`] : ['报名学员', row.student || '—'],
+    ['下单时间', row.time || '—'],
+    ['订单金额', `¥${row.amount}`],
+    ['订单状态', row.status],
+    ['关联状态', row.fulfillment || '—']
+  ].map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value ?? '—'))}</dd></div>`).join('');
+  const paymentRows = row.payment
+    ? [['支付渠道', row.payment.channel], ['支付金额', `¥${row.payment.amount}`], ['支付状态', row.payment.status], ['支付时间', row.payment.time]].map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value ?? '—'))}</dd></div>`).join('')
+    : '';
+  const refundRows = row.refund
+    ? [['退款单号', row.refund.number], ['退款渠道', row.refund.method || '原路退回'], ['退款金额', `¥${row.refund.amount}`], ['退款状态', row.refund.status], ['预计到账时间', row.refund.expectedAt || '以渠道回执为准'], ['退款原因', row.refund.reason]].map(([label, value]) => `<div${label === '退款原因' ? ' class="wide"' : ''}><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value ?? '—'))}</dd></div>`).join('')
+    : '';
+  const logRows = (row.logs || []).map((log) => `<tr><td>${escapeHtml(log.at)}</td><td>${escapeHtml(log.role)}</td><td>${escapeHtml(`${log.from} → ${log.to}`)}</td><td>${escapeHtml(log.reason || '—')}</td></tr>`).join('');
+  const section = (title, content) => (content ? `<section class="course-detail-section wide"><h3>${title}</h3>${content}</section>` : '');
+  const seatFailed = /报名未成功/.test(String(fulfillment['分班结果'] || ''));
+  const body = [
+    section('订单基础信息', `<dl class="course-detail-list">${baseRows}</dl>`),
+    section('支付记录', paymentRows ? `<dl class="course-detail-list">${paymentRows}</dl>` : ''),
+    section('退款记录', refundRows ? `<dl class="course-detail-list">${refundRows}</dl>` : ''),
+    section('履约结果', `<dl class="course-detail-list">${fulfillmentRows || '<div class="wide"><dt>结果</dt><dd>—</dd></div>'}${seatFailed ? '<div class="wide"><dt>退款结果</dt><dd>报名未成功，已发起全额原路退款</dd></div>' : ''}</dl>`),
+    section('操作日志', logRows ? `<div class="table-wrap"><table><thead><tr><th>时间</th><th>操作人角色</th><th>状态变更</th><th>变更原因</th></tr></thead><tbody>${logRows}</tbody></table></div>` : '')
+  ].join('');
+  return openBusinessDialog('订单详情', `${row.number} · ${row.name}`, `<div class="course-detail-grid">${body}</div>`, '<button type="button" class="button" data-dialog-close>关闭</button>');
+}
+
 function openDetail(row, kind) {
   const labels = kind === 'product' ? [['商品名称', row.name], ['关联课程', row.course], ['售价', `¥${row.price}`], ['销售数量', row.sales], ['商品状态', row.status], ['上架时间', row.updated]] : kind === 'order' ? [['订单号', row.number], ['课程类型', row.type], ['学员', row.student], ['订单金额', `¥${row.amount}`], ['订单状态', row.status], ['关联状态', row.fulfillment], ['关联班级 / 权限', row.linked], ['下单时间', row.time]] : kind === 'class' ? [['班级名称', row.name], ['关联课程', row.course], ['授课教师', row.teacher], ['报名情况', `${row.enrolled} / ${row.capacity}`], ['运营状态', row.status], ['前台展示状态', row.display]] : kind === 'trial' ? [['学员', row.student], ['家长手机号', row.phone], ['目标课程', row.course], ['试听时间', row.time], ['校区', row.campus], ['试听状态', row.status]] : kind === 'lead' ? [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course], ['来源', row.source], ['线索状态', row.status]] : [['线索编号', row.number], ['联系人', row.student], ['意向课程', row.course], ['试听状态', row.trial], ['报名状态', row.status], ['报名班级', row.className]];
   openBusinessDialog(`${kind === 'product' ? '商品' : kind === 'order' || kind === 'offline' ? '订单' : kind === 'class' ? '班级' : kind === 'trial' ? '试听预约' : kind === 'lead' ? '线索' : '报名转化'}详情`, '查看当前记录的完整字段和状态。', `<div class="sales-detail-list">${labels.map(([label, value]) => `<div><span>${label}</span><strong>${label.includes('状态') ? tag(value) : escapeHtml(value)}</strong></div>`).join('')}</div>`);
@@ -518,7 +607,7 @@ function handleBusinessAction(action, row) {
     return;
   }
   if (action === 'product-publish' || action === 'product-unpublish') { row.status = action === 'product-publish' ? '已上架' : '已下架'; row.updated = action === 'product-publish' ? demoTime() : row.updated; persistProduct(row); renderProducts(); showToast(action === 'product-publish' ? '商品已上架，学员端可购买。' : '商品已下架，历史订单不受影响。'); return; }
-  if (action === 'order-view') return openDetail(row, 'order');
+  if (action === 'order-view') return openOrderDetail(row);
   if (action === 'class-view') { openDetail(row, 'class'); appendClassRosterSection(row); return; }
   if (action === 'class-create' || action === 'class-edit') return openClassForm(row);
   if (action === 'class-publish') return openClassForm(row);

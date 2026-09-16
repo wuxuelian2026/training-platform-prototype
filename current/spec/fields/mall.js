@@ -47,6 +47,29 @@ export const MALL_FIELD_SPEC = {
       ]
     },
 
+    // CR-2026-032：订单详情分区字段与列表筛选字段纳入规格。
+    'mall/orders': {
+      groups: [
+        { heading: '列表筛选字段', fields: [
+          { id: 'FD-MALL-041', label: '订单类型', type: '下拉', length: '视频课程 / 面授课程', required: '否', note: '区分视频订单与面授订单', constraints: { options: ['视频课程', '面授课程'] } },
+          { id: 'FD-MALL-042', label: '订单状态', type: '下拉', length: '待支付 / 已支付 / 已取消 / 退款中 / 已退款', required: '否', note: '取值与 SM-ORDER 一致', constraints: { options: ['待支付', '已支付', '已取消', '退款中', '已退款'] } },
+          { id: 'FD-MALL-043', label: '下单时间起', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '按下单时间范围筛选，含当天' },
+          { id: 'FD-MALL-044', label: '下单时间止', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '含当天；与起始日期共同构成闭区间' },
+          { id: 'FD-MALL-045', label: '指标卡筛选', type: '按钮', length: '—', required: '否', note: '今日订单／待支付／退款中／已支付可点击筛选，再次点击取消', constraints: { action: true } }
+        ] },
+        { heading: '订单详情分区字段', fields: [
+          { id: 'FD-MALL-046', label: '订单基础信息', type: '只读', length: '—', required: '系统展示', note: '订单号、类型、课程、购买账号或报名学员、下单时间、金额、状态与关联状态', constraints: { readOnly: true, system: true } },
+          { id: 'FD-MALL-047', label: '支付记录', type: '只读', length: '—', required: '有支付记录时展示', note: '支付渠道、金额、状态与时间；未支付订单不渲染该分区', constraints: { readOnly: true, system: true } },
+          { id: 'FD-MALL-048', label: '退款记录', type: '只读', length: '—', required: '退款中或已退款时展示', note: '退款单号、渠道、金额、状态、到账时间与原因；视频订单不渲染该分区', constraints: { readOnly: true, system: true } },
+          { id: 'FD-MALL-049', label: '履约结果', type: '只读', length: '—', required: '系统展示', note: '视频订单展示学习权限与有效期；面授订单展示班级、校区、分班与名额占用结果', constraints: { readOnly: true, system: true } },
+          { id: 'FD-MALL-050', label: '操作日志', type: '只读', length: '—', required: '有状态变更时展示', note: '状态变更时间、操作人角色、变更前后状态与原因', constraints: { readOnly: true, system: true } }
+        ] }
+      ],
+      notes: [
+        '详情不展示渠道侧标识与回调结果，只展示业务单号；分区无数据时不渲染；退款状态在渠道回调前保持退款中。',
+        '导出按当前筛选结果执行，不提供单条订单导出入口。'
+      ]
+    },
     'mall/products': {
       groups: [
         { heading: '发布商品字段', fields: [
