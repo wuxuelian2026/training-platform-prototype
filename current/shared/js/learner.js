@@ -10,6 +10,7 @@ import { resolveHomeBanners } from './banner-seed.js';
 import { toCanonicalCourseId } from './course-seed.js';
 import { allProducts, productForCourse } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, saleUnitDisplay } from './course-display.js';
+import { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } from './teacher-facts.js';
 
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
@@ -50,11 +51,11 @@ const demo = {
     { id: 'COURSE-CR-2026-0002', type: 'video', name: '声乐演唱技巧', teacher: '陈晨', category: '音乐表演', discipline: '音乐', field: '音乐表演', professional: '声乐演唱', level: '中级', age: '成人', hours: 12, price: 1280, progress: 45, chapter: '第3章 · 作品演唱', status: '可购买', intro: '从发声、气息、共鸣到作品演唱，建立清晰、可反复练习的声乐训练路径。', detail: ['课程从呼吸与发声基础开始，逐步进入共鸣位置、咬字处理和作品表达，适合已有基础、希望系统提升演唱能力的学员。', '每节课包含教师示范、训练重点和课后练习建议，可按自己的节奏重复观看。'], outline: [{ title: '第1章 · 发声基础', note: '4课时' }, { title: '第2章 · 气息与共鸣', note: '4课时' }, { title: '第3章 · 作品演唱', note: '4课时' }] },
     ...learnerClassCourses
   ],
-  teachers: [
-    { id: 'teacher-chen', sourceTeacherId: 'teacher-chen', name: '陈晨', title: '声乐教师', years: 12, tags: ['声乐演唱', '艺术歌曲'], tagline: '让每一位学员找到自然、稳定且有表现力的声音。', intro: '专注声乐发声与作品演唱训练，擅长建立循序渐进的练习路径。', profile: [{ type: 'text', text: '陈晨老师长期从事声乐教学与舞台实践，注重气息、共鸣和作品表达的协调训练，并根据学员基础设计阶段性练习目标。' }, { type: 'image', title: '声乐课堂教学记录', caption: '课堂中针对气息控制与作品处理进行示范指导' }, { type: 'text', text: '课程强调听辨、示范、练习与反馈的完整闭环，帮助学员在稳定发声的基础上建立个人演唱表达。' }, { type: 'video', title: '声乐发声训练示范', caption: '教师示范视频 · 03:20' }] },
-    { id: 'teacher-wang', sourceTeacherId: 'teacher-wang', name: '王玥', title: '舞蹈教师', years: 8, tags: ['中国舞', '身韵训练'], tagline: '从基本功到舞台表达，让身体真正理解动作。', intro: '关注基本功、身韵和舞台表现，帮助学员建立稳定的身体控制。', profile: [{ type: 'text', text: '王玥老师坚持基本功与舞蹈表达并重，通过分解练习、组合训练和课堂展示，帮助学员建立动作规范与身体意识。' }, { type: 'image', title: '中国舞课堂训练', caption: '少儿中国舞课堂组合训练现场' }, { type: 'text', text: '教学过程关注学员年龄特点与身体条件，在安全训练的前提下逐步提升柔韧、协调和节奏表现。' }, { type: 'video', title: '身韵组合教学示范', caption: '教师示范视频 · 02:45' }] },
-    { id: 'teacher-li', sourceTeacherId: 'teacher-li', name: '李老师', title: '钢琴教师', years: 10, tags: ['钢琴启蒙', '视奏'], tagline: '用清晰的方法建立兴趣，也建立扎实的演奏习惯。', intro: '从兴趣启蒙到基础演奏，重视节奏感与音乐表达的培养。', profile: [{ type: 'text', text: '李老师擅长钢琴启蒙与基础演奏教学，通过节奏、识谱、手型和作品练习，帮助学员形成稳定的练琴习惯。' }, { type: 'image', title: '钢琴一对一课堂', caption: '课堂中进行手型与视奏指导' }, { type: 'text', text: '教学内容兼顾技术训练和音乐理解，鼓励学员通过小型展示积累舞台经验与学习信心。' }, { type: 'video', title: '钢琴启蒙课堂片段', caption: '课堂视频 · 03:05' }] }
-  ],
+  // CR-2026-022 §2.3：名师数据只保留展示字段，取值来自教师档案
+  // （FD-TEACHER-002 姓名、FD-TEACHER-010 授课专业、FD-TEACHER-011 从教年限、
+  //  FD-TEACHER-012 职称、FD-TEACHER-024 一句话简介、FD-TEACHER-025 简介）；
+  // 原自造的 title / years / tags / tagline / intro / profile 富文本块已删除。
+  teachers: ['teacher-chen', 'teacher-wang'].map(teacherPublicProfileById).filter(Boolean),
   orders: [
     { id: 'OD202609080001', courseId: 'COURSE-CR-2026-0002', status: '已支付', amount: 1280, studentId: 'student-001', createdAt: '2026-09-08 14:20', paidAt: '2026-09-08 14:22' },
     { id: 'OD202609080002', courseId: 'class-001', status: '待支付', amount: 1680, studentId: 'student-001', createdAt: '2026-09-08 16:42', paidAt: '' },
@@ -131,8 +132,16 @@ function readState() {
     const knownCourses = demo.courses.map(item => ({ ...item, ...(storedCourses.find(row => row.id === item.id) || {}) }));
     const additionalCourses = storedCourses.filter(item => !demo.courses.some(row => row.id === item.id));
     const storedTeachers = Array.isArray(stored.teachers) ? stored.teachers : [];
-    const knownTeachers = demo.teachers.map(item => ({ ...item, ...(storedTeachers.find(row => row.id === item.id) || {}) }));
-    const additionalTeachers = storedTeachers.filter(item => !demo.teachers.some(row => row.id === item.id));
+    // CR-2026-022：会话里遗留的教师记录可能带 title / years / tags / intro / profile 等自造字段，
+    // 合并时只接收教师档案字段，避免旧值把学员端展示带回自造字段。
+    const publicTeacherPatch = (row) => (row && typeof row === 'object'
+      ? Object.fromEntries(TEACHER_PUBLIC_PROFILE_KEYS.filter(key => row[key] !== undefined).map(key => [key, row[key]]))
+      : {});
+    const knownTeachers = demo.teachers.map(item => ({ ...item, ...publicTeacherPatch(storedTeachers.find(row => row.id === item.id)) }));
+    const additionalTeachers = storedTeachers
+      .filter(item => !demo.teachers.some(row => row.id === item.id))
+      .map(item => ({ ...(teacherPublicProfileById(item.id) || { id: item.id }), ...publicTeacherPatch(item) }))
+      .filter(item => item.name && item.professionalTitle);
     const storedOrders = (Array.isArray(stored.orders) ? stored.orders : []).filter(item => item && typeof item === 'object').map(item => ({ ...item, courseId: toCanonicalCourseId(item.courseId) }));
     const knownOrders = demo.orders.map(item => ({ ...item, ...(storedOrders.find(row => row.id === item.id) || {}) }));
     const additionalOrders = storedOrders.filter(item => !demo.orders.some(row => row.id === item.id));
@@ -183,7 +192,7 @@ function readState() {
       return [...byId.values()];
     })();
     const featuredTeacherIds = new Set(shared.featuredTeacherIds || []);
-    const featuredTeachers = [...knownTeachers, ...additionalTeachers].filter(item => featuredTeacherIds.has(item.sourceTeacherId || item.id));
+    const featuredTeachers = [...knownTeachers, ...additionalTeachers].filter(item => featuredTeacherIds.has(item.id));
     return { ...demo, ...stored, accountId, students: learners.length ? learners : demo.students, currentStudentId: learners.some(item => item.id === stored.currentStudentId) ? stored.currentStudentId : learners[0]?.id || demo.currentStudentId, courses: sellableCourses, allCourses: displayCourses, teachers: featuredTeachers, allTeachers: [...knownTeachers, ...additionalTeachers], orders: mergedOrders, consultations: [...knownConsultations, ...additionalConsultations], messages: [...knownMessages, ...additionalMessages] };
   } catch (error) { console.warn('学员端演示数据合并失败，回退到内置演示数据。', error); return { ...demo }; }
 }
@@ -228,14 +237,14 @@ function courseCard(item) {
 }
 function teacherLink(item) { return `/learner/pages/teacher-detail.html?teacherId=${item.id}`; }
 function isLoggedIn() { return sessionStorage.getItem('hbyx-mini-logged-in') === '1'; }
-function teacherCard(item, variant = 'compact') { return `<a class="mp-teacher-card ${variant === 'list' ? 'is-list' : ''}" href="${teacherLink(item)}"><div class="mp-teacher-card-head"><span class="mp-avatar mp-teacher-avatar" aria-hidden="true">${esc(item.name.slice(0, 1))}</span><div class="mp-teacher-identity"><strong>${esc(item.name)}</strong><small>${esc(item.title)} · ${item.years}年教龄</small></div></div><div class="mp-teacher-card-copy"><p>${esc(item.tagline || item.intro)}</p><div class="mp-pills">${item.tags.map(tag => pill(tag, 'gray')).join('')}</div></div><span class="mp-teacher-card-arrow" aria-hidden="true">›</span></a>`; }
-function teacherRichContent(item) {
-  const blocks = Array.isArray(item.profile) ? item.profile : [{ type: 'text', text: item.intro }];
-  return blocks.map(block => {
-    if (block.type === 'image') return `<figure class="mp-rich-figure"><div class="mp-rich-image" role="img" aria-label="${esc(block.title)}图片占位"><span>图片</span><strong>${esc(block.title)}</strong></div><figcaption>${esc(block.caption || block.title)}</figcaption></figure>`;
-    if (block.type === 'video') return `<figure class="mp-rich-figure"><div class="mp-rich-video" role="img" aria-label="${esc(block.title)}视频占位"><span class="mp-rich-play" aria-hidden="true">▶</span><div><strong>${esc(block.title)}</strong><small>视频内容占位</small></div></div><figcaption>${esc(block.caption || block.title)}</figcaption></figure>`;
-    return `<p>${esc(block.text || '')}</p>`;
-  }).join('');
+// CR-2026-022 §2.3: 名师卡片只渲染教师档案字段——姓名（FD-TEACHER-002）、职称（FD-TEACHER-012）、
+// 从教年限（FD-TEACHER-011）、一句话简介（FD-TEACHER-024）与授课专业（FD-TEACHER-010）。
+function teacherMajorPills(item) { return (item.majors || []).map(major => pill(major, 'gray')).join(''); }
+function teacherCard(item, variant = 'compact') { return `<a class="mp-teacher-card ${variant === 'list' ? 'is-list' : ''}" href="${teacherLink(item)}"><div class="mp-teacher-card-head"><span class="mp-avatar mp-teacher-avatar" aria-hidden="true">${esc(item.name.slice(0, 1))}</span><div class="mp-teacher-identity"><strong>${esc(item.name)}</strong><small>${esc(item.professionalTitle)} · ${esc(item.teachingYears)}年教龄</small></div></div><div class="mp-teacher-card-copy"><p>${esc(item.tagline)}</p><div class="mp-pills">${teacherMajorPills(item)}</div></div><span class="mp-teacher-card-arrow" aria-hidden="true">›</span></a>`; }
+// 教师详情页的“个人简介”只渲染 FD-TEACHER-025 简介正文，不再渲染自造的图文／视频富文本块。
+function teacherIntroduction(item) {
+  const paragraphs = String(item.introduction || '').split(/\n+/).map(line => line.trim()).filter(Boolean);
+  return paragraphs.length ? paragraphs.map(text => `<p>${esc(text)}</p>`).join('') : '<p class="mp-muted">该教师尚未填写个人简介。</p>';
 }
 function layout(content) { main.innerHTML = content; }
 function renderHome() {
@@ -255,7 +264,19 @@ function renderHome() {
   window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
 }
 function renderTeachers() { layout(stack(card(`<div class="mp-section-head"><h2>名师推荐</h2><span class="mp-muted">专业教师</span></div><p>按教师专业方向查看已发布课程。</p>`), `<div class="mp-list">${state.teachers.map(item => teacherCard(item, 'list')).join('')}</div>`)); }
-function renderTeacherDetail() { const teachers = state.allTeachers || state.teachers; const item = teachers.find(row => row.id === params.get('teacherId')) || teachers[0]; if (!item) { layout('<div class="mp-empty">教师信息不存在</div>'); return; } const related = state.courses.filter(row => row.teacher === item.name); layout(stack(card(`<div class="mp-teacher-profile"><div class="mp-teacher-profile-head"><span class="mp-avatar mp-teacher-profile-avatar" aria-hidden="true">${esc(item.name.slice(0, 1))}</span><div class="mp-teacher-profile-identity"><h2>${esc(item.name)}</h2><p>${esc(item.title)} · ${item.years}年教龄</p></div></div><p class="mp-teacher-profile-tagline">${esc(item.tagline || item.intro)}</p><div class="mp-pills mp-teacher-profile-tags">${item.tags.map(tag => pill(tag, 'gray')).join('')}</div></div>`), card(`<h3>教师简介</h3><article class="mp-rich-content">${teacherRichContent(item)}</article>`), card(`<div class="mp-section-head"><h3>已发布课程</h3><span class="mp-muted">${related.length}门</span></div><div class="mp-list" style="margin-top:10px">${related.length ? related.map(row => courseCard(row)).join('') : '<div class="mp-empty">暂无已发布课程</div>'}</div>`))); }
+// CR-2026-022：教师详情展示 姓名／职称／从教年限／一句话简介／授课专业／个人简介，
+// 取值全部来自教师档案字段，学习经历、工作经历与获奖情况不在学员端展示。
+function renderTeacherDetail() {
+  const teachers = state.allTeachers || state.teachers;
+  const item = teachers.find(row => row.id === params.get('teacherId')) || teachers[0];
+  if (!item) { layout('<div class="mp-empty">教师信息不存在</div>'); return; }
+  const related = state.courses.filter(row => row.teacher === item.name);
+  layout(stack(
+    card(`<div class="mp-teacher-profile"><div class="mp-teacher-profile-head"><span class="mp-avatar mp-teacher-profile-avatar" aria-hidden="true">${esc(item.name.slice(0, 1))}</span><div class="mp-teacher-profile-identity"><h2>${esc(item.name)}</h2><p>${esc(item.professionalTitle)} · ${esc(item.teachingYears)}年教龄</p></div></div><p class="mp-teacher-profile-tagline">${esc(item.tagline)}</p><div class="mp-pills mp-teacher-profile-tags">${teacherMajorPills(item)}</div></div>`),
+    card(`<h3>个人简介</h3><article class="mp-rich-content">${teacherIntroduction(item)}</article>`),
+    card(`<div class="mp-section-head"><h3>已发布课程</h3><span class="mp-muted">${related.length}门</span></div><div class="mp-list" style="margin-top:10px">${related.length ? related.map(row => courseCard(row)).join('') : '<div class="mp-empty">暂无已发布课程</div>'}</div>`)
+  ));
+}
 function renderCourses() {
   const requestedCategory = params.get('category') || '';
   const disciplineOptions = [...new Set(state.courses.map(item => item.discipline).filter(Boolean))];

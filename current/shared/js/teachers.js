@@ -4,6 +4,7 @@ import { mountRichEditor } from './rich-editor.js';
 import { readDemoState, writeDemoState } from './demo-store.js';
 import { readXlsxSheetRows } from './xlsx-lite.js';
 import { teacherFactsById } from './teacher-facts.js';
+import { TEACHER_PROFILE_LABELS, teacherProfileMask } from './teacher-profile-fields.js';
 import { explainTeacherCapacity, summarizeTeacherCapacity } from './teacher-capacity.js';
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 
@@ -808,10 +809,36 @@ function initSchedule() {
 
 function initProfile() {
   renderProfileCapacity();
+  const facts = teacherFactsById(new URLSearchParams(location.search).get('teacher_id') || 'teacher-wang');
+  if (facts) renderTeacherSelfProfile(facts);
   document.querySelectorAll('[data-profile-action]').forEach((button) => button.addEventListener('click', () => {
     const action = button.dataset.profileAction;
     if (action === 'freeze' || action === 'resign') toast(action === 'freeze' ? '已打开冻结确认。' : '已打开离职确认。');
   }));
+}
+
+// CR-2026-022：教师端“我的档案”由教师本人维护，后台教师详情页读取最新值并展示变更审计。
+function renderTeacherSelfProfile(facts) {
+  const state = readDemoState();
+  const profile = (state.teacherProfiles || {})[facts.id];
+  const mobileCell = document.querySelector('#teacher-profile-mobile');
+  const rows = document.querySelector('#teacher-self-profile-rows');
+  const versionTag = document.querySelector('#teacher-self-profile-version');
+  const auditRows = document.querySelector('#teacher-profile-audit-rows');
+  const auditCount = document.querySelector('#teacher-profile-audit-count');
+  if (mobileCell && profile?.mobile) mobileCell.textContent = teacherProfileMask('mobile', profile.mobile);
+  if (rows && profile) {
+    const keys = Object.keys(TEACHER_PROFILE_LABELS).filter((key) => profile[key] !== undefined);
+    rows.innerHTML = keys.length
+      ? keys.map((key) => `<tr><td>${importEsc(TEACHER_PROFILE_LABELS[key])}</td><td>${importEsc(teacherProfileMask(key, profile[key]) || '未填写')}</td><td>教师本人</td><td>${importEsc(profile.updatedAt || '—')}</td></tr>`).join('')
+      : '<tr><td colspan="4">教师尚未在教师端修改过档案，当前值以后台建档内容为准。</td></tr>';
+  }
+  if (versionTag && profile?.profileVersion) versionTag.textContent = `v${profile.profileVersion}`;
+  const records = (state.teacherProfileAudit || []).filter((item) => !item.teacherId || item.teacherId === facts.id);
+  if (auditCount) auditCount.textContent = `${records.length} 条`;
+  if (!auditRows) return;
+  if (!records.length) { auditRows.innerHTML = '<tr><td colspan="5">暂无档案变更记录。</td></tr>'; return; }
+  auditRows.innerHTML = records.map((record) => record.changes.map((change, index) => `<tr>${index === 0 ? `<td rowspan="${record.changes.length}">${importEsc(record.at)}</td><td rowspan="${record.changes.length}">${importEsc(record.operator)}</td>` : ''}<td>${importEsc(change.label)}</td><td>${importEsc(change.before || '未填写')}</td><td>${importEsc(change.after || '未填写')}</td></tr>`).join('')).join('');
 }
 
 // 教师详情：按专业逐条给出资质结论，并列出申报层面的准入阻断。

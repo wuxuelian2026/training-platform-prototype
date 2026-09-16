@@ -93,6 +93,24 @@ export const LEARNER_APP_FIELD_SPEC = {
       ]
     },
 
+    // CR-2026-022 §2.3：学员端教师详情的展示字段一律取自后台教师档案，学员端不自造字段。
+    'learner/teacher-detail': {
+      groups: [
+        { heading: '教师展示字段（镜像后台教师档案）', fields: [
+          { id: 'FD-LAPP-028', label: '教师姓名', type: '只读', length: '2–30 字', required: '系统展示', note: '取自后台新增教师页的姓名字段', constraints: { readOnly: true, sourceField: 'FD-TEACHER-002' } },
+          { id: 'FD-LAPP-029', label: '授课专业', type: '只读', length: '至少 1 个', required: '系统展示', note: '取自后台新增教师页的授课专业字段，作为专业标签展示', constraints: { readOnly: true, sourceField: 'FD-TEACHER-010' } },
+          { id: 'FD-LAPP-030', label: '从教年限', type: '只读', length: '0 及以上整数', required: '系统展示', note: '取自后台新增教师页的从教年限字段', constraints: { readOnly: true, sourceField: 'FD-TEACHER-011' } },
+          { id: 'FD-LAPP-031', label: '职称', type: '只读', length: '8 个预置选项', required: '系统展示', note: '取自后台新增教师页的职称字段', constraints: { readOnly: true, sourceField: 'FD-TEACHER-012' } },
+          { id: 'FD-LAPP-032', label: '一句话简介', type: '只读', length: '≤ 200 字', required: '系统展示', note: '取自后台新增教师页的一句话简介字段，用于教师卡片与详情顶部', constraints: { readOnly: true, sourceField: 'FD-TEACHER-024' } },
+          { id: 'FD-LAPP-033', label: '个人简介', type: '只读', length: '≤ 2000 字', required: '系统展示', note: '只渲染后台新增教师页的简介正文，不再渲染自造图文块', constraints: { readOnly: true, sourceField: 'FD-TEACHER-025' } }
+        ] }
+      ],
+      notes: [
+        '学员端只读取后台教师档案字段；学习经历、工作经历与获奖情况属于内部资料，不在学员端展示。',
+        '已发布课程来自课程与商品配置，不属于教师档案字段。',
+        '教师档案的维护入口在教师端与后台，学员端只读展示。'
+      ]
+    },
     'learner/settings': {
       groups: [
         { heading: '账号设置项', fields: [

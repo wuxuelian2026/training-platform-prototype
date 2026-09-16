@@ -7,19 +7,59 @@ import { COURSE_TEACHING_FIELDS, courseFieldRows } from './courses.js';
 export const TEACHER_APP_FIELD_SPEC = {
   module: '教师端小程序',
   pages: {
+    // CR-2026-022：教师端“我的档案”由纯只读调整为“只读身份字段 + 本人可维护字段”，
+    // 保存后直接生效并写入审计，不恢复档案审核状态机。
     'teacher/profile-detail': {
       groups: [
-        { heading: '个人档案字段', fields: [
-          { id: 'FD-TAPP-001', label: '姓名', type: '只读', length: '2–30 字', required: '系统展示', note: '按教师 ID 读取后台档案，教师端不可修改', constraints: { readOnly: true, system: true } },
-          { id: 'FD-TAPP-002', label: '工号', type: '只读', length: 'JS+年月日+序号', required: '系统展示', note: '由后台建档时生成，教师端不可修改', constraints: { readOnly: true, system: true } },
-          { id: 'FD-TAPP-003', label: '身份证号', type: '只读', length: '18 位（脱敏）', required: '系统展示', note: '按权限返回脱敏值，教师端不可修改', constraints: { readOnly: true, system: true, masked: true } },
-          { id: 'FD-TAPP-004', label: '人员类型', type: '只读', length: '在编 / 签约 / 外聘', required: '系统展示', note: '按教师 ID 读取后台档案，教师端不可修改', constraints: { readOnly: true, system: true } },
-          { id: 'FD-TAPP-005', label: '授课专业', type: '只读', length: '至少 1 个', required: '系统展示', note: '按教师 ID 读取授课专业，教师端不可修改', constraints: { readOnly: true, system: true } }
+        { heading: '学校维护字段（教师端只读）', fields: [
+          { id: 'FD-TAPP-001', label: '姓名', type: '只读', length: '2–30 字', required: '系统展示', note: '黑名单字段：身份标识，与身份证、证书和合同保持一致', constraints: { readOnly: true, system: true } },
+          { id: 'FD-TAPP-002', label: '工号', type: '只读', length: 'JS+年月日+序号', required: '系统展示', note: '黑名单字段：系统生成且全局唯一，不可变更', constraints: { readOnly: true, system: true } },
+          { id: 'FD-TAPP-003', label: '身份证号', type: '只读', length: '18 位（脱敏）', required: '系统展示', note: '黑名单字段：按权限返回脱敏值，唯一校验由后台承担', constraints: { readOnly: true, system: true, masked: true } },
+          { id: 'FD-TAPP-004', label: '人员类型', type: '只读', length: '在编 / 签约 / 外聘', required: '系统展示', note: '黑名单字段：涉及用工与结算口径', constraints: { readOnly: true, system: true } },
+          { id: 'FD-TAPP-005', label: '授课专业', type: '只读', length: '至少 1 个', required: '系统展示', note: '黑名单字段：资质判断与排课准入依据', constraints: { readOnly: true, system: true } }
+        ] },
+        { heading: '基础信息（本人可维护）', fields: [
+          { id: 'FD-TAPP-030', label: '性别', type: '单选', length: '女 / 男', required: '是', note: '与建档枚举保持一致', constraints: { options: ['女', '男'] } },
+          { id: 'FD-TAPP-031', label: '出生年月', type: '单月选择', length: 'YYYY-MM', required: '是', note: '按建档时的日期选择器录入', constraints: { format: 'YYYY-MM' } },
+          { id: 'FD-TAPP-032', label: '政治面貌', type: '下拉', length: '5 个预置选项', required: '否', note: '中共党员 / 中共预备党员 / 共青团员 / 民主党派 / 群众', constraints: { options: ['中共党员', '中共预备党员', '共青团员', '民主党派', '群众'] } },
+          { id: 'FD-TAPP-033', label: '民族', type: '文本', length: '≤ 20 字', required: '否', note: '按建档时的民族口径填写', constraints: { maxLength: 20 } },
+          { id: 'FD-TAPP-034', label: '最高学历', type: '下拉', length: '5 个预置选项', required: '否', note: '中专 / 大专 / 本科 / 硕士研究生 / 博士研究生', constraints: { options: ['中专', '大专', '本科', '硕士研究生', '博士研究生'] } },
+          { id: 'FD-TAPP-035', label: '从教年限', type: '数字', length: '0 及以上整数', required: '是', note: '单位：年，用于教师详情展示', constraints: { min: 0, integer: true } },
+          { id: 'FD-TAPP-036', label: '职称', type: '下拉', length: '8 个预置选项', required: '否', note: '教授 / 副教授 / 讲师 / 助教 / 高级教师 / 一级教师 / 二级教师 / 无', constraints: { options: ['教授', '副教授', '讲师', '助教', '高级教师', '一级教师', '二级教师', '无'] } },
+          { id: 'FD-TAPP-037', label: '车牌号', type: '文本', length: '7–8 位', required: '否', note: '用于校区停车与门禁登记，可为空', constraints: { pattern: '^[\u4e00-\u9fa5A-Z][A-Z0-9·]{6,7}$' } }
+        ] },
+        { heading: '联系方式（本人可维护）', fields: [
+          { id: 'FD-TAPP-038', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '账号唯一字段，变更须通过页面内验证码校验（原型不接真实短信通道）', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$', unique: true } },
+          { id: 'FD-TAPP-039', label: '邮箱', type: '文本', length: '≤ 64 字符', required: '否', note: '用于接收排课与工资通知', constraints: { maxLength: 64, format: 'email' } },
+          { id: 'FD-TAPP-040', label: '紧急联系人姓名', type: '文本', length: '2–30 字', required: '是', note: '按建档时的紧急联系人规则填写', constraints: { minLength: 2, maxLength: 30 } },
+          { id: 'FD-TAPP-041', label: '紧急联系人电话', type: '文本', length: '11 位数字', required: '是', note: '紧急情况下的联系号码', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
+          { id: 'FD-TAPP-050', label: '验证码', type: '文本', length: '6 位数字', required: '手机号变更时必填', note: '点击获取，60 秒倒计时内不可重复获取；原型在页面内回显演示验证码', constraints: { maxLength: 6, pattern: '^\\d{6}$' } }
+        ] },
+        { heading: '收付款信息（本人可维护）', fields: [
+          { id: 'FD-TAPP-042', label: '收款户名', type: '文本', length: '2–30 字', required: '是', note: '须与本人姓名一致，变更留存审计', constraints: { minLength: 2, maxLength: 30 } },
+          { id: 'FD-TAPP-043', label: '银行卡号', type: '文本', length: '16–19 位数字', required: '是', note: '工资发放账户，变更留存审计', constraints: { pattern: '^\\d{16,19}$' } },
+          { id: 'FD-TAPP-044', label: '开户行', type: '文本', length: '≤ 50 字', required: '是', note: '开户银行名称与支行', constraints: { maxLength: 50 } }
+        ] },
+        { heading: '经历与介绍（本人可维护）', fields: [
+          { id: 'FD-TAPP-045', label: '学习经历', type: '多行文本', length: '≤ 500 字', required: '否', note: '学校、专业与学习时间，仅内部管理与教师端展示', constraints: { maxLength: 500 } },
+          { id: 'FD-TAPP-046', label: '工作经历', type: '多行文本', length: '≤ 500 字', required: '否', note: '任职单位、岗位与时间，仅内部管理与教师端展示', constraints: { maxLength: 500 } },
+          { id: 'FD-TAPP-047', label: '获奖情况', type: '多行文本', length: '≤ 500 字', required: '否', note: '奖项名称与获奖时间，仅内部管理与教师端展示', constraints: { maxLength: 500 } },
+          { id: 'FD-TAPP-048', label: '一句话简介', type: '多行文本', length: '≤ 200 字', required: '否', note: '对应教师档案 FD-TEACHER-024，学员端教师卡片与详情展示', constraints: { maxLength: 200 } },
+          { id: 'FD-TAPP-049', label: '简介', type: '多行文本', length: '≤ 2000 字', required: '否', note: '对应教师档案 FD-TEACHER-025，作为学员端“个人简介”正文', constraints: { maxLength: 2000 } }
+        ] },
+        { heading: '操作字段', fields: [
+          { id: 'FD-TAPP-051', label: '编辑档案', type: '按钮', length: '—', required: '是', note: '进入编辑态；账号冻结或人员离职时隐藏', constraints: { action: true } },
+          { id: 'FD-TAPP-052', label: '获取验证码', type: '按钮', length: '—', required: '手机号变更时使用', note: '页面内回显演示验证码并开始 60 秒倒计时', constraints: { action: true } },
+          { id: 'FD-TAPP-053', label: '保存修改', type: '按钮', length: '—', required: '是', note: '校验通过后直写本人档案并写入变更审计', constraints: { action: true } },
+          { id: 'FD-TAPP-054', label: '取消', type: '按钮', length: '—', required: '否', note: '放弃本次编辑，不改动已保存值', constraints: { action: true } }
         ] }
       ],
       notes: [
-        '教师端个人档案全部只读，由后台建档与审核维护，教师端不提供编辑入口。',
-        '资料、人员、账号、证书和合同状态分别维护，不相互覆盖；教师端只展示与本人相关的信息。'
+        '黑名单字段只有工号、姓名、身份证号、人员类型与授课专业五项：教师端无编辑入口，接口层同样拒绝写入。',
+        '其余档案字段教师本人可维护，保存后直接生效并逐字段写入变更审计（操作人、时间、修改前后值）。',
+        '手机号变更须先通过页面内验证码校验，校验失败不落库；原型阶段不接真实短信通道。',
+        '账号冻结或人员离职时教师端不可编辑本人档案，返回 40301；过期 profile_version 返回 40901 且不产生部分写入。',
+        '不恢复档案审核状态机：SM-TEACHER-PROFILE 维持待完善与已建档两态，修改不改变资料、人员与账号状态。'
       ]
     },
     'teacher/application-create': {

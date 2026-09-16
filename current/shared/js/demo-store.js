@@ -89,6 +89,9 @@ const defaultState = () => ({
   library: [],
   products: [],
   featuredTeacherIds: ['teacher-wang', 'teacher-chen'],
+  // CR-2026-022：教师本人在教师端维护的档案字段与变更审计（后台教师详情页读取展示）。
+  teacherProfiles: {},
+  teacherProfileAudit: [],
   classes: [],
   orders: [],
   // P0-1: one demo enrollment record so the admin class roster has a real detail row to show.

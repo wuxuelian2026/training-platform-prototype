@@ -4,9 +4,11 @@ import { mountPageHelp } from './page-help.js';
 import { toLocalDateString } from './date-utils.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
-import { demoId, demoTime, getCurrentAccountId, readDemoState, upsertDemoRecord } from './demo-store.js';
+import { demoId, demoTime, getCurrentAccountId, readDemoState, upsertDemoRecord, writeDemoState } from './demo-store.js';
 import { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } from './course-seed.js';
 import { courseAgesText } from './course-display.js';
+import { teacherFactsById } from './teacher-facts.js';
+import { TEACHER_PROFILE_EDITABLE_FIELDS as teacherProfileEditableFields, TEACHER_PROFILE_GROUPS as teacherProfileGroups, TEACHER_PROFILE_GROUP_NOTE as teacherProfileGroupNote, teacherProfileMask } from './teacher-profile-fields.js';
 
 const teacherMain = document.querySelector('.mobile-main');
 const teacherPath = location.pathname;
@@ -26,6 +28,7 @@ const teacherProfileDefaults = {
   payeeName: '王玥',
   bankCard: '6217003810022866',
   bankName: '中国建设银行武汉光谷支行',
+  carPlate: '鄂A·9X2R6',
   education: '2010.09-2014.06，湖北艺术学院舞蹈表演专业，本科。',
   employment: '2018.07至今，湖北艺术职业学院舞蹈教师，承担中国舞基础与身韵课程教学。',
   awards: '2024年湖北省职业院校技能大赛优秀指导教师。',
@@ -538,7 +541,7 @@ function teacherProfileRow({ mark, title, description, href, value = '', tone = 
 function renderProfile() {
   const graduationPending = teacherState.graduationRecords.filter(item => ['审核中', '需补课', '补课中'].includes(item.status)).length;
   const unreadMessages = teacherState.messages.filter(item => !item.read).length;
-  const archive = teacherProfileRow({ mark: '档', title: '个人档案', description: '查看学校维护的本人基础资料', href: '/teacher/pages/profile-detail.html', value: '只读', tone: 'green' });
+  const archive = teacherProfileRow({ mark: '档', title: '个人档案', description: '查看并维护本人基础资料', href: '/teacher/pages/profile-detail.html', value: '可编辑', tone: 'green' });
   const affairs = [
     { mark: '信', title: '消息通知', description: '查看排课、审核与工资通知', href: '/teacher/pages/messages.html', value: unreadMessages ? `${unreadMessages}条未读` : '已读', tone: unreadMessages ? 'amber' : 'green' },
     { mark: '证', title: '我的证书', description: '资格证书与审核记录', href: '/teacher/pages/certificates.html', value: '1项待审核', tone: 'amber' },
@@ -548,23 +551,184 @@ function renderProfile() {
   const settings = teacherProfileRow({ mark: '设', title: '设置', description: '账号设置、协议与关于我们', href: '/teacher/pages/settings.html' });
   tLayout(tStack(`<section class="teacher-profile-identity-card"><div class="teacher-profile-identity-main"><span class="teacher-profile-avatar" aria-hidden="true">王</span><div><div class="teacher-profile-name-row"><h2>王玥</h2>${tPill('正常', 'green')}</div><p>工号 JS20260901</p></div></div></section>`, `<section class="teacher-profile-group"><h3>个人资料</h3><div class="teacher-profile-row-list">${archive}</div></section>`, `<section class="teacher-profile-group"><h3>教师事务</h3><div class="teacher-profile-row-list">${affairs}</div></section>`, `<section class="teacher-profile-group teacher-profile-settings"><div class="teacher-profile-row-list">${settings}</div></section>`));
 }
-const teacherProfileReadonlyIdentity = [
-  ['姓名', '王玥'], ['工号', 'JS20260901'], ['身份证号', '420106********2428'], ['人员类型', '在编'],
-  ['授课专业', '文化艺术 · 表演艺术 · 舞蹈表演']
-];
+let teacherProfileEditing = false;
+let teacherProfileCodeRequest = null;
+let teacherProfileCodeTimer = 0;
+// CR-2026-022 §2.1：黑名单 5 项由学校后台维护，教师端只读（工号、姓名、身份证号、人员类型、授课专业）。
+// 取值按当前登录教师的档案事实与账号记录读取，未建档的教师显示占位符而不是借用他人信息。
+function teacherProfileReadonlyRows() {
+  const facts = teacherProfileCurrentFacts();
+  const account = teacherAccounts.find(item => item.id === (facts?.id || currentTeacher().id)) || null;
+  return [
+    ['姓名', facts?.name || account?.name || '王玥'],
+    ['工号', account?.no || '—'],
+    ['身份证号', account?.id === 'teacher-wang' ? '420106********2428' : '—'],
+    ['人员类型', account ? '在编' : '—'],
+    ['授课专业', account ? `文化艺术 · 表演艺术 · ${account.professional}（${(facts?.majors || []).join('、')}）` : '—']
+  ];
+}
+// 档案页按 URL/session 指定的教师读取事实，避免未建档教师回落到默认账号而绕过离职/冻结拦截。
+const teacherProfileRequestedId = () => new URLSearchParams(location.search).get('teacher') || sessionStorage.getItem('hbyx-teacher-id') || defaultTeacherId();
+const teacherProfileCurrentFacts = () => teacherFactsById(teacherProfileRequestedId());
+// “本人档案”只对当前登录教师开放：查看他人档案时不展示可维护资料，也不提供编辑入口。
+const teacherProfileIsSelf = () => teacherProfileRequestedId() === (sessionStorage.getItem('hbyx-teacher-id') || defaultTeacherId());
+// CR-2026-022 §3.5：账号冻结或人员离职后，教师端不可编辑本人档案。
+function teacherProfileEditBlocked() {
+  const facts = teacherProfileCurrentFacts();
+  return Boolean(facts && (facts.accountStatus === 'frozen' || facts.departedAt));
+}
 function teacherProfileSection(title, content, note = '') {
   return `<section class="teacher-archive-section"><div class="teacher-archive-section-head"><h2>${tEsc(title)}</h2>${note ? `<span>${tEsc(note)}</span>` : ''}</div>${content}</section>`;
 }
 function teacherArchiveRows(rows) {
   return `<dl class="teacher-archive-rows">${rows.map(([label, value, options = '']) => `<div class="${options}"><dt>${tEsc(label)}</dt><dd>${tEsc(value || '未填写')}</dd></div>`).join('')}</dl>`;
 }
+function teacherProfileFieldControl(field, value) {
+  const id = `teacher-profile-${field.key}`;
+  const common = `id="${id}" name="${field.key}"`;
+  if (field.control === 'select') return `<select ${common}>${field.options.map(option => `<option ${option === value ? 'selected' : ''}>${tEsc(option)}</option>`).join('')}</select>`;
+  if (field.control === 'textarea') return `<textarea ${common} ${field.maxLength ? `maxlength="${field.maxLength}"` : ''} data-profile-limit>${tEsc(value)}</textarea>`;
+  if (field.control === 'number') return `<input ${common} type="number" min="${field.min ?? 0}" step="1" value="${tEsc(value)}">`;
+  if (field.control === 'month') return `<input ${common} type="month" value="${tEsc(value)}">`;
+  return `<input ${common} type="${field.control === 'email' ? 'email' : field.control === 'tel' ? 'tel' : 'text'}" ${field.control === 'tel' ? 'inputmode="numeric"' : ''} value="${tEsc(value)}">`;
+}
+function teacherProfileFieldInput(field, profile) {
+  const value = profile[field.key] ?? '';
+  // 提示文案放在标签之外：字段约束按 .mp-field 的标签文本匹配规格，标签里混入提示会匹配不上。
+  const hint = field.note ? `<small class="teacher-profile-hint">${tEsc(field.note)}</small>` : '';
+  // CR-2026-022 §2.2 / §4.3：手机号属于唯一字段，变更须先通过页面内验证码校验（原型不接真实短信）。
+  const codeRow = field.verifyCode
+    ? `<div class="teacher-profile-code"><input id="teacher-profile-mobile-code" name="mobileCode" inputmode="numeric" maxlength="6" placeholder="6 位验证码"><button type="button" class="mp-button secondary" data-profile-action="send-code">获取验证码</button></div><p class="teacher-profile-code-hint" data-profile-code-hint>原型不发送真实短信，点击“获取验证码”后在页面内校验。</p>`
+    : '';
+  return `<div class="mp-field"><label for="teacher-profile-${field.key}">${tEsc(field.label)}${field.optional ? '' : ' <b>*</b>'}</label>${hint}${teacherProfileFieldControl(field, value)}${codeRow}</div>`;
+}
+function teacherProfileSummary(editing) {
+  const facts = teacherProfileCurrentFacts();
+  const identity = facts ? `${facts.name} · ${facts.majors.join('、')}` : '王玥 · 中国舞';
+  const mode = editing
+    ? '<span class="teacher-archive-mode">编辑中</span>'
+    : (teacherProfileEditBlocked() || !teacherProfileIsSelf()
+      ? '<span class="teacher-archive-mode">不可编辑</span>'
+      : '<button type="button" class="teacher-archive-edit" data-profile-action="edit">编辑</button>');
+  return `<section class="teacher-archive-summary"><div class="teacher-archive-person"><span class="teacher-profile-avatar" aria-hidden="true">${tEsc(identity.slice(0, 1))}</span><div><strong>${tEsc(identity.split(' · ')[0])}</strong><span>${tEsc(teacherState.profile.tagline)}</span></div></div>${mode}</section>`;
+}
 function renderTeacherProfileDetail() {
-  const identity = teacherArchiveRows(teacherProfileReadonlyIdentity.map((item, index) => [...item, index === 4 ? 'wide' : '']));
+  const profile = teacherState.profile;
+  if (teacherProfileEditing) {
+    const groups = teacherProfileGroups.map(group => teacherProfileSection(group,
+      `<div class="teacher-archive-form">${teacherProfileEditableFields.filter(field => field.group === group).map(field => teacherProfileFieldInput(field, profile)).join('')}</div>`,
+      teacherProfileGroupNote[group] || ''));
+    tLayout(tStack(
+      teacherProfileSummary(true),
+      teacherProfileSection('身份与任职（只读）', teacherArchiveRows(teacherProfileReadonlyRows().map((item, index) => [...item, index === 4 ? 'wide' : ''])), '学校维护'),
+      ...groups,
+      `<p class="mp-form-error" data-profile-error role="alert" hidden></p>`,
+      `<div class="teacher-archive-actions"><button type="button" class="mp-button secondary" data-profile-action="cancel">取消</button><button type="button" class="mp-button" data-profile-action="save">保存修改</button></div>`
+    ));
+    return;
+  }
+  const isSelf = teacherProfileIsSelf();
+  const rowsOnly = teacherArchiveRows(teacherProfileEditableFields.map(field => [field.label, teacherProfileMask(field.key, profile[field.key]), field.control === 'textarea' ? 'wide long' : '']));
+  const selfSections = isSelf ? [teacherProfileSection('本人可维护资料', rowsOnly, '教师本人维护')] : [];
+  const note = !isSelf
+    ? `<p class="teacher-profile-readonly-note">当前登录的教师账号与所查看档案不一致，仅展示身份与任职信息；本人档案只能在教师本人登录后查看和维护。</p>`
+    : teacherProfileEditBlocked()
+      ? `<p class="teacher-profile-readonly-note">当前账号已冻结或已办理离职，暂不可编辑本人档案。如需修改请联系学校管理员。</p>`
+      : `<p class="teacher-profile-readonly-note">工号、姓名、身份证号、人员类型与授课专业由学校维护；其余字段可本人修改，保存后直接生效并写入变更审计。</p>`;
   tLayout(tStack(
-    `<section class="teacher-archive-summary"><div class="teacher-archive-person"><span class="teacher-profile-avatar" aria-hidden="true">王</span><div><strong>王玥</strong><span>本人档案由学校后台统一维护</span></div></div><span class="teacher-archive-mode">只读</span></section>`,
-    teacherProfileSection('本人基础资料', identity, '如需变更请联系学校管理员'),
-    `<p class="teacher-profile-readonly-note">此处仅展示姓名、工号、脱敏身份证号、人员类型和授课专业，不支持教师端编辑或提交审核。</p>`
+    teacherProfileSummary(false),
+    teacherProfileSection('身份与任职（只读）', teacherArchiveRows(teacherProfileReadonlyRows().map((item, index) => [...item, index === 4 ? 'wide' : ''])), '学校维护'),
+    ...selfSections,
+    note
   ));
+}
+function collectTeacherProfileForm() {
+  return [...document.querySelectorAll('.teacher-archive-form [name]')].reduce((values, field) => ({ ...values, [field.name]: field.value.trim() }), {});
+}
+function teacherProfileError(message, key = '') {
+  const error = document.querySelector('[data-profile-error]');
+  if (error) { error.textContent = message; error.hidden = false; }
+  tToast(message);
+  if (key) document.querySelector(`#teacher-profile-${key}`)?.focus();
+}
+function validateTeacherProfile(values) {
+  const current = teacherState.profile;
+  for (const field of teacherProfileEditableFields) {
+    const value = values[field.key] ?? '';
+    if (!field.optional && !value) return { message: `请填写${field.label}。`, key: field.key };
+  }
+  if (!/^1[3-9]\d{9}$/.test(values.mobile)) return { message: '手机号需为 11 位数字。', key: 'mobile' };
+  if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) return { message: '邮箱格式不正确。', key: 'email' };
+  if (!/^1[3-9]\d{9}$/.test(values.emergencyMobile)) return { message: '紧急联系人电话需为 11 位数字。', key: 'emergencyMobile' };
+  if (values.carPlate && !/^[\u4e00-\u9fa5A-Z]{1}[A-Z0-9·]{6,7}$/.test(values.carPlate)) return { message: '车牌号需为 7–8 位。', key: 'carPlate' };
+  if (!/^\d+$/.test(values.teachingYears)) return { message: '从教年限需为 0 及以上整数。', key: 'teachingYears' };
+  if (values.payeeName !== teacherProfileReadonlyRows()[0][1]) return { message: '收款户名须与本人姓名一致。', key: 'payeeName' };
+  if (!/^\d{16,19}$/.test(values.bankCard)) return { message: '银行卡号需为 16–19 位数字。', key: 'bankCard' };
+  if (values.tagline.length > 200) return { message: '一句话简介不超过 200 字。', key: 'tagline' };
+  if (values.introduction.length > 2000) return { message: '简介不超过 2000 字。', key: 'introduction' };
+  if (values.mobile !== current.mobile) {
+    const request = teacherProfileCodeRequest;
+    if (!request || request.mobile !== values.mobile) return { message: '手机号已变更，请先获取并填写验证码。', key: 'mobile' };
+    const code = String(document.querySelector('#teacher-profile-mobile-code')?.value || '').trim();
+    if (code !== request.code) return { message: '验证码不正确，请重新获取。', key: 'mobile' };
+  }
+  return null;
+}
+function saveTeacherProfile() {
+  const values = collectTeacherProfileForm();
+  const problem = validateTeacherProfile(values);
+  if (problem) { teacherProfileError(problem.message, problem.key); return; }
+  const before = teacherState.profile;
+  const changes = teacherProfileEditableFields
+    .filter(field => String(before[field.key] ?? '') !== String(values[field.key] ?? ''))
+    .map(field => ({ key: field.key, label: field.label, before: teacherProfileMask(field.key, before[field.key]), after: teacherProfileMask(field.key, values[field.key]) }));
+  if (!changes.length) { teacherProfileError('档案内容没有变化。'); return; }
+  const operator = `教师本人（${teacherProfileReadonlyRows()[0][1]}）`;
+  const at = demoTime();
+  teacherState.profile = { ...before, ...values };
+  teacherState.profileVersion = Number(teacherState.profileVersion || 1) + 1;
+  saveTeacher();
+  writeDemoState(next => {
+    next.teacherProfiles = { ...(next.teacherProfiles || {}), [teacherProfileRequestedId()]: { ...values, updatedAt: at, updatedBy: operator, profileVersion: teacherState.profileVersion } };
+    const record = { id: demoId('TPA'), teacherId: teacherProfileRequestedId(), teacher: teacherProfileReadonlyRows()[0][1], operator, at, version: teacherState.profileVersion, changes };
+    next.teacherProfileAudit = [record, ...(next.teacherProfileAudit || [])].slice(0, 30);
+  });
+  teacherProfileEditing = false;
+  teacherProfileCodeRequest = null;
+  renderTeacherProfileDetail();
+  bindTeacherProfileEvents();
+  window.scrollTo(0, 0);
+  tToast(`档案已保存，${changes.length} 项变更已写入审计`);
+}
+function sendTeacherProfileCode() {
+  const mobile = String(document.querySelector('#teacher-profile-mobile')?.value || '').trim();
+  if (!/^1[3-9]\d{9}$/.test(mobile)) { teacherProfileError('请先填写正确的 11 位手机号。', 'mobile'); return; }
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  teacherProfileCodeRequest = { mobile, code };
+  const hint = document.querySelector('[data-profile-code-hint]');
+  if (hint) hint.textContent = `演示验证码 ${code}（原型不发送真实短信）`;
+  const button = document.querySelector('[data-profile-action="send-code"]');
+  let remain = 60;
+  if (button) {
+    button.disabled = true;
+    button.textContent = `重新获取（${remain}s）`;
+    window.clearInterval(teacherProfileCodeTimer);
+    teacherProfileCodeTimer = window.setInterval(() => {
+      remain -= 1;
+      if (remain <= 0) { window.clearInterval(teacherProfileCodeTimer); button.disabled = false; button.textContent = '获取验证码'; return; }
+      button.textContent = `重新获取（${remain}s）`;
+    }, 1000);
+  }
+}
+function bindTeacherProfileEvents() {
+  document.querySelector('[data-profile-action="edit"]')?.addEventListener('click', () => { teacherProfileEditing = true; renderTeacherProfileDetail(); bindTeacherProfileEvents(); window.scrollTo(0, 0); });
+  document.querySelector('[data-profile-action="cancel"]')?.addEventListener('click', () => { teacherProfileEditing = false; teacherProfileCodeRequest = null; window.clearInterval(teacherProfileCodeTimer); renderTeacherProfileDetail(); bindTeacherProfileEvents(); window.scrollTo(0, 0); });
+  document.querySelector('[data-profile-action="save"]')?.addEventListener('click', saveTeacherProfile);
+  document.querySelector('[data-profile-action="send-code"]')?.addEventListener('click', sendTeacherProfileCode);
+  document.querySelectorAll('[data-profile-limit]').forEach(input => input.addEventListener('input', () => {
+    const counter = input.parentElement?.querySelector('[data-profile-count]');
+    if (counter) counter.textContent = `${input.value.length}/${input.maxLength}`;
+  }));
 }
 let teacherCertificateFilter = '全部';
 function certificateStatusTone(status) {
@@ -1042,6 +1206,7 @@ initApplicationForm();
 initApplicationDetail();
 bindTeacherCertificateEvents();
 bindTeacherContractEvents();
+bindTeacherProfileEvents();
 bindTeacherGraduationEvents();
 bindLessonEvents();
 bindTeacherEvents();

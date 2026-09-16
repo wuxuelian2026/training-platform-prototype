@@ -996,6 +996,14 @@ body { background: #f7f7f5; }
 .teacher-archive-actions { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 10px; padding-bottom: 4px; }
 .teacher-archive-actions .mp-button { min-height: 46px; }
 .teacher-profile-readonly-note { margin: 0 2px; padding: 11px 12px; border-left: 3px solid #c7beb7; background: #f7f4f2; color: var(--muted); font-size: 11px; line-height: 1.65; }
+/* CR-2026-022：教师端本人可维护档案的编辑表单补充样式（验证码行、字段提示、长文本计数）。 */
+.teacher-profile-hint { display: block; margin: 4px 0 7px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.teacher-archive-form .mp-field .teacher-profile-hint { margin-top: 4px; }
+.teacher-profile-code { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 8px; }
+.teacher-profile-code input { min-height: 44px; }
+.teacher-profile-code .mp-button { min-height: 44px; padding: 0 12px; font-size: 11px; white-space: nowrap; }
+.teacher-profile-code-hint { margin: 6px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.teacher-profile-code-hint b { color: var(--brand); font-size: 12px; letter-spacing: .06em; }
 @media (max-width: 360px) {
   .teacher-archive-form-split { grid-template-columns: 1fr; }
 }
