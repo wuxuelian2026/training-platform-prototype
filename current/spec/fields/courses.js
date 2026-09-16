@@ -102,6 +102,14 @@ export const COURSE_FIELD_SPEC = {
           { id: 'FD-COURSE-020', label: '简短课程介绍', type: '多行文本', length: '≤ 500 字', required: '是', note: '快速报名详情页展示', constraints: { maxLength: 500 } },
           { id: 'FD-COURSE-030', label: '课程大纲', type: '富文本', length: '≤ 2000 字', required: '否', note: '可选展示内容，不作为教学执行前置条件；教学执行按课次开展', constraints: { maxLength: 2000, richText: true } }
         ] },
+        // CR-2026-025：全部课程页签的行内查看／编辑拆分与版本号、历史版本入口。
+        { heading: '查看与版本字段', fields: [
+          { id: 'FD-COURSE-046', label: '查看', type: '按钮', length: '—', required: '是', note: '打开只读详情，展示档案字段、版本号与编排摘要，不提供写入控件', constraints: { action: true } },
+          { id: 'FD-COURSE-047', label: '编辑', type: '按钮', length: '—', required: '是', note: '打开可编辑档案表单，保存按版本规则决定是否生成新版本', constraints: { action: true } },
+          { id: 'FD-COURSE-048', label: '版本号', type: '只读', length: 'v1 起单调递增', required: '系统生成', note: '当前版本；存在历史版本时点击进入该课程的历史版本列表', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-049', label: '历史版本', type: '按钮', length: '—', required: '是', note: '打开版本历史列表，历史版本整体快照只读且可回溯', constraints: { action: true } },
+          { id: 'FD-COURSE-050', label: '变更摘要', type: '只读', length: '变更字段清单', required: '系统生成', note: '历史版本列表中的本版本变更字段与操作人、生成时间并列展示', constraints: { readOnly: true, system: true } }
+        ] },
         // CR-2026-021：课程内容编排并入课程库，编排工作台字段随页面并入。
         { heading: '教学属性字段（编排）', fields: courseFieldRows('COURSE', 44, COURSE_TEACHING_FIELDS) },
         { heading: '章节字段（编排）', fields: [

@@ -4,6 +4,7 @@ import { cloneCourseCatalogSeed } from './course-catalog-seed.js';
 import { addWeeksLocal, toLocalDateString } from './date-utils.js';
 import { cloneProductSeed } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseDisplayConfigured, courseDisplayTags, persistSaleUnitDisplay, productForCourse, saleUnitDisplay } from './course-display.js';
+import { versionForCourseId } from './course-version.js';
 import { mergeVenues, resolveVenueId } from './venue-seed.js';
 import { DEFAULT_LESSON_DURATION, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
 
@@ -51,10 +52,19 @@ const dataSets = {
 
 function sharedCourseCatalog() {
   const shared = readDemoState();
-  const rows = [...(shared.courses || []).filter(item => item.status === '已完成'), ...(shared.library || []).filter(item => item.archive === '轻量课程档案')];
+  const rows = [
+    ...(shared.courses || []).filter(item => item.status === '已完成'),
+    // CR-2026-025：课程档案改名或调整课时后，发布商品／班级带入的课程主体同步取最新值。
+    ...(shared.library || []).map(item => ({ ...item, id: item.archive === '轻量课程档案' ? item.id : (item.sourceCourseId || item.id) }))
+  ];
   rows.forEach(item => {
-    const id = item.archive === '轻量课程档案' ? item.id : item.id;
-    if (!courseCatalog.some(course => course.id === id)) courseCatalog.push({ id, name: item.name, type: item.type, archive: item.archive || '完整课程', status: item.status, major: item.major, teacher: item.teacher, hours: item.hours });
+    const patch = {};
+    ['name', 'type', 'major', 'teacher', 'hours'].forEach(key => { if (item[key] !== undefined) patch[key] = item[key]; });
+    if (item.archive) patch.archive = item.archive;
+    if (item.status) patch.status = item.status;
+    const existing = courseCatalog.find(course => course.id === item.id);
+    if (existing) Object.assign(existing, patch);
+    else courseCatalog.push({ id: item.id, ...patch });
   });
   return shared;
 }
@@ -129,6 +139,14 @@ function requiredSelect(label, name, options, value = '') { return `<label class
 function courseSummary(course, note) { return `<div class="sales-dialog-summary sales-course-summary"><div><span>课程主体</span><strong>${escapeHtml(course?.name || '未带入课程')}</strong><small>${escapeHtml(course?.id || '请从课程库进入发布')}</small></div><div><span>课程类型 / 档案</span><strong>${escapeHtml(course?.type || '—')}</strong><small>${escapeHtml(course?.archive || '—')}</small></div><div><span>教师 / 总课时</span><strong>${escapeHtml(course ? `${course.teacher} · ${course.hours}课时` : '—')}</strong><small>${escapeHtml(note || '课程主体只读带入')}</small></div></div>`; }
 function checkBusinessForm(form) { if (!form.reportValidity()) return false; return true; }
 
+// CR-2026-025 §4：商品与班级在发布时记录所引用的课程版本号，在售期间不随课程档案升级自动跟随；
+// 需要跟随时由运营在售卖单元侧显式同步，页面同时提示影响范围。
+function courseVersionRow(course, row) {
+  const latest = versionForCourseId(course.id);
+  const referenced = Number(row?.courseVersion) || latest;
+  const syncable = Boolean(row) && latest > referenced;
+  return `<label class="form-field"><span>引用课程版本</span><input name="courseVersion" value="${referenced}" readonly class="readonly-field" data-course-version-input /><small>${syncable ? `课程档案已更新至 v${latest}；在售期间不随课程档案升级自动跟随，如需切换请显式同步。` : '发布时记录引用版本；在售期间不随课程档案升级自动跟随。'}</small></label>${syncable ? `<label class="form-field"><span>版本同步</span><button type="button" class="button" data-course-version-sync data-latest="${latest}">同步到 v${latest}</button><small>同步后本次发布按 v${latest} 引用，已支付订单仍按下单快照，不改写历史。</small></label>` : ''}`;
+}
 // CR-2026-012：教学属性由申报与编排链路维护，发布环节只读带入。
 function courseTeachingRow(course) {
   const archive = courseArchiveFor(course);
@@ -154,10 +172,18 @@ function openProductForm(row = null, options = {}) {
   const courseField = course
     ? `${courseSummary(course, '仅允许已完成的视频课程发布商品')}<input type="hidden" name="courseId" value="${escapeHtml(course.id)}">`
     : requiredSelect('关联课程', 'courseId', videoCourses.map(item => item.name));
-  const body = `<form id="business-dialog-form" class="sales-dialog-grid">${courseField}<label class="form-field"><span>课程名称</span><input value="${escapeHtml(course?.name || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>所属专业</span><input value="${escapeHtml(course?.major || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>总课时数</span><input value="${escapeHtml(String(course?.hours || ''))}" readonly class="readonly-field" /></label>${requiredInput('商品名称', 'name', row?.name || course?.name || '', 'text', '请输入商品名称')}${requiredInput('售卖价格', 'price', row?.price || '', 'number', '请输入售价')}<label class="form-field"><span>试看策略<b class="required-mark">*</b></span><select name="preview" id="preview-policy" required><option ${row?.preview !== '允许试看' ? 'selected' : ''}>不允许试看</option><option ${row?.preview === '允许试看' ? 'selected' : ''}>允许试看</option></select></label><label class="form-field"><span>试看课时<b class="required-mark">*</b></span><select name="previewHours" id="preview-hours" required ${row?.preview !== '允许试看' ? 'disabled' : ''}><option ${row?.previewHours === '第1课时' ? 'selected' : ''}>第1课时</option></select></label>${course ? courseTeachingRow(course) : ''}${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '商品' }) : ''}<label class="form-field"><span>上下架时间</span><input name="shelfAt" value="${escapeHtml(row?.shelfAt || '')}" placeholder="YYYY-MM-DD HH:mm"></label><label class="form-field"><span>商品状态</span><input value="${escapeHtml(row?.status || '草稿')}" readonly class="readonly-field" /></label></form>`;
+  const body = `<form id="business-dialog-form" class="sales-dialog-grid">${courseField}<label class="form-field"><span>课程名称</span><input value="${escapeHtml(course?.name || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>所属专业</span><input value="${escapeHtml(course?.major || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>总课时数</span><input value="${escapeHtml(String(course?.hours || ''))}" readonly class="readonly-field" /></label>${course ? courseVersionRow(course, row) : ''}${requiredInput('商品名称', 'name', row?.name || course?.name || '', 'text', '请输入商品名称')}${requiredInput('售卖价格', 'price', row?.price || '', 'number', '请输入售价')}<label class="form-field"><span>试看策略<b class="required-mark">*</b></span><select name="preview" id="preview-policy" required><option ${row?.preview !== '允许试看' ? 'selected' : ''}>不允许试看</option><option ${row?.preview === '允许试看' ? 'selected' : ''}>允许试看</option></select></label><label class="form-field"><span>试看课时<b class="required-mark">*</b></span><select name="previewHours" id="preview-hours" required ${row?.preview !== '允许试看' ? 'disabled' : ''}><option ${row?.previewHours === '第1课时' ? 'selected' : ''}>第1课时</option></select></label>${course ? courseTeachingRow(course) : ''}${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '商品' }) : ''}<label class="form-field"><span>上下架时间</span><input name="shelfAt" value="${escapeHtml(row?.shelfAt || '')}" placeholder="YYYY-MM-DD HH:mm"></label><label class="form-field"><span>商品状态</span><input value="${escapeHtml(row?.status || '草稿')}" readonly class="readonly-field" /></label></form>`;
   const dialog = openBusinessDialog(row ? '编辑商品' : '发布商品', '从课程库带入课程主体；视频商品只允许一门课程一个有效商品。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存草稿</button>');
   // 二次发布时运营四字段只读带入，“修改展示信息”重新打开可编辑表单。
   dialog.querySelector('[data-display-edit]')?.addEventListener('click', () => { closeBusinessDialog(); openProductForm(row, { editDisplay: true }); });
+  dialog.querySelector('[data-course-version-sync]')?.addEventListener('click', (event) => {
+    const latest = event.currentTarget.dataset.latest;
+    const input = dialog.querySelector('[data-course-version-input]');
+    if (input) input.value = latest;
+    event.currentTarget.disabled = true;
+    event.currentTarget.textContent = `已同步至 v${latest}`;
+    showToast(`引用课程版本已同步至 v${latest}；本次发布按新版本引用，已支付订单不受影响`);
+  });
   // 未从课程库带入课程时，选择关联课程后重建表单，展示信息才能挂到所选课程档案上。
   dialog.querySelector('[name="courseId"]')?.addEventListener('change', (event) => {
     const selected = businessCourse(event.target.value) || videoCourses.find(item => item.name === event.target.value);
@@ -183,7 +209,7 @@ function openProductForm(row = null, options = {}) {
     const priceChanged = Boolean(row) && Number(row.price) !== Number(nextPrice);
     const priceChanges = row ? [...(row.priceChanges || [])] : [];
     if (priceChanged) priceChanges.unshift({ at: demoTime(), operator: '平台运营', from: '¥' + Number(row.price).toFixed(2), to: '¥' + nextPrice });
-    const record = { id: row?.id || demoId('product'), courseId: selected.id, name: String(data.get('name')).trim(), course: selected.name, price: nextPrice, sales: row?.sales || '0', status: row?.status || '草稿', updated: row?.updated || '—', preview: data.get('preview'), previewHours: data.get('previewHours'), shelfAt: String(data.get('shelfAt') || '').trim(), priceChanges };
+    const record = { id: row?.id || demoId('product'), courseId: selected.id, name: String(data.get('name')).trim(), course: selected.name, price: nextPrice, sales: row?.sales || '0', status: row?.status || '草稿', updated: row?.updated || '—', preview: data.get('preview'), previewHours: data.get('previewHours'), shelfAt: String(data.get('shelfAt') || '').trim(), priceChanges, courseVersion: Number(data.get('courseVersion')) || versionForCourseId(selected.id) };
     // CR-2026-020：课程封面、图文详情、课程标签与 C 端推荐语写在商品自身。
     const coverFile = event.currentTarget.querySelector('[name="cover"]')?.files?.[0]?.name || displayUnit.coverFile || '';
     if (!courseDisplayConfigured(displayUnit) && selected.archive === '完整课程' && !coverFile) { showToast('完整课程首次发布需先上传课程封面', 'error'); return; }
@@ -237,10 +263,18 @@ function openClassForm(row = null, options = {}) {
   const scheduleParts = parseClassSchedule(row?.schedule);
   const lessonDuration = Number(row?.lessonDuration || DEFAULT_LESSON_DURATION);
   const startValue = snapToStep(scheduleParts.start || TIMELINE_START);
-  const body = `<form id="business-dialog-form" class="sales-dialog-grid">${course ? courseSummary(course, course.archive === '完整课程' ? '展示信息写入本班级；完整课程首次发布必须上传课程封面' : '轻量课程档案：展示信息写入本班级，课程封面选填') : ''}${course ? courseTeachingRow(course) : ''}${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '本班级' }) : ''}${requiredInput('课程定价', 'price', row?.price || '', 'number', '请输入课程定价')}<label class="form-field"><span>试听是否收费</span><select name="trialFee"><option>否</option><option>是</option></select></label><label class="form-field"><span>报名开始时间</span><input name="enrollStart" type="datetime-local" value="${escapeHtml(row?.enrollStart || '').replace(' ', 'T')}"></label>${requiredInput('报名截止时间', 'deadline', row?.deadline || '', 'datetime-local', '')}<label class="form-field wide"><span>发布方式</span><select name="publishMode"><option>仅保存</option><option>立即发布</option><option>定时发布</option></select></label><label class="form-field sales-switch-field"><span>快速报名入口</span><span class="sales-switch-control"><input name="fast" type="checkbox" ${row?.fast === '是' ? 'checked' : ''}></span></label><label class="form-field"><span>前台展示状态</span><input class="readonly-field" readonly value="${row?.display || '未发布'}"></label></form>`;
+  const body = `<form id="business-dialog-form" class="sales-dialog-grid">${course ? courseSummary(course, course.archive === '完整课程' ? '展示信息写入本班级；完整课程首次发布必须上传课程封面' : '轻量课程档案：展示信息写入本班级，课程封面选填') : ''}${course ? courseTeachingRow(course) : ''}${course ? courseVersionRow(course, row) : ''}${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '本班级' }) : ''}${requiredInput('课程定价', 'price', row?.price || '', 'number', '请输入课程定价')}<label class="form-field"><span>试听是否收费</span><select name="trialFee"><option>否</option><option>是</option></select></label><label class="form-field"><span>报名开始时间</span><input name="enrollStart" type="datetime-local" value="${escapeHtml(row?.enrollStart || '').replace(' ', 'T')}"></label>${requiredInput('报名截止时间', 'deadline', row?.deadline || '', 'datetime-local', '')}<label class="form-field wide"><span>发布方式</span><select name="publishMode"><option>仅保存</option><option>立即发布</option><option>定时发布</option></select></label><label class="form-field sales-switch-field"><span>快速报名入口</span><span class="sales-switch-control"><input name="fast" type="checkbox" ${row?.fast === '是' ? 'checked' : ''}></span></label><label class="form-field"><span>前台展示状态</span><input class="readonly-field" readonly value="${row?.display || '未发布'}"></label></form>`;
   const dialog = openBusinessDialog(`发布班级 · ${row?.name || ''}`, '在已创建的班级上设置定价、报名窗口与前台展示；班级与排课由教务的「创建班级」维护。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存发布设置</button>');
   // 二次发布时运营四字段只读带入，可从“修改展示信息”改为可编辑。
   dialog.querySelector('[data-display-edit]')?.addEventListener('click', () => { closeBusinessDialog(); openClassForm(row, { editDisplay: true }); });
+  dialog.querySelector('[data-course-version-sync]')?.addEventListener('click', (event) => {
+    const latest = event.currentTarget.dataset.latest;
+    const input = dialog.querySelector('[data-course-version-input]');
+    if (input) input.value = latest;
+    event.currentTarget.disabled = true;
+    event.currentTarget.textContent = `已同步至 v${latest}`;
+    showToast(`引用课程版本已同步至 v${latest}；本次发布按新版本引用，已支付订单不受影响`);
+  });
   const form = dialog.querySelector('#business-dialog-form');
   const conflictHint = dialog.querySelector('[data-conflict-hint]');
   const refreshScheduleHint = () => {
@@ -330,7 +364,7 @@ function openClassForm(row = null, options = {}) {
       showToast(`开始时间 ${shownFrom} 非 15 分钟刻度，已吸附为 ${startTime}（结束时间 ${endTime}）`);
     }
     if (!isWithinTimeline(startTime, lessonDuration)) { showToast(`上课时间需落在 08:00–21:00 时间轴内，当前 ${startTime}–${endTime} 超出范围`, 'error'); return; }
-    const record = { id: row?.id || demoId('class'), courseId: selected.id, archive: selected.archive, name: String(data.get('name')).trim(), course: selected.name, batch: data.get('batch'), teacher: String(data.get('teacher')).trim(), category: selected.major.includes('中国') ? '舞蹈类' : selected.major.includes('声乐') ? '音乐类' : '美术类', campus: data.get('campus'), classroom: String(data.get('classroom')).trim(), schedule: composeClassSchedule(weekday, startTime, endTime), weekday, startTime, endTime, lessonDuration, firstLessonDate, price: Number(data.get('price')).toFixed(2), deadline: data.get('deadline').replace('T', ' '), enrolled: row?.enrolled || 0, capacity: data.get('capacity'), lessons: Number(selected.hours) || Number(row?.lessons) || 0, status: row?.status || '未发布', display: row?.display || '未发布', fast: data.get('fast') === 'on' ? '是' : '否', created: row?.created || toLocalDateString() };
+    const record = { id: row?.id || demoId('class'), courseId: selected.id, archive: selected.archive, name: String(data.get('name')).trim(), course: selected.name, batch: data.get('batch'), teacher: String(data.get('teacher')).trim(), category: selected.major.includes('中国') ? '舞蹈类' : selected.major.includes('声乐') ? '音乐类' : '美术类', campus: data.get('campus'), classroom: String(data.get('classroom')).trim(), schedule: composeClassSchedule(weekday, startTime, endTime), weekday, startTime, endTime, lessonDuration, firstLessonDate, price: Number(data.get('price')).toFixed(2), deadline: data.get('deadline').replace('T', ' '), courseVersion: Number(data.get('courseVersion')) || versionForCourseId(selected.id), enrolled: row?.enrolled || 0, capacity: data.get('capacity'), lessons: Number(selected.hours) || Number(row?.lessons) || 0, status: row?.status || '未发布', display: row?.display || '未发布', fast: data.get('fast') === 'on' ? '是' : '否', created: row?.created || toLocalDateString() };
     // RM-T-F04: total lessons == session count; each session runs for the chosen lesson duration.
     record.sessions = buildClassSessions(record.lessons, weekday, startTime, lessonDuration, firstLessonDate, record.classroom, record.batch === '暑假' ? '2026暑期' : '2026秋季');
     if (!row?.id) record.enrolled = 0;

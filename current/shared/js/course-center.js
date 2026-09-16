@@ -1,6 +1,7 @@
 import { relativePath } from './paths.js';
 import { demoId, demoTime, readDemoState, removeDemoRecord, updateDemoRecord, upsertDemoRecord } from './demo-store.js';
-import { applicationSeed, courseIdForApplication } from './course-seed.js';
+import { applicationSeed, courseIdForApplication, teacherAccounts, toCanonicalCourseId } from './course-seed.js';
+import { COURSE_PROMISE_LABELS, changedPromiseFields, commitCourseVersion, courseArchiveKey, courseReferences, courseSnapshot, courseStructure, courseVersionOf, ensureVersionTrack, refreshCurrentSnapshot, referenceLabel } from './course-version.js';
 import { courseAgesText, courseArchiveFor, persistCourseTeaching } from './course-display.js';
 import { courseArchiveSeed } from './course-display.js';
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
@@ -35,6 +36,9 @@ const resources = [
 
 // CR-2026-012：课程档案（教学属性）与售卖单元展示素材的读写入口统一在 shared/js/course-display.js。
 const library = courseArchiveSeed();
+// CR-2026-025：课程档案的编排结构来自课程主体；轻量档案以课程大纲参与承诺类变更判定。
+const courseChaptersOf = (record) => (record?.archive === '完整课程' ? (contentCourses.find((item) => item.id === courseArchiveKey(record))?.chapters || []) : []);
+const courseStructureOf = (record) => (record?.archive === '完整课程' ? courseStructure(courseChaptersOf(record)) : null);
 
 const catalog = {
   groupStatus: { '音乐类': '启用', '舞蹈类': '启用', '美术类': '停用', '戏剧类': '启用' },
@@ -221,10 +225,64 @@ function renderResources(page) {
   page.innerHTML = `<div class="course-page">${pageShell('教学资源库', '', '<button class="button primary" type="button" data-action="upload-resource">上传资源</button>')}<section class="course-surface"><form class="course-filter" data-form="resource-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('资源类型', selectWithValues('type', ['教学视频', '课件PPT', '乐谱PDF', '音频示范', '其他'], state.resourceFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.resourceFilters.major))}${filterField('上传教师', `<input name="teacher" value="${escapeHtml(state.resourceFilters.teacher || '')}" placeholder="输入教师姓名" />`)}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.resourceFilters.keyword || '')}" placeholder="资源名称" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>资源列表</strong><span> 当前显示 ${filtered.length} 条</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>资源名称</th><th>资源类型</th><th>所属专业</th><th>适用等级</th><th>文件大小</th><th>上传教师</th><th>上传时间</th><th>引用次数</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${item.references ? `已被 ${item.references} 门课程引用` : '暂未被课程引用'}</span></td><td>${tag(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.level)}</td><td>${escapeHtml(item.size)}</td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.uploadedAt)}</td><td>${item.references}</td><td><div class="course-actions">${button('预览', 'resource-preview', `data-id="${item.id}"`)}${button('编辑', 'resource-edit', `data-id="${item.id}"`)}${button('删除', 'resource-delete', `data-id="${item.id}"`, 'danger-link')}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无资源</strong><span>上传教学视频、课件或附件，供课程编排引用。</span></div>'}</div>${pagination(filtered.length, '个资源')}</section></div>`;
 }
 
+// CR-2026-025：全部课程页签的行内操作拆分为「查看 / 编辑 / 历史版本」，并新增版本号列。
+function syncLibraryVersion(record) {
+  ensureVersionTrack(record);
+  refreshCurrentSnapshot(record, courseStructureOf(record));
+  return courseVersionOf(record);
+}
+// 承诺类字段变更后统一提交版本：被引用课程生成 v(n+1)，未引用课程直接更新当前版本。
+function versionResultMessage(result, base) {
+  if (!result || !result.changes.length) return `${base}；未变更承诺类字段，版本保持 v${result?.version || ''}`;
+  return result.bumped
+    ? `${base}；已生成 v${result.version}，旧版本 v${result.previous} 保留`
+    : `${base}；课程未被售卖单元引用，直接更新 v${result.version}，未生成新版本`;
+}
+function versionNotice(record, references, version) {
+  if (!references.count) {
+    return `<p class="course-hint course-version-notice">该课程未被在售商品或已展示班级引用：修改承诺类字段（${COURSE_PROMISE_LABELS}）直接更新当前版本 v${version}，不产生新版本。</p>`;
+  }
+  return `<p class="course-hint course-version-notice">该课程已被 ${escapeHtml(referenceLabel(references))} 引用：保存时若变更承诺类字段（${COURSE_PROMISE_LABELS}），将生成 v${version + 1}，旧版本 v${version} 保留。</p>`;
+}
+function applyArchiveChange(record, patch, chapters = null) {
+  const structure = record.archive === '轻量课程档案' ? null : courseStructure(chapters || courseChaptersOf(record));
+  ensureVersionTrack(record);
+  refreshCurrentSnapshot(record, structure);
+  const before = courseSnapshot(record, structure);
+  Object.assign(record, patch);
+  const after = courseSnapshot(record, structure);
+  const references = courseReferences(record);
+  const result = commitCourseVersion(record, { changed: changedPromiseFields(before, after), structure, references });
+  // 完整课程的档案字段与课程主体同源，档案改动同步回课程主体，避免两处口径分叉。
+  if (record.archive === '完整课程') {
+    const course = contentCourses.find((item) => item.id === courseArchiveKey(record));
+    if (course) {
+      Object.assign(course, { name: record.name, type: record.type, major: record.major, teacher: record.teacher, hours: record.hours, difficulty: record.difficulty, ages: [...record.ages] });
+      persistCourse(course);
+      persistCourseTeaching(course, { difficulty: record.difficulty, ages: [...record.ages] });
+    }
+  }
+  return result;
+}
+function libraryRow(item) {
+  const key = courseArchiveKey(item);
+  const version = syncLibraryVersion(item);
+  const references = courseReferences(item);
+  const actions = [
+    button('查看', 'library-view', `data-id="${item.id}"`),
+    button('编辑', 'library-edit', `data-id="${item.id}"`),
+    button('历史版本', 'library-versions', `data-id="${item.id}"`),
+    item.type === '视频课程' && item.archive === '完整课程' && item.status === '已完成' ? button('发布商品', 'publish-product', `data-id="${item.id}"`) : '',
+    item.type === '面授课程' ? button('发布班级', 'publish-class', `data-id="${item.id}"`) : '',
+    item.archive === '完整课程' ? button('查看编排', 'library-workbench', `data-id="${item.id}"`) : ''
+  ].join('');
+  return `<tr><td><span class="primary-cell">${escapeHtml(key || '—')}</span><span class="sub-cell">${item.archive === '完整课程' ? '来源课程主体' : '轻量档案'}</span></td><td><span class="primary-cell">${escapeHtml(item.name)}</span></td><td>${tag(item.archive)}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${item.hours} 课时</td><td><button type="button" class="text-button course-version-link" data-action="library-versions" data-id="${item.id}">v${version}</button><span class="sub-cell">${escapeHtml(referenceLabel(references))}</span></td><td><div class="course-actions">${actions}</div></td></tr>`;
+}
+
+// CR-2026-025：全部课程页签（行内操作拆分为查看 / 编辑 / 历史版本，新增版本号列）。
 function renderLibraryAllView(page) {
   const filtered = library.filter(item => !state.libraryFilters.archive || item.archive === state.libraryFilters.archive).filter(item => !state.libraryFilters.type || item.type === state.libraryFilters.type).filter(item => !state.libraryFilters.major || item.major === state.libraryFilters.major).filter(item => !state.libraryFilters.keyword || `${item.name}${item.teacher}`.includes(state.libraryFilters.keyword));
-  page.innerHTML = `<div class="course-page">${pageShell('课程库', '', '<button class="button primary" type="button" data-action="new-lightweight">新建轻量课程档案</button>')}<section class="course-surface"><form class="course-filter" data-form="library-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('课程档案类型', selectWithValues('archive', ['完整课程', '轻量课程档案'], state.libraryFilters.archive || '', '全部类型'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.libraryFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.libraryFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.libraryFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>课程档案</strong><span> 当前显示 ${filtered.length} 条</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程名称</th><th>课程档案类型</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span></td><td>${tag(item.archive)}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${item.hours} 课时</td><td><div class="course-actions">${item.type === '视频课程' && item.archive === '完整课程' && item.status === '已完成' ? button('发布商品', 'publish-product', `data-id="${item.id}"`) : ''}${item.type === '面授课程' ? button('发布班级', 'publish-class', `data-id="${item.id}"`) : ''}${button(item.archive === '完整课程' ? '查看编排' : '查看/编辑', 'library-edit', `data-id="${item.id}"`)}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无课程档案</strong><span>审核通过并完成编排的完整课程，或新建的轻量档案会出现在这里。</span></div>'}</div>${pagination(filtered.length, '个课程档案')}</section></div>`;
-  appendLibraryCourseIdColumn(page, filtered);
+  page.innerHTML = `<div class="course-page">${pageShell('课程库', '', '<button class="button primary" type="button" data-action="new-lightweight">新建轻量课程档案</button>')}<section class="course-surface"><form class="course-filter" data-form="library-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('课程档案类型', selectWithValues('archive', ['完整课程', '轻量课程档案'], state.libraryFilters.archive || '', '全部类型'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.libraryFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.libraryFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.libraryFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>课程档案</strong><span> 当前显示 ${filtered.length} 条</span></div><div class="course-legend"><span class="course-legend-item success">版本号可点击查看历史版本</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程编号</th><th>课程名称</th><th>课程档案类型</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>版本号</th><th>操作</th></tr></thead><tbody>${filtered.map(libraryRow).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无课程档案</strong><span>审核通过并完成编排的完整课程，或新建的轻量档案会出现在这里。</span></div>'}</div>${pagination(filtered.length, '个课程档案')}</section></div>`;
 }
 
 // CR-2026-021：课程内容编排并入课程库，一个页面两个视图（待编排 / 全部课程），视图状态进 URL。
@@ -247,25 +305,76 @@ function renderLibrary(page) {
   page.innerHTML = holder.innerHTML;
 }
 
-// I1-DEC-19: surface the course number so the teacher application, course center and library
-// share one visible primary key.
-function appendLibraryCourseIdColumn(page, rows) {
-  const table = page?.querySelector('.course-table-wrap table');
-  if (!table || !rows?.length) return;
-  const headerRow = table.querySelector('thead tr');
-  if (headerRow) {
-    const header = document.createElement('th');
-    header.textContent = '课程编号';
-    headerRow.insertBefore(header, headerRow.firstElementChild);
-  }
-  table.querySelectorAll('tbody tr').forEach((row, index) => {
-    const item = rows[index];
-    if (!item) return;
-    const number = item.archive === '完整课程' ? item.sourceCourseId : item.id;
-    const cell = document.createElement('td');
-    cell.innerHTML = `<span class="primary-cell">${escapeHtml(number || '—')}</span><span class="sub-cell">${item.archive === '完整课程' ? '来源课程主体' : '轻量档案'}</span>`;
-    row.insertBefore(cell, row.firstElementChild);
+// 只读详情：档案字段、版本号与编排摘要，不出现任何可写控件。
+function openLibraryView(id) {
+  const item = library.find(record => record.id === id);
+  if (!item) return;
+  const key = courseArchiveKey(item);
+  const version = syncLibraryVersion(item);
+  const references = courseReferences(item);
+  const chapters = courseChaptersOf(item);
+  const outline = String(item.outline || '').trim();
+  const structureBlock = item.archive === '完整课程'
+    ? (chapters.length
+      ? `<ul class="course-version-outline">${chapters.map(chapter => `<li><strong>${escapeHtml(chapter.name)}</strong><small>${(chapter.lessons || []).length} 个课时</small></li>`).join('')}</ul>`
+      : '<p class="course-hint">该课程尚未编排章节。</p>')
+    : `<p class="course-hint">${escapeHtml(outline || '未填写课程大纲')}</p>`;
+  const current = refreshCurrentSnapshot(item, courseStructureOf(item));
+  modal('课程档案详情', `${key} · ${item.name}`, `<div class="course-version-summary"><div><span>当前版本</span><strong>v${version}</strong><small>自建档起单调递增，不因下架或重命名重置</small></div><div><span>引用情况</span><strong>${escapeHtml(referenceLabel(references))}</strong><small>在售商品与已展示班级决定是否生成新版本</small></div></div><section class="course-detail-section wide"><h3>档案字段（只读）</h3><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(key || '—')}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程档案类型</dt><dd>${escapeHtml(item.archive)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>总课时</dt><dd>${item.hours} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(item.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(item) || '未填写')}</dd></div>${item.archive === '轻量课程档案' ? `<div class="wide"><dt>简短课程介绍</dt><dd>${escapeHtml(item.detail || '未填写')}</dd></div>` : ''}</dl></section><section class="course-detail-section wide"><h3>编排摘要</h3>${structureBlock}</section><section class="course-detail-section wide"><h3>展示素材</h3><p class="course-hint">课程封面、图文详情、标签与 C 端推荐语按售卖单元维护，本页只读展示，不提供写入入口。</p></section><p class="course-hint">当前版本 v${version} 生成于 ${escapeHtml(current?.at || '—')}，操作人 ${escapeHtml(current?.operator || '—')}，变更字段：${escapeHtml((current?.changes || []).join('、') || '—')}。</p><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button><button class="button" type="button" data-action="library-versions" data-id="${item.id}">历史版本</button><button class="button primary" type="button" data-action="library-edit" data-id="${item.id}">编辑档案</button></div>`, { large: true });
+}
+
+// 编辑入口：轻量档案走轻量表单，完整课程走课程档案表单（课程档案类型与课程类型不可改）。
+function openLibraryEdit(id) {
+  const item = library.find(record => record.id === id);
+  if (!item) return;
+  if (item.archive === '轻量课程档案') openLightweightForm(id);
+  else openCourseArchiveForm(id);
+}
+
+function openCourseArchiveForm(id) {
+  const item = library.find(record => record.id === id);
+  if (!item) return;
+  const key = courseArchiveKey(item);
+  const version = syncLibraryVersion(item);
+  const references = courseReferences(item);
+  const teacherNames = [...new Set([item.teacher, ...teacherAccounts.map(teacher => teacher.name)].filter(Boolean))];
+  const dialog = modal('编辑课程档案', `${key} · ${item.name}`, `<form data-form="course-archive-form" data-id="${item.id}"><div class="course-detail-grid"><div class="course-field"><label>课程编号</label><input class="readonly-field" value="${escapeHtml(key)}" readonly /></div><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required maxlength="30" value="${escapeHtml(item.name)}" /></div><div class="course-field"><label>课程档案类型</label><input class="readonly-field" value="${escapeHtml(item.archive)}" readonly /></div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="${escapeHtml(item.type)}" readonly /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major', item.major)}</div><div class="course-field"><label>申报教师 <span class="sub-cell">必填</span></label><select name="teacher">${teacherNames.map(name => option(name, name === item.teacher)).join('')}</select></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="${item.hours}" /></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', ['启蒙', '初级', '中级', '高级', '考级冲刺'], item.difficulty, '')}</div><div class="course-field wide"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" ${(item.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div></div>${versionNotice(item, references, version)}<div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button" type="button" data-action="library-versions" data-id="${item.id}">历史版本</button><button class="button primary" type="submit">保存档案</button></div></form>`, { large: true });
+  dialog.querySelector('form').addEventListener('submit', event => {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    const name = String(data.get('name') || '').trim();
+    if (!name || !data.get('major') || !data.get('teacher') || Number(data.get('hours')) <= 0) { showToast('请补齐课程名称、所属专业、申报教师和总课时', 'error'); return; }
+    if (!data.get('difficulty') || !data.getAll('ages').length) { showToast('请选择难度等级和适合年龄（教学属性必填）', 'error'); return; }
+    const result = applyArchiveChange(item, { name, major: data.get('major'), teacher: data.get('teacher'), hours: Number(data.get('hours')), difficulty: data.get('difficulty'), ages: data.getAll('ages') });
+    closeModal();
+    renderLibrary(root());
+    showToast(versionResultMessage(result, '课程档案已保存'));
   });
+}
+
+// 历史版本列表：版本号、生成时间、操作人、变更摘要与当前版本标识；不提供差异对比与回退。
+function openLibraryVersions(id) {
+  const item = library.find(record => record.id === id);
+  if (!item) return;
+  const key = courseArchiveKey(item);
+  syncLibraryVersion(item);
+  ensureVersionTrack(item);
+  const currentVersion = courseVersionOf(item);
+  const rows = [...item.versions].reverse().map(entry => `<tr><td><span class="primary-cell">v${entry.version}</span>${entry.version === currentVersion ? '<span class="sub-cell">当前版本</span>' : ''}</td><td>${escapeHtml(entry.at || '—')}</td><td>${escapeHtml(entry.operator || '—')}</td><td>${escapeHtml((entry.changes || []).join('、') || '—')}</td><td><div class="course-actions">${button(entry.version === currentVersion ? '查看当前版本' : `查看 v${entry.version}`, 'library-version-detail', `data-id="${item.id}" data-version="${entry.version}"`)}</div></td></tr>`).join('');
+  modal('历史版本', `${key} · ${item.name}`, `<div class="course-version-summary"><div><span>当前版本</span><strong>v${currentVersion}</strong><small>历史版本整体快照只读</small></div><div><span>引用情况</span><strong>${escapeHtml(referenceLabel(courseReferences(item)))}</strong><small>历史版本可查可回溯</small></div></div><div class="course-table-wrap"><table><thead><tr><th>版本号</th><th>生成时间</th><th>操作人</th><th>变更摘要</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div><p class="course-hint">历史版本不提供字段级差异对比，也不提供版本回退；如需恢复历史内容，请按当前版本手工修改并生成新版本。</p><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div>`, { large: true });
+}
+
+// 历史版本只读详情：整体快照，可返回版本列表或当前版本。
+function openLibraryVersionDetail(id, version) {
+  const item = library.find(record => record.id === id);
+  if (!item) return;
+  syncLibraryVersion(item);
+  const entry = (item.versions || []).find(row => row.version === version);
+  if (!entry) { showToast('未找到该历史版本', 'error'); return; }
+  const snapshot = entry.snapshot || {};
+  const currentVersion = courseVersionOf(item);
+  const isCurrent = entry.version === currentVersion;
+  modal(isCurrent ? '当前版本详情（只读）' : `历史版本详情 v${entry.version}（只读）`, `${courseArchiveKey(item)} · ${item.name}`, `<div class="course-version-summary"><div><span>版本号</span><strong>v${entry.version}</strong><small>${isCurrent ? '当前版本' : '历史版本，永久只读'}</small></div><div><span>生成时间 / 操作人</span><strong>${escapeHtml(entry.at || '—')}</strong><small>${escapeHtml(entry.operator || '—')}</small></div></div><section class="course-detail-section wide"><h3>版本快照</h3><dl class="course-detail-list"><div><dt>课程名称</dt><dd>${escapeHtml(snapshot.name || '—')}</dd></div><div><dt>课程档案类型</dt><dd>${escapeHtml(snapshot.archive || '—')}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(snapshot.type || '—')}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(snapshot.major || '—')}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(snapshot.teacher || '—')}</dd></div><div><dt>总课时</dt><dd>${escapeHtml(String(snapshot.hours ?? '—'))} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(snapshot.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml((snapshot.ages || []).join('、') || '未填写')}</dd></div><div class="wide"><dt>编排结构摘要</dt><dd>${escapeHtml(snapshot.structure || '—')}</dd></div><div class="wide"><dt>本版本变更字段</dt><dd>${escapeHtml((entry.changes || []).join('、') || '—')}</dd></div></dl></section><p class="course-hint">历史版本为整体快照，不提供与当前版本的字段级差异对比，也不提供回退入口。</p><div class="course-modal-actions"><button class="button" type="button" data-action="library-versions" data-id="${item.id}">返回版本列表</button><button class="button primary" type="button" data-action="close-modal">关闭</button></div>`, { large: true });
 }
 
 function renderCatalog(page) {
@@ -313,6 +422,14 @@ function openWorkbench(id) {
   const item = contentCourses.find(record => record.id === id);
   if (!item) return;
   let activeChapter = 0;
+  // CR-2026-025：编排结构（章节与课时组成）属承诺类变更，保存时按入口快照比较后提交版本。
+  const workbenchLibrary = library.find((record) => courseArchiveKey(record) === toCanonicalCourseId(item.id)) || null;
+  const entryStructure = workbenchLibrary ? courseStructure(item.chapters) : null;
+  const commitWorkbenchVersion = () => {
+    if (!workbenchLibrary || !entryStructure) return null;
+    const structure = courseStructure(item.chapters);
+    return commitCourseVersion(workbenchLibrary, { changed: entryStructure.key === structure.key ? [] : ['编排结构'], structure });
+  };
   // CR-2026-014：教学属性来自申报，编排阶段可修改，保存后写入课程档案（course-display.js）。
   const archiveRecord = courseArchiveFor(item);
   const teaching = { difficulty: archiveRecord?.difficulty || item.difficulty || '', ages: [...(archiveRecord?.ages?.length ? archiveRecord.ages : item.ages || [])] };
@@ -351,7 +468,7 @@ function openWorkbench(id) {
     if (action === 'edit-lesson') openLessonForm(item, Number(target.dataset.chapter), Number(target.dataset.index), () => { persistCourse(item); renderWorkbench(); });
     if (action === 'delete-lesson') { if (window.confirm('确认删除该课时？')) { item.chapters[Number(target.dataset.chapter)].lessons.splice(Number(target.dataset.index), 1); persistCourse(item); renderWorkbench(); showToast('课时已删除'); } }
     if (action === 'resource') openResourcePicker(item, Number(target.dataset.chapter), Number(target.dataset.index), () => { persistCourse(item); renderWorkbench(); });
-    if (action === 'save') { if (!saveTeaching()) return; item.status = '编排中'; item.updatedAt = demoTime(); persistCourse(item); renderWorkbench(); showToast('编排草稿已保存'); }
+    if (action === 'save') { if (!saveTeaching()) return; item.status = '编排中'; item.updatedAt = demoTime(); persistCourse(item); const versionResult = commitWorkbenchVersion(); renderWorkbench(); showToast(versionResult && versionResult.bumped ? `编排草稿已保存；编排结构变更已生成 v${versionResult.version}，v${versionResult.previous} 保留` : '编排草稿已保存'); }
     if (action === 'complete') { if (!saveTeaching()) return;
       const lessons = item.chapters.flatMap(current => current.lessons);
       if (!item.chapters.length || item.chapters.some(current => !current.lessons.length || current.lessons.some(lesson => !lesson.name || !lesson.target || !lesson.duration))) { showToast('请补齐章节和课时必填信息', 'error'); return; }
@@ -368,9 +485,10 @@ function openWorkbench(id) {
       item.updatedAt = demoTime();
       persistCourse(item);
       syncLibraryCourse(item);
+      const versionResult = commitWorkbenchVersion();
       renderWorkbench();
       renderContent(root());
-      showToast('课程编排已完成，可进入课程库');
+      showToast(versionResult && versionResult.bumped ? `课程编排已完成，编排结构变更已生成 v${versionResult.version}，v${versionResult.previous} 保留` : '课程编排已完成，可进入课程库');
     }
   });
   renderWorkbench();
@@ -438,9 +556,11 @@ function openResourcePreview(id) {
 }
 
 function openLightweightForm(id = null) {
-  const current = id ? library.find(item => item.id === id) : { name: '', major: '', hours: 16, detail: '', difficulty: '启蒙', ages: ['少儿'] };
-  const dialog = modal(id ? '编辑轻量课程档案' : '新建轻量课程档案', '轻量档案只用于快速报名班级，不进入课程内容编排', `<form data-form="lightweight-form" data-id="${id || ''}"><div class="course-detail-grid"><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required value="${escapeHtml(current.name)}" placeholder="填写课程名称" /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major', current.major)}</div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="面授课程" readonly /></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="${current.hours}" /></div><div class="course-field wide"><label>简短课程介绍 <span class="sub-cell">必填</span></label><textarea name="detail" required placeholder="填写快速报名详情页使用的介绍">${escapeHtml(current.detail)}</textarea></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', ['启蒙', '初级', '中级', '高级', '考级冲刺'], current.difficulty, '')}</div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" ${(current.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div><div class="course-field wide"><label>课程大纲</label><textarea name="outline" placeholder="可选：填写课程大纲，不作为教学执行前置条件"></textarea></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存档案</button></div></form>`);
-  dialog.querySelector('form').addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); if (!data.get('name').trim() || !data.get('major') || !data.get('detail').trim() || Number(data.get('hours')) <= 0) { showToast('请补齐课程名称、专业、介绍和总课时', 'error'); return; } if (!data.get('difficulty') || !data.getAll('ages').length) { showToast('请选择难度等级和适合年龄（教学属性必填）', 'error'); return; } const record = { id: id || `LIB-${Date.now()}`, name: data.get('name').trim(), archive: '轻量课程档案', type: '面授课程', major: data.get('major'), teacher: id ? current.teacher : '李教务', hours: Number(data.get('hours')), difficulty: data.get('difficulty'), ages: data.getAll('ages'), detail: data.get('detail').trim() }; if (id) { Object.assign(current, record); delete current.status; persistLibrary(record); } else { library.unshift(record); persistLibrary(record); } closeModal(); renderLibrary(root()); showToast(id ? '轻量课程档案已保存' : '轻量课程档案已创建'); });
+  const current = id ? library.find(item => item.id === id) : { name: '', major: '', hours: 16, detail: '', difficulty: '启蒙', ages: ['少儿'], outline: '' };
+  // CR-2026-025：已引用课程保存前提示将生成的版本号与被引用数量。
+  const notice = id && current ? versionNotice(current, courseReferences(current), syncLibraryVersion(current)) : '';
+  const dialog = modal(id ? '编辑轻量课程档案' : '新建轻量课程档案', '轻量档案只用于快速报名班级，不进入课程内容编排', `<form data-form="lightweight-form" data-id="${id || ''}"><div class="course-detail-grid"><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required value="${escapeHtml(current.name)}" placeholder="填写课程名称" /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major', current.major)}</div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="面授课程" readonly /></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="${current.hours}" /></div><div class="course-field wide"><label>简短课程介绍 <span class="sub-cell">必填</span></label><textarea name="detail" required placeholder="填写快速报名详情页使用的介绍">${escapeHtml(current.detail)}</textarea></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', ['启蒙', '初级', '中级', '高级', '考级冲刺'], current.difficulty, '')}</div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" ${(current.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div><div class="course-field wide"><label>课程大纲 <span class="sub-cell">编排结构参与版本升级</span></label><textarea name="outline" maxlength="2000" placeholder="可选：填写课程大纲，不作为教学执行前置条件">${escapeHtml(current.outline || '')}</textarea></div>${notice}<div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button>${id ? `<button class="button" type="button" data-action="library-versions" data-id="${id}">历史版本</button>` : ''}<button class="button primary" type="submit">保存档案</button></div></form>`, { large: true });
+  dialog.querySelector('form').addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); if (!data.get('name').trim() || !data.get('major') || !data.get('detail').trim() || Number(data.get('hours')) <= 0) { showToast('请补齐课程名称、专业、介绍和总课时', 'error'); return; } if (!data.get('difficulty') || !data.getAll('ages').length) { showToast('请选择难度等级和适合年龄（教学属性必填）', 'error'); return; } const patch = { name: data.get('name').trim(), major: data.get('major'), hours: Number(data.get('hours')), difficulty: data.get('difficulty'), ages: data.getAll('ages'), detail: data.get('detail').trim(), outline: String(data.get('outline') || '').trim() }; if (id) { const result = applyArchiveChange(current, patch); closeModal(); renderLibrary(root()); showToast(versionResultMessage(result, '轻量课程档案已保存')); return; } const record = { id: `LIB-${Date.now()}`, archive: '轻量课程档案', type: '面授课程', teacher: '李教务', ...patch }; library.unshift(record); ensureVersionTrack(record); refreshCurrentSnapshot(record, null); persistLibrary(record); closeModal(); renderLibrary(root()); showToast('轻量课程档案已创建，建档版本 v1'); });
 }
 
 function openCatalogForm(type, id = null) {
@@ -490,7 +610,15 @@ function handleClick(event) {
     const route = action === 'publish-product' ? '/admin/pages/mall/products.html' : '/admin/pages/crm/classes.html';
     if (item?.sourceCourseId) window.location.href = relativePath(`${route}?courseId=${encodeURIComponent(item.sourceCourseId)}`);
   }
-  if (action === 'library-edit') { const item = library.find(record => record.id === target.dataset.id); if (item?.archive === '完整课程') window.location.href = `content.html?courseId=${encodeURIComponent(contentCourses.find(course => course.id === item.sourceCourseId)?.id || item.sourceCourseId || '')}`; else openLightweightForm(target.dataset.id); }
+  if (action === 'library-view') openLibraryView(target.dataset.id);
+  if (action === 'library-edit') openLibraryEdit(target.dataset.id);
+  if (action === 'library-versions') openLibraryVersions(target.dataset.id);
+  if (action === 'library-version-detail') openLibraryVersionDetail(target.dataset.id, Number(target.dataset.version));
+  if (action === 'library-workbench') {
+    const item = library.find(record => record.id === target.dataset.id);
+    const courseId = item ? courseArchiveKey(item) : '';
+    if (courseId) window.location.href = `content.html?courseId=${encodeURIComponent(courseId)}`;
+  }
   if (action === 'catalog-add') openCatalogForm(target.dataset.type);
   if (action === 'catalog-tree-toggle') { const key = target.dataset.key; if (state.expandedCatalog.has(key)) state.expandedCatalog.delete(key); else state.expandedCatalog.add(key); renderCatalog(root()); }
   if (action === 'catalog-select-group') { state.selectedGroup = target.dataset.value; state.selectedCategory = catalog.categories.find(item => item.parent === state.selectedGroup)?.name || ''; renderCatalog(root()); }
