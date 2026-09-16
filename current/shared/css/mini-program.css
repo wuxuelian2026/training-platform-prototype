@@ -227,6 +227,23 @@ body { background: #f7f7f5; }
 .mp-order-card-footer { align-items: center; padding-top: 12px; }
 .mp-order-card-footer > span { color: var(--muted); font-size: 12px; }
 .mp-order-card-footer b { color: var(--brand); font-size: 15px; }
+/* CR-2026-026：待办前置两段式列表与订单详情凭证区。 */
+.mp-order-section { display: grid; gap: 10px; }
+.mp-order-section + .mp-order-section { margin-top: 16px; }
+.mp-order-section-head { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 2px; }
+.mp-order-section-head h3 { margin: 0; font-size: 14px; }
+.mp-order-section-head span { color: var(--muted); font-size: 11px; }
+.mp-order-card-hint { margin: 12px 0 0; padding: 8px 10px; border-left: 3px solid #d8a12a; border-radius: 6px; background: #fdf6e7; color: #7a5a12; font-size: 11px; line-height: 1.6; }
+.mp-order-association { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.mp-order-association div { min-width: 0; }
+.mp-order-association strong, .mp-order-association span { display: block; }
+.mp-order-association strong { font-size: 14px; }
+.mp-order-association span { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.mp-order-association .mp-button { flex: none; }
+.mp-order-association-note { margin: 10px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.mp-order-no { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.mp-order-no span { min-width: 0; overflow-wrap: anywhere; }
+.mp-order-no .mp-button { flex: none; min-height: 32px; padding: 0 10px; font-size: 11px; }
 .mp-order-action { min-height: 34px; padding: 0 11px; font-size: 12px; }
 .mp-order-detail-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .mp-order-status-copy { margin-top: 10px; color: #4d433e; font-size: 13px; line-height: 1.6; }

@@ -57,14 +57,14 @@ const demo = {
   // 原自造的 title / years / tags / tagline / intro / profile 富文本块已删除。
   teachers: ['teacher-chen', 'teacher-wang'].map(teacherPublicProfileById).filter(Boolean),
   orders: [
-    { id: 'OD202609080001', courseId: 'COURSE-CR-2026-0002', status: '已支付', amount: 1280, studentId: 'student-001', createdAt: '2026-09-08 14:20', paidAt: '2026-09-08 14:22' },
+    { id: 'OD202609080001', courseId: 'COURSE-CR-2026-0002', status: '已支付', amount: 1280, studentId: 'student-001', createdAt: '2026-09-08 14:20', paidAt: '2026-09-08 14:22', paymentNo: 'PAY2026090800001', payMethod: '微信支付' },
     { id: 'OD202609080002', courseId: 'class-001', status: '待支付', amount: 1680, studentId: 'student-001', createdAt: '2026-09-08 16:42', paidAt: '' },
     { id: 'OD202609090001', courseId: 'COURSE-CR-2026-0002', status: '待支付', amount: 1280, studentId: '', accountId: 'account-002', createdAt: '2026-09-09 10:18', paidAt: '' },
-    { id: 'OD202609090002', courseId: 'class-001', status: '已支付', amount: 1680, studentId: 'student-001', createdAt: '2026-09-09 09:36', paidAt: '2026-09-09 09:38' },
-    { id: 'OD202609070001', courseId: 'COURSE-CR-2026-0002', status: '退款中', amount: 1280, studentId: 'student-001', createdAt: '2026-09-07 15:12', paidAt: '2026-09-07 15:15' },
-    { id: 'OD202609070002', courseId: 'class-001', status: '退款中', amount: 1680, studentId: 'student-001', createdAt: '2026-09-07 11:25', paidAt: '2026-09-07 11:29' },
-    { id: 'OD202609060001', courseId: 'COURSE-CR-2026-0002', status: '已退款', amount: 1280, studentId: 'student-001', createdAt: '2026-09-06 17:08', paidAt: '2026-09-06 17:10' },
-    { id: 'OD202609060002', courseId: 'class-001', status: '已退款', amount: 1680, studentId: 'student-001', createdAt: '2026-09-06 13:50', paidAt: '2026-09-06 13:53' },
+    { id: 'OD202609090002', courseId: 'class-001', status: '已支付', amount: 1680, studentId: 'student-001', createdAt: '2026-09-09 09:36', paidAt: '2026-09-09 09:38', paymentNo: 'PAY2026090900002', payMethod: '微信支付' },
+    { id: 'OD202609070001', courseId: 'COURSE-CR-2026-0002', status: '退款中', amount: 1280, studentId: 'student-001', createdAt: '2026-09-07 15:12', paidAt: '2026-09-07 15:15', paymentNo: 'PAY2026090700001', payMethod: '微信支付', refundNo: 'RF2026090900001', refundAmount: 1280, refundMethod: '微信支付原路退回', refundStatus: '审核通过，退款处理中', refundExpectedAt: '2026-09-20', refundAt: '2026-09-09 10:20', refundReason: '学员时间冲突，申请退款' },
+    { id: 'OD202609070002', courseId: 'class-001', status: '退款中', amount: 1680, studentId: 'student-001', createdAt: '2026-09-07 11:25', paidAt: '2026-09-07 11:29', paymentNo: 'PAY2026090700002', payMethod: '微信支付', refundNo: 'RF2026090900002', refundAmount: 1680, refundMethod: '微信支付原路退回', refundStatus: '审核通过，退款处理中', refundExpectedAt: '2026-09-20', refundAt: '2026-09-09 09:40', refundReason: '重复报名，申请退款' },
+    { id: 'OD202609060001', courseId: 'COURSE-CR-2026-0002', status: '已退款', amount: 1280, studentId: 'student-001', createdAt: '2026-09-06 17:08', paidAt: '2026-09-06 17:10', paymentNo: 'PAY2026090600001', payMethod: '微信支付', refundNo: 'RF2026090800011', refundAmount: 1280, refundMethod: '微信支付原路退回', refundStatus: '已完成', refundExpectedAt: '2026-09-08', refundAt: '2026-09-07 09:05', refundReason: '学员时间冲突，申请退款' },
+    { id: 'OD202609060002', courseId: 'class-001', status: '已退款', amount: 1680, studentId: 'student-001', createdAt: '2026-09-06 13:50', paidAt: '2026-09-06 13:53', paymentNo: 'PAY2026090600002', payMethod: '微信支付', refundNo: 'RF2026090800012', refundAmount: 1680, refundMethod: '微信支付原路退回', refundStatus: '已完成', refundExpectedAt: '2026-09-08', refundAt: '2026-09-07 08:40', refundReason: '重复报名，申请退款' },
     { id: 'OD202609050001', courseId: 'COURSE-CR-2026-0002', status: '已取消', amount: 1280, studentId: 'student-001', createdAt: '2026-09-05 16:30', paidAt: '' },
     { id: 'OD202609050002', courseId: 'class-001', status: '已取消', amount: 1680, studentId: 'student-001', createdAt: '2026-09-05 10:05', paidAt: '' }
   ],
@@ -805,26 +805,123 @@ function normalizeOrderStatus(order) {
 }
 function orderTone(status) { return status === '已支付' || status === '已退款' ? 'green' : status === '待支付' || status === '退款中' ? 'amber' : 'gray'; }
 function orderTimes(order) { return { createdAt: order.createdAt || '2026-09-08 14:20', paidAt: order.paidAt || '' }; }
+// CR-2026-026 §3.4：订单号可复制；无剪贴板权限时退回到选中复制并给出同一个提示。
+function copyOrderNo(orderNo) {
+  const fallback = () => {
+    const input = document.createElement('textarea');
+    input.value = orderNo;
+    input.setAttribute('readonly', '');
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+    document.body.appendChild(input);
+    input.select();
+    try { document.execCommand('copy'); } catch { /* 无权限时仍给出可手动复制的提示 */ }
+    input.remove();
+  };
+  if (navigator.clipboard?.writeText) { navigator.clipboard.writeText(orderNo).catch(fallback); toast('订单号已复制'); return; }
+  fallback();
+  toast('订单号已复制');
+}
+// CR-2026-026 §3.3：订单凭证字段（支付流水号、支付方式、退款单号、退款金额／方式／状态、预计到账时间）。
+function orderCredentials(order) {
+  const paid = Boolean(order.paidAt);
+  const refunding = order.status === '退款中' || order.status === '已退款';
+  return {
+    paymentNo: order.paymentNo || order.paymentRecordId || (paid ? `PAY-${order.id}` : ''),
+    payMethod: order.payMethod || (paid ? '微信支付' : '未完成支付'),
+    paidAt: order.paidAt || '',
+    refundNo: order.refundNo || order.merchantRefundNo || (refunding ? `RF-${order.id}` : ''),
+    refundAmount: Number(order.refundAmount ?? order.amount ?? 0),
+    refundMethod: order.refundMethod || order.refundType || '原路退回',
+    refundStatus: order.refundStatus || (order.status === '已退款' ? '已完成' : order.status === '退款中' ? '处理中' : ''),
+    refundExpectedAt: order.refundExpectedAt || '',
+    refundReason: order.refundReason || order.paymentReason || '用户申请退款'
+  };
+}
+// 支付时限提示：SM-ORDER 未定义支付时限时长，因此只给时限文案不启用倒计时（CR-2026-026 §6 待确认项 2）。
+const ORDER_PAY_WINDOW_HINT = '请在 30 分钟内完成支付，超时订单将自动关闭；继续支付会复用当前订单号。';
+const ORDER_SECTIONS = [
+  { key: 'pending', title: '待处理', statuses: ['待支付', '退款中'], note: '需要你处理的动作' },
+  { key: 'history', title: '历史订单', statuses: ['已支付', '已退款', '已取消'], note: '已完成的交易记录' }
+];
+function orderPendingHint(order) {
+  if (order.status === '待支付') return ORDER_PAY_WINDOW_HINT;
+  if (order.status === '退款中') {
+    const credentials = orderCredentials(order);
+    return credentials.refundExpectedAt
+      ? `退款进度：${credentials.refundStatus}，预计 ${credentials.refundExpectedAt} 到账。`
+      : `退款进度：${credentials.refundStatus || '处理中'}。`;
+  }
+  return '';
+}
+// 段内排序：待支付按剩余支付时限升序（时限统一，按创建时间升序等价于最紧急在前），退款中按发起时间倒序。
+function sortPendingOrders(orders) {
+  const paying = orders.filter(order => order.status === '待支付').sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+  const refunding = orders.filter(order => order.status === '退款中').sort((a, b) => (b.refundAt || b.updatedAt || b.createdAt || '').localeCompare(a.refundAt || a.updatedAt || a.createdAt || ''));
+  return [...paying, ...refunding];
+}
+const sortHistoryOrders = (orders) => [...orders].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+function orderCard(order) {
+  const item = course(order.courseId);
+  const student = state.students.find(row => row.id === order.studentId) || currentStudent();
+  const times = orderTimes(order);
+  const isClass = item.type === 'class';
+  // I1-DEC-25 / RM-U-01: video orders are keyed by the purchasing account, class orders by account + student.
+  const subjectFact = isClass ? `<div><span>当前学员</span><strong>${esc(student.name)}</strong></div>` : `<div><span>购买账号</span><strong>${esc(purchaseAccount().name)}</strong></div>`;
+  const detailLink = `/learner/pages/order-detail.html?orderId=${encodeURIComponent(order.id)}`;
+  const primary = isPaymentResumable(order)
+    ? `<button class="mp-button mp-order-action" type="button" data-order-action="pay" data-course-id="${item.id}" data-order-id="${order.id}">${order.status === '待支付' ? '去支付' : '继续支付'}</button>`
+    : order.status === '已支付' && isClass
+      ? `<button class="mp-button secondary mp-order-action" type="button" data-order-action="refund" data-order-id="${order.id}">申请退款</button>`
+      : '';
+  const hint = orderPendingHint(order);
+  return `<article class="mp-order-card"><div class="mp-order-card-head"><div><strong>${esc(item.name)}</strong><small>${isClass ? '面授课程' : '视频课程'} · ${esc(order.id)}</small></div>${pill(paymentStatusLabel(order), orderTone(order.status))}</div>${hint ? `<p class="mp-order-card-hint">${esc(hint)}</p>` : ''}<div class="mp-order-card-facts">${subjectFact}<div><span>${isClass ? '班级' : '课程类型'}</span><strong>${esc(isClass ? item.className : '视频课程')}</strong></div>${isClass ? `<div><span>上课安排</span><strong>${esc(item.campus)} · ${esc(item.schedule)}</strong></div>` : `<div><span>下单时间</span><strong>${esc(times.createdAt)}</strong></div>`}<div><span>${times.paidAt ? '支付时间' : '订单时间'}</span><strong>${esc(times.paidAt || times.createdAt)}</strong></div>${order.paymentReason ? `<div><span>支付说明</span><strong>${esc(order.paymentReason)}</strong></div>` : ''}</div><div class="mp-order-card-footer"><span>实付 <b>${money2(order.amount || item.price)}</b></span><div class="mp-actions">${primary}<a class="mp-button secondary mp-order-action" href="${detailLink}">${order.status === '退款中' ? '查看退款进度' : '查看详情'}</a></div></div></article>`;
+}
 function renderOrders() {
   if (!isLoggedIn()) { layout(stack(`<section class="mp-locked"><span class="mp-avatar" aria-hidden="true">单</span><strong>登录后查看我的订单</strong><p>登录后可查看课程交易记录、支付状态和退款进度。</p><a class="mp-button" href="/login.html?redirect=${encodeURIComponent('/learner/pages/orders.html')}">去登录</a></section>`)); return; }
-  // CR-2026-023：页签固定为 SM-ORDER 五态 + 全部，取值与列表同源；不按账号增减。
+  // CR-2026-023／CR-2026-026：页签固定为 SM-ORDER 五态 + 全部，取值与列表同源；「全部」为待处理 + 历史订单两段式。
   const tabs = [['all', '全部'], ['待支付', '待支付'], ['已支付', '已支付'], ['退款中', '退款中'], ['已退款', '已退款'], ['已取消', '已取消']];
-  layout(stack(card(`<div class="mp-tabs" aria-label="订单状态筛选">${tabs.map(([value, label], index) => `<button class="mp-tab ${index === 0 ? 'active' : ''}" data-order-tab="${value}" type="button">${label}<span>${state.orders.filter(order => value === 'all' || order.status === value).length}</span></button>`).join('')}</div>`), `<div id="order-list" class="mp-order-list"></div>`));
+  const orders = state.orders.map(normalizeOrderStatus);
+  layout(stack(card(`<div class="mp-tabs" aria-label="订单状态筛选">${tabs.map(([value, label], index) => `<button class="mp-tab ${index === 0 ? 'active' : ''}" data-order-tab="${value}" type="button">${label}<span>${orders.filter(order => value === 'all' || order.status === value).length}</span></button>`).join('')}</div>`), `<div id="order-list" class="mp-order-list" aria-live="polite"></div>`));
   const draw = () => {
     const active = document.querySelector('[data-order-tab].active')?.dataset.orderTab || 'all';
-    const orders = state.orders.map(normalizeOrderStatus).filter(order => active === 'all' || order.status === active);
     const list = document.querySelector('#order-list');
-    list.innerHTML = orders.length ? orders.map(order => {
-      const item = course(order.courseId); const student = state.students.find(row => row.id === order.studentId) || currentStudent(); const times = orderTimes(order); const isClass = item.type === 'class';
-      // I1-DEC-25 / RM-U-01: video orders are keyed by the purchasing account, class orders by account + student.
-      const subjectFact = isClass ? `<div><span>当前学员</span><strong>${esc(student.name)}</strong></div>` : `<div><span>购买账号</span><strong>${esc(purchaseAccount().name)}</strong></div>`;
-      const action = isPaymentResumable(order) ? `<button class="mp-button mp-order-action" type="button" data-order-action="pay" data-course-id="${item.id}" data-order-id="${order.id}">${order.status === '待支付' ? '去支付' : '继续支付'}</button>` : order.status === '已支付' && isClass ? `<button class="mp-button secondary mp-order-action" type="button" data-order-action="refund" data-order-id="${order.id}">申请退款</button>` : `<a class="mp-button secondary mp-order-action" href="/learner/pages/order-detail.html?orderId=${encodeURIComponent(order.id)}">查看详情</a>`;
-      return `<article class="mp-order-card"><div class="mp-order-card-head"><div><strong>${esc(item.name)}</strong><small>${isClass ? '面授课程' : '视频课程'} · ${esc(order.id)}</small></div>${pill(paymentStatusLabel(order), orderTone(order.status))}</div><div class="mp-order-card-facts">${subjectFact}<div><span>${isClass ? '班级' : '课程类型'}</span><strong>${esc(isClass ? item.className : '视频课程')}</strong></div>${isClass ? `<div><span>上课安排</span><strong>${esc(item.campus)} · ${esc(item.schedule)}</strong></div>` : `<div><span>下单时间</span><strong>${esc(times.createdAt)}</strong></div>`}<div><span>${times.paidAt ? '支付时间' : '订单时间'}</span><strong>${esc(times.paidAt || times.createdAt)}</strong></div>${order.paymentReason ? `<div><span>支付说明</span><strong>${esc(order.paymentReason)}</strong></div>` : ''}</div><div class="mp-order-card-footer"><span>实付 <b>${money2(order.amount || item.price)}</b></span><div class="mp-actions">${action}</div></div></article>`;
-    }).join('') : `<div class="mp-empty">暂无${active === 'all' ? '' : active}订单</div>`;
+    if (active !== 'all') {
+      const filtered = sortHistoryOrders(orders.filter(order => order.status === active));
+      list.innerHTML = filtered.length ? filtered.map(orderCard).join('') : `<div class="mp-empty">暂无${active}订单</div>`;
+    } else if (!orders.length) {
+      list.innerHTML = `<div class="mp-empty"><strong>暂无订单</strong><p>挑选一门课程开始学习吧。</p></div><a class="mp-button secondary full" href="/learner/pages/courses.html">去课程库看看</a>`;
+    } else {
+      list.innerHTML = ORDER_SECTIONS.map(section => {
+        const rows = section.key === 'pending'
+          ? sortPendingOrders(orders.filter(order => section.statuses.includes(order.status)))
+          : sortHistoryOrders(orders.filter(order => section.statuses.includes(order.status)));
+        const body = rows.length ? rows.map(orderCard).join('') : `<div class="mp-empty">${section.key === 'pending' ? '暂无待处理订单' : '暂无历史订单'}</div>`;
+        return `<section class="mp-order-section"><div class="mp-order-section-head"><h3>${section.title}</h3><span>${rows.length} 笔 · ${section.note}</span></div>${body}</section>`;
+      }).join('');
+    }
     list.querySelectorAll('[data-order-action="pay"]').forEach(node => node.addEventListener('click', () => go(`/learner/pages/payment.html?courseId=${encodeURIComponent(node.dataset.courseId)}&orderId=${encodeURIComponent(node.dataset.orderId)}`)));
-    list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); if (!order) return; order.status = '退款中'; saveState(); draw(); toast('退款申请已提交，等待后台审核'); }));
+    list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); if (!order) return; order.status = '退款中'; order.refundAt = order.refundAt || '刚刚'; order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.refundAmount ?? order.amount); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || '用户申请退款'; saveState(); draw(); toast('退款申请已提交，等待后台审核'); }));
   };
-  document.querySelectorAll('[data-order-tab]').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('[data-order-tab]').forEach(item => item.classList.remove('active')); tab.classList.add('active'); draw(); })); draw();
+  document.querySelectorAll('[data-order-tab]').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('[data-order-tab]').forEach(item => item.classList.remove('active')); tab.classList.add('active'); draw(); }));
+  draw();
+}
+// 关联卡片：只保留名称 + 一行关键信息 + 跳转按钮，课程与班级细节回到各自详情页。
+function orderAssociation(order, item, isClass) {
+  const isPaid = order.status === '已支付';
+  if (isClass) return { title: item.className || item.name, line: `${item.teacher}老师 · ${item.schedule || '上课时间以班级详情为准'}`, label: '查看班级', href: courseLink(item) };
+  if (isPaid) return { title: item.name, line: `${item.teacher}老师 · 共${item.hours}课时`, label: '进入学习', href: '/learner/pages/learning.html' };
+  return { title: item.name, line: `${item.teacher}老师 · 共${item.hours}课时`, label: '查看课程', href: `/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}` };
+}
+// 状态 + 下一步指引（CR-2026-026 §3.4）
+function orderStatusGuidance(order, isClass) {
+  const credentials = orderCredentials(order);
+  if (order.status === '待支付') return `${ORDER_PAY_WINDOW_HINT}超时后订单自动关闭，未产生课程授权与面授分班。`;
+  if (order.status === '已支付') return '支付已确认，订单交易完成；课程学习与面授报名结果以关联卡片为准。';
+  if (order.status === '退款中') return `${credentials.refundExpectedAt ? `退款申请已受理，预计 ${credentials.refundExpectedAt} 到账；` : '退款申请已受理，等待后台审核；'}审核期间${isClass ? '面授报名资格' : '课程学习权限'}暂时冻结。`;
+  if (order.status === '已退款') return `退款已完成，${isClass ? '原面授班级名额已释放' : '课程学习权限已关闭'}。`;
+  if (order.status === '已取消') return `${order.paymentReason || '订单已取消'}。本次未授权、不分班、不扣减面授名额，可继续支付复用当前订单号。`;
+  return '订单状态以系统记录为准。';
 }
 function renderOrderDetail() {
   if (!isLoggedIn()) { renderOrders(); return; }
@@ -836,18 +933,14 @@ function renderOrderDetail() {
   if (!order) { layout(stack(card('<div class="mp-empty"><strong>未找到该订单</strong><p>订单不存在或已失效，请返回订单列表查看当前记录。</p></div>'), '<a class="mp-button secondary full" href="/learner/pages/orders.html">返回我的订单</a>')); return; }
   const student = state.students.find(row => row.id === order.studentId) || currentStudent();
   const times = orderTimes(order);
+  const credentials = orderCredentials(order);
   const isClass = item.type === 'class';
   if (isClass && order.cancelType === 'seat-allocation-failed') { renderSeatFailureOrder(order, item, student); return; }
   const isPaid = order.status === '已支付';
   const canRefund = isClass && isPaid;
   const displayStatus = paymentStatusLabel(order);
-  const statusCopy = order.status === '已取消' ? `${order.paymentReason || '订单已取消'}。当前未产生课程授权、面授分班或名额占用，可继续支付。` : { '待支付': '订单已创建，请在有效期内完成支付。', '已支付': '支付已确认，订单交易完成。', '退款中': '退款申请已提交，正在等待后台审核。', '已退款': isClass ? '退款已完成，面授报名资格已取消。' : '退款已完成，课程学习权限已关闭。' }[order.status] || '订单状态以系统记录为准。';
-  const productSummary = isClass
-    ? `<div class="mp-order-product-copy"><strong>${esc(item.className)}</strong><span>${esc(item.courseName || item.name)} · ${esc(item.teacher)}老师</span></div><div class="mp-order-product-cover class-cover">面授</div>`
-    : `<div class="mp-order-product-copy"><strong>${esc(item.name)}</strong><span>${esc(item.teacher)}老师 · 共${esc(item.hours)}课时</span></div><div class="mp-order-product-cover video-cover">视频</div>`;
-  const fulfillment = isClass
-    ? order.status === '已支付' ? ['已保留名额', 'green'] : order.status === '退款中' ? ['资格冻结', 'amber'] : order.status === '已退款' ? ['名额已释放', 'gray'] : ['未生效', 'gray']
-    : order.status === '已支付' ? ['已开通', 'green'] : order.status === '退款中' ? ['权限冻结', 'amber'] : order.status === '已退款' ? ['已关闭', 'gray'] : ['未生效', 'gray'];
+  const association = orderAssociation(order, item, isClass);
+  const refundable = order.status === '退款中' || order.status === '已退款';
   const primaryAction = isPaymentResumable(order)
     ? `<a class="mp-button full" href="/learner/pages/payment.html?courseId=${encodeURIComponent(item.id)}&orderId=${encodeURIComponent(order.id)}">${order.status === '待支付' ? '去支付' : '继续支付'}</a>`
     : isClass && isPaid
@@ -857,14 +950,16 @@ function renderOrderDetail() {
         : '';
   const secondaryAction = canRefund ? button('申请退款', `data-action="refund" data-order-id="${order.id}"`, 'secondary') : '';
   layout(stack(
-    card(`<div class="mp-order-detail-status">${pill(displayStatus, orderTone(order.status))}<span class="mp-muted">${isClass ? '面授课程订单' : '视频课程订单'}</span></div><div class="mp-order-status-copy">${esc(statusCopy)}</div>`),
-    card(`<div class="mp-order-product">${productSummary}</div><div class="mp-divider"></div><div class="mp-row"><span class="mp-label">订单金额</span><strong class="mp-price">${money2(order.amount || item.price)}</strong></div>`),
-    card(`<div class="mp-section-head"><h3>订单信息</h3><span class="mp-muted">交易记录</span></div><dl class="mp-order-detail-facts"><div><dt>订单号</dt><dd>${esc(order.id)}</dd></div>${isClass ? `<div><dt>当前学员</dt><dd>${esc(student.name)}</dd></div>` : `<div><dt>购买账号</dt><dd>${esc(purchaseAccount().name)}${purchaseAccount().phone ? `（${esc(purchaseAccount().phone)}）` : ''}</dd></div>`}<div><dt>下单时间</dt><dd>${esc(times.createdAt)}</dd></div><div><dt>${times.paidAt ? '支付时间' : '支付状态'}</dt><dd>${esc(times.paidAt || displayStatus)}</dd></div><div><dt>课程类型</dt><dd>${isClass ? '面授课程' : '视频课程'}</dd></div><div><dt>支付方式</dt><dd>${isPaid || times.paidAt ? '微信支付' : '未完成支付'}</dd></div>${order.paymentReason ? `<div><dt>支付说明</dt><dd>${esc(order.paymentReason)}</dd></div>` : ''}</dl>`),
-    card(`<div class="mp-section-head"><h3>${isClass ? '报名信息' : '课程权限'}</h3>${pill(...fulfillment)}</div>${isClass ? `<dl class="mp-order-detail-facts"><div><dt>班级</dt><dd>${esc(item.className)}</dd></div><div><dt>授课教师</dt><dd>${esc(item.teacher)}老师</dd></div><div><dt>上课时间</dt><dd>${esc(item.schedule)}</dd></div><div><dt>上课教室</dt><dd>${esc(item.campus)} · ${esc(item.classroom)}</dd></div></dl>` : `<p>${isPaid ? '课程学习权限已生效，学习状态和进度请前往“我的学习”查看。' : '完成支付后将开通课程学习权限，学习进度不会显示在订单状态中。'}</p>`}${['已取消'].includes(order.status) ? `<div class="mp-notice" style="margin-top:12px">本次未授权、不分班、不扣减面授名额；继续支付会复用当前订单号。</div>` : order.status === '退款中' ? `<div class="mp-notice" style="margin-top:12px">退款审核期间，${isClass ? '面授报名资格' : '课程学习权限'}暂时冻结。</div>` : order.status === '已退款' ? `<div class="mp-notice" style="margin-top:12px">退款完成后，${isClass ? '原面授班级名额已释放' : '课程学习权限已关闭'}。</div>` : !isClass && isPaid ? `<div class="mp-notice" style="margin-top:12px">视频课程订单不支持退款，订单状态与学习状态相互独立。</div>` : ''}`),
+    card(`<div class="mp-order-detail-status">${pill(displayStatus, orderTone(order.status))}<span class="mp-muted">${isClass ? '面授课程订单' : '视频课程订单'}</span></div><div class="mp-order-status-copy">${esc(orderStatusGuidance(order, isClass))}</div>`),
+    card(`<div class="mp-section-head"><h3>关联课程</h3><span class="mp-muted">${isClass ? '面授班级' : '视频课程'}</span></div><div class="mp-order-association"><div><strong>${esc(association.title)}</strong><span>${esc(association.line)}</span></div><a class="mp-button secondary" href="${association.href}">${association.label}</a></div><p class="mp-order-association-note">教师、上课时间、教室与学习进度在班级详情与学习页维护，订单详情不重复展开。</p>`),
+    card(`<div class="mp-section-head"><h3>金额与支付</h3><span class="mp-muted">交易凭证</span></div><dl class="mp-order-detail-facts"><div><dt>实付金额</dt><dd><strong class="mp-price">${money2(order.amount || item.price)}</strong></dd></div><div><dt>支付方式</dt><dd>${esc(credentials.payMethod)}</dd></div><div><dt>支付流水号</dt><dd>${esc(credentials.paymentNo || '未产生支付流水')}</dd></div><div><dt>支付时间</dt><dd>${esc(credentials.paidAt || '未完成支付')}</dd></div></dl>`),
+    refundable ? card(`<div class="mp-section-head"><h3>退款信息</h3>${pill(credentials.refundStatus || '处理中', order.status === '已退款' ? 'green' : 'amber')}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(credentials.refundNo || '—')}</dd></div><div><dt>退款金额</dt><dd>${money2(credentials.refundAmount)}</dd></div><div><dt>退款方式</dt><dd>${esc(credentials.refundMethod)}</dd></div><div><dt>退款状态</dt><dd>${esc(credentials.refundStatus || '处理中')}</dd></div><div><dt>${order.status === '已退款' ? '实际到账时间' : '预计到账时间'}</dt><dd>${esc(credentials.refundExpectedAt || '以渠道回执为准')}</dd></div><div class="wide"><dt>退款原因</dt><dd>${esc(credentials.refundReason)}</dd></div></dl>`) : '',
+    card(`<div class="mp-section-head"><h3>订单信息</h3><span class="mp-muted">交易记录</span></div><dl class="mp-order-detail-facts"><div><dt>订单号</dt><dd class="mp-order-no"><span>${esc(order.id)}</span><button class="mp-button secondary" type="button" data-action="copy-order-no" data-order-no="${esc(order.id)}">复制</button></dd></div><div><dt>下单时间</dt><dd>${esc(times.createdAt)}</dd></div>${isClass ? `<div><dt>报名学员</dt><dd>${esc(student.name)}</dd></div>` : `<div><dt>购买账号</dt><dd>${esc(purchaseAccount().name)}${purchaseAccount().phone ? `（${esc(purchaseAccount().phone)}）` : ''}</dd></div>`}<div><dt>订单类型</dt><dd>${isClass ? '面授课程' : '视频课程'}</dd></div>${order.paymentReason ? `<div class="wide"><dt>状态说明</dt><dd>${esc(order.paymentReason)}</dd></div>` : ''}</dl>`),
     primaryAction || secondaryAction ? `<div class="mp-order-detail-actions">${primaryAction}${secondaryAction ? `<div class="mp-actions">${secondaryAction}</div>` : ''}</div>` : '',
     `<a class="mp-button secondary full" href="/learner/pages/orders.html">返回我的订单</a>`
   ));
 }
+
 function renderSeatFailureOrder(order, item, student) {
   const candidates = state.courses.filter(candidate => candidate.type === 'class' && candidate.id !== item.id && candidate.classStatus === '招生中' && candidate.professional === item.professional && candidate.age === item.age && Number(candidate.seats?.split('/')[0] || 0) > 0);
   const candidateMarkup = candidates.length ? candidates.map(candidate => `<article class="mp-order-recommendation"><div><strong>${esc(candidate.className || candidate.name)}</strong><p>${esc(candidate.teacher)}老师 · ${esc(candidate.campus)} · ${esc(candidate.classroom || '教室待定')}</p><p>${esc(candidate.schedule || '时间待定')} · 余${esc(candidate.seats)} · ${money2(candidate.price)} · 截止${esc(candidate.deadline || '待定')}</p></div><button class="mp-button" type="button" data-action="seat-retry" data-course-id="${esc(candidate.id)}">重新报名</button></article>`).join('') : '<div class="mp-empty">暂无符合条件的班级，请返回班级列表或查看退款进度。</div>';
@@ -1167,7 +1262,7 @@ document.addEventListener('click', event => {
   renderOrderDetail();
   toast(success ? '退款成功回调已确认' : '退款失败，已进入重试');
 });
-document.addEventListener('click', event => { const action = event.target.closest('[data-action]')?.dataset.action; if (!action) return; if (action === 'seat-retry') { const courseId = event.target.closest('[data-course-id]').dataset.courseId; const dialog = document.createElement('dialog'); dialog.innerHTML = `<form method="dialog" class="mp-dialog-card"><h2>确认重新报名</h2><p>将进入所选班级的报名支付页面，当前订单退款流程不变。</p><div class="mp-actions"><button value="cancel" class="mp-button secondary">取消</button><button value="confirm" class="mp-button">确认重新报名</button></div></form>`; document.body.appendChild(dialog); dialog.showModal(); dialog.addEventListener('close', () => { if (dialog.returnValue === 'confirm') go(`/learner/pages/payment.html?courseId=${encodeURIComponent(courseId)}`); dialog.remove(); }, { once: true }); } if (action === 'courses') go('/learner/pages/courses.html'); if (action === 'consult') showConsultDialog(); if (action === 'share') toast('课程分享卡片已生成'); if (action === 'buy') { const trigger = event.target.closest('[data-course-id]'); const courseId = trigger.dataset.courseId; const item = course(courseId); const detailPath = item.type === 'video' ? '/learner/pages/course-detail.html' : '/learner/pages/class-detail.html'; if (!isLoggedIn()) go(`/login.html?redirect=${encodeURIComponent(`${detailPath}?courseId=${courseId}`)}`); else go(`/learner/pages/payment.html?courseId=${courseId}`); } if (action === 'learning') go('/learner/pages/video.html'); if (action === 'homework') go(`/learner/pages/homework.html?courseId=${event.target.closest('[data-course-id]').dataset.courseId}`); if (action === 'switch-student') switchStudent(); if (action === 'refund') { const orderId = event.target.closest('[data-order-id]')?.dataset.orderId; const order = state.orders.find(row => row.id === orderId); if (order) { order.status = '退款中'; saveState(); renderOrderDetail(); } toast('退款申请已提交，等待后台审核'); } });
+document.addEventListener('click', event => { const action = event.target.closest('[data-action]')?.dataset.action; if (!action) return; if (action === 'seat-retry') { const courseId = event.target.closest('[data-course-id]').dataset.courseId; const dialog = document.createElement('dialog'); dialog.innerHTML = `<form method="dialog" class="mp-dialog-card"><h2>确认重新报名</h2><p>将进入所选班级的报名支付页面，当前订单退款流程不变。</p><div class="mp-actions"><button value="cancel" class="mp-button secondary">取消</button><button value="confirm" class="mp-button">确认重新报名</button></div></form>`; document.body.appendChild(dialog); dialog.showModal(); dialog.addEventListener('close', () => { if (dialog.returnValue === 'confirm') go(`/learner/pages/payment.html?courseId=${encodeURIComponent(courseId)}`); dialog.remove(); }, { once: true }); } if (action === 'courses') go('/learner/pages/courses.html'); if (action === 'consult') showConsultDialog(); if (action === 'share') toast('课程分享卡片已生成'); if (action === 'buy') { const trigger = event.target.closest('[data-course-id]'); const courseId = trigger.dataset.courseId; const item = course(courseId); const detailPath = item.type === 'video' ? '/learner/pages/course-detail.html' : '/learner/pages/class-detail.html'; if (!isLoggedIn()) go(`/login.html?redirect=${encodeURIComponent(`${detailPath}?courseId=${courseId}`)}`); else go(`/learner/pages/payment.html?courseId=${courseId}`); } if (action === 'learning') go('/learner/pages/video.html'); if (action === 'homework') go(`/learner/pages/homework.html?courseId=${event.target.closest('[data-course-id]').dataset.courseId}`); if (action === 'switch-student') switchStudent(); if (action === 'copy-order-no') { const orderNo = event.target.closest('[data-order-no]')?.dataset.orderNo || ''; if (orderNo) copyOrderNo(orderNo); } if (action === 'refund') { const orderId = event.target.closest('[data-order-id]')?.dataset.orderId; const order = state.orders.find(row => row.id === orderId); if (order) { order.status = '退款中'; order.refundAt = order.refundAt || '刚刚'; order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.refundAmount ?? order.amount); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || '用户申请退款'; saveState(); renderOrderDetail(); } toast('退款申请已提交，等待后台审核'); } });
 
 subscribeDemoState(() => {
   state = readState();
