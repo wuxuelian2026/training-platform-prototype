@@ -1,3 +1,5 @@
+import { DATA_SCOPES, PERMISSION_POINTS, permissionById, permissionPointsByModule, permissionsOfRole } from './permissions.js';
+
 const systemRoot = document.querySelector('[data-system-page]');
 const systemPage = systemRoot?.dataset.systemPage;
 let systemData = null;
@@ -31,10 +33,22 @@ const roles = [
   { id: 'role-consultant', name: '课程顾问', key: 'course_consultant', description: '客户跟进、销售转化', users: 6, modules: '面授招生与CRM', updated: '2026-09-02', status: '启用', preset: true },
   { id: 'role-finance', name: '财务', key: 'finance', description: '财务核算、对账', users: 2, modules: '财务中心、商城订单', updated: '2026-09-04', status: '启用', preset: true }
 ];
-const permissionGroups = [
-  ['工作台', ['查看本人待办']], ['师资中心', ['查看', '档案维护', '证书审核']], ['课程中心', ['查看', '课程申报审核', '内容与资源管理']], ['商城运营', ['查看订单', '收款记录', '订单处理']], ['面授招生与CRM', ['线索与试听', '报名转化', '班级与订单处理']], ['物资中心', ['查看', '维护', '出入库', '台账导出']], ['教务执行监管', ['查看', '排班与执行', '结业复核']], ['财务中心', ['工资管理', '收款记录', '退款处理']], ['系统管理', ['用户管理', '角色权限', '参数配置']]
-];
+// CR-2026-027：原 permissionGroups 字面量清单已迁移到 shared/js/permissions.js（权限点单一事实源）。
 const settings = { platform: '湖北艺术职业学院继续教育', timezone: 'Asia/Shanghai（UTC+8）', defaultLessonMinutes: 90, homeworkDeadlineHours: 72, attendanceThreshold: 80, homeworkThreshold: 80, switches: { teacherApplication: true, anonymousConsultation: true, messageRetry: true, consultantTrial: true } };
+bootstrapRolePermissions();
+// CR-2026-027：角色的权限点与模块列来自预置初始数据，勾选结果保存在本地并可覆盖预置值。
+function bootstrapRolePermissions() {
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem('hbyx-admin-role-permissions') || '{}'); } catch { stored = {}; }
+  const storedByKey = Object.fromEntries((Array.isArray(stored) ? stored : []).map((item) => [item.key, item]));
+  roles.forEach((role) => {
+    const preset = permissionsOfRole(role.key);
+    const saved = storedByKey[role.key];
+    role.permissions = saved?.permissions?.length ? saved.permissions : preset;
+    role.scopes = saved?.scopes || role.scopes || {};
+    role.modules = saved?.modules || [...new Set(role.permissions.map((id) => permissionById(id)?.module).filter(Boolean))].join('、') || '未配置';
+  });
+}
 const studentUsers = [
   { id: 'parent-001', accountNo: 'STU-20260001', name: '林女士', phone: '138****2026', login: '验证码登录', status: '启用', registered: '2026-08-20 09:12', firstLogin: '2026-08-20 09:13', lastLogin: '2026-09-11 10:20', ip: '10.0.***.26', students: [{ name: '林知夏', relation: '女儿', gender: '女', age: '9岁', phone: '138****1122', status: '正常', current: true, classes: 1, courses: 2 }, { name: '林知远', relation: '儿子', gender: '男', age: '10岁', phone: '138****3344', status: '正常', current: false, classes: 0, courses: 1 }], audits: [] },
   { id: 'parent-002', accountNo: 'STU-20260002', name: '周女士', phone: '139****2027', login: '微信授权', status: '启用', registered: '2026-08-22 14:05', firstLogin: '2026-08-22 14:06', lastLogin: '2026-09-10 16:40', ip: '10.0.***.27', students: [{ name: '周予安', relation: '女儿', gender: '女', age: '10岁', phone: '139****7788', status: '正常', current: true, classes: 1, courses: 1 }], audits: [] },
@@ -43,7 +57,10 @@ const studentUsers = [
 const studentUserRole = new URLSearchParams(window.location.search).get('role') || systemRoot?.closest('[data-admin-shell]')?.dataset.role || 'super_admin';
 const studentUserAccounts = studentUsers.map((item) => ({ ...item, avatar: item.name.slice(-1), loginMethod: item.login, registeredAt: item.registered, firstLoginAt: item.firstLogin, lastLoginAt: item.lastLogin, lastLoginIp: item.ip, consentAt: item.registered, stateChangedAt: item.audits[0]?.time || item.registered, stateChangedBy: item.audits[0]?.operator || '系统', learners: item.students.map((student) => ({ ...student, birthday: student.age, linkedAt: item.registered })), audits: item.audits.map((audit) => ({ ...audit, at: audit.at || audit.time })) }));
 
-function renderStudentUsers() { const rows = studentUsers; const role = new URLSearchParams(location.search).get('role') || 'super_admin'; if (['research_lead', 'course_consultant', 'finance'].includes(role)) { pageFrame('无权限访问', '当前角色未配置学员用户管理权限。', '', '<div class="card empty">暂无权限查看该页面，请联系超级管理员。</div>'); return; } const canToggle = role === 'super_admin'; pageFrame('学员用户管理', canToggle ? '超级管理员可查看并启停账号；关联学员只读展示，敏感信息默认脱敏。' : '教务主管仅可查看账号和关联学员，不能执行启停操作。', '', metrics([['账号总数', rows.length, '家长/监护人账号'], ['启用', rows.filter(r => r.status === '启用').length, '可正常登录'], ['禁用', rows.filter(r => r.status === '禁用').length, '登录已阻断'], ['关联学员', rows.reduce((n, r) => n + r.students.length, 0), '详情完整展示']]) + filterPanel('student-user-filter', field('关键词', 'keyword', 'text', '昵称 / 手机号 / 账号编号', true) + select('账号状态', 'status', ['启用', '禁用']) + select('登录方式', 'login', ['验证码登录', '密码登录', '微信授权'])) + table('<thead><tr><th>账号</th><th>登录手机号</th><th>登录方式</th><th>关联学员数</th><th>状态</th><th>最近登录</th><th>注册时间</th><th>操作</th></tr></thead>')); const row = r => `<td><strong>${r.name}</strong><br><span class="muted">${r.accountNo}</span></td><td>${r.phone}</td><td>${r.login}</td><td>${r.students.length}</td><td>${tag(r.status)}</td><td>${r.lastLogin}</td><td>${r.registered}</td><td class="action-cell"><button class="text-button" data-system-action="student-detail">查看详情</button>${canToggle ? `<button class="text-button ${r.status === '启用' ? 'danger-link' : ''}" data-system-action="student-toggle">${r.status === '启用' ? '禁用' : '启用'}</button>` : ''}</td>`; renderRows(rows, row); bindFilter('student-user-filter', rows, form => { const keyword = form.keyword.value.trim(); return r => (!keyword || `${r.name}${r.phone}${r.accountNo}`.includes(keyword)) && (!form.status.value || r.status === form.status.value) && (!form.login.value || r.login === form.login.value); }, row); }
+// CR-2026-027：学员用户管理的可访问与可操作按权限点判定（PERM-SYSTEM-002 查看 / 启停），不再按角色名。
+function currentRoleKey() { return window.hbyxPermissions?.roleKey || new URLSearchParams(location.search).get('role') || systemRoot?.closest('[data-admin-shell]')?.dataset.role || 'super_admin'; }
+const roleCan = (id) => (window.hbyxPermissions ? window.hbyxPermissions.can(id) : permissionsOfRole(currentRoleKey()).includes(id));
+function renderStudentUsers() { const rows = studentUsers; if (!roleCan('PERM-SYSTEM-002')) { const point = permissionById('PERM-SYSTEM-002'); pageFrame('暂无权限', '当前账号未获得访问本页所需的权限点。', '', `<div class="card empty">缺少权限点：${point ? `${point.id} ${point.action}（${point.note}）` : 'PERM-SYSTEM-002'}。请在「角色权限管理」中开启后重试；前端隐藏入口不代表已授权，接口层同样按权限点与数据范围校验。</div>`); return; } const canToggle = roleCan('PERM-SYSTEM-001'); pageFrame('学员用户管理', canToggle ? '超级管理员可查看并启停账号；关联学员只读展示，敏感信息默认脱敏。' : '教务主管仅可查看账号和关联学员，不能执行启停操作。', '', metrics([['账号总数', rows.length, '家长/监护人账号'], ['启用', rows.filter(r => r.status === '启用').length, '可正常登录'], ['禁用', rows.filter(r => r.status === '禁用').length, '登录已阻断'], ['关联学员', rows.reduce((n, r) => n + r.students.length, 0), '详情完整展示']]) + filterPanel('student-user-filter', field('关键词', 'keyword', 'text', '昵称 / 手机号 / 账号编号', true) + select('账号状态', 'status', ['启用', '禁用']) + select('登录方式', 'login', ['验证码登录', '密码登录', '微信授权'])) + table('<thead><tr><th>账号</th><th>登录手机号</th><th>登录方式</th><th>关联学员数</th><th>状态</th><th>最近登录</th><th>注册时间</th><th>操作</th></tr></thead>')); const row = r => `<td><strong>${r.name}</strong><br><span class="muted">${r.accountNo}</span></td><td>${r.phone}</td><td>${r.login}</td><td>${r.students.length}</td><td>${tag(r.status)}</td><td>${r.lastLogin}</td><td>${r.registered}</td><td class="action-cell"><button class="text-button" data-system-action="student-detail">查看详情</button>${canToggle ? `<button class="text-button ${r.status === '启用' ? 'danger-link' : ''}" data-system-action="student-toggle">${r.status === '启用' ? '禁用' : '启用'}</button>` : ''}</td>`; renderRows(rows, row); bindFilter('student-user-filter', rows, form => { const keyword = form.keyword.value.trim(); return r => (!keyword || `${r.name}${r.phone}${r.accountNo}`.includes(keyword)) && (!form.status.value || r.status === form.status.value) && (!form.login.value || r.login === form.login.value); }, row); }
 function openStudentDetail(row) { const students = row.students.map(s => `<tr><td>${s.name}</td><td>${s.relation}</td><td>${s.gender}</td><td>${s.age}</td><td>${s.phone}</td><td>${s.status}</td><td>${s.current ? '是' : '否'}</td><td>${s.classes}</td><td>${s.courses}</td></tr>`).join(''); const audits = row.audits.length ? row.audits.map(a => `<tr><td>${a.action}</td><td>${a.before}</td><td>${a.after}</td><td>${a.operator}</td><td>${a.time}</td><td>${a.reason}</td></tr>`).join('') : '<tr><td colspan="6">暂无状态变更记录</td></tr>'; openDialog(`${row.name} · 学员用户详情`, `${row.accountNo} · 账号与关联学员`, `<h3>账号信息</h3><dl class="system-detail-list"><dt>登录手机号</dt><dd>${row.phone}</dd><dt>登录方式</dt><dd>${row.login}</dd><dt>状态</dt><dd>${tag(row.status)}</dd><dt>注册时间</dt><dd>${row.registered}</dd><dt>首次登录</dt><dd>${row.firstLogin}</dd><dt>最近登录/IP</dt><dd>${row.lastLogin} / ${row.ip}</dd><dt>禁用原因</dt><dd>${row.disabledReason || '—'}</dd></dl><h3>关联学员</h3><div class="table-wrap"><table><thead><tr><th>姓名</th><th>关系</th><th>性别</th><th>年龄段</th><th>手机号</th><th>状态</th><th>当前</th><th>在读班级</th><th>已报名课程</th></tr></thead><tbody>${students}</tbody></table></div><h3>操作记录</h3><div class="table-wrap"><table><thead><tr><th>操作</th><th>操作前</th><th>操作后</th><th>操作人</th><th>时间</th><th>原因</th></tr></thead><tbody>${audits}</tbody></table></div>`); }
 function renderUsers() {
   systemData = users;
@@ -120,7 +137,40 @@ function handleAction(action, row) {
   if (action === 'role-toggle') { const target = row.status === '启用' ? '禁用' : '启用'; const dialog = openDialog(`确认${target}角色`, target === '禁用' ? '禁用后该角色下用户权限立即失效。' : '启用后该角色可继续分配给后台用户。', `<p>确认${target}角色“${escapeHtml(row.name)}”？</p>`, `<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-confirm-action="role-toggle">确认${target}</button>`); dialog.dataset.rowId = row.id; return dialog; }
   if (action === 'role-delete') { if (row.users > 0) return openDialog('无法删除角色', '删除前需要转移该角色下的用户。', `<p class="system-danger">该角色下仍有 ${row.users} 名用户，请先转移用户后再操作。</p>`); const dialog = openDialog('确认删除角色', '删除后角色记录不可恢复。', `<p>确认删除角色“${escapeHtml(row.name)}”？</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" data-confirm-action="role-delete">确认删除</button>'); dialog.dataset.rowId = row.id; return dialog; }
 }
-function openPermissionDialog(row) { const body = `<div class="permission-groups">${permissionGroups.map(([group, items]) => `<section class="permission-group"><h3>${group}</h3><div class="permission-items">${items.map((item, index) => `<label class="permission-item"><input type="checkbox" ${row.name === '超级管理员' || (row.name === '教务主管' && ['查看', '排班与执行', '结业复核', '维护', '出入库', '台账导出'].includes(item)) ? 'checked' : ''} data-permission="${escapeHtml(group)}-${escapeHtml(item)}"><span>${item}</span></label>`).join('')}</div></section>`).join('')}</div>`; return openSimpleForm('权限分配', `为“${row.name}”配置菜单级可见权限。`, body, () => { closeDialog(); showToast('角色权限已保存，变更将记录审计日志。'); }); }
+// CR-2026-027：权限分配按权限点清单分组渲染，每条权限点可单独设置数据范围；默认勾选取自角色已有配置（预置角色仅是初始数据）。
+const roleStateKey = 'hbyx-admin-role-permissions';
+const auditEntries = [];
+function persistRoleState() { try { localStorage.setItem(roleStateKey, JSON.stringify(roles.map((role) => ({ key: role.key, permissions: role.permissions || [], scopes: role.scopes || {}, modules: role.modules })))); } catch { /* 忽略存储失败 */ } }
+function selectedPermissionsOf(role) {
+  if (Array.isArray(role.permissions) && role.permissions.length) return role.permissions;
+  const preset = permissionsOfRole(role.key);
+  return preset.length ? preset : PERMISSION_POINTS.map((point) => point.id);
+}
+function openPermissionDialog(row) {
+  const selected = new Set(selectedPermissionsOf(row));
+  const scopeOf = (point) => (row.scopes && row.scopes[point.id]) || ['all'];
+  const body = '<div class="permission-groups">' + permissionPointsByModule().map(({ module, points }) => '<section class="permission-group"><h3>' + escapeHtml(module) + '<small>' + points.length + ' 个权限点</small></h3><div class="permission-items">' + points.map((point) => {
+    const scopes = Array.isArray(point.scopes) && point.scopes.length ? point.scopes : ['all'];
+    const chosen = scopeOf(point);
+    const scopeControl = scopes.length > 1
+      ? '<select class="permission-scope" data-permission-scope="' + point.id + '" aria-label="' + escapeHtml(point.action) + '数据范围">' + scopes.map((key) => { const scope = DATA_SCOPES.find((item) => item.key === key); return '<option value="' + key + '"' + (chosen[0] === key ? ' selected' : '') + '>' + escapeHtml(scope?.label || key) + '</option>'; }).join('') + '</select>'
+      : '<span class="permission-scope readonly">' + escapeHtml(DATA_SCOPES.find((item) => item.key === scopes[0])?.label || '全部') + '</span>';
+    return '<label class="permission-item"><input type="checkbox"' + (selected.has(point.id) ? ' checked' : '') + ' data-permission="' + point.id + '"><span><strong>' + escapeHtml(point.object) + ' · ' + escapeHtml(point.action) + '</strong><small>' + point.id + ' · ' + escapeHtml(point.note || '') + '</small></span>' + scopeControl + '</label>';
+  }).join('') + '</div></section>').join('') + '</div>';
+  return openSimpleForm('权限分配', '为“' + row.name + '”按其权限点配置动作权限与数据范围；未配置范围的权限点按“全部”处理。', body, () => {
+    const checked = [...document.querySelectorAll('[data-permission]:checked')].map((input) => input.dataset.permission);
+    row.permissions = checked;
+    row.scopes = Object.fromEntries(checked.map((id) => [id, [document.querySelector('[data-permission-scope="' + id + '"]')?.value || 'all']]));
+    row.modules = [...new Set(checked.map((id) => permissionById(id)?.module).filter(Boolean))].join('、') || '未配置';
+    row.updated = '刚刚';
+    persistRoleState();
+    auditEntries.unshift({ id: 'audit-' + Date.now(), action: '权限分配', target: row.name, detail: '勾选 ' + checked.length + ' 个权限点，数据范围按权限点保存', at: '刚刚' });
+    window.hbyxLastRoleAudit = auditEntries[0];
+    closeDialog();
+    renderRoles();
+    showToast(row.name + '权限已保存（' + checked.length + ' 个权限点），变更已写入审计日志。');
+  });
+}
 
 document.addEventListener('submit', (event) => { if (event.target.id === 'student-user-toggle-form') setTimeout(persistStudentUserState, 0); }, true);
 document.addEventListener('click', (event) => {

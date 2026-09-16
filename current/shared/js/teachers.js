@@ -4,6 +4,7 @@ import { mountRichEditor } from './rich-editor.js';
 import { readDemoState, writeDemoState } from './demo-store.js';
 import { readXlsxSheetRows } from './xlsx-lite.js';
 import { teacherFactsById } from './teacher-facts.js';
+import { permissionsOfRole } from './permissions.js';
 import { TEACHER_PROFILE_LABELS, teacherProfileMask } from './teacher-profile-fields.js';
 import { explainTeacherCapacity, summarizeTeacherCapacity } from './teacher-capacity.js';
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
@@ -123,7 +124,7 @@ function renderFeaturedSwitch(row, canManage) {
   const cell = row.querySelector('[data-cell="featured"]');
   if (!cell) return;
   const checked = (readDemoState().featuredTeacherIds || []).includes(row.dataset.teacherId);
-  cell.innerHTML = `<label class="teacher-featured-switch"><input type="checkbox" role="switch" data-action="toggle-featured"${checked ? ' checked' : ''}${canManage ? '' : ' disabled'} aria-label="将${row.dataset.teacher}设为名师推荐"><span class="teacher-featured-track" aria-hidden="true"></span><span data-featured-label>${checked ? '是' : '否'}</span></label>`;
+  cell.innerHTML = `<label class="teacher-featured-switch" data-perm="PERM-TEACHER-007"><input type="checkbox" role="switch" data-action="toggle-featured"${checked ? ' checked' : ''}${canManage ? '' : ' disabled'} aria-label="将${row.dataset.teacher}设为名师推荐"><span class="teacher-featured-track" aria-hidden="true"></span><span data-featured-label>${checked ? '是' : '否'}</span></label>`;
 }
 
 function updateFeaturedTeacher(row, checked) {
@@ -483,11 +484,12 @@ function initTeacherList() {
   document.querySelector('[data-action="teacher-import-validate"]')?.addEventListener('click', validateTeacherImport);
   document.querySelector('[data-action="teacher-import-commit"]')?.addEventListener('click', commitTeacherImport);
   document.querySelectorAll('[data-action="teacher-import-errors"]').forEach((button) => button.addEventListener('click', downloadTeacherImportErrors));
-  const importOpen = document.querySelector('[data-action="teacher-import-open"]');
-  // CR009-QA-04：角色与 admin-shell 同口径——URL 参数 > 登录会话 > 默认，权限不再只认 URL 参数。
+  // CR009-QA-04／CR-2026-027：角色口径与 admin-shell 同源（URL 参数 > 登录会话 > 默认），
+  // 但可见性改为按权限点判定，不再按角色名；按钮本身由 data-perm 门禁统一隐藏。
   const currentRole = new URLSearchParams(location.search).get('role') || readAdminSession()?.role || 'academic_lead';
-  const canManageFeatured = ['super_admin', 'academic_lead'].includes(currentRole);
-  if (importOpen && !['super_admin', 'academic_lead'].includes(currentRole)) importOpen.remove();
+  const roleCan = (id) => (window.hbyxPermissions ? window.hbyxPermissions.can(id) : permissionsOfRole(currentRole).includes(id));
+  const canManageFeatured = roleCan('PERM-TEACHER-007');
+  document.querySelector('[data-action="teacher-import-open"]')?.addEventListener('click', (event) => { if (!roleCan('PERM-TEACHER-003')) { event.preventDefault(); event.stopImmediatePropagation(); } }, true);
   applyHashFilters();
   window.addEventListener('hashchange', () => { applyHashFilters(); applyTeacherFilters(); });
   document.querySelectorAll('tr[data-teacher-id]').forEach((row) => {

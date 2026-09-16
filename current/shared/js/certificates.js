@@ -176,7 +176,7 @@ function updateActionCell(row) {
   // UI v1.2 状态—操作矩阵 + 2026-09-16 口径：未引用且未审核可撤回（撤回后为“已撤销”）；
   // 证书不设归档状态，已审核的记录通过重新上传生成新版本改变材料。
   const withdraw = row.dataset.status === '待审核' && row.dataset.referenced !== '是';
-  cell.innerHTML = `${review ? '<button type="button" class="text-button" data-action="review">审核</button>' : ''}${reupload ? '<button type="button" class="text-button" data-action="reupload">重新上传</button>' : ''}<button type="button" class="text-button" data-action="view">查看</button>${withdraw ? '<button type="button" class="text-button" data-action="withdraw">撤回</button>' : ''}<button type="button" class="text-button danger-link" data-action="delete">删除</button>`;
+  cell.innerHTML = `${review ? '<button type="button" class="text-button" data-action="review" data-perm="PERM-TEACHER-005">审核</button>' : ''}${reupload ? '<button type="button" class="text-button" data-action="reupload">重新上传</button>' : ''}<button type="button" class="text-button" data-action="view">查看</button>${withdraw ? '<button type="button" class="text-button" data-action="withdraw">撤回</button>' : ''}<button type="button" class="text-button danger-link" data-action="delete">删除</button>`;
 }
 
 // 证书审核状态以页签切换：状态取值只读 spec/states 的 SM-TEACHER-CERTIFICATE，
