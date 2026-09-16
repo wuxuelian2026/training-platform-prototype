@@ -40,6 +40,26 @@ function migrateLightweightCourseArrangeStatus(state) {
   return changed;
 }
 
+// CR-2026-020 兼容：旧版本把运营四字段存在课程档案（library）上，
+// 现在按课程下发给已存在的商品与班级作为初值；已有值的售卖单元不被覆盖。
+const SALE_UNIT_DISPLAY_KEYS = ['cover', 'coverFile', 'displayDetail', 'tags', 'recommendation'];
+function migrateCourseDisplayToSaleUnits(state) {
+  let changed = false;
+  const legacy = (state.library || []).filter((row) => row && typeof row === 'object');
+  const copyDown = (record, courseId) => {
+    const source = [...legacy].reverse().find((row) => toCanonicalCourseId(row.sourceCourseId) === toCanonicalCourseId(courseId));
+    if (!source) return;
+    if (!record.cover && source.cover) { record.cover = source.cover; changed = true; }
+    if (!record.coverFile && source.coverFile) { record.coverFile = source.coverFile; changed = true; }
+    if (!record.displayDetail && source.detail) { record.displayDetail = source.detail; changed = true; }
+    if (!record.tags && source.tags) { record.tags = source.tags; changed = true; }
+    if (!record.recommendation && source.recommendation) { record.recommendation = source.recommendation; changed = true; }
+  };
+  (state.products || []).forEach((record) => { if (record && typeof record === 'object') copyDown(record, record.courseId); });
+  (state.classes || []).forEach((record) => { if (record && typeof record === 'object') copyDown(record, record.courseId || record.id); });
+  return changed;
+}
+
 function migrateCourseApplicationStatusLabel(state) {
   let changed = false;
   (state.applications || []).forEach(record => {
@@ -93,7 +113,8 @@ function readStored() {
     const courseReferencesMigrated = migrateCourseReferences(merged);
     const arrangeStatusMigrated = migrateLightweightCourseArrangeStatus(merged);
     const applicationStatusMigrated = migrateCourseApplicationStatusLabel(merged);
-    if (courseReferencesMigrated || arrangeStatusMigrated || applicationStatusMigrated) {
+    const displayMigrated = migrateCourseDisplayToSaleUnits(merged);
+    if (courseReferencesMigrated || arrangeStatusMigrated || applicationStatusMigrated || displayMigrated) {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* private mode: in-memory migration still applies. */ }
     }
     return merged;

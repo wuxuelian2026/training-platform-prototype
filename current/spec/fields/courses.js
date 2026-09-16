@@ -4,7 +4,7 @@
 
 // CR-2026-012：课程展示信息六个字段按性质分流，规格只在这里定义一次。
 //   教学属性（难度等级、适合年龄）：教师申报填写 → 后台编排带出可改 → 写入课程档案（CR-2026-014）。
-//   运营素材（课程封面、图文详情、课程标签、C 端推荐语）：发布视频商品 / 发布面授班级时维护，写入课程档案。
+//   运营素材（课程封面、图文详情、课程标签、C 端推荐语）：发布视频商品 / 发布面授班级时维护，写入各自的售卖单元（CR-2026-020）。
 // 需要引用这两个数组的页面用 courseFieldRows() 生成带本页唯一编号的字段行，不要复制定义。
 export const COURSE_TEACHING_FIELDS = [
   { label: '难度等级', type: '下拉', length: '启蒙 / 初级 / 中级 / 高级 / 考级冲刺', required: '是', note: '教学属性，教师申报时维护；后台编排可修改，发布环节只读带入', constraints: { options: ['启蒙', '初级', '中级', '高级', '考级冲刺'] } },
@@ -12,10 +12,10 @@ export const COURSE_TEACHING_FIELDS = [
 ];
 
 export const COURSE_DISPLAY_FIELDS = [
-  { label: '课程封面', type: '图片上传', length: '单个图片', required: '完整课程首次发布必填', note: '课程级存储；完整课程首次发布必填，轻量课程档案可选填，未上传时使用系统默认封面', constraints: { maxFiles: 1, image: true } },
-  { label: '图文详情', type: '富文本', length: '≤ 2000 字', required: '否', note: '课程级存储，学员端课程详情展示', constraints: { maxLength: 2000, richText: true } },
-  { label: '课程标签', type: '标签输入', length: '单个标签 ≤ 12 字', required: '否', note: '课程级存储，列表卡片与详情页展示' },
-  { label: 'C 端推荐语', type: '文本', length: '≤ 30 字', required: '否', note: '课程级存储，学员端展示的推荐语', constraints: { maxLength: 30 } }
+  { label: '课程封面', type: '图片上传', length: '单个图片', required: '完整课程首次发布必填', note: '售卖单元级存储；完整课程首次发布必填，轻量课程档案可选填，未上传时使用系统默认封面', constraints: { maxFiles: 1, image: true } },
+  { label: '图文详情', type: '富文本', length: '≤ 2000 字', required: '否', note: '售卖单元级存储，学员端课程详情展示', constraints: { maxLength: 2000, richText: true } },
+  { label: '课程标签', type: '标签输入', length: '单个标签 ≤ 12 字', required: '否', note: '售卖单元级存储，列表卡片与详情页展示' },
+  { label: 'C 端推荐语', type: '文本', length: '≤ 30 字', required: '否', note: '售卖单元级存储，学员端展示的推荐语', constraints: { maxLength: 30 } }
 ];
 
 // 页面字段表要求编号在本页唯一：引用共享定义时按页前缀与起始序号生成当前页的行。

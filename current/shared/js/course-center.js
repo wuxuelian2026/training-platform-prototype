@@ -1,7 +1,7 @@
 import { relativePath } from './paths.js';
 import { demoId, demoTime, readDemoState, removeDemoRecord, updateDemoRecord, upsertDemoRecord } from './demo-store.js';
 import { applicationSeed, courseIdForApplication } from './course-seed.js';
-import { courseAgesText, courseArchiveFor, persistCourseDisplay } from './course-display.js';
+import { courseAgesText, courseArchiveFor, persistCourseTeaching } from './course-display.js';
 import { courseArchiveSeed } from './course-display.js';
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 
@@ -33,7 +33,7 @@ const resources = [
   { id: 'res-006', name: '芭蕾基础动作参考.jpg', type: '其他', major: '芭蕾舞', level: '中级', size: '2.1MB', teacher: '王玥', uploadedAt: '2026-08-28 13:50', references: 0, ext: 'image' }
 ];
 
-// CR-2026-012：课程档案（课程级存储）的种子与读写入口统一在 shared/js/course-display.js。
+// CR-2026-012：课程档案（教学属性）与售卖单元展示素材的读写入口统一在 shared/js/course-display.js。
 const library = courseArchiveSeed();
 
 const catalog = {
@@ -119,7 +119,7 @@ function courseFromApplication(item) {
 }
 function syncLibraryCourse(item) {
   const existing = library.find(record => record.sourceCourseId === item.id);
-  const record = existing || { id: `LIB-${item.id}`, sourceCourseId: item.id, archive: '完整课程', name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: item.hours, status: '已完成', cover: '未配置', coverFile: '', difficulty: '', ages: [], detail: '', tags: [], recommendation: '' };
+  const record = existing || { id: `LIB-${item.id}`, sourceCourseId: item.id, archive: '完整课程', name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: item.hours, status: '已完成', difficulty: '', ages: [], detail: '' };
   // 教学属性来自申报；只有档案里还没有值时，才用课程主体带的申报值补齐，不覆盖编排阶段的修改。
   Object.assign(record, { sourceCourseId: item.id, name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: item.hours, status: '已完成', difficulty: record.difficulty || item.difficulty || '', ages: (record.ages && record.ages.length ? record.ages : item.ages) || [] });
   if (!existing) library.unshift(record);
@@ -327,7 +327,7 @@ function openWorkbench(id) {
     if (!teaching.difficulty || !teaching.ages.length) { showToast('请选择难度等级和适合年龄（教学属性必填）', 'error'); return false; }
     item.difficulty = teaching.difficulty;
     item.ages = [...teaching.ages];
-    persistCourseDisplay(item, { difficulty: teaching.difficulty, ages: [...teaching.ages] });
+    persistCourseTeaching(item, { difficulty: teaching.difficulty, ages: [...teaching.ages] });
     return true;
   };
   const teachingPanel = () => '<section class="course-workbench-teaching"><div class="course-pane-head"><div><h3>教学属性</h3><p>默认读取教师申报值，可在编排阶段调整；保存后写入课程档案</p></div></div><div class="course-teaching-grid"><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label><select id="workbench-difficulty" aria-label="难度等级"><option value="">请选择难度等级</option>' + ['启蒙', '初级', '中级', '高级', '考级冲刺'].map(value => `<option ${teaching.difficulty === value ? 'selected' : ''}>${value}</option>`).join('') + '</select></div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">' + ['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="workbench-age" value="${value}" ${teaching.ages.includes(value) ? 'checked' : ''} />${value}</label>`).join('') + '</div></div></div></section>';
@@ -438,9 +438,9 @@ function openResourcePreview(id) {
 }
 
 function openLightweightForm(id = null) {
-  const current = id ? library.find(item => item.id === id) : { name: '', major: '', hours: 16, detail: '', cover: '未配置', difficulty: '启蒙', ages: ['少儿'], tags: [], recommendation: '' };
+  const current = id ? library.find(item => item.id === id) : { name: '', major: '', hours: 16, detail: '', difficulty: '启蒙', ages: ['少儿'] };
   const dialog = modal(id ? '编辑轻量课程档案' : '新建轻量课程档案', '轻量档案只用于快速报名班级，不进入课程内容编排', `<form data-form="lightweight-form" data-id="${id || ''}"><div class="course-detail-grid"><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required value="${escapeHtml(current.name)}" placeholder="填写课程名称" /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major', current.major)}</div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="面授课程" readonly /></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="${current.hours}" /></div><div class="course-field wide"><label>简短课程介绍 <span class="sub-cell">必填</span></label><textarea name="detail" required placeholder="填写快速报名详情页使用的介绍">${escapeHtml(current.detail)}</textarea></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', ['启蒙', '初级', '中级', '高级', '考级冲刺'], current.difficulty, '')}</div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" ${(current.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div><div class="course-field wide"><label>课程大纲</label><textarea name="outline" placeholder="可选：填写课程大纲，不作为教学执行前置条件"></textarea></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存档案</button></div></form>`);
-  dialog.querySelector('form').addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); if (!data.get('name').trim() || !data.get('major') || !data.get('detail').trim() || Number(data.get('hours')) <= 0) { showToast('请补齐课程名称、专业、介绍和总课时', 'error'); return; } if (!data.get('difficulty') || !data.getAll('ages').length) { showToast('请选择难度等级和适合年龄（教学属性必填）', 'error'); return; } const record = { id: id || `LIB-${Date.now()}`, name: data.get('name').trim(), archive: '轻量课程档案', type: '面授课程', major: data.get('major'), teacher: id ? current.teacher : '李教务', hours: Number(data.get('hours')), cover: current.cover || '未配置', difficulty: data.get('difficulty'), ages: data.getAll('ages'), detail: data.get('detail').trim() }; if (id) { Object.assign(current, record); delete current.status; persistLibrary(record); } else { library.unshift(record); persistLibrary(record); } closeModal(); renderLibrary(root()); showToast(id ? '轻量课程档案已保存' : '轻量课程档案已创建'); });
+  dialog.querySelector('form').addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); if (!data.get('name').trim() || !data.get('major') || !data.get('detail').trim() || Number(data.get('hours')) <= 0) { showToast('请补齐课程名称、专业、介绍和总课时', 'error'); return; } if (!data.get('difficulty') || !data.getAll('ages').length) { showToast('请选择难度等级和适合年龄（教学属性必填）', 'error'); return; } const record = { id: id || `LIB-${Date.now()}`, name: data.get('name').trim(), archive: '轻量课程档案', type: '面授课程', major: data.get('major'), teacher: id ? current.teacher : '李教务', hours: Number(data.get('hours')), difficulty: data.get('difficulty'), ages: data.getAll('ages'), detail: data.get('detail').trim() }; if (id) { Object.assign(current, record); delete current.status; persistLibrary(record); } else { library.unshift(record); persistLibrary(record); } closeModal(); renderLibrary(root()); showToast(id ? '轻量课程档案已保存' : '轻量课程档案已创建'); });
 }
 
 function openCatalogForm(type, id = null) {

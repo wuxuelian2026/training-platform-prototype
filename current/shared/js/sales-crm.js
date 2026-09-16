@@ -3,7 +3,7 @@ import { cloneClassSeed } from './class-seed.js';
 import { cloneCourseCatalogSeed } from './course-catalog-seed.js';
 import { addWeeksLocal, toLocalDateString } from './date-utils.js';
 import { cloneProductSeed } from './product-seed.js';
-import { COURSE_DISPLAY_UNSET, courseAgesText, courseArchiveFor, courseDisplayConfigured, courseDisplayTags, persistCourseDisplay } from './course-display.js';
+import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseDisplayConfigured, courseDisplayTags, persistSaleUnitDisplay, productForCourse, saleUnitDisplay } from './course-display.js';
 import { mergeVenues, resolveVenueId } from './venue-seed.js';
 import { DEFAULT_LESSON_DURATION, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
 
@@ -134,9 +134,9 @@ function courseTeachingRow(course) {
   const archive = courseArchiveFor(course);
   return `<label class="form-field"><span>难度等级</span><input value="${escapeHtml(archive?.difficulty || '—')}" readonly class="readonly-field" /></label><label class="form-field"><span>适合年龄</span><input value="${escapeHtml(courseAgesText(archive) || '—')}" readonly class="readonly-field" /></label>`;
 }
-// CR-2026-012：运营四字段写入课程档案（课程级存储），不写商品记录或班级记录。
-function courseDisplaySection(course, { editDisplay = false } = {}) {
-  const archive = courseArchiveFor(course);
+// CR-2026-020：运营四字段写在售卖单元自身（商品或班级），不再写入课程档案。
+function courseDisplaySection(course, unit = {}, { editDisplay = false, unitLabel = '商品' } = {}) {
+  const archive = saleUnitDisplay(unit);
   const configured = courseDisplayConfigured(archive);
   const editable = editDisplay || !configured;
   const coverRequired = !configured && course?.archive === '完整课程';
@@ -144,19 +144,19 @@ function courseDisplaySection(course, { editDisplay = false } = {}) {
   const coverCell = editable
     ? `<input type="file" name="cover" accept="image/*" data-display-input />${archive?.coverFile ? `<small>当前封面：${escapeHtml(archive.coverFile)}</small>` : coverRequired ? '<small>完整课程首次发布必须上传课程封面</small>' : '<small>轻量课程档案可以不上传封面</small>'}`
     : `<input class="readonly-field" readonly value="${escapeHtml(archive?.coverFile || archive?.cover || '未配置')}" />`;
-  return `<div class="form-field wide sales-display-section"><span>课程展示信息<b class="required-mark">课程级存储</b></span><div class="sales-display-grid"><label class="form-field"><span>课程封面${coverRequired ? ' *' : ''}</span>${coverCell}</label><label class="form-field"><span>C 端推荐语</span><input name="recommendation" maxlength="30" data-display-input ${lockedAttr} value="${escapeHtml(archive?.recommendation || '')}" placeholder="不超过30字" /></label><label class="form-field wide"><span>图文详情</span><textarea name="detail" data-display-input ${lockedAttr} placeholder="写入课程档案，学员端详情展示，≤2000字">${escapeHtml(archive?.detail || '')}</textarea></label><label class="form-field wide"><span>课程标签</span><input name="tags" data-display-input ${lockedAttr} value="${escapeHtml(courseDisplayTags(archive).join(','))}" placeholder="多个标签用逗号分隔" /></label></div><div class="sales-display-actions">${editable ? '' : '<button type="button" class="button" data-display-edit>修改展示信息</button>'}<span class="sales-display-warning">${editable ? '修改后该课程的封面、图文详情、标签与 C 端推荐语会在所有展示位同步更新（课程级覆盖）。' : '已按上次发布的值只读带入；需要调整时点击“修改展示信息”。'}</span></div></div>`;
+  return `<div class="form-field wide sales-display-section"><span>课程展示信息<b class="required-mark">售卖单元级存储</b></span><div class="sales-display-grid"><label class="form-field"><span>课程封面${coverRequired ? ' *' : ''}</span>${coverCell}</label><label class="form-field"><span>C 端推荐语</span><input name="recommendation" maxlength="30" data-display-input ${lockedAttr} value="${escapeHtml(archive?.recommendation || '')}" placeholder="不超过30字" /></label><label class="form-field wide"><span>图文详情</span><textarea name="detail" data-display-input ${lockedAttr} placeholder="只作用于本单元的对外展示，学员端详情展示，≤2000字">${escapeHtml(archive?.detail || '')}</textarea></label><label class="form-field wide"><span>课程标签</span><input name="tags" data-display-input ${lockedAttr} value="${escapeHtml(courseDisplayTags(archive).join(','))}" placeholder="多个标签用逗号分隔" /></label></div><div class="sales-display-actions">${editable ? '' : '<button type="button" class="button" data-display-edit>修改展示信息</button>'}<span class="sales-display-warning">${editable ? `修改后只影响${unitLabel}的对外展示：封面、图文详情、标签与 C 端推荐语，不影响同课程的其他售卖单元。` : '已按上次发布的值只读带入；需要调整时点击“修改展示信息”。'}</span></div></div>`;
 }
 function openProductForm(row = null, options = {}) {
   const course = businessCourse(options.courseId || row?.courseId || businessParams.get('courseId'));
-  const displayArchive = course ? courseArchiveFor(course) : null;
-  const displayEdit = Boolean(options.editDisplay) || !courseDisplayConfigured(displayArchive);
+  const displayUnit = row || {};
+  const displayEdit = Boolean(options.editDisplay) || !courseDisplayConfigured(displayUnit);
   const videoCourses = courseCatalog.filter(item => item.type === '视频课程' && (item.archive === '完整课程' || item.status === '已完成'));
   const courseField = course
     ? `${courseSummary(course, '仅允许已完成的视频课程发布商品')}<input type="hidden" name="courseId" value="${escapeHtml(course.id)}">`
     : requiredSelect('关联课程', 'courseId', videoCourses.map(item => item.name));
-  const body = `<form id="business-dialog-form" class="sales-dialog-grid">${courseField}<label class="form-field"><span>课程名称</span><input value="${escapeHtml(course?.name || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>所属专业</span><input value="${escapeHtml(course?.major || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>总课时数</span><input value="${escapeHtml(String(course?.hours || ''))}" readonly class="readonly-field" /></label>${requiredInput('商品名称', 'name', row?.name || course?.name || '', 'text', '请输入商品名称')}${requiredInput('售卖价格', 'price', row?.price || '', 'number', '请输入售价')}<label class="form-field"><span>试看策略<b class="required-mark">*</b></span><select name="preview" id="preview-policy" required><option ${row?.preview !== '允许试看' ? 'selected' : ''}>不允许试看</option><option ${row?.preview === '允许试看' ? 'selected' : ''}>允许试看</option></select></label><label class="form-field"><span>试看课时<b class="required-mark">*</b></span><select name="previewHours" id="preview-hours" required ${row?.preview !== '允许试看' ? 'disabled' : ''}><option ${row?.previewHours === '第1课时' ? 'selected' : ''}>第1课时</option></select></label>${course ? courseTeachingRow(course) : ''}${course ? courseDisplaySection(course, { editDisplay: displayEdit }) : ''}<label class="form-field"><span>上下架时间</span><input name="shelfAt" value="${escapeHtml(row?.shelfAt || '')}" placeholder="YYYY-MM-DD HH:mm"></label><label class="form-field"><span>商品状态</span><input value="${escapeHtml(row?.status || '草稿')}" readonly class="readonly-field" /></label></form>`;
+  const body = `<form id="business-dialog-form" class="sales-dialog-grid">${courseField}<label class="form-field"><span>课程名称</span><input value="${escapeHtml(course?.name || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>所属专业</span><input value="${escapeHtml(course?.major || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>总课时数</span><input value="${escapeHtml(String(course?.hours || ''))}" readonly class="readonly-field" /></label>${requiredInput('商品名称', 'name', row?.name || course?.name || '', 'text', '请输入商品名称')}${requiredInput('售卖价格', 'price', row?.price || '', 'number', '请输入售价')}<label class="form-field"><span>试看策略<b class="required-mark">*</b></span><select name="preview" id="preview-policy" required><option ${row?.preview !== '允许试看' ? 'selected' : ''}>不允许试看</option><option ${row?.preview === '允许试看' ? 'selected' : ''}>允许试看</option></select></label><label class="form-field"><span>试看课时<b class="required-mark">*</b></span><select name="previewHours" id="preview-hours" required ${row?.preview !== '允许试看' ? 'disabled' : ''}><option ${row?.previewHours === '第1课时' ? 'selected' : ''}>第1课时</option></select></label>${course ? courseTeachingRow(course) : ''}${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '商品' }) : ''}<label class="form-field"><span>上下架时间</span><input name="shelfAt" value="${escapeHtml(row?.shelfAt || '')}" placeholder="YYYY-MM-DD HH:mm"></label><label class="form-field"><span>商品状态</span><input value="${escapeHtml(row?.status || '草稿')}" readonly class="readonly-field" /></label></form>`;
   const dialog = openBusinessDialog(row ? '编辑商品' : '发布商品', '从课程库带入课程主体；视频商品只允许一门课程一个有效商品。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存草稿</button>');
-  // 二次发布时运营四字段只读带入，“修改展示信息”重新打开可编辑表单并提示课程级覆盖。
+  // 二次发布时运营四字段只读带入，“修改展示信息”重新打开可编辑表单。
   dialog.querySelector('[data-display-edit]')?.addEventListener('click', () => { closeBusinessDialog(); openProductForm(row, { editDisplay: true }); });
   // 未从课程库带入课程时，选择关联课程后重建表单，展示信息才能挂到所选课程档案上。
   dialog.querySelector('[name="courseId"]')?.addEventListener('change', (event) => {
@@ -184,18 +184,18 @@ function openProductForm(row = null, options = {}) {
     const priceChanges = row ? [...(row.priceChanges || [])] : [];
     if (priceChanged) priceChanges.unshift({ at: demoTime(), operator: '平台运营', from: '¥' + Number(row.price).toFixed(2), to: '¥' + nextPrice });
     const record = { id: row?.id || demoId('product'), courseId: selected.id, name: String(data.get('name')).trim(), course: selected.name, price: nextPrice, sales: row?.sales || '0', status: row?.status || '草稿', updated: row?.updated || '—', preview: data.get('preview'), previewHours: data.get('previewHours'), shelfAt: String(data.get('shelfAt') || '').trim(), priceChanges };
-    if (row) Object.assign(row, record); else dataSets.products.unshift(record);
-    persistProduct(record);
-    // CR-2026-012：课程封面、图文详情、课程标签与 C 端推荐语写入课程档案（课程级存储）。
-    const coverFile = event.currentTarget.querySelector('[name="cover"]')?.files?.[0]?.name || displayArchive?.coverFile || '';
-    if (!courseDisplayConfigured(displayArchive) && selected.archive === '完整课程' && !coverFile) { showToast('完整课程首次发布需先上传课程封面', 'error'); return; }
-    persistCourseDisplay(selected, {
+    // CR-2026-020：课程封面、图文详情、课程标签与 C 端推荐语写在商品自身。
+    const coverFile = event.currentTarget.querySelector('[name="cover"]')?.files?.[0]?.name || displayUnit.coverFile || '';
+    if (!courseDisplayConfigured(displayUnit) && selected.archive === '完整课程' && !coverFile) { showToast('完整课程首次发布需先上传课程封面', 'error'); return; }
+    Object.assign(record, {
       coverFile,
-      cover: coverFile ? '已配置' : (displayArchive?.cover || COURSE_DISPLAY_UNSET),
-      detail: String(data.get('detail') || '').trim(),
+      cover: coverFile ? '已配置' : (displayUnit.cover || COURSE_DISPLAY_UNSET),
+      displayDetail: String(data.get('detail') || '').trim(),
       tags: String(data.get('tags') || '').split(/[，,、\s]+/).map(value => value.trim()).filter(Boolean),
       recommendation: String(data.get('recommendation') || '').trim()
     });
+    if (row) Object.assign(row, record); else dataSets.products.unshift(record);
+    persistSaleUnitDisplay('products', record);
     closeBusinessDialog(); renderProducts(); showToast(row ? (priceChanged ? '商品信息已保存；本次调价已写入变更记录，只影响生效后的新订单' : '商品信息已保存') : '商品草稿已保存，已加入商品列表');
   });
 }
@@ -228,8 +228,8 @@ function findClassConflicts(record) {
 }
 function openClassForm(row = null, options = {}) {
   const course = businessCourse(row?.courseId || businessParams.get('courseId'));
-  const displayArchive = course ? courseArchiveFor(course) : null;
-  const displayEdit = Boolean(options.editDisplay) || !courseDisplayConfigured(displayArchive);
+  const displayUnit = row || classRecordFor(row?.id);
+  const displayEdit = Boolean(options.editDisplay) || !courseDisplayConfigured(displayUnit);
   const classCourses = courseCatalog.filter(item => item.type === '面授课程');
   const courseField = course
     ? `${courseSummary(course, course.archive === '完整课程' ? '完整课程需已完成编排' : '轻量课程档案可直接发布班级')}<input type="hidden" name="courseId" value="${escapeHtml(course.id)}">`
@@ -237,9 +237,9 @@ function openClassForm(row = null, options = {}) {
   const scheduleParts = parseClassSchedule(row?.schedule);
   const lessonDuration = Number(row?.lessonDuration || DEFAULT_LESSON_DURATION);
   const startValue = snapToStep(scheduleParts.start || TIMELINE_START);
-  const body = `<form id="business-dialog-form" class="sales-dialog-grid">${course ? courseSummary(course, course.archive === '完整课程' ? '展示信息写入课程档案；完整课程首次发布必须上传课程封面' : '轻量课程档案：展示信息写入课程档案，课程封面选填') : ''}${course ? courseTeachingRow(course) : ''}${course ? courseDisplaySection(course, { editDisplay: displayEdit }) : ''}${requiredInput('课程定价', 'price', row?.price || '', 'number', '请输入课程定价')}<label class="form-field"><span>试听是否收费</span><select name="trialFee"><option>否</option><option>是</option></select></label><label class="form-field"><span>报名开始时间</span><input name="enrollStart" type="datetime-local" value="${escapeHtml(row?.enrollStart || '').replace(' ', 'T')}"></label>${requiredInput('报名截止时间', 'deadline', row?.deadline || '', 'datetime-local', '')}<label class="form-field wide"><span>发布方式</span><select name="publishMode"><option>仅保存</option><option>立即发布</option><option>定时发布</option></select></label><label class="form-field sales-switch-field"><span>快速报名入口</span><span class="sales-switch-control"><input name="fast" type="checkbox" ${row?.fast === '是' ? 'checked' : ''}></span></label><label class="form-field"><span>前台展示状态</span><input class="readonly-field" readonly value="${row?.display || '未发布'}"></label></form>`;
+  const body = `<form id="business-dialog-form" class="sales-dialog-grid">${course ? courseSummary(course, course.archive === '完整课程' ? '展示信息写入本班级；完整课程首次发布必须上传课程封面' : '轻量课程档案：展示信息写入本班级，课程封面选填') : ''}${course ? courseTeachingRow(course) : ''}${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '本班级' }) : ''}${requiredInput('课程定价', 'price', row?.price || '', 'number', '请输入课程定价')}<label class="form-field"><span>试听是否收费</span><select name="trialFee"><option>否</option><option>是</option></select></label><label class="form-field"><span>报名开始时间</span><input name="enrollStart" type="datetime-local" value="${escapeHtml(row?.enrollStart || '').replace(' ', 'T')}"></label>${requiredInput('报名截止时间', 'deadline', row?.deadline || '', 'datetime-local', '')}<label class="form-field wide"><span>发布方式</span><select name="publishMode"><option>仅保存</option><option>立即发布</option><option>定时发布</option></select></label><label class="form-field sales-switch-field"><span>快速报名入口</span><span class="sales-switch-control"><input name="fast" type="checkbox" ${row?.fast === '是' ? 'checked' : ''}></span></label><label class="form-field"><span>前台展示状态</span><input class="readonly-field" readonly value="${row?.display || '未发布'}"></label></form>`;
   const dialog = openBusinessDialog(`发布班级 · ${row?.name || ''}`, '在已创建的班级上设置定价、报名窗口与前台展示；班级与排课由教务的「创建班级」维护。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存发布设置</button>');
-  // 二次发布时运营四字段只读带入，可从这里改为课程级覆盖。
+  // 二次发布时运营四字段只读带入，可从“修改展示信息”改为可编辑。
   dialog.querySelector('[data-display-edit]')?.addEventListener('click', () => { closeBusinessDialog(); openClassForm(row, { editDisplay: true }); });
   const form = dialog.querySelector('#business-dialog-form');
   const conflictHint = dialog.querySelector('[data-conflict-hint]');
@@ -290,15 +290,17 @@ function openClassForm(row = null, options = {}) {
       target.display = mode === '仅保存' ? '未发布' : '已发布';
       if (course) {
         // CR-2026-012 增补：完整课程与轻量课程档案都在发布班级时维护运营四字段。
-        const coverFile = event.currentTarget.querySelector('[name="cover"]')?.files?.[0]?.name || displayArchive?.coverFile || '';
-        if (!courseDisplayConfigured(displayArchive) && course.archive === '完整课程' && !coverFile) { showToast('完整课程首次发布需先上传课程封面', 'error'); return; }
-        persistCourseDisplay(course, {
+        const coverFile = event.currentTarget.querySelector('[name="cover"]')?.files?.[0]?.name || displayUnit.coverFile || '';
+        if (!courseDisplayConfigured(displayUnit) && course.archive === '完整课程' && !coverFile) { showToast('完整课程首次发布需先上传课程封面', 'error'); return; }
+        // CR-2026-020：运营四字段写在本班级记录上，同一课程的其他班级不受影响。
+        Object.assign(target, {
           coverFile,
-          cover: coverFile ? '已配置' : (displayArchive?.cover || COURSE_DISPLAY_UNSET),
-          detail: String(data.get('detail') || '').trim(),
+          cover: coverFile ? '已配置' : (displayUnit.cover || COURSE_DISPLAY_UNSET),
+          displayDetail: String(data.get('detail') || '').trim(),
           tags: String(data.get('tags') || '').split(/[，,、\s]+/).map(value => value.trim()).filter(Boolean),
           recommendation: String(data.get('recommendation') || '').trim()
         });
+        persistSaleUnitDisplay('classes', target);
       }
       persistClass(target);
       closeBusinessDialog(); renderClasses();
