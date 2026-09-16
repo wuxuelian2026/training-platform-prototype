@@ -34,7 +34,7 @@ const teacherProfileDefaults = {
 };
 const teacherCertificateDefaults = [
   { id: 'cert-001', name: '中国舞教师资格证', number: 'WD-2019-0028', type: '艺术等级证', issuer: '中国舞蹈家协会', issuedAt: '2019-10-01', expiresAt: '2027-09-30', status: '审核通过', validity: '有效', source: '后台录入', file: '中国舞教师资格证-WD-2019-0028.pdf', reviewedAt: '2026-01-04', reviewNote: '证书编号、发证机构和文件内容已核验。' },
-  { id: 'cert-002', name: '本科学历证书', number: 'HBYS-2014-0618', type: '学历证书', issuer: '湖北艺术学院', issuedAt: '2014-06-20', expiresAt: '', status: '已录入', validity: '有效', source: '后台录入', file: '本科学历证书.pdf', reviewNote: '由学校档案管理员录入。' },
+  { id: 'cert-002', name: '本科学历证书', number: 'HBYS-2014-0618', type: '学历证书', issuer: '湖北艺术学院', issuedAt: '2014-06-20', expiresAt: '', status: '审核通过', validity: '有效', source: '后台录入', file: '本科学历证书.pdf', reviewedAt: '2026-09-07', reviewNote: '后台录入默认通过。' },
   { id: 'cert-003', name: '少儿舞蹈教师培训证', number: 'SEWD-2026-0902', type: '教师资格证', issuer: '湖北省舞蹈家协会', issuedAt: '2026-08-28', expiresAt: '2029-08-27', status: '待审核', validity: '有效', source: '教师端上传', file: '少儿舞蹈教师培训证.jpg', reviewNote: '已提交，等待教研审核。' },
   { id: 'cert-004', name: '舞蹈编导专项培训证', number: 'WDBD-2023-0186', type: '其他', issuer: '湖北省艺术教育协会', issuedAt: '2023-07-12', expiresAt: '2028-07-11', status: '审核不通过', validity: '有效', source: '教师端上传', file: '舞蹈编导专项培训证.jpg', reviewedAt: '2026-09-08', reviewNote: '证书照片右下角信息不完整，请重新拍摄清晰完整的证书。' },
   { id: 'cert-005', name: '中国舞等级考试考官证', number: 'KG-2022-1056', type: '艺术等级证', issuer: '中国舞蹈家协会', issuedAt: '2022-10-01', expiresAt: '2026-10-15', status: '审核通过', validity: '即将过期', source: '教师端上传', file: '中国舞等级考试考官证.pdf', reviewedAt: '2022-10-06', reviewNote: '证书信息已核验，请在有效期结束前办理续期。' }
@@ -69,12 +69,25 @@ const teacherMessageDefaults = [
   { id: 'TMSG20260906005', type: '证书审核结果', title: '教师证书审核结果已更新', summary: '中国舞教师资格证已审核通过。', body: '您提交的中国舞教师资格证已完成审核，证书状态已更新为审核通过。', createdAt: '2026-09-06 11:05', read: true, target: '/teacher/pages/certificates.html', actionLabel: '查看我的证书' },
   { id: 'TMSG20260905006', type: '结业申请审核结果', title: '有3项结业申请待处理', summary: '请查看学员结业复核结果及补课安排。', body: '当前有3项学员结业申请正在处理中，其中包含需补课和审核中的记录，请及时查看并完成相关教学记录。', createdAt: '2026-09-05 09:15', read: true, target: '/teacher/pages/graduation.html', actionLabel: '查看结业记录' }
 ];
-const teacherDefaults = { lesson: teacherLessonDefaults, application: '审核中', applicationUpdates: {}, graduation: '可申请', salary: '已发布', profile: teacherProfileDefaults, certificates: teacherCertificateDefaults, contracts: teacherContractDefaults, graduationRecords: teacherGraduationDefaults, messages: teacherMessageDefaults };
+const teacherDefaults = { lesson: teacherLessonDefaults, application: '待审核', applicationUpdates: {}, graduation: '可申请', salary: '已发布', profile: teacherProfileDefaults, certificates: teacherCertificateDefaults, contracts: teacherContractDefaults, graduationRecords: teacherGraduationDefaults, messages: teacherMessageDefaults };
 let teacherState;
 try { teacherState = { ...teacherDefaults, ...JSON.parse(sessionStorage.getItem(teacherKey) || '{}') }; } catch { teacherState = { ...teacherDefaults }; }
 teacherState.profile = { ...teacherProfileDefaults, ...(teacherState.profile || {}) };
 teacherState.lesson = { ...teacherLessonDefaults, ...(teacherState.lesson || {}), attendance: { ...teacherLessonDefaults.attendance, ...(teacherState.lesson?.attendance || {}) }, attendanceNotes: { ...(teacherState.lesson?.attendanceNotes || {}) } };
 teacherState.certificates = Array.isArray(teacherState.certificates) ? teacherState.certificates : teacherCertificateDefaults.map(item => ({ ...item }));
+// CR-2026-019 §6 本地旧值兼容：会话里遗留的“已录入”按来源迁移，
+// 后台录入直接为审核通过并补齐审核人／时间／来源，教师端上传回到待审核。
+const LEGACY_RECORDED_CERT_STATUS = '已录入';
+teacherState.certificates = teacherState.certificates.map(item => {
+  if (item?.status !== LEGACY_RECORDED_CERT_STATUS) return item;
+  const backendEntered = item.source === '后台录入';
+  return {
+    ...item,
+    status: backendEntered ? '审核通过' : '待审核',
+    reviewedAt: backendEntered ? (item.reviewedAt || item.uploadedAt || '2026-09-07') : '',
+    reviewNote: backendEntered ? (item.reviewNote || '后台录入默认通过。') : '已迁移为待审核，等待教研审核。'
+  };
+});
 teacherState.contracts = Array.isArray(teacherState.contracts) ? teacherState.contracts : teacherContractDefaults.map(item => ({ ...item }));
 teacherState.graduationRecords = Array.isArray(teacherState.graduationRecords) ? teacherState.graduationRecords : teacherGraduationDefaults.map(item => ({ ...item }));
 const storedTeacherMessages = Array.isArray(teacherState.messages) ? teacherState.messages : [];
@@ -331,20 +344,24 @@ function nextApplicationId() {
   const next = (used.length ? Math.max(...used) : 0) + 1;
   return `CR-${new Date().getFullYear()}-${String(next).padStart(4, '0')}`;
 }
-function applicationTone(status) { return status === '已通过' ? 'green' : status === '审核中' ? 'amber' : 'gray'; }
+function applicationTone(status) { return status === '已通过' ? 'green' : status === '待审核' ? 'amber' : 'gray'; }
 function teacherApplicationRecords() {
   const shared = readDemoState().applications || [];
   const merged = teacherApplications.map(item => ({ ...item, ...(shared.find(record => record.id === item.id) || {}) }));
   return [...merged, ...shared.filter(record => !teacherApplications.some(item => item.id === record.id))].map(applicationWithStatus).filter(item => item.status !== '草稿');
 }
-function applicationWithStatus(item) { const shared = readDemoState().applications.some(record => record.id === item.id); return { ...item, status: shared ? item.status : teacherState.applicationUpdates[item.id] || item.status }; }
+function applicationWithStatus(item) {
+  const shared = readDemoState().applications.some(record => record.id === item.id);
+  const status = shared ? item.status : teacherState.applicationUpdates[item.id] || item.status;
+  return { ...item, status: status === '审核中' ? '待审核' : status };
+}
 function currentApplication() {
   const id = new URLSearchParams(location.search).get('application');
   return teacherApplicationRecords().find(item => item.id === id) || teacherApplicationRecords()[0];
 }
 function renderApplications() {
   const applications = teacherApplicationRecords();
-  tLayout(tStack(`<section class="teacher-application-header"><div><span class="mp-eyebrow">教学内容</span><h2>课程申报</h2><p>发起新课程，查看教研审核进度和结果。</p></div>${tButton('发起申报', 'data-teacher-action="new-application"')}</section>`, `<section class="teacher-application-summary"><div><strong>${applications.length}</strong><span>全部申报</span></div><div><strong>${applications.filter(item => item.status === '审核中').length}</strong><span>审核中</span></div><div><strong>${applications.filter(item => item.status === '已通过').length}</strong><span>已通过</span></div></section>`, `<section class="teacher-application-list"><div class="teacher-application-list-head"><h3>我的申报</h3><span>共 ${applications.length} 条</span></div>${applications.map(item => `<a class="teacher-application-card" href="${relativePath(`/teacher/pages/application-detail.html?application=${item.id}`)}"><div class="teacher-application-card-head"><div><span>${tEsc(item.date)} 提交 · ${tEsc(item.id)}</span><h3>${tEsc(item.name)}</h3></div>${tPill(item.status, applicationTone(item.status))}</div><p>${tEsc(item.type)} · ${tEsc(item.professional || item.major)}${item.hours ? ` · ${item.hours}课时` : ''}</p>${item.review && item.status === '已驳回' ? `<div class="teacher-application-reason">驳回原因：${tEsc(item.review)}</div>` : ''}<div class="teacher-application-card-foot"><span class="teacher-application-action">查看详情</span><span aria-hidden="true">›</span></div></a>`).join('')}</section>`));
+  tLayout(tStack(`<section class="teacher-application-header"><div><span class="mp-eyebrow">教学内容</span><h2>课程申报</h2><p>发起新课程，查看教研审核进度和结果。</p></div>${tButton('发起申报', 'data-teacher-action="new-application"')}</section>`, `<section class="teacher-application-summary"><div><strong>${applications.length}</strong><span>全部申报</span></div><div><strong>${applications.filter(item => item.status === '待审核').length}</strong><span>待审核</span></div><div><strong>${applications.filter(item => item.status === '已通过').length}</strong><span>已通过</span></div></section>`, `<section class="teacher-application-list"><div class="teacher-application-list-head"><h3>我的申报</h3><span>共 ${applications.length} 条</span></div>${applications.map(item => `<a class="teacher-application-card" href="${relativePath(`/teacher/pages/application-detail.html?application=${item.id}`)}"><div class="teacher-application-card-head"><div><span>${tEsc(item.date)} 提交 · ${tEsc(item.id)}</span><h3>${tEsc(item.name)}</h3></div>${tPill(item.status, applicationTone(item.status))}</div><p>${tEsc(item.type)} · ${tEsc(item.professional || item.major)}${item.hours ? ` · ${item.hours}课时` : ''}</p>${item.review && item.status === '已驳回' ? `<div class="teacher-application-reason">驳回原因：${tEsc(item.review)}</div>` : ''}<div class="teacher-application-card-foot"><span class="teacher-application-action">查看详情</span><span aria-hidden="true">›</span></div></a>`).join('')}</section>`));
 }
 function renderApplicationCreate() {
   const requestedId = new URLSearchParams(location.search).get('application');
@@ -354,7 +371,7 @@ function renderApplicationCreate() {
   tLayout(tStack(`<section class="teacher-application-detail-head"><div>${tPill(editing ? '编辑中' : '新申报')}<h2>${editing ? '编辑课程申报' : '发起课程申报'}</h2><p>教师资料由系统自动带入，课程信息请完整填写。</p></div></section>`, `<section class="teacher-application-form"><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>系统带入</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(teacherProfile.name)}</strong></div><div><span>教师工号</span><strong>${tEsc(teacherProfile.no)}</strong></div><div><span>教学单位</span><strong>${tEsc(teacherProfile.unit)}</strong></div><div><span>专业方向</span><strong>${tEsc(teacherProfile.professional)}</strong></div><div><span>职称</span><strong>${tEsc(teacherProfile.title)}</strong></div></div></div><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>申报内容</h3><span>带 * 为必填</span></div><div class="mp-form"><div class="mp-field"><label for="application-name">课程名称 <b>*</b></label><input id="application-name" value="${tEsc(source.name)}" maxlength="100" placeholder="请输入课程名称"></div><div class="mp-field"><label>所属专业 <b>*</b><small>按门类、分类、专业逐级选择</small></label><div class="teacher-professional-cascade"><select id="application-discipline" aria-label="专业门类"><option>艺术学</option><option>教育学</option></select><select id="application-category" aria-label="专业分类"><option>舞蹈类</option><option>音乐类</option></select><select id="application-professional" aria-label="专业">${[...new Set([teacherProfile.professional, '舞蹈表演', '音乐表演', '音乐学'])].map(name => `<option ${source.professional === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div></div><div class="mp-field"><label>课程类型 <b>*</b></label><div class="teacher-radio-row"><label><input type="radio" name="application-type" value="面授课程" ${source.type === '面授课程' ? 'checked' : ''}>面授课程</label><label><input type="radio" name="application-type" value="视频课程" ${source.type === '视频课程' ? 'checked' : ''}>视频课程</label></div></div><div class="mp-field" id="application-hours-field"><label for="application-hours">总课时 <b>*</b><small>面授课程用于生成课次和工资统计</small></label><input id="application-hours" type="number" min="1" value="${tEsc(source.hours || 16)}" placeholder="请输入总课时"></div><div class="mp-field"><label for="application-difficulty">难度等级 <b>*</b><small>学员端卡片与筛选按此展示</small></label><select id="application-difficulty"><option value="">请选择难度等级</option>${['启蒙', '初级', '中级', '高级', '考级冲刺'].map(value => `<option ${source.difficulty === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div><div class="mp-field"><label>适合年龄 <b>*</b><small>可多选</small></label><div class="teacher-radio-row">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label><input type="checkbox" name="application-age" value="${value}" ${(source.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div><div class="mp-field"><label for="application-intro">课程简介</label><textarea id="application-intro" placeholder="补充课程目标、教学内容和适合人群">${tEsc(source.intro)}</textarea></div><div class="mp-field"><label for="application-file">附加材料</label><button type="button" class="teacher-upload-placeholder" id="application-file">＋ ${source.file ? tEsc(source.file) : '上传教学计划'} <span>可选</span></button></div></div></div><div class="teacher-application-form-actions"><a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">取消</a>${tButton('提交审核', 'data-application-form-action="submit"')}</div></section>`));
 }
 function applicationReviewCopy(item) {
-  if (item.status === '审核中') return ['等待教研审核', '申报已提交，审核期间课程内容不可修改。'];
+  if (item.status === '待审核') return ['等待教研审核', '申报已提交，审核期间课程内容不可修改。'];
   if (item.status === '已通过') return ['审核通过', `教研已于${item.reviewedAt || '近期'}完成审核：${item.review || '审批通过'}`];
   if (item.status === '已驳回') return ['审核未通过', item.review || '请根据审核意见修改后重新提交。'];
   if (item.status === '已撤销') return ['申报已撤销', '该申报已停止审核，可重新编辑后提交。'];
@@ -363,7 +380,7 @@ function applicationReviewCopy(item) {
 function applicationDetailActions(item) {
   const back = `<a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">返回列表</a>`;
   if (['已驳回', '已撤销'].includes(item.status)) return `${back}<button type="button" class="mp-button" data-application-detail-action="edit">${item.status === '已驳回' ? '修改并重新提交' : '重新发起申报'}</button>`;
-  if (item.status === '审核中') return `${back}<button type="button" class="mp-button secondary teacher-application-withdraw" data-application-detail-action="withdraw">撤销申报</button>`;
+  if (item.status === '待审核') return `${back}<button type="button" class="mp-button secondary teacher-application-withdraw" data-application-detail-action="withdraw">撤销申报</button>`;
   return `<a class="mp-button secondary full" href="${relativePath('/teacher/pages/applications.html')}">返回申报列表</a>`;
 }
 function renderApplicationDetail() {
@@ -409,7 +426,7 @@ function initApplicationForm() {
       type,
       date: toLocalDateString(),
       submittedAt: demoTime(),
-      status: '审核中',
+      status: '待审核',
       hours: type === '面授课程' ? Number(document.querySelector('#application-hours')?.value || existing?.hours || 1) : Number(existing?.hours || 0),
       intro: document.querySelector('#application-intro')?.value.trim() || '', difficulty: document.querySelector('#application-difficulty')?.value || existing?.difficulty || '', ages: [...document.querySelectorAll('[name="application-age"]:checked')].map(input => input.value),
       file: existing?.file || '',
@@ -428,8 +445,8 @@ function initApplicationForm() {
       reviewedAt: ''
     };
     upsertDemoRecord('applications', record);
-    teacherState.applicationUpdates[record.id] = '审核中';
-    teacherState.application = '审核中';
+    teacherState.applicationUpdates[record.id] = '待审核';
+    teacherState.application = '待审核';
     saveTeacher();
     location.href = relativePath(`/teacher/pages/application-detail.html?application=${encodeURIComponent(record.id)}`);
   };

@@ -642,17 +642,22 @@ function renderFastRegistrationDetail(item = course('class-001')) {
   const statusTone = available ? 'green' : 'gray';
   const coverMark = (item.professional || item.name).slice(0, 1);
   const detail = item.detail?.length ? item.detail : [item.intro || '本班为线下面授课程，具体教学安排以班级通知为准。'];
-  const outline = Array.isArray(item.outline) && item.outline.length
-    ? card(`<div class="mp-section-head"><h3>课程大纲</h3><span class="mp-muted">共${item.outline.length}章</span></div><div class="mp-course-detail-outline">${item.outline.map((chapter, index) => `<div class="mp-course-detail-chapter"><span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></div>`).join('')}</div>`, 'mp-fast-detail-section')
-    : '';
+  const detailTab = params.get('tab') === 'outline' ? 'outline' : 'intro';
+  const hasOutline = Array.isArray(item.outline) && item.outline.length > 0;
+  const outlineContent = hasOutline
+    ? `<div class="mp-course-detail-outline">${item.outline.map((chapter, index) => `<div class="mp-course-detail-chapter"><span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></div>`).join('')}</div>`
+    : '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
+  const detailContent = detailTab === 'outline'
+    ? card(`<div class="mp-section-head"><h3>课程大纲</h3><span class="mp-muted">${hasOutline ? `共${item.outline.length}章` : '待完善'}</span></div>${outlineContent}`, 'mp-fast-detail-section')
+    : card(`<h3>课程简介</h3><article class="mp-rich-content mp-fast-detail-content">${detail.map(text => `<p>${esc(text)}</p>`).join('')}</article>`, 'mp-fast-detail-section');
   const action = available ? detailActions(item) : `<div class="mp-bottom-actions mp-course-detail-actions"><button class="mp-button secondary" type="button" data-action="consult">咨询</button><button class="mp-button secondary" type="button" data-action="share">分享</button><button class="mp-button mp-course-detail-primary" type="button" disabled>已满员</button></div>`;
   layout(stack(
     `<section class="mp-fast-detail-hero"><div class="mp-fast-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${pill('快速报名', 'light')}${pill(status, statusTone)}</div></div><div class="mp-fast-detail-summary"><h2>${esc(item.className || item.name)}</h2><p>${esc(item.courseName || item.name)} · ${esc(item.professional || item.category)}</p><strong class="mp-fast-detail-price">¥${item.price.toLocaleString()}.00</strong></div></section>`,
     card(`<div class="mp-section-head"><h3>报名信息</h3>${pill(status, statusTone)}</div><dl class="mp-fast-detail-facts"><div><dt>授课教师</dt><dd>${esc(item.teacher)}老师</dd></div><div><dt>上课教室</dt><dd>${esc(item.campus)} · ${esc(item.classroom || '待定')}</dd></div><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule || '以开课通知为准')}</dd></div><div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div><dt>剩余名额</dt><dd>${available ? esc(item.seats) : '已满员'}</dd></div><div><dt>报名截止</dt><dd>${esc(item.deadline || '以招生通知为准')}</dd></div></dl>`, 'mp-fast-detail-section'),
-    card(`<h3>课程简介</h3><article class="mp-rich-content mp-fast-detail-content">${detail.map(text => `<p>${esc(text)}</p>`).join('')}</article>`, 'mp-fast-detail-section'),
-    outline,
+    `<section class="mp-fast-detail-tab-section"><div class="mp-tabs mp-course-detail-tabs" role="tablist" aria-label="课程内容切换"><button class="mp-tab ${detailTab === 'intro' ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === 'intro'}" data-fast-detail-tab="intro">课程简介</button><button class="mp-tab ${detailTab === 'outline' ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === 'outline'}" data-fast-detail-tab="outline">课程大纲</button></div>${detailContent}</section>`,
     action
   ));
+  document.querySelectorAll('[data-fast-detail-tab]').forEach(tab => tab.addEventListener('click', () => go(`/learner/pages/fast-registration-detail.html?courseId=${encodeURIComponent(item.id)}&tab=${tab.dataset.fastDetailTab}`)));
 }
 function classLearningRecord(item) { return learningRecords().find(record => record.courseId === item.id && record.type === 'class'); }
 function classStatusLabel(record, item) { return record?.status === 'ended' ? '已结束' : record?.status === 'upcoming' ? '待开课' : record ? '学习中' : item.classStatus || '招生中'; }

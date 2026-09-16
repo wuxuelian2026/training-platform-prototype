@@ -16,7 +16,7 @@ export const ADMIN_ROLE_LABELS = {
   finance: '财务'
 };
 
-// 演示口令与验证码只用于原型演示；真实系统由服务端校验，不在前端保存口令。
+// 演示口令只用于原型演示；真实系统由服务端校验，不在前端保存口令。
 export const ADMIN_DEMO_PASSWORD = 'Hbyx@2026';
 
 // 演示账号：五类角色各一个可用账号，外加一个停用账号用于演示“停用拒绝登录”。

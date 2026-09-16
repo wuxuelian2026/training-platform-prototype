@@ -6,8 +6,8 @@ export const courseCatalogSeed = [
   { id: 'COURSE-006', name: '艺术歌曲示范课', type: '视频课程', archive: '完整课程', status: '已完成', major: '声乐演唱', teacher: '陈晨', hours: 8 },
   { id: 'COURSE-CR-2026-0001', name: '舞蹈基本功', type: '面授课程', archive: '完整课程', status: '已完成', major: '中国舞', teacher: '王玥', hours: 16 },
   { id: 'COURSE-CR-2026-0003', name: '少儿国画入门', type: '面授课程', archive: '完整课程', status: '已完成', major: '中国画', teacher: '李青', hours: 20 },
-  { id: 'LIB-003', name: '少儿美术兴趣班', type: '面授课程', archive: '轻量课程档案', status: '不适用', major: '少儿绘画', teacher: '李青', hours: 20 },
-  { id: 'LIB-004', name: '朗诵与主持基础', type: '面授课程', archive: '轻量课程档案', status: '不适用', major: '朗诵与主持', teacher: '赵可', hours: 16 }
+  { id: 'LIB-003', name: '少儿美术兴趣班', type: '面授课程', archive: '轻量课程档案', major: '少儿绘画', teacher: '李青', hours: 20 },
+  { id: 'LIB-004', name: '朗诵与主持基础', type: '面授课程', archive: '轻量课程档案', major: '朗诵与主持', teacher: '赵可', hours: 16 }
 ];
 
 export function cloneCourseCatalogSeed() {

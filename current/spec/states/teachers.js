@@ -27,11 +27,6 @@ export const STATE_MACHINES = [
         "frozen",
         "冻结",
         false
-      ],
-      [
-        "cancelled",
-        "已注销",
-        true
       ]
     ],
     "transitions": [
@@ -58,12 +53,6 @@ export const STATE_MACHINES = [
         "解冻账号",
         "正常",
         "超级管理员/教务主管"
-      ],
-      [
-        "正常/冻结/未激活",
-        "注销账号",
-        "已注销",
-        "超级管理员"
       ]
     ]
   },
@@ -145,11 +134,6 @@ export const STATE_MACHINES = [
     ],
     "states": [
       [
-        "recorded",
-        "已录入",
-        false
-      ],
-      [
         "pending",
         "待审核",
         false
@@ -166,12 +150,6 @@ export const STATE_MACHINES = [
       ]
     ],
     "transitions": [
-      [
-        "已录入",
-        "提交审核",
-        "待审核",
-        "教研主管"
-      ],
       [
         "待审核",
         "审核通过",

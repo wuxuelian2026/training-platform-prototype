@@ -42,8 +42,8 @@ const navGroups = [
     icon: '课', label: '课程中心', items: [
       ['申', '课程申报', '/admin/pages/courses/applications.html', 'courses'],
       ['编', '课程内容编排', '/admin/pages/courses/content.html', 'courses'],
-      ['资', '教学资源库', '/admin/pages/courses/resources.html', 'courses'],
       ['库', '课程库', '/admin/pages/courses/library.html', 'courses'],
+      ['资', '教学资源库', '/admin/pages/courses/resources.html', 'courses'],
       ['类', '专业目录维护', '/admin/pages/courses/catalog.html', 'courses']
     ]
   },

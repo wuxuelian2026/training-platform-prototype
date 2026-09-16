@@ -13,19 +13,16 @@
 .admin-login-demo div { display: grid; gap: 3px; }
 .admin-login-demo dt { color: rgba(255, 255, 255, .72); font-size: 12px; }
 .admin-login-demo dd { margin: 0; font-size: 13px; line-height: 1.6; }
+.admin-login-account-list { display: grid; gap: 2px; }
 .admin-login-brand-note { margin: 0; color: rgba(255, 255, 255, .72); font-size: 12px; line-height: 1.6; }
 
 .admin-login-form { display: grid; gap: 14px; align-content: start; padding: 32px; }
 .admin-login-head h1 { margin: 0; font-size: 20px; }
 .admin-login-head p { margin: 6px 0 2px; color: var(--muted); font-size: 13px; }
 
-.admin-login-captcha { display: grid; gap: 8px; align-items: center; grid-template-columns: minmax(0, 1fr) auto auto; }
-.admin-login-captcha-code { display: grid; min-width: 72px; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px; background: #fafafa; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; font-weight: 700; cursor: pointer; place-items: center; }
-.admin-login-captcha .button { white-space: nowrap; }
-
 .admin-login-error { margin: 0; padding: 10px 12px; border: 1px solid #f2d4cf; border-radius: 6px; background: #fff8f6; color: #8b3d32; font-size: 13px; }
-.admin-login-agreement { display: flex; gap: 8px; align-items: flex-start; color: #595959; font-size: 13px; }
-.admin-login-agreement input { width: 16px; min-height: 16px; height: 16px; margin: 2px 0 0; }
+.admin-login-remember { display: flex; gap: 8px; align-items: flex-start; color: #595959; font-size: 13px; }
+.admin-login-remember input { width: 16px; min-height: 16px; height: 16px; margin: 2px 0 0; }
 .admin-login-submit { width: 100%; min-height: 40px; }
 
 @media (max-width: 880px) {

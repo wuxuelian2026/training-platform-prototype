@@ -12,7 +12,6 @@ const text = (id, value) => {
 };
 
 const statusClass = (value) => ({
-  已录入: 'gray',
   待审核: 'amber',
   审核通过: 'green',
   审核不通过: 'red',
@@ -21,6 +20,24 @@ const statusClass = (value) => ({
 }[value] || 'gray');
 
 const validityClass = (value) => ({有效: 'green', 即将过期: 'amber', 已过期: 'red'}[value] || 'gray');
+
+// CR-2026-019 §6 本地旧值兼容：审核状态删除“已录入”后，存量记录按来源迁移，
+// 后台录入直接视为审核通过并补齐操作人／时间／来源，教师端上传回到待审核。
+const LEGACY_RECORDED_STATUS = '已录入';
+rows.forEach((row) => {
+  if (row.dataset.status !== LEGACY_RECORDED_STATUS) return;
+  const backendEntered = row.dataset.source === '后台录入';
+  row.dataset.status = backendEntered ? '审核通过' : '待审核';
+  if (backendEntered) {
+    row.dataset.reviewer = row.dataset.reviewer || row.dataset.enteredBy || '后台录入';
+    row.dataset.reviewedAt = row.dataset.reviewedAt || row.dataset.uploadedAt || '';
+    row.dataset.reviewNote = row.dataset.reviewNote || '后台录入默认通过。';
+  } else {
+    row.dataset.reviewNote = row.dataset.reviewNote || '已迁移为待审核，等待教研审核。';
+  }
+  updateStatusCell(row);
+  updateActionCell(row);
+});
 
 rows.slice().sort((a, b) => a.dataset.expiry.localeCompare(b.dataset.expiry)).forEach((row) => table.tBodies[0].append(row));
 
@@ -49,7 +66,7 @@ function confirmCertificateStatus(action) {
   const row = activeRow;
   if (!row) return;
   if (action === 'certificate-withdraw') {
-    if (!['已录入', '待审核'].includes(row.dataset.status) || row.dataset.referenced === '是') {
+    if (row.dataset.status !== '待审核' || row.dataset.referenced === '是') {
       const error = document.querySelector('#certificate-status-error');
       if (error) { error.hidden = false; error.textContent = '该证书已审核或已被课程、排课引用，不能撤回，请改用归档。'; }
       return;
@@ -125,7 +142,7 @@ function updateActionCell(row) {
   const review = row.dataset.status === '待审核';
   // UI v1.2 状态—操作矩阵：未引用且未审核可撤回；已审核或已被课程/排课引用只能归档。
   const archived = row.dataset.status === '已归档';
-  const withdraw = ['已录入', '待审核'].includes(row.dataset.status) && row.dataset.referenced !== '是';
+  const withdraw = row.dataset.status === '待审核' && row.dataset.referenced !== '是';
   const archive = ['审核通过', '审核不通过'].includes(row.dataset.status) || row.dataset.referenced === '是';
   cell.innerHTML = `${review ? '<button type="button" class="text-button" data-action="review">审核</button>' : ''}${reupload && !archived ? '<button type="button" class="text-button" data-action="reupload">重新上传</button>' : ''}<button type="button" class="text-button" data-action="view">查看</button>${withdraw ? '<button type="button" class="text-button" data-action="withdraw">撤回</button>' : ''}${archive && !archived ? '<button type="button" class="text-button" data-action="archive">归档</button>' : ''}<button type="button" class="text-button danger-link" data-action="delete">删除</button>`;
 }

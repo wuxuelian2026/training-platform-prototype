@@ -21,7 +21,7 @@
           </div>
           <dl class="admin-login-demo">
             <div><dt>演示密码</dt><dd>Hbyx@2026</dd></div>
-            <div><dt>验证码</dt><dd>以页面显示为准，可点击“换一张”</dd></div>
+            <div><dt>演示账号</dt><dd id="admin-login-accounts" class="admin-login-account-list"></dd></div>
             <div><dt>停用账号</dt><dd>王会计 · finance.wang（登录被拒绝）</dd></div>
           </dl>
           <p class="admin-login-brand-note">演示账号与口令仅用于原型演示，不连接真实账号服务。</p>
@@ -32,20 +32,6 @@
             <p>登录后进入培训管理后台工作台。</p>
           </div>
           <label class="form-field">
-            <span>后台角色</span>
-            <select id="admin-login-role" name="role">
-              <option value="super_admin">超级管理员</option>
-              <option value="research_lead">教研主管</option>
-              <option value="academic_lead" selected>教务主管</option>
-              <option value="course_consultant">课程顾问</option>
-              <option value="finance">财务</option>
-            </select>
-          </label>
-          <label class="form-field">
-            <span>演示账号</span>
-            <select id="admin-login-demo" name="demoAccount"></select>
-          </label>
-          <label class="form-field">
             <span>登录账号</span>
             <input id="admin-login-account" name="account" type="text" autocomplete="username" required />
           </label>
@@ -53,18 +39,10 @@
             <span>登录密码</span>
             <input id="admin-login-password" name="password" type="password" autocomplete="current-password" required />
           </label>
-          <label class="form-field">
-            <span>图形验证码</span>
-            <span class="admin-login-captcha">
-              <input id="admin-login-captcha" name="captcha" type="text" inputmode="numeric" autocomplete="off" required />
-              <b id="admin-login-captcha-code" class="admin-login-captcha-code" title="点击可换一张">0000</b>
-              <button id="admin-login-captcha-refresh" class="button" type="button">换一张</button>
-            </span>
-          </label>
           <p id="admin-login-error" class="admin-login-error" role="alert" hidden></p>
-          <label class="admin-login-agreement">
-            <input id="admin-login-agreement" type="checkbox" checked />
-            <span>我已阅读并同意用户协议与隐私政策</span>
+          <label class="admin-login-remember">
+            <input id="admin-login-remember" type="checkbox" />
+            <span>记住密码</span>
           </label>
           <button class="button primary admin-login-submit" type="submit">登录</button>
         </form>

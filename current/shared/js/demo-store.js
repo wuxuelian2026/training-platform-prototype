@@ -30,6 +30,26 @@ function migrateCourseReferences(state) {
   return changed;
 }
 
+function migrateLightweightCourseArrangeStatus(state) {
+  let changed = false;
+  (state.library || []).forEach(record => {
+    if (!record || record.archive !== '轻量课程档案' || !Object.prototype.hasOwnProperty.call(record, 'status')) return;
+    delete record.status;
+    changed = true;
+  });
+  return changed;
+}
+
+function migrateCourseApplicationStatusLabel(state) {
+  let changed = false;
+  (state.applications || []).forEach(record => {
+    if (!record || record.status !== '审核中') return;
+    record.status = '待审核';
+    changed = true;
+  });
+  return changed;
+}
+
 const clone = value => JSON.parse(JSON.stringify(value));
 const defaultState = () => ({
   schemaVersion: SCHEMA_VERSION,
@@ -70,7 +90,10 @@ function readStored() {
     const base = defaultState();
     const merged = { ...base, ...stored, schemaVersion: SCHEMA_VERSION, accounts: stored.accounts || base.accounts, students: stored.students || base.students };
     // The repaired payload is written back once so the migrated ids are what the browser actually holds.
-    if (migrateCourseReferences(merged)) {
+    const courseReferencesMigrated = migrateCourseReferences(merged);
+    const arrangeStatusMigrated = migrateLightweightCourseArrangeStatus(merged);
+    const applicationStatusMigrated = migrateCourseApplicationStatusLabel(merged);
+    if (courseReferencesMigrated || arrangeStatusMigrated || applicationStatusMigrated) {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* private mode: in-memory migration still applies. */ }
     }
     return merged;

@@ -36,7 +36,7 @@ function toast(message, kind = 'success') {
 const tagClass = (value) => ({
   待完善: 'gray', 已建档: 'green', 在职: 'green', 离职: 'gray', 可申报: 'brand', 可排课: 'green', 暂停使用: 'gray',
   已签署: 'green', 待签署: 'amber', 签署中: 'brand', 即将到期: 'amber', 已到期: 'red', 已终止: 'gray', 无合同: 'gray',
-  未激活: 'gray', 正常: 'green', 冻结: 'gray', 已注销: 'gray', 草稿: 'gray'
+  未激活: 'gray', 正常: 'green', 冻结: 'gray', 草稿: 'gray'
 }[value] || 'gray');
 
 function statusTag(value) { return `<span class="tag ${tagClass(value)}">${value}</span>`; }

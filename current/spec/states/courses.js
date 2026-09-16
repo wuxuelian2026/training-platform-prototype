@@ -16,7 +16,7 @@ export const STATE_MACHINES = [
     "states": [
       [
         "reviewing",
-        "审核中",
+        "待审核",
         false
       ],
       [
@@ -37,19 +37,19 @@ export const STATE_MACHINES = [
     ],
     "transitions": [
       [
-        "审核中",
+        "待审核",
         "审批通过",
         "已通过",
         "教研主管"
       ],
       [
-        "审核中",
+        "待审核",
         "驳回（填原因）",
         "已驳回",
         "教研主管"
       ],
       [
-        "审核中",
+        "待审核",
         "撤销申报",
         "已撤销",
         "教师本人"
@@ -57,7 +57,7 @@ export const STATE_MACHINES = [
       [
         "已驳回/已撤销",
         "修改后重新提交",
-        "审核中",
+        "待审核",
         "教师本人"
       ]
     ]
@@ -84,11 +84,6 @@ export const STATE_MACHINES = [
       [
         "completed",
         "已完成",
-        true
-      ],
-      [
-        "not_applicable",
-        "不适用",
         true
       ]
     ],
