@@ -147,6 +147,11 @@ export const STATE_MACHINES = [
         "rejected",
         "审核不通过",
         false
+      ],
+      [
+        "withdrawn",
+        "已撤销",
+        false
       ]
     ],
     "transitions": [
@@ -163,7 +168,19 @@ export const STATE_MACHINES = [
         "教研主管"
       ],
       [
+        "待审核",
+        "撤销",
+        "已撤销",
+        "教研主管"
+      ],
+      [
         "审核不通过",
+        "重新上传并提交",
+        "待审核",
+        "教师本人/教研主管"
+      ],
+      [
+        "已撤销",
         "重新上传并提交",
         "待审核",
         "教师本人/教研主管"

@@ -17,8 +17,7 @@ const statusClass = (value) => ({
   待审核: 'amber',
   审核通过: 'green',
   审核不通过: 'red',
-  未提交: 'gray',
-  已归档: 'gray'
+  已撤销: 'gray'
 }[value] || 'gray');
 
 const validityClass = (value) => ({有效: 'green', 即将过期: 'amber', 已过期: 'red'}[value] || 'gray');
@@ -43,14 +42,12 @@ rows.forEach((row) => {
 
 rows.slice().sort((a, b) => a.dataset.expiry.localeCompare(b.dataset.expiry)).forEach((row) => table.tBodies[0].append(row));
 
-// 9.2 可自动化复现：撤回/归档使用标准 dialog，确认按钮带 data-confirm-action 便于测试定位提交结果。
-function openStatusConfirm(row, action) {
+// 9.2 可自动化复现：撤回使用标准 dialog，确认按钮带 data-confirm-action 便于测试定位提交结果。
+// 口径（2026-09-16）：证书不设归档状态；撤回后进入状态字典的“已撤销”，可重新上传生成新版本。
+function openWithdrawConfirm(row) {
   activeRow = row;
-  const withdraw = action === 'withdraw';
-  text('certificate-status-title', withdraw ? '撤回证书' : '归档证书');
-  text('certificate-status-copy', withdraw
-    ? '撤回后该证书回到未提交状态，可修改后重新提交；已审核或已被课程、排课引用的证书不能撤回。'
-    : '归档后该证书不再参与资质校验，历史版本、审核结论与操作记录只读保留。');
+  text('certificate-status-title', '撤回证书');
+  text('certificate-status-copy', '撤回后该证书状态变为已撤销，可重新上传后再次提交审核；已审核或已被课程、排课引用的证书不能撤回。');
   text('certificate-status-teacher', row.dataset.teacher);
   text('certificate-status-name', `${row.dataset.name} · ${row.dataset.number}`);
   text('certificate-status-current', `${row.dataset.status} / ${row.dataset.validity || '—'}`);
@@ -58,37 +55,27 @@ function openStatusConfirm(row, action) {
   if (error) { error.hidden = true; error.textContent = ''; }
   const confirmButton = document.querySelector('#certificate-status-confirm');
   if (confirmButton) {
-    confirmButton.dataset.confirmAction = withdraw ? 'certificate-withdraw' : 'certificate-archive';
-    confirmButton.textContent = withdraw ? '确认撤回' : '确认归档';
+    confirmButton.dataset.confirmAction = 'certificate-withdraw';
+    confirmButton.textContent = '确认撤回';
   }
   openDialog('certificate-status-dialog');
 }
 
-function confirmCertificateStatus(action) {
+function confirmCertificateStatus() {
   const row = activeRow;
   if (!row) return;
-  if (action === 'certificate-withdraw') {
-    if (row.dataset.status !== '待审核' || row.dataset.referenced === '是') {
-      const error = document.querySelector('#certificate-status-error');
-      if (error) { error.hidden = false; error.textContent = '该证书已审核或已被课程、排课引用，不能撤回，请改用归档。'; }
-      return;
-    }
-    row.dataset.status = '未提交';
-    updateStatusCell(row);
-    updateActionCell(row);
-    updateMetrics();
-    applyFilters();
-    closeDialog('certificate-status-dialog');
-    showToast(`已撤回证书：${row.dataset.name}，可重新提交。`);
+  if (row.dataset.status !== '待审核' || row.dataset.referenced === '是') {
+    const error = document.querySelector('#certificate-status-error');
+    if (error) { error.hidden = false; error.textContent = '只有待审核且未被课程、排课引用的证书可以撤回。'; }
     return;
   }
-  row.dataset.status = '已归档';
+  row.dataset.status = '已撤销';
   updateStatusCell(row);
   updateActionCell(row);
   updateMetrics();
   applyFilters();
   closeDialog('certificate-status-dialog');
-  showToast(`已归档证书：${row.dataset.name}，历史版本与审核结论保留。`);
+  showToast(`已撤销证书：${row.dataset.name}，可重新上传后再次提交审核。`);
 }
 
 function openDialog(id) {
@@ -139,14 +126,14 @@ function updateStatusCell(row) {
 function updateActionCell(row) {
   const cell = row.querySelector('[data-cell="actions"]');
   if (!cell) return;
-  // UI v1.2：审核通过可直接重传（新版本独立审核，旧结论归属旧版本）；驳回与已过期同样可重传。
-  const reupload = ['审核通过', '审核不通过'].includes(row.dataset.status) || row.dataset.validity === '已过期';
+  // UI v1.2：审核通过可直接重传（新版本独立审核，旧结论归属旧版本）；驳回、已过期与已撤销同样可重传，
+  // 已撤销的记录重新上传并提交后回到“待审核”。
+  const reupload = ['审核通过', '审核不通过', '已撤销'].includes(row.dataset.status) || row.dataset.validity === '已过期';
   const review = row.dataset.status === '待审核';
-  // UI v1.2 状态—操作矩阵：未引用且未审核可撤回；已审核或已被课程/排课引用只能归档。
-  const archived = row.dataset.status === '已归档';
+  // UI v1.2 状态—操作矩阵 + 2026-09-16 口径：未引用且未审核可撤回（撤回后为“已撤销”）；
+  // 证书不设归档状态，已审核的记录通过重新上传生成新版本改变材料。
   const withdraw = row.dataset.status === '待审核' && row.dataset.referenced !== '是';
-  const archive = ['审核通过', '审核不通过'].includes(row.dataset.status) || row.dataset.referenced === '是';
-  cell.innerHTML = `${review ? '<button type="button" class="text-button" data-action="review">审核</button>' : ''}${reupload && !archived ? '<button type="button" class="text-button" data-action="reupload">重新上传</button>' : ''}<button type="button" class="text-button" data-action="view">查看</button>${withdraw ? '<button type="button" class="text-button" data-action="withdraw">撤回</button>' : ''}${archive && !archived ? '<button type="button" class="text-button" data-action="archive">归档</button>' : ''}<button type="button" class="text-button danger-link" data-action="delete">删除</button>`;
+  cell.innerHTML = `${review ? '<button type="button" class="text-button" data-action="review">审核</button>' : ''}${reupload ? '<button type="button" class="text-button" data-action="reupload">重新上传</button>' : ''}<button type="button" class="text-button" data-action="view">查看</button>${withdraw ? '<button type="button" class="text-button" data-action="withdraw">撤回</button>' : ''}<button type="button" class="text-button danger-link" data-action="delete">删除</button>`;
 }
 
 function updateMetrics() {
@@ -345,7 +332,7 @@ document.addEventListener('click', (event) => {
   if (actionElement && actionElement.dataset.action !== 'download-current') {
     const row = actionElement.closest('tr[data-certificate-id]');
     if (row) {
-      ({preview: openPreview, download: () => showToast(`已准备下载：${row.dataset.file}`), review: openReview, reupload: openReupload, view: openDetail, delete: openDelete, withdraw: (target) => openStatusConfirm(target, 'withdraw'), archive: (target) => openStatusConfirm(target, 'archive')}[actionElement.dataset.action])?.(row);
+      ({preview: openPreview, download: () => showToast(`已准备下载：${row.dataset.file}`), review: openReview, reupload: openReupload, view: openDetail, delete: openDelete, withdraw: openWithdrawConfirm}[actionElement.dataset.action])?.(row);
     }
   }
   if (event.target.closest('[data-dialog-close]')) {
@@ -363,7 +350,7 @@ document.addEventListener('click', (event) => {
     applyFilters();
     showToast(`已删除证书：${deletedName}`);
   }
-  if (event.target.id === 'certificate-status-confirm') confirmCertificateStatus(event.target.dataset.confirmAction);
+  if (event.target.id === 'certificate-status-confirm') confirmCertificateStatus();
   if (event.target.matches('[data-action="download-current"]') && activeRow) showToast(`已准备下载：${activeRow.dataset.file}`);
 });
 
@@ -403,5 +390,7 @@ const queryTeacher = params.get('teacher');
 if (queryStatus && statusTabs.some((tab) => tab.dataset.certificateStatus === queryStatus)) activeStatus = queryStatus;
 if (queryValidity) document.querySelector('#certificate-validity').value = queryValidity;
 if (queryTeacher) document.querySelector('#certificate-teacher').value = queryTeacher;
+// 操作列由 updateActionCell 统一渲染，静态标记只作占位，避免静态与动态分叉成两套动作。
+rows.forEach(updateActionCell);
 updateMetrics();
 applyFilters();
