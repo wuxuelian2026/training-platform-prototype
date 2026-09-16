@@ -42,7 +42,7 @@ const teacherCertificateDefaults = [
 const teacherContractDefaults = [
   { id: 'contract-2027', name: '2026-2027年度教师合作协议', number: 'CT2026090021', type: '合作协议', status: '待教师签署', startAt: '2026-10-01', endAt: '2027-09-30', signedAt: '', version: 'v1', rate: 180, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2026090021-教师合作协议.pdf', pushedAt: '2026-09-09', note: '请在2026年9月20日前完成签署。' },
   { id: 'contract-2026', name: '2026年度教师合作协议', number: 'CT2026010008', type: '合作协议', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', signedAt: '2026-01-03', version: 'v1', rate: 180, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2026010008-教师合作协议.pdf', pushedAt: '2026-01-02', note: '合同已完成双方签署，按有效课次计薪。' },
-  { id: 'contract-2025', name: '2025年度教师合作协议', number: 'CT2025010006', type: '合作协议', status: '已到期', startAt: '2025-01-01', endAt: '2025-12-31', signedAt: '2025-01-02', version: 'v1', rate: 165, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2025010006-教师合作协议.pdf', pushedAt: '2024-12-28', note: '合同已到期，仅供历史查询。' },
+  { id: 'contract-2025', name: '2025年度教师合作协议', number: 'CT2025010006', type: '合作协议', status: '已签署', startAt: '2025-01-01', endAt: '2025-12-31', signedAt: '2025-01-02', version: 'v1', rate: 165, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2025010006-教师合作协议.pdf', pushedAt: '2024-12-28', note: '合同已到期，仅供历史查询。' },
   { id: 'contract-2024', name: '2024年度教师合作协议', number: 'CT2024010004', type: '合作协议', status: '已终止', startAt: '2024-01-01', endAt: '2024-12-31', signedAt: '2024-01-03', version: 'v2', rate: 150, campus: '南湖校区', course: '舞蹈基本功', file: 'CT2024010004-教师合作协议.pdf', pushedAt: '2023-12-25', terminatedAt: '2024-10-31', terminateReason: '因授课安排调整，双方协商终止本合同。', note: '因授课安排调整，双方协商终止本合同。' }
 ];
 const teacherGraduationDefaults = [
@@ -653,17 +653,28 @@ function bindTeacherCertificateEvents() {
 let teacherContractFilter = '全部';
 function contractStatusTone(status) {
   if (status === '已签署') return 'green';
+  if (status === '有效') return 'green';
   if (status === '待教师签署' || status === '即将到期') return 'amber';
+  if (status === '待学校签署') return 'brand';
   if (status === '已到期') return 'red';
   return 'gray';
 }
+
+// 合同期限状态按字典 §4.2 由起止日期派生（有效／即将到期／已到期），不写进签署状态字段。
+function contractTermStatusOf(contract, today = new Date().toISOString().slice(0, 10)) {
+  if (!contract?.endAt) return '有效';
+  if (contract.endAt < today) return '已到期';
+  if (contract.startAt && contract.startAt > today) return '有效';
+  return Math.round((new Date(`${contract.endAt}T00:00:00`) - new Date(`${today}T00:00:00`)) / 86400000) <= 30 ? '即将到期' : '有效';
+}
+
 function teacherContractCard(contract) {
   const action = contract.status === '待教师签署' ? '去签署' : '查看详情';
   // I1-DEF-012：签署态与期限态分列，期限状态不替换签署状态。
-  const signedContract = Boolean(contract.signedAt);
-  // I1-DEF-014：只有「已到期」合成签署态；「已终止」是签署终态，不能被折叠成已签署。
-  const signingStatus = contract.status === '已到期' && signedContract ? '已签署' : contract.status;
-  const statusLabel = signingStatus === '已签署' && contract.status === '已到期' ? '已签署 · 已到期' : signingStatus;
+  // I1-DEF-014：签署状态只取字典四态；期限状态派生后并排展示，「已终止」不参与合成。
+  const signingStatus = contract.status;
+  const termStatus = contractTermStatusOf(contract);
+  const statusLabel = signingStatus === '已签署' && termStatus === '已到期' ? '已签署 · 已到期' : signingStatus;
   // I1-DEF-014：已终止是签署终态，需可见终止生效日期与终止原因。
   const terminated = contract.status === '已终止';
   const terminateFacts = terminated
@@ -691,7 +702,7 @@ function renderTeacherContractDetail() {
   const statusNote = contract.status === '待教师签署' ? contract.note : contract.status === '已终止' ? `终止日期 ${contract.terminatedAt} · ${contract.note}` : contract.note;
   // I1-DEF-014：已终止合同的终止生效日期与终止原因在详情同步可见。
   const terminateRows = contract.status === '已终止' ? [['终止生效日期', contract.terminatedAt || '—'], ['终止原因', contract.terminateReason || contract.note || '—', 'wide']] : [];
-  tLayout(tStack(`<section class="teacher-contract-detail-head"><div><span>${tEsc(contract.type)} · ${tEsc(contract.version)}</span><h2>${tEsc(contract.name)}</h2><p>${tEsc(contract.number)}</p></div>${tPill(contract.status, contractStatusTone(contract.status))}</section>`, `<section class="teacher-contract-info"><div class="teacher-contract-info-head"><h3>合同信息</h3><span>${readonly ? '只读' : '签署前请核对'}</span></div>${teacherArchiveRows([['合同期限', `${contract.startAt} 至 ${contract.endAt}`, 'wide'], ['授课课程', contract.course, 'wide'], ['工作校区', contract.campus], ['每课次含税单价', `¥${Number(contract.rate).toFixed(2)} / 每次课（含税）`], ['签署日期', contract.signedAt || '未签署'], ['合同版本', contract.version], ...terminateRows])}</section>`, `<section class="teacher-contract-file"><div class="teacher-contract-file-page"><span>PDF · ${tEsc(contract.file)}</span><strong>教师${tEsc(contract.type)}</strong><p>${tEsc(contract.number)}</p><small>共 8 条</small></div><div><h3>合同全文</h3><p>查看合同期限、授课安排、每课次含税单价及双方权责。</p><button type="button" class="mp-button secondary full" data-contract-read>${readonly ? '查看合同全文' : '阅读并签署'}</button></div></section>`, `<p class="teacher-contract-status-note ${contract.status === '待教师签署' ? 'pending' : ''}">${tEsc(statusNote)}</p>`));
+  tLayout(tStack(`<section class="teacher-contract-detail-head"><div><span>${tEsc(contract.type)} · ${tEsc(contract.version)}</span><h2>${tEsc(contract.name)}</h2><p>${tEsc(contract.number)}</p></div>${tPill(contract.status, contractStatusTone(contract.status))}${tPill(contractTermStatusOf(contract), contractStatusTone(contractTermStatusOf(contract)))}</section>`, `<section class="teacher-contract-info"><div class="teacher-contract-info-head"><h3>合同信息</h3><span>${readonly ? '只读' : '签署前请核对'}</span></div>${teacherArchiveRows([['合同期限', `${contract.startAt} 至 ${contract.endAt}`, 'wide'], ['授课课程', contract.course, 'wide'], ['工作校区', contract.campus], ['每课次含税单价', `¥${Number(contract.rate).toFixed(2)} / 每次课（含税）`], ['签署日期', contract.signedAt || '未签署'], ['合同版本', contract.version], ...terminateRows])}</section>`, `<section class="teacher-contract-file"><div class="teacher-contract-file-page"><span>PDF · ${tEsc(contract.file)}</span><strong>教师${tEsc(contract.type)}</strong><p>${tEsc(contract.number)}</p><small>共 8 条</small></div><div><h3>合同全文</h3><p>查看合同期限、授课安排、每课次含税单价及双方权责。</p><button type="button" class="mp-button secondary full" data-contract-read>${readonly ? '查看合同全文' : '阅读并签署'}</button></div></section>`, `<p class="teacher-contract-status-note ${contract.status === '待教师签署' ? 'pending' : ''}">${tEsc(statusNote)}</p>`));
 }
 function openTeacherContractReader(contract) {
   const canSign = contract.status === '待教师签署';

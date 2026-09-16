@@ -90,7 +90,8 @@ export const TEACHER_FIELD_SPEC = {
           { id: 'FD-TEACHER-043', label: '合同截止日期', type: '日期', length: 'YYYY-MM-DD', required: '是', note: '需晚于起始日期', constraints: { format: 'YYYY-MM-DD', afterField: 'FD-TEACHER-042' } },
           { id: 'FD-TEACHER-044', label: '课时费标准', type: '金额', length: '大于 0', required: '是', note: '每课次含税单价，用于工资核算', constraints: { exclusiveMin: 0, decimals: 2 } },
           { id: 'FD-TEACHER-045', label: '无固定期限', type: '开关', length: '是 / 否', required: '否', note: '开启后合同截止日期不作为必填', constraints: { boolean: true, whenOn: 'FD-TEACHER-043' } },
-          { id: 'FD-TEACHER-049', label: '合同状态', type: '只读', length: '6 个状态值', required: '系统计算', note: '推送成功后为待教师签署；教师签名后视学校签署情况进入待学校签署或已签署；到期与终止另行标记', constraints: { system: true, readOnly: true, options: ['待教师签署 pending_teacher', '待学校签署 pending_school', '已签署 signed', '即将到期 expiring', '已到期 expired', '已终止 terminated'] } },
+          { id: 'FD-TEACHER-049', label: '签署状态', type: '只读', length: '4 个状态值', required: '系统计算', note: '推送成功后为待教师签署；教师签名后进入待学校签署；学校签署后为已签署；终���后为已终止（终态）', constraints: { system: true, readOnly: true, options: ['待教师签署 pending_teacher', '待学校签署 pending_school', '已签署 signed', '已终止 terminated'] } },
+          { id: 'FD-TEACHER-065', label: '期限状态', type: '只读', length: '3 个派生值', required: '系统计算', note: '按合同起止日期派生：有效 active／即将到期 expiring／已到期 expired；不设「未生效」，未到起始日期按有效计算', constraints: { system: true, readOnly: true, derived: true, options: ['有效 active', '即将到期 expiring', '已到期 expired'] } },
           { id: 'FD-TEACHER-050', label: '合同文件', type: '预览区域', length: '按模板生成', required: '系统生成', note: '按合同模板和填写内容自动生成 PDF，不需要后台上传；推送后随合同版本留存并可预览', constraints: { system: true, readOnly: true, generated: true, templateDriven: true, noUpload: true } },
           { id: 'FD-TEACHER-046', label: '备注', type: '多行文本', length: '≤ 200 字', required: '否', note: '补充约定或内部说明', constraints: { maxLength: 200 } }
         ] }

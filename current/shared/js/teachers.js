@@ -37,7 +37,8 @@ function toast(message, kind = 'success') {
 
 const tagClass = (value) => ({
   待完善: 'gray', 已建档: 'green', 在职: 'green', 离职: 'gray', 可申报: 'brand', 可排课: 'green', 暂停使用: 'gray',
-  已签署: 'green', 待签署: 'amber', 签署中: 'brand', 即将到期: 'amber', 已到期: 'red', 已终止: 'gray', 无合同: 'gray',
+  已签署: 'green', 待签署: 'amber', 待教师签署: 'amber', 待学校签署: 'brand', 签署中: 'brand',
+  有效: 'green', 即将到期: 'amber', 已到期: 'red', 已终止: 'gray', 无合同: 'gray',
   未激活: 'gray', 正常: 'green', 冻结: 'gray', 草稿: 'gray'
 }[value] || 'gray');
 
@@ -627,13 +628,32 @@ function contractActionConfirm() {
 function initContracts() {
   const form = document.querySelector('#contract-filter');
   const rows = [...document.querySelectorAll('tr[data-contract-id]')];
+  // 合同期限状态是派生值：由合同起止日期按当天计算，不写入签署状态字段（05-状态字典 §4.2）。
+  const today = new Date().toISOString().slice(0, 10);
+  const termStatusOf = (row) => {
+    const [startAt, endAt] = String(row.dataset.term || '').split('至').map((value) => value.trim());
+    if (!endAt) return '有效';
+    if (endAt < today) return '已到期';
+    if (startAt && startAt > today) return '有效';
+    return Math.round((new Date(`${endAt}T00:00:00`) - new Date(`${today}T00:00:00`)) / 86400000) <= 30 ? '即将到期' : '有效';
+  };
+  rows.forEach((row) => {
+    const cell = row.querySelector('[data-cell="term"]');
+    if (!cell) return;
+    const value = termStatusOf(row);
+    cell.innerHTML = `<span class="tag ${tagClass(value)} contract-term-status">${value}</span>`;
+  });
   const apply = () => {
     const status = form?.querySelector('[name="status"]')?.value || '';
+    const termStatus = form?.querySelector('[name="termStatus"]')?.value || '';
     const type = form?.querySelector('[name="type"]')?.value || '';
     const teacher = (form?.querySelector('[name="teacher"]')?.value || '').trim();
     let visible = 0;
     rows.forEach((row) => {
-      const matches = (!status || row.dataset.status === status) && (!type || row.dataset.type === type) && (!teacher || row.dataset.teacher.includes(teacher));
+      const matches = (!status || row.dataset.status === status)
+        && (!termStatus || termStatusOf(row) === termStatus)
+        && (!type || row.dataset.type === type)
+        && (!teacher || row.dataset.teacher.includes(teacher));
       row.hidden = !matches;
       if (matches) visible += 1;
     });
@@ -653,7 +673,7 @@ function initContracts() {
     activeContractRow = row;
     if (action === 'view') {
       const data = row.dataset;
-      text('contract-detail-teacher', data.teacher); text('contract-detail-number', data.number); text('contract-detail-status', data.status); text('contract-detail-term', data.term); text('contract-detail-rate', `¥${data.rate}  / 每次课（含税）`); text('contract-detail-note', data.note || '暂无备注。');
+      text('contract-detail-teacher', data.teacher); text('contract-detail-number', data.number); text('contract-detail-status', data.status); text('contract-detail-term', `${data.term}（${termStatusOf(row)}）`); text('contract-detail-rate', `¥${data.rate}  / 每次课（含税）`); text('contract-detail-note', data.note || '暂无备注。');
       const status = document.querySelector('#contract-detail-status'); if (status) status.className = `tag ${tagClass(data.status)}`;
       openDialog('contract-detail-dialog');
     }
