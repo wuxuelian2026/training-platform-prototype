@@ -1,3 +1,5 @@
+import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
+
 const table = document.querySelector('#certificates-table');
 const filterForm = document.querySelector('#certificate-filter');
 const emptyRow = table?.querySelector('.certificate-empty');
@@ -155,7 +157,20 @@ function updateMetrics() {
   text('metric-expired', count('[data-validity="已过期"]'));
 }
 
-// 证书审核状态以页签切换：计数按当前存活行实时重算，选中态与筛选条件分离。
+// 证书审核状态以页签切换：状态取值只读 spec/states 的 SM-TEACHER-CERTIFICATE，
+// 页面不得自定义状态；「全部」是不加状态过滤的默认项，本身不是状态取值。
+const CERTIFICATE_STATE_MACHINE = 'SM-TEACHER-CERTIFICATE';
+const certificateStateMachine = machinesForPage('teachers/certificates').find((machine) => machine.id === CERTIFICATE_STATE_MACHINE);
+const certificateStatusTabs = [
+  { value: '', label: '全部' },
+  ...(certificateStateMachine ? stateLabelsOf(certificateStateMachine).map((label) => ({ value: label, label })) : [])
+];
+const statusTabHost = document.querySelector('#certificate-status-tabs');
+if (statusTabHost) {
+  statusTabHost.innerHTML = certificateStatusTabs
+    .map(({ value, label }) => `<button type="button" role="tab" class="certificate-status-tab" data-certificate-status="${value}" aria-selected="false">${label}<span>0</span></button>`)
+    .join('');
+}
 const statusTabs = [...document.querySelectorAll('[data-certificate-status]')];
 let activeStatus = '';
 
