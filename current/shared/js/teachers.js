@@ -3,6 +3,8 @@ import { readAdminSession } from './admin-auth.js';
 import { mountRichEditor } from './rich-editor.js';
 import { readDemoState, writeDemoState } from './demo-store.js';
 import { readXlsxSheetRows } from './xlsx-lite.js';
+import { teacherFactsById } from './teacher-facts.js';
+import { explainTeacherCapacity, summarizeTeacherCapacity } from './teacher-capacity.js';
 
 const teacherRoot = document.querySelector('[data-teacher-page]');
 const teacherPage = teacherRoot?.dataset.teacherPage;
@@ -68,12 +70,26 @@ function updateTeacherRow(row, action) {
   }
   if (action === 'resign') {
     row.dataset.personnelStatus = '离职';
-    row.dataset.capabilities = '暂停使用';
     row.dataset.todos = `${row.dataset.todos || ''},人员离职`;
-    const capabilityCell = row.querySelector('[data-cell="capability"]');
-    if (capabilityCell) capabilityCell.innerHTML = statusTag('暂停使用');
   }
+  renderTeacherCapability(row);
   renderTeacherActions(row, actionCell);
+}
+
+// 视图层：教师列表只回答「可授课几个专业、哪些专业有有效资质、档案与账号是否异常」，
+// 不再输出教师级“可排课”结论——那个结论只在具体（专业 × 课次日期）下成立。
+function renderTeacherCapability(row) {
+  const cell = row.querySelector('[data-cell="capability"]');
+  if (!cell) return;
+  const facts = teacherFactsById(row.dataset.teacherId);
+  if (!facts) return;
+  const summary = summarizeTeacherCapacity(facts);
+  const tags = [`<span class="tag brand">可授课 ${summary.majorCount} 个专业</span>`];
+  const tone = summary.qualifiedCount === summary.majorCount ? 'green' : summary.qualifiedCount ? 'amber' : 'gray';
+  tags.push(`<span class="tag ${tone}">${summary.qualifiedCount}/${summary.majorCount} 有有效资质</span>`);
+  summary.issues.forEach((issue) => tags.push(`<span class="tag red">${issue.text}</span>`));
+  cell.innerHTML = tags.join('');
+  row.dataset.capabilities = summary.blocked ? '暂停使用' : '可授课';
 }
 
 function renderTeacherActions(row, cell) {
@@ -467,6 +483,7 @@ function initTeacherList() {
   document.querySelectorAll('tr[data-teacher-id]').forEach((row) => {
     renderTeacherActions(row, row.querySelector('[data-cell="actions"]'));
     renderFeaturedSwitch(row, canManageFeatured);
+    renderTeacherCapability(row);
   });
   document.addEventListener('change', (event) => {
     if (!event.target.matches('[data-action="toggle-featured"]') || !canManageFeatured) return;
@@ -725,10 +742,33 @@ function initSchedule() {
 }
 
 function initProfile() {
+  renderProfileCapacity();
   document.querySelectorAll('[data-profile-action]').forEach((button) => button.addEventListener('click', () => {
     const action = button.dataset.profileAction;
     if (action === 'freeze' || action === 'resign') toast(action === 'freeze' ? '已打开冻结确认。' : '已打开离职确认。');
   }));
+}
+
+// 教师详情：按专业逐条给出资质结论，并列出申报层面的准入阻断。
+function renderProfileCapacity() {
+  const container = document.querySelector('.teacher-capability-detail');
+  const facts = teacherFactsById(new URLSearchParams(location.search).get('teacher_id') || 'teacher-wang');
+  if (!container || !facts) return;
+  const summary = summarizeTeacherCapacity(facts);
+  const apply = explainTeacherCapacity(facts, { purpose: 'apply' });
+  const withoutCertificate = summary.majors.filter((item) => !item.qualified).map((item) => item.major);
+  const reasonRows = [
+    ...apply.blocks.map((block) => `<div><span class="tag red">阻断</span><p>${block.text}</p></div>`),
+    ...(withoutCertificate.length ? [`<div><span class="tag amber">排课提醒</span><p>${withoutCertificate.join('、')} 暂无有效资质，不影响申报，但发布与排课会按专业和课次日期校验。</p></div>`] : [])
+  ].join('');
+  container.innerHTML = `<div><span class="tag ${apply.status === 'available' ? 'brand' : 'gray'}">${apply.status === 'available' ? '可申报' : '暂不可申报'}</span><p>${apply.status === 'available' ? '资料已建档、人员在职、账号正常，且已配置授课专业。' : apply.reasons.join('；')}</p></div>${reasonRows}<div><span class="tag brand">授课专业 ${summary.majorCount} 个</span><p>${summary.majors.map((item) => `${item.major}：${item.qualified ? '有有效资质' : '缺有效资质'}`).join('；')}。</p></div>`;
+  const summaryResult = document.querySelector('.teacher-summary-result');
+  if (summaryResult) {
+    const today = new Date().toISOString().slice(0, 10);
+    const usable = (facts.certificates || []).filter((item) => item.status === '已通过' && (!item.expiresAt || item.expiresAt >= today)).length;
+    const pending = (facts.certificates || []).length - usable;
+    summaryResult.innerHTML = `<strong>可用 ${usable} 份 <span aria-hidden="true">|</span> 待处理 ${pending} 份</strong><p>${summary.majors.map((item) => `${item.major}：${item.qualified ? '资质满足' : '待补充专业资质'}`).join('；')}。</p>`;
+  }
 }
 
 document.addEventListener('click', (event) => { if (event.target.closest('[data-dialog-close]')) event.target.closest('dialog')?.close(); });

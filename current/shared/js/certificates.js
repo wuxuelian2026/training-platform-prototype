@@ -1,4 +1,5 @@
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
+import { sessionsFrom, teacherFactsByName } from './teacher-facts.js';
 
 const table = document.querySelector('#certificates-table');
 const filterForm = document.querySelector('#certificate-filter');
@@ -50,6 +51,40 @@ rows.forEach((row) => {
 });
 
 rows.slice().sort((a, b) => a.dataset.expiry.localeCompare(b.dataset.expiry)).forEach((row) => table.tBodies[0].append(row));
+
+// 事实层视图：证书只在“适用专业”范围内参与资质校验；受影响课次 =
+// 证书到期之后、教师仍要上的、属于该适用专业的课次，用来提前发现换人或续证需求。
+function renderCertificateFactCells() {
+  const today = new Date().toISOString().slice(0, 10);
+  rows.forEach((row) => {
+    const facts = teacherFactsByName(row.dataset.teacher);
+    const certificate = (facts?.certificates || []).find((item) => item.name === row.dataset.name);
+    const majors = certificate?.majors || [];
+    const majorCell = document.createElement('td');
+    majorCell.dataset.cell = 'majors';
+    majorCell.textContent = majors.length ? majors.join('、') : '—';
+    row.insertBefore(majorCell, row.children[2] || null);
+
+    const affectedCell = document.createElement('td');
+    affectedCell.dataset.cell = 'affected';
+    if (!certificate || !certificate.expiresAt) {
+      affectedCell.textContent = '—';
+    } else if (certificate.expiresAt < today) {
+      affectedCell.textContent = '已过期';
+      affectedCell.className = 'expiry-danger';
+    } else {
+      const affected = majors.flatMap((major) => sessionsFrom({ teacher: row.dataset.teacher, major, from: certificate.expiresAt }));
+      const unique = [...new Map(affected.map((item) => [`${item.classId}-${item.date}`, item])).values()].sort((a, b) => a.date.localeCompare(b.date));
+      affectedCell.textContent = unique.length ? `${unique.length} 个课次` : '无';
+      affectedCell.className = unique.length ? 'expiry-warning' : '';
+      if (unique.length) affectedCell.title = `${certificate.expiresAt} 之后：${unique.slice(0, 4).map((item) => `${item.date} ${item.className}`).join('；')}${unique.length > 4 ? ' 等' : ''}`;
+    }
+    const actionCell = row.querySelector('[data-cell="actions"]');
+    row.insertBefore(affectedCell, actionCell || null);
+  });
+}
+
+renderCertificateFactCells();
 
 // 9.2 可自动化复现：撤回使用标准 dialog，确认按钮带 data-confirm-action 便于测试定位提交结果。
 // 口径（2026-09-16）：证书不设归档状态；撤回后进入状态字典的“已撤销”，可重新上传生成新版本。
