@@ -18,12 +18,6 @@
         <a class="button" href="list.html">教师档案列表</a>
       </div>
 
-      <div class="card-grid compact-metrics">
-        <a class="card stat-link" href="?status=待审核"><div class="metric-label">待审核</div><div class="metric-value" id="metric-pending">6</div><div class="metric-note">教研主管待处理</div></a>
-        <a class="card stat-link" href="?status=已驳回"><div class="metric-label">已驳回</div><div class="metric-value" id="metric-rejected">2</div><div class="metric-note">需要重新上传材料</div></a>
-        <a class="card stat-link" href="?validity=即将过期"><div class="metric-label">即将过期</div><div class="metric-value" id="metric-expiring">3</div><div class="metric-note">有效期内需安排续期</div></a>
-        <a class="card stat-link" href="?validity=已过期"><div class="metric-label">已过期</div><div class="metric-value" id="metric-expired">1</div><div class="metric-note">当前不可作为有效资质</div></a>
-      </div>
 
       <!-- 状态页签由 certificates.js 按 spec/states 的 SM-TEACHER-CERTIFICATE 运行时生成，页面不写死状态取值。 -->
       <nav class="status-tabs" id="certificate-status-tabs" role="tablist" aria-label="证书审核状态"></nav>

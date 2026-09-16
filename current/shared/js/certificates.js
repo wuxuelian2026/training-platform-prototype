@@ -116,7 +116,6 @@ function confirmCertificateStatus() {
   row.dataset.status = '已撤销';
   updateStatusCell(row);
   updateActionCell(row);
-  updateMetrics();
   applyFilters();
   closeDialog('certificate-status-dialog');
   showToast(`已撤销证书：${row.dataset.name}，可重新上传后再次提交审核。`);
@@ -178,14 +177,6 @@ function updateActionCell(row) {
   // 证书不设归档状态，已审核的记录通过重新上传生成新版本改变材料。
   const withdraw = row.dataset.status === '待审核' && row.dataset.referenced !== '是';
   cell.innerHTML = `${review ? '<button type="button" class="text-button" data-action="review">审核</button>' : ''}${reupload ? '<button type="button" class="text-button" data-action="reupload">重新上传</button>' : ''}<button type="button" class="text-button" data-action="view">查看</button>${withdraw ? '<button type="button" class="text-button" data-action="withdraw">撤回</button>' : ''}<button type="button" class="text-button danger-link" data-action="delete">删除</button>`;
-}
-
-function updateMetrics() {
-  const count = (selector) => rows.filter((row) => row.isConnected && row.matches(selector)).length;
-  text('metric-pending', count('[data-status="待审核"]'));
-  text('metric-rejected', count('[data-status="已驳回"]'));
-  text('metric-expiring', count('[data-validity="即将过期"]'));
-  text('metric-expired', count('[data-validity="已过期"]'));
 }
 
 // 证书审核状态以页签切换：状态取值只读 spec/states 的 SM-TEACHER-CERTIFICATE，
@@ -346,7 +337,7 @@ function handleReview(result) {
     activeRow.dataset.reviewNote = note;
     activeRow.dataset.reviewer = '李教研';
     activeRow.dataset.reviewedAt = '';
-    updateStatusCell(activeRow); updateActionCell(activeRow); updateMetrics(); applyFilters();
+    updateStatusCell(activeRow); updateActionCell(activeRow); applyFilters();
     closeDialog('review-dialog');
     showToast('新版本被驳回，已回退到最近一次已通过版本，发布与排课按该版本重算资质。');
     return;
@@ -358,7 +349,6 @@ function handleReview(result) {
   activeRow.dataset.reviewedAt = '2026-09-08 15:20';
   updateStatusCell(activeRow);
   updateActionCell(activeRow);
-  updateMetrics();
   applyFilters();
   closeDialog('review-dialog');
   showToast(result === 'pass' ? '证书已通过审核，列表已更新。' : (noApprovedVersion ? '证书已驳回；无已通过版本，该证书不再满足资质要求，发布与排课按目标专业重新校验。' : '证书已驳回，已保留驳回原因。'));
@@ -390,7 +380,6 @@ document.addEventListener('click', (event) => {
     activeRow.remove();
     closeDialog('delete-dialog');
     activeRow = null;
-    updateMetrics();
     applyFilters();
     showToast(`已删除证书：${deletedName}`);
   }
@@ -421,7 +410,6 @@ document.querySelector('#reupload-form')?.addEventListener('submit', (event) => 
   if (activeRow.children[8]) activeRow.children[8].textContent = activeRow.dataset.source;
   updateStatusCell(activeRow);
   updateActionCell(activeRow);
-  updateMetrics();
   applyFilters();
   closeDialog('reupload-dialog');
   showToast('证书已重新上传，等待教研主管审核。');
@@ -436,5 +424,4 @@ if (queryValidity) document.querySelector('#certificate-validity').value = query
 if (queryTeacher) document.querySelector('#certificate-teacher').value = queryTeacher;
 // 操作列由 updateActionCell 统一渲染，静态标记只作占位，避免静态与动态分叉成两套动作。
 rows.forEach(updateActionCell);
-updateMetrics();
 applyFilters();

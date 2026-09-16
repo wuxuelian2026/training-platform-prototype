@@ -677,7 +677,7 @@ function initContracts() {
     const empty = document.querySelector('.contract-empty-row');
     if (empty) empty.hidden = visible !== 0;
     text('contract-count', `共${rows.length}份合同 · 当前筛选显示${visible}份`);
-    // 页签计数按全部存活行重算，指标卡与页签同源，避免出现两套数字。
+    // 页签计数按全部存活行重算，不受其他筛选条件影响。
     const allCount = (predicate) => rows.filter((row) => row.isConnected && predicate(row)).length;
     statusTabs.forEach((tab) => {
       const value = tab.dataset.contractStatus || '';
@@ -687,10 +687,6 @@ function initContracts() {
       const badge = tab.querySelector('span');
       if (badge) badge.textContent = String(allCount((row) => !value || row.dataset.status === value));
     });
-    text('metric-contract-pending', allCount((row) => row.dataset.status === '待教师签署'));
-    text('metric-contract-expiring', rows.filter((row) => termStatusOf(row) === '即将到期').length);
-    text('metric-contract-signed', allCount((row) => row.dataset.status === '已签署'));
-    text('metric-contract-terminated', allCount((row) => row.dataset.status === '已终止'));
   };
   statusTabs.forEach((tab) => tab.addEventListener('click', () => {
     activeContractStatus = tab.dataset.contractStatus || '';
