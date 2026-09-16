@@ -28,7 +28,6 @@
       <form class="card filter-panel" id="certificate-filter">
         <div class="filter-head"><strong>筛选条件</strong></div>
         <div class="filter-grid certificate-filter-grid">
-          <label class="form-field"><span>证书审核状态</span><select id="certificate-status"><option value="">全部状态</option><option>待审核</option><option>审核通过</option><option>审核不通过</option></select></label>
           <label class="form-field"><span>证书有效性</span><select id="certificate-validity"><option value="">全部有效性</option><option>有效</option><option>即将过期</option><option>已过期</option></select></label>
           <label class="form-field"><span>证书类型</span><select id="certificate-type"><option value="">全部类型</option><option>学历证书</option><option>教师资格证</option><option>艺术等级证</option><option>其他</option></select></label>
           <label class="form-field"><span>教师姓名</span><input id="certificate-teacher" placeholder="请输入教师姓名" /></label>
@@ -37,6 +36,15 @@
         </div>
         <div class="filter-actions"><button type="reset" class="button">重置</button><button type="submit" class="button primary">查询</button></div>
       </form>
+
+      <nav class="certificate-status-tabs" role="tablist" aria-label="证书审核状态">
+        <button type="button" role="tab" class="certificate-status-tab active" data-certificate-status="" aria-selected="true">全部<span id="tab-count-all">4</span></button>
+        <button type="button" role="tab" class="certificate-status-tab" data-certificate-status="待审核" aria-selected="false">待审核<span id="tab-count-pending">1</span></button>
+        <button type="button" role="tab" class="certificate-status-tab" data-certificate-status="审核通过" aria-selected="false">审核通过<span id="tab-count-approved">2</span></button>
+        <button type="button" role="tab" class="certificate-status-tab" data-certificate-status="审核不通过" aria-selected="false">审核不通过<span id="tab-count-rejected">1</span></button>
+        <button type="button" role="tab" class="certificate-status-tab" data-certificate-status="未提交" aria-selected="false">未提交<span id="tab-count-draft">0</span></button>
+        <button type="button" role="tab" class="certificate-status-tab" data-certificate-status="已归档" aria-selected="false">已归档<span id="tab-count-archived">0</span></button>
+      </nav>
 
       <div class="table-note" id="certificate-count">共4条证书 · 当前页显示4条 · 证书审核状态与有效性分开展示</div>
       <div class="table-wrap certificate-table-wrap">

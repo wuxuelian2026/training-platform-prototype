@@ -155,8 +155,28 @@ function updateMetrics() {
   text('metric-expired', count('[data-validity="已过期"]'));
 }
 
+// 证书审核状态以页签切换：计数按当前存活行实时重算，选中态与筛选条件分离。
+const statusTabs = [...document.querySelectorAll('[data-certificate-status]')];
+let activeStatus = '';
+
+function syncStatusTabs() {
+  statusTabs.forEach((tab) => {
+    const value = tab.dataset.certificateStatus || '';
+    const selected = value === activeStatus;
+    tab.classList.toggle('active', selected);
+    tab.setAttribute('aria-selected', String(selected));
+    const badge = tab.querySelector('span');
+    if (badge) badge.textContent = String(rows.filter((row) => row.isConnected && (!value || row.dataset.status === value)).length);
+  });
+}
+
+statusTabs.forEach((tab) => tab.addEventListener('click', () => {
+  activeStatus = tab.dataset.certificateStatus || '';
+  applyFilters();
+}));
+
 function applyFilters() {
-  const status = document.querySelector('#certificate-status')?.value || '';
+  const status = activeStatus;
   const validity = document.querySelector('#certificate-validity')?.value || '';
   const type = document.querySelector('#certificate-type')?.value || '';
   const teacher = (document.querySelector('#certificate-teacher')?.value || '').trim();
@@ -177,6 +197,7 @@ function applyFilters() {
     if (matches) visible += 1;
   });
 
+  syncStatusTabs();
   if (emptyRow) emptyRow.hidden = visible !== 0;
   const total = rows.filter((row) => row.isConnected).length;
   text('certificate-count', `共${total}条证书 · 当前筛选显示${visible}条 · 默认按有效期截止升序`);
@@ -364,7 +385,7 @@ const params = new URLSearchParams(window.location.search);
 const queryStatus = params.get('status');
 const queryValidity = params.get('validity');
 const queryTeacher = params.get('teacher');
-if (queryStatus) document.querySelector('#certificate-status').value = queryStatus;
+if (queryStatus && statusTabs.some((tab) => tab.dataset.certificateStatus === queryStatus)) activeStatus = queryStatus;
 if (queryValidity) document.querySelector('#certificate-validity').value = queryValidity;
 if (queryTeacher) document.querySelector('#certificate-teacher').value = queryTeacher;
 updateMetrics();
