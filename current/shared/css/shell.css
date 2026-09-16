@@ -179,13 +179,13 @@ tr:last-child td { border-bottom: 0; }
 .link { color: var(--brand); }
 .empty { padding: 64px 20px; color: var(--muted); text-align: center; }
 .certificate-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.certificate-status-tabs { display: flex; flex-wrap: wrap; gap: 24px; margin: 0 0 14px; padding: 0 2px 10px; border-bottom: 1px solid var(--line); }
-.certificate-status-tab { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; white-space: nowrap; }
-.certificate-status-tab:hover { color: var(--brand); }
-.certificate-status-tab.active { color: var(--brand); font-weight: 700; }
-.certificate-status-tab.active::after { position: absolute; right: 0; bottom: -11px; left: 0; height: 2px; background: var(--brand); content: ''; }
-.certificate-status-tab span { display: inline-grid; min-width: 18px; height: 18px; padding: 0 5px; place-items: center; border-radius: 9px; background: #f2f2f2; color: var(--muted); font-size: 11px; font-weight: 400; }
-.certificate-status-tab.active span { background: var(--brand-soft); color: var(--brand); }
+.status-tabs { display: flex; flex-wrap: wrap; gap: 24px; margin: 0 0 14px; padding: 0 2px 10px; border-bottom: 1px solid var(--line); }
+.status-tab { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; white-space: nowrap; }
+.status-tab:hover { color: var(--brand); }
+.status-tab.active { color: var(--brand); font-weight: 700; }
+.status-tab.active::after { position: absolute; right: 0; bottom: -11px; left: 0; height: 2px; background: var(--brand); content: ''; }
+.status-tab span { display: inline-grid; min-width: 18px; height: 18px; padding: 0 5px; place-items: center; border-radius: 9px; background: #f2f2f2; color: var(--muted); font-size: 11px; font-weight: 400; }
+.status-tab.active span { background: var(--brand-soft); color: var(--brand); }
 .certificate-table-wrap table { min-width: 1420px; }
 .expiry-warning { color: var(--warning); font-weight: 600; }
 .expiry-danger { color: var(--danger); font-weight: 600; }

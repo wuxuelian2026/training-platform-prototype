@@ -5,6 +5,7 @@ import { readDemoState, writeDemoState } from './demo-store.js';
 import { readXlsxSheetRows } from './xlsx-lite.js';
 import { teacherFactsById } from './teacher-facts.js';
 import { explainTeacherCapacity, summarizeTeacherCapacity } from './teacher-capacity.js';
+import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 
 const teacherRoot = document.querySelector('[data-teacher-page]');
 const teacherPage = teacherRoot?.dataset.teacherPage;
@@ -628,6 +629,22 @@ function contractActionConfirm() {
 function initContracts() {
   const form = document.querySelector('#contract-filter');
   const rows = [...document.querySelectorAll('tr[data-contract-id]')];
+  // 签署状态页签：取值只读 spec/states 的 SM-TEACHER-CONTRACT，「全部」是不加状态过滤的默认项。
+  const contractStateMachine = machinesForPage('teachers/contracts').find((machine) => machine.id === 'SM-TEACHER-CONTRACT');
+  const contractTabs = [
+    { value: '', label: '全部' },
+    ...(contractStateMachine ? stateLabelsOf(contractStateMachine).map((label) => ({ value: label, label })) : [])
+  ];
+  const tabHost = document.querySelector('#contract-status-tabs');
+  if (tabHost) {
+    tabHost.innerHTML = contractTabs
+      .map(({ value, label }) => `<button type="button" role="tab" class="status-tab" data-contract-status="${value}" aria-selected="false">${label}<span>0</span></button>`)
+      .join('');
+  }
+  const statusTabs = [...document.querySelectorAll('[data-contract-status]')];
+  let activeContractStatus = new URLSearchParams(location.search).get('status') || '';
+  if (!contractTabs.some((tab) => tab.value === activeContractStatus)) activeContractStatus = '';
+
   // 合同期限状态是派生值：由合同起止日期按当天计算，不写入签署状态字段（05-状态字典 §4.2）。
   const today = new Date().toISOString().slice(0, 10);
   const termStatusOf = (row) => {
@@ -644,7 +661,7 @@ function initContracts() {
     cell.innerHTML = `<span class="tag ${tagClass(value)} contract-term-status">${value}</span>`;
   });
   const apply = () => {
-    const status = form?.querySelector('[name="status"]')?.value || '';
+    const status = activeContractStatus;
     const termStatus = form?.querySelector('[name="termStatus"]')?.value || '';
     const type = form?.querySelector('[name="type"]')?.value || '';
     const teacher = (form?.querySelector('[name="teacher"]')?.value || '').trim();
@@ -660,7 +677,25 @@ function initContracts() {
     const empty = document.querySelector('.contract-empty-row');
     if (empty) empty.hidden = visible !== 0;
     text('contract-count', `共${rows.length}份合同 · 当前筛选显示${visible}份`);
+    // 页签计数按全部存活行重算，指标卡与页签同源，避免出现两套数字。
+    const allCount = (predicate) => rows.filter((row) => row.isConnected && predicate(row)).length;
+    statusTabs.forEach((tab) => {
+      const value = tab.dataset.contractStatus || '';
+      const selected = value === activeContractStatus;
+      tab.classList.toggle('active', selected);
+      tab.setAttribute('aria-selected', String(selected));
+      const badge = tab.querySelector('span');
+      if (badge) badge.textContent = String(allCount((row) => !value || row.dataset.status === value));
+    });
+    text('metric-contract-pending', allCount((row) => row.dataset.status === '待教师签署'));
+    text('metric-contract-expiring', rows.filter((row) => termStatusOf(row) === '即将到期').length);
+    text('metric-contract-signed', allCount((row) => row.dataset.status === '已签署'));
+    text('metric-contract-terminated', allCount((row) => row.dataset.status === '已终止'));
   };
+  statusTabs.forEach((tab) => tab.addEventListener('click', () => {
+    activeContractStatus = tab.dataset.contractStatus || '';
+    apply();
+  }));
   form?.addEventListener('submit', (event) => { event.preventDefault(); apply(); });
   form?.addEventListener('reset', () => window.setTimeout(apply));
   document.addEventListener('click', (event) => {

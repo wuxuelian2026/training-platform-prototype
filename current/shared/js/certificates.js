@@ -199,7 +199,7 @@ const certificateStatusTabs = [
 const statusTabHost = document.querySelector('#certificate-status-tabs');
 if (statusTabHost) {
   statusTabHost.innerHTML = certificateStatusTabs
-    .map(({ value, label }) => `<button type="button" role="tab" class="certificate-status-tab" data-certificate-status="${value}" aria-selected="false">${label}<span>0</span></button>`)
+    .map(({ value, label }) => `<button type="button" role="tab" class="status-tab" data-certificate-status="${value}" aria-selected="false">${label}<span>0</span></button>`)
     .join('');
 }
 const statusTabs = [...document.querySelectorAll('[data-certificate-status]')];
