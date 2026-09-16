@@ -35,7 +35,7 @@ export function explainTeacherCapacity(facts, request = {}) {
   const warnings = [];
 
   if (facts.profileStatus !== '已建档') blocks.push({ code: 'profile_incomplete', text: '资料待完善，请先完成建档' });
-  const departed = Boolean(facts.departedAt) || facts.personnelStatus === '离职';
+  const departed = Boolean(facts.departedAt);
   if (departed) blocks.push({ code: 'departed', text: facts.departedAt ? `已于 ${facts.departedAt} 离职` : '人员已离职' });
   if (facts.accountStatus !== 'active') {
     const text = facts.accountStatus === 'frozen' ? '账号已冻结，无法登录教师端' : '账号未激活，无法登录教师端';
@@ -81,7 +81,7 @@ export function summarizeTeacherCapacity(facts, today = new Date().toISOString()
   });
   const issues = [];
   if (facts?.profileStatus !== '已建档') issues.push({ code: 'profile_incomplete', text: '资料待完善' });
-  if (facts?.departedAt || facts?.personnelStatus === '离职') issues.push({ code: 'departed', text: '已离职' });
+  if (facts?.departedAt) issues.push({ code: 'departed', text: '已离职' });
   if (facts?.accountStatus === 'frozen') issues.push({ code: 'account_frozen', text: '账号冻结' });
   else if (facts?.accountStatus === 'inactive') issues.push({ code: 'account_inactive', text: '账号未激活' });
   return {

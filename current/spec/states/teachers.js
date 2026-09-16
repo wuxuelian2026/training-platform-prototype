@@ -94,36 +94,6 @@ export const STATE_MACHINES = [
     ]
   },
   {
-    "id": "SM-TEACHER-PERSONNEL",
-    "object": "教师人员",
-    "diagram": false,
-    "pages": [
-      "teachers/list",
-      "teacher/profile",
-      "teachers/profile"
-    ],
-    "states": [
-      [
-        "active",
-        "在职",
-        false
-      ],
-      [
-        "departed",
-        "离职",
-        false
-      ]
-    ],
-    "transitions": [
-      [
-        "在职",
-        "办理离职",
-        "离职",
-        "超级管理员/教务主管"
-      ]
-    ]
-  },
-  {
     "id": "SM-TEACHER-CERTIFICATE",
     "object": "教师证书",
     "diagram": true,

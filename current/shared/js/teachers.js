@@ -51,7 +51,7 @@ function confirmTeacherAction(row, action) {
   const copy = {
     freeze: ['冻结教师账号', '确认冻结该教师账号？仅账号状态变为冻结，资料、人员、证书、合同和历史记录不变。', '确认冻结'],
     unfreeze: ['解冻教师账号', '确认解冻该教师账号？', '确认解冻'],
-    resign: ['办理教师离职', '确认将人员状态改为离职？教师将无法登录或新增未来排课，但账号及历史业务状态不被改写。', '确认离职']
+    resign: ['办理教师离职', '确认办理离职？离职日期必填，默认当天。办理后教师无法登录或新增未来排课，但账号、资料、证书、合同与历史记录不被改写。', '确认离职']
   }[action];
   if (!copy) return;
   text('teacher-action-title', copy[0]);
@@ -59,6 +59,15 @@ function confirmTeacherAction(row, action) {
   text('teacher-action-teacher', `${teacher} · ${row.dataset.employeeNo}`);
   const confirm = document.querySelector('#teacher-action-confirm');
   if (confirm) { confirm.dataset.action = action; confirm.textContent = copy[2]; }
+  // 离职日期只在办理离职时出现，默认当天、允许改期（CR-2026-021）。
+  const dateField = document.querySelector('#teacher-action-date-field');
+  const dateInput = document.querySelector('#teacher-action-date');
+  if (dateField && dateInput) {
+    const needDate = action === 'resign';
+    dateField.hidden = !needDate;
+    dateInput.required = needDate;
+    if (needDate) dateInput.value = new Date().toISOString().slice(0, 10);
+  }
   openDialog('teacher-action-dialog');
 }
 
@@ -71,7 +80,7 @@ function updateTeacherRow(row, action) {
     row.dataset.accountStatus = 'active';
   }
   if (action === 'resign') {
-    row.dataset.personnelStatus = '离职';
+    row.dataset.departedAt = String(document.querySelector('#teacher-action-date')?.value || '').trim() || new Date().toISOString().slice(0, 10);
     row.dataset.todos = `${row.dataset.todos || ''},人员离职`;
   }
   renderTeacherCapability(row);
@@ -97,14 +106,14 @@ function renderTeacherCapability(row) {
 function renderTeacherActions(row, cell) {
   if (!cell) return;
   const profile = row.dataset.profileStatus;
-  const personnel = row.dataset.personnelStatus;
+  const departedAt = row.dataset.departedAt;
   const account = row.dataset.accountStatus;
   const id = encodeURIComponent(row.dataset.teacherId);
   const actions = [`<a class="link" href="/admin/pages/teachers/profile.html?teacher_id=${id}">查看</a>`, `<a class="link" href="/admin/pages/teachers/create.html?mode=edit&teacher_id=${id}">编辑</a>`];
   if (profile === '已建档' && account === 'inactive') actions.push('<button type="button" class="text-button" data-action="resend-invite">重新发送邀请</button>');
   if (account === 'frozen') actions.push('<button type="button" class="text-button" data-action="unfreeze">解冻</button>');
-  else if (account === 'active' && personnel === '在职') actions.push('<button type="button" class="text-button danger-link" data-action="freeze">冻结</button>');
-  if (personnel === '在职') actions.push('<button type="button" class="text-button danger-link" data-action="resign">办理离职</button>');
+  else if (account === 'active' && !departedAt) actions.push('<button type="button" class="text-button danger-link" data-action="freeze">冻结</button>');
+  if (!departedAt) actions.push('<button type="button" class="text-button danger-link" data-action="resign">办理离职</button>');
   actions.push(`<a class="link" href="/admin/pages/academic/timetable.html?view=teacher&teacher_id=${id}">查看课表</a>`);
   cell.innerHTML = actions.join('');
 }
@@ -132,7 +141,6 @@ function applyTeacherFilters() {
   const form = document.querySelector('#teacher-filter');
   const capability = form?.querySelector('[name="capability"]')?.value || '';
   const todo = form?.querySelector('[name="todo"]')?.value || '';
-  const personnel = form?.querySelector('[name="personnel"]')?.value || '';
   const account = form?.querySelector('[name="account"]')?.value || '';
   const category = form?.querySelector('[name="category"]')?.value || '';
   const keyword = (form?.querySelector('[name="keyword"]')?.value || '').trim();
@@ -141,7 +149,6 @@ function applyTeacherFilters() {
   rows.forEach((row) => {
     const matches = (!capability || row.dataset.capabilities.split(',').includes(capability))
       && (!todo || row.dataset.todos.includes(todo))
-      && (!personnel || row.dataset.personnelStatus === personnel)
       && (!account || row.dataset.accountStatus === account)
       && (!category || row.dataset.category === category)
       && (!keyword || `${row.dataset.teacher}${row.dataset.employeeNo}${row.dataset.phone}`.includes(keyword));
@@ -373,7 +380,7 @@ function appendImportedTeachers(rows, results) {
     row.dataset.phone = String(item.phone).replace(/\D/g, '');
     row.dataset.category = importCategory(item.major);
     row.dataset.profileStatus = '已建档';
-    row.dataset.personnelStatus = '在职';
+    row.dataset.departedAt = '';
     row.dataset.accountStatus = 'inactive';
     row.dataset.capabilities = '暂停使用';
     row.dataset.todos = todos;
@@ -501,9 +508,16 @@ function initTeacherList() {
   });
   document.querySelector('#teacher-action-confirm')?.addEventListener('click', (event) => {
     if (!activeTeacherRow) return;
+    if (event.currentTarget.dataset.action === 'resign' && !String(document.querySelector('#teacher-action-date')?.value || '').trim()) {
+      const dateInput = document.querySelector('#teacher-action-date');
+      dateInput?.focus();
+      dateInput?.reportValidity?.();
+      toast('请填写离职日期。', 'error');
+      return;
+    }
     updateTeacherRow(activeTeacherRow, event.currentTarget.dataset.action);
     closeDialog('teacher-action-dialog');
-    toast(event.currentTarget.dataset.action === 'resign' ? '人员状态已更新为离职；其他业务状态及历史记录保持不变。' : '教师账号状态已更新，其他业务状态保持不变。');
+    toast(event.currentTarget.dataset.action === 'resign' ? `已办理离职，离职日期 ${activeTeacherRow?.dataset.departedAt}；其他业务状态及历史记录保持不变。` : '教师账号状态已更新，其他业务状态保持不变。');
     applyTeacherFilters();
     activeTeacherRow = null;
   });
@@ -812,7 +826,11 @@ function renderProfileCapacity() {
     ...apply.blocks.map((block) => `<div><span class="tag red">阻断</span><p>${block.text}</p></div>`),
     ...(withoutCertificate.length ? [`<div><span class="tag amber">排课提醒</span><p>${withoutCertificate.join('、')} 暂无有效资质，不影响申报，但发布与排课会按专业和课次日期校验。</p></div>`] : [])
   ].join('');
-  container.innerHTML = `<div><span class="tag ${apply.status === 'available' ? 'brand' : 'gray'}">${apply.status === 'available' ? '可申报' : '暂不可申报'}</span><p>${apply.status === 'available' ? '资料已建档、人员在职、账号正常，且已配置授课专业。' : apply.reasons.join('；')}</p></div>${reasonRows}<div><span class="tag brand">授课专业 ${summary.majorCount} 个</span><p>${summary.majors.map((item) => `${item.major}：${item.qualified ? '有有效资质' : '缺有效资质'}`).join('；')}。</p></div>`;
+  container.innerHTML = `<div><span class="tag ${apply.status === 'available' ? 'brand' : 'gray'}">${apply.status === 'available' ? '可申报' : '暂不可申报'}</span><p>${apply.status === 'available' ? '资料已建档、离职日期为空（在职）、账号正常，且已配置授课专业。' : apply.reasons.join('；')}</p></div>${reasonRows}<div><span class="tag brand">授课专业 ${summary.majorCount} 个</span><p>${summary.majors.map((item) => `${item.major}：${item.qualified ? '有有效资质' : '缺有效资质'}`).join('；')}。</p></div>`;
+  const departedStatus = document.querySelector('#teacher-departed-status');
+  const departedNote = document.querySelector('#teacher-departed-note');
+  if (departedStatus) departedStatus.textContent = facts.departedAt ? `离职 · ${facts.departedAt}` : '在职';
+  if (departedNote) departedNote.textContent = facts.departedAt ? '离职后禁止登录与新增未来排课，历史记录保留。' : '离职日期为空即在职。';
   const summaryResult = document.querySelector('.teacher-summary-result');
   if (summaryResult) {
     const today = new Date().toISOString().slice(0, 10);

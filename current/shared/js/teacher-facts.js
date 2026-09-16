@@ -7,7 +7,7 @@ import { classSeed } from './class-seed.js';
 
 export const TEACHER_FACTS = [
   {
-    id: 'teacher-wang', name: '王玥', profileStatus: '已建档', personnelStatus: '在职', accountStatus: 'active',
+    id: 'teacher-wang', name: '王玥', profileStatus: '已建档', accountStatus: 'active',
     majors: ['中国舞', '民族民间舞'],
     certificates: [
       { id: 'cert-001', name: '中国舞教师资格证', type: '艺术等级证', status: '已通过', expiresAt: '2027-09-30', majors: ['中国舞'] },
@@ -20,7 +20,7 @@ export const TEACHER_FACTS = [
     ]
   },
   {
-    id: 'teacher-chen', name: '陈晨', profileStatus: '已建档', personnelStatus: '在职', accountStatus: 'inactive',
+    id: 'teacher-chen', name: '陈晨', profileStatus: '已建档', accountStatus: 'inactive',
     majors: ['声乐演唱', '音乐表演'],
     certificates: [
       { id: 'cert-chen', name: '教师资格证', type: '教师资格证', status: '待审核', expiresAt: '2034-06-30', majors: ['声乐演唱'] }
@@ -30,7 +30,7 @@ export const TEACHER_FACTS = [
     ]
   },
   {
-    id: 'teacher-liu', name: '刘佳', profileStatus: '待完善', personnelStatus: '在职', accountStatus: 'inactive',
+    id: 'teacher-liu', name: '刘佳', profileStatus: '待完善', accountStatus: 'inactive',
     majors: ['绘画', '少儿绘画'],
     certificates: [
       { id: 'cert-liu', name: '美术教师资格证', type: '教师资格证', status: '已通过', expiresAt: '2026-09-20', majors: ['绘画'] }
@@ -38,7 +38,7 @@ export const TEACHER_FACTS = [
     contracts: []
   },
   {
-    id: 'teacher-zhou', name: '周晓', profileStatus: '已建档', personnelStatus: '离职', accountStatus: 'active',
+    id: 'teacher-zhou', name: '周晓', profileStatus: '已建档', departedAt: '2026-06-30', accountStatus: 'active',
     majors: ['戏剧表演'],
     certificates: [
       { id: 'cert-zhou', name: '高级教师职称证', type: '其他', status: '已驳回', expiresAt: '2026-08-31', majors: ['戏剧表演'] }
@@ -48,7 +48,7 @@ export const TEACHER_FACTS = [
     ]
   },
   {
-    id: 'teacher-liqing', name: '李青', profileStatus: '已建档', personnelStatus: '在职', accountStatus: 'active',
+    id: 'teacher-liqing', name: '李青', profileStatus: '已建档', accountStatus: 'active',
     majors: ['少儿绘画', '中国画'],
     certificates: [
       { id: 'cert-liqing', name: '美术教师资格证', type: '教师资格证', status: '已通过', expiresAt: '2030-06-30', majors: ['少儿绘画', '中国画'] }
@@ -58,7 +58,7 @@ export const TEACHER_FACTS = [
     ]
   },
   {
-    id: 'teacher-zhao', name: '赵老师', profileStatus: '已建档', personnelStatus: '在职', accountStatus: 'active',
+    id: 'teacher-zhao', name: '赵老师', profileStatus: '已建档', accountStatus: 'active',
     majors: ['中国画', '书法'],
     certificates: [
       { id: 'cert-zhao', name: '书法等级证书', type: '艺术等级证', status: '已通过', expiresAt: '2028-05-31', majors: ['书法', '中国画'] }

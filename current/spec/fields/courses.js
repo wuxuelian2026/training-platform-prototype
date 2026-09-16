@@ -86,34 +86,6 @@ export const COURSE_FIELD_SPEC = {
       ]
     },
     // 课程内容编排：章节 → 课时两层结构。两层的字段分属不同表单，分开成组呈现。
-    'courses/content': {
-      layout: 'steps',
-      groups: [
-        // CR-2026-014：编排页带出申报填写的教学属性，可修改，保存后写入课程档案。
-        { heading: '教学属性字段', fields: courseFieldRows('COURSE', 44, COURSE_TEACHING_FIELDS) },
-        { heading: '章节字段', fields: [
-          { id: 'FD-COURSE-034', label: '章节名称', type: '文本', length: '≤ 50 字', required: '是', note: '如“第 1 章：身韵元素训练”', constraints: { maxLength: 50 } },
-          { id: 'FD-COURSE-035', label: '章节描述', type: '多行文本', length: '≤ 200 字', required: '否', note: '填写章节的教学重点', constraints: { maxLength: 200 } },
-          { id: 'FD-COURSE-036', label: '排序', type: '数字 / 拖拽', length: '≥ 1 的整数', required: '否', note: '决定章节在课程内的先后顺序', constraints: { min: 1, integer: true } }
-        ] },
-        { heading: '课时字段', fields: [
-          { id: 'FD-COURSE-037', label: '课时名称', type: '文本', length: '≤ 50 字', required: '是', note: '如“站姿与脚位”', constraints: { maxLength: 50 } },
-          { id: 'FD-COURSE-038', label: '课时序号', type: '数字', length: '≥ 1 的整数', required: '是', note: '决定课时在章节内的先后顺序，可拖拽调整', constraints: { min: 1, integer: true } },
-          { id: 'FD-COURSE-039', label: '课时目标', type: '文本', length: '≤ 100 字', required: '是', note: '本课时可达成、可验收的教学目标', constraints: { maxLength: 100 } },
-          { id: 'FD-COURSE-040', label: '课时时长（分钟）', type: '数字', length: '45 / 60 / 90 / 120 / 150', required: '是', note: '一个课时对应一个课次；默认 45 分钟', constraints: { options: [45, 60, 90, 120, 150] } },
-          { id: 'FD-COURSE-041', label: '课时类型', type: '下拉', length: '理论 / 示范 / 练习 / 综合', required: '是', note: '决定课时的教学形式', constraints: { options: ['理论', '示范', '练习', '综合'] } },
-          { id: 'FD-COURSE-042', label: '内容描述', type: '多行文本', length: '≤ 500 字', required: '否', note: '填写教学内容和执行提示', constraints: { maxLength: 500 } },
-          { id: 'FD-COURSE-043', label: '引用资源', type: '资源选择器', length: '至少 1 个资源', required: '视频课程必填', note: '视频课程所有课时必须关联至少一个视频资源才能完成编排；面授课程可选', constraints: { minItems: 1, requiredWhen: 'courseType=video' } }
-        ] }
-      ],
-      notes: [
-        '编排工作台按“章节 → 课时”两层结构维护，章节可增删改并拖拽排序，课时挂在章节下。',
-        '编排保存后直接生效，不设二次审核；完成编排后课程进入课程库。',
-        '视频课程完成编排前强制校验每个课时都关联了视频资源；面授课程的资源关联为可选。',
-        '面授课程完成编排时校验课时总数等于申报总课时，不一致时阻止完成并提示补齐或删除。',
-        '轻量课程档案不进入编排工作台，只能作为快速报名班级的关联课程。'
-      ]
-    },
     // 课程展示信息：**不设独立页面键**（GT-12／PC-06：并入两个发布表单，不新增页面）。
     // 六个展示字段只在文件顶部 COURSE_TEACHING_FIELDS / COURSE_DISPLAY_FIELDS 定义一次，
     // 由 spec/fields/mall.js（mall/products）与 spec/fields/crm.js（crm/classes）用 courseFieldRows() 引用，
@@ -129,9 +101,29 @@ export const COURSE_FIELD_SPEC = {
           { id: 'FD-COURSE-019', label: '总课时', type: '数字', length: '≥ 1 的整数', required: '是', note: '单位：课次数' },
           { id: 'FD-COURSE-020', label: '简短课程介绍', type: '多行文本', length: '≤ 500 字', required: '是', note: '快速报名详情页展示', constraints: { maxLength: 500 } },
           { id: 'FD-COURSE-030', label: '课程大纲', type: '富文本', length: '≤ 2000 字', required: '否', note: '可选展示内容，不作为教学执行前置条件；教学执行按课次开展', constraints: { maxLength: 2000, richText: true } }
+        ] },
+        // CR-2026-021：课程内容编排并入课程库，编排工作台字段随页面并入。
+        { heading: '教学属性字段（编排）', fields: courseFieldRows('COURSE', 44, COURSE_TEACHING_FIELDS) },
+        { heading: '章节字段（编排）', fields: [
+          { id: 'FD-COURSE-034', label: '章节名称', type: '文本', length: '≤ 50 字', required: '是', note: '如“第 1 章：身韵元素训练”', constraints: { maxLength: 50 } },
+          { id: 'FD-COURSE-035', label: '章节描述', type: '多行文本', length: '≤ 200 字', required: '否', note: '填写章节的教学重点', constraints: { maxLength: 200 } },
+          { id: 'FD-COURSE-036', label: '排序', type: '数字 / 拖拽', length: '≥ 1 的整数', required: '否', note: '决定章节在课程内的先后顺序', constraints: { min: 1, integer: true } }
+        ] },
+        { heading: '课时字段（编排）', fields: [
+          { id: 'FD-COURSE-037', label: '课时名称', type: '文本', length: '≤ 50 字', required: '是', note: '如“站姿与脚位”', constraints: { maxLength: 50 } },
+          { id: 'FD-COURSE-038', label: '课时序号', type: '数字', length: '≥ 1 的整数', required: '是', note: '决定课时在章节内的先后顺序，可拖拽调整', constraints: { min: 1, integer: true } },
+          { id: 'FD-COURSE-039', label: '课时目标', type: '文本', length: '≤ 100 字', required: '是', note: '本课时可达成、可验收的教学目标', constraints: { maxLength: 100 } },
+          { id: 'FD-COURSE-040', label: '课时时长（分钟）', type: '数字', length: '45 / 60 / 90 / 120 / 150', required: '是', note: '一个课时对应一个课次；默认 45 分钟', constraints: { options: [45, 60, 90, 120, 150] } },
+          { id: 'FD-COURSE-041', label: '课时类型', type: '下拉', length: '理论 / 示范 / 练习 / 综合', required: '是', note: '决定课时的教学形式', constraints: { options: ['理论', '示范', '练习', '综合'] } },
+          { id: 'FD-COURSE-042', label: '内容描述', type: '多行文本', length: '≤ 500 字', required: '否', note: '填写教学内容和执行提示', constraints: { maxLength: 500 } },
+          { id: 'FD-COURSE-043', label: '引用资源', type: '资源选择器', length: '至少 1 个资源', required: '视频课程必填', note: '视频课程所有课时必须关联至少一个视频资源才能完成编排；面授课程可选', constraints: { minItems: 1, requiredWhen: 'courseType=video' } }
         ] }
       ],
       notes: [
+        '编排工作台按“章节 → 课时”两层结构维护，章节可增删改并拖拽排序，课时挂在章节下。',
+        '编排保存后直接生效，不设二次审核；完成编排后课程进入课程库。',
+        '视频课程完成编排前强制校验每个课时都关联了视频资源；面授课程的资源关联为可选。',
+        '面授课程完成编排时校验课时总数等于申报总课时，不一致时阻止完成并提示补齐或删除。',
         '轻量课程档案只用于快速报名班级，不进入课程内容编排。',
         '课程库记录来源课程编号，与课程中心的内容编排相互独立。',
         '课程库区分完整课程与轻量课程档案：完整课程需完成编排后才能发布商品或班级，轻量档案只用于快速报名班级。',

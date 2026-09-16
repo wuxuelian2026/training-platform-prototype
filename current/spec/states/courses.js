@@ -67,7 +67,6 @@ export const STATE_MACHINES = [
     "object": "课程编排",
     "diagram": false,
     "pages": [
-      "courses/content",
       "courses/library"
     ],
     "states": [

@@ -126,7 +126,7 @@ function syncLibraryCourse(item) {
   persistLibrary(record);
 }
 
-const state = { page: courseRoot?.dataset.coursePage || '', applicationTab: '', applicationFilters: {}, contentFilters: {}, resourceFilters: {}, libraryFilters: {}, selectedGroup: '音乐类', selectedCategory: '声乐', pageSize: 20, modal: null };
+const state = { page: courseRoot?.dataset.coursePage || '', applicationTab: '', libraryTab: new URLSearchParams(location.search).get('tab') === 'all' ? 'all' : 'arrange', applicationFilters: {}, contentFilters: {}, resourceFilters: {}, libraryFilters: {}, selectedGroup: '音乐类', selectedCategory: '声乐', pageSize: 20, modal: null };
 
 // 申报状态页签：取值只读 spec/states 的 SM-COURSE-APPLICATION，「全部」是不加状态过滤的默认项。
 const applicationStatusTabs = () => {
@@ -181,6 +181,10 @@ function init() {
   document.addEventListener('click', handleClick);
   document.addEventListener('change', handleChange);
   document.addEventListener('submit', handleSubmit);
+  window.addEventListener('popstate', () => {
+    state.libraryTab = new URLSearchParams(location.search).get('tab') === 'all' ? 'all' : 'arrange';
+    if (state.page === 'library') renderLibrary(root());
+  });
 }
 
 function renderPage() {
@@ -217,10 +221,30 @@ function renderResources(page) {
   page.innerHTML = `<div class="course-page">${pageShell('教学资源库', '', '<button class="button primary" type="button" data-action="upload-resource">上传资源</button>')}<section class="course-surface"><form class="course-filter" data-form="resource-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('资源类型', selectWithValues('type', ['教学视频', '课件PPT', '乐谱PDF', '音频示范', '其他'], state.resourceFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.resourceFilters.major))}${filterField('上传教师', `<input name="teacher" value="${escapeHtml(state.resourceFilters.teacher || '')}" placeholder="输入教师姓名" />`)}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.resourceFilters.keyword || '')}" placeholder="资源名称" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>资源列表</strong><span> 当前显示 ${filtered.length} 条</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>资源名称</th><th>资源类型</th><th>所属专业</th><th>适用等级</th><th>文件大小</th><th>上传教师</th><th>上传时间</th><th>引用次数</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${item.references ? `已被 ${item.references} 门课程引用` : '暂未被课程引用'}</span></td><td>${tag(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.level)}</td><td>${escapeHtml(item.size)}</td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.uploadedAt)}</td><td>${item.references}</td><td><div class="course-actions">${button('预览', 'resource-preview', `data-id="${item.id}"`)}${button('编辑', 'resource-edit', `data-id="${item.id}"`)}${button('删除', 'resource-delete', `data-id="${item.id}"`, 'danger-link')}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无资源</strong><span>上传教学视频、课件或附件，供课程编排引用。</span></div>'}</div>${pagination(filtered.length, '个资源')}</section></div>`;
 }
 
-function renderLibrary(page) {
+function renderLibraryAllView(page) {
   const filtered = library.filter(item => !state.libraryFilters.archive || item.archive === state.libraryFilters.archive).filter(item => !state.libraryFilters.type || item.type === state.libraryFilters.type).filter(item => !state.libraryFilters.major || item.major === state.libraryFilters.major).filter(item => !state.libraryFilters.keyword || `${item.name}${item.teacher}`.includes(state.libraryFilters.keyword));
   page.innerHTML = `<div class="course-page">${pageShell('课程库', '', '<button class="button primary" type="button" data-action="new-lightweight">新建轻量课程档案</button>')}<section class="course-surface"><form class="course-filter" data-form="library-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('课程档案类型', selectWithValues('archive', ['完整课程', '轻量课程档案'], state.libraryFilters.archive || '', '全部类型'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.libraryFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.libraryFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.libraryFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>课程档案</strong><span> 当前显示 ${filtered.length} 条</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程名称</th><th>课程档案类型</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span></td><td>${tag(item.archive)}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${item.hours} 课时</td><td><div class="course-actions">${item.type === '视频课程' && item.archive === '完整课程' && item.status === '已完成' ? button('发布商品', 'publish-product', `data-id="${item.id}"`) : ''}${item.type === '面授课程' ? button('发布班级', 'publish-class', `data-id="${item.id}"`) : ''}${button(item.archive === '完整课程' ? '查看编排' : '查看/编辑', 'library-edit', `data-id="${item.id}"`)}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无课程档案</strong><span>审核通过并完成编排的完整课程，或新建的轻量档案会出现在这里。</span></div>'}</div>${pagination(filtered.length, '个课程档案')}</section></div>`;
   appendLibraryCourseIdColumn(page, filtered);
+}
+
+// CR-2026-021：课程内容编排并入课程库，一个页面两个视图（待编排 / 全部课程），视图状态进 URL。
+function libraryTabBar() {
+  const tabs = [['arrange', '待编排', contentCourses.length], ['all', '全部课程', library.length]];
+  return `<div class="course-tabs">${tabs.map(([value, label, count]) => `<button type="button" class="course-tab${state.libraryTab === value ? ' active' : ''}" data-action="library-tab" data-value="${value}">${label} <small>(${count})</small></button>`).join('')}</div>`;
+}
+
+function renderLibrary(page) {
+  const view = state.libraryTab === 'all' ? 'all' : 'arrange';
+  const holder = document.createElement('div');
+  if (view === 'all') renderLibraryAllView(holder);
+  else renderContent(holder);
+  const pageEl = holder.querySelector('.course-page');
+  if (pageEl) {
+    const heading = pageEl.querySelector('.page-head h1');
+    if (heading) heading.textContent = '课程库';
+    pageEl.querySelector('.page-head')?.insertAdjacentHTML('afterend', libraryTabBar());
+  }
+  page.innerHTML = holder.innerHTML;
 }
 
 // I1-DEC-19: surface the course number so the teacher application, course center and library
@@ -444,6 +468,13 @@ function handleClick(event) {
   }
   if (action === 'close-modal') closeModal();
   if (action === 'application-tab') { state.applicationTab = target.dataset.value || ''; state.applicationFilters.status = ''; renderApplications(root()); }
+  if (action === 'library-tab') {
+    state.libraryTab = target.dataset.value === 'all' ? 'all' : 'arrange';
+    const url = new URL(location.href);
+    url.searchParams.set('tab', state.libraryTab);
+    history.replaceState(null, '', url);
+    renderLibrary(root());
+  }
   if (action === 'export-applications') showToast('列表导出任务已创建，数据将按当前权限脱敏');
   if (action === 'application-detail') openApplicationDetail(target.dataset.id);
   if (action === 'application-review') openApplicationDetail(target.dataset.id, true);

@@ -70,7 +70,7 @@ export const TEACHER_FIELD_SPEC = {
       notes: [
         '保存草稿：资料状态为“待完善”，不创建账号、不发送邀请。',
         '完成建档并发送邀请：校验姓名、人员类型、身份证号、手机号和至少一个授课专业。',
-        '校验通过后资料状态为“已建档”，人员状态默认为“在职”，账号状态为“未激活”。',
+        '校验通过后资料状态为“已建档”，离职日期为空（即在职），账号状态为“未激活”。',
         '邀请失败不回退建档结果，可复用同一教师记录重新发送邀请。',
         '教师验证建档手机号、设置本人密码并同意协议后，账号状态转为“正常”，后台不设置初始密码。',
         '证书子表不作为完成建档的必填项；证书缺失不影响课程申报，但会在课程发布、班级发布或排课时按目标专业进入资质校验。'
@@ -102,7 +102,7 @@ export const TEACHER_FIELD_SPEC = {
         '教师工资按课次数乘以合同约定的每课次含税单价计算。',
         '续签基于原合同带入信息，生成新合同编号与递增版本，原合同不被覆盖。',
         '终止须记录原因及生效日期，两端同步，已完成课次和历史计薪保留。',
-        '合同与证书、人员状态、账号状态独立维护，不相互级联。'
+        '合同与证书、离职日期、账号状态独立维护，不相互级联。'
       ]
     },
     'teachers/certificates': {
@@ -134,7 +134,8 @@ export const TEACHER_FIELD_SPEC = {
         ] },
         { heading: '列表状态操作字段', fields: [
           { id: 'FD-TEACHER-061', label: '名师推荐', type: '开关', length: '是 / 否', required: '否', note: '仅控制学员端名师推荐展示，不参与教师能力计算；默认关闭', constraints: { boolean: true } },
-          { id: 'FD-TEACHER-062', label: '操作类型', type: '单选', length: '冻结 / 解冻 / 离职 / 重新发送邀请', required: '是', note: '冻结与解冻只改账号状态，离职只改人员状态，两者不互相改写', constraints: { options: ['冻结', '解冻', '离职', '重新发送邀请'] } },
+          { id: 'FD-TEACHER-062', label: '操作类型', type: '单选', length: '冻结 / 解冻 / 离职 / 重新发送邀请', required: '是', note: '冻结与解冻只改账号状态，离职只写入离职日期，两者不互相改写', constraints: { options: ['冻结', '解冻', '离职', '重新发送邀请'] } },
+          { id: 'FD-TEACHER-066', label: '离职日期', type: '日期', length: 'YYYY-MM-DD', required: '办理离职时必填', note: '默认当天，允许修改；空值即在职，离职后禁止新增未来排课，历史记录保留', constraints: { format: 'YYYY-MM-DD', requiredWhen: 'FD-TEACHER-062=离职' } },
           { id: 'FD-TEACHER-063', label: '操作原因', type: '多行文本', length: '≤ 200 字', required: '冻结与离职时必填', note: '写入状态变更记录，供审计与复核', constraints: { maxLength: 200, requiredWhen: 'FD-TEACHER-062=冻结,离职' } }
         ] }
       ],

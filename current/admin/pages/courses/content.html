@@ -3,16 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>课程中心 · 课程内容编排</title>
-  <link rel="stylesheet" href="../../../shared/css/tokens.css" />
-  <link rel="stylesheet" href="../../../shared/css/shell.css" />
-  <link rel="stylesheet" href="../../../shared/css/course-center.css" />
+  <title>课程中心 · 课程库</title>
 </head>
 <body>
-  <div data-admin-shell data-title="课程内容编排" data-active="courses" data-course-page="content">
-    <div id="page-content"><div id="course-root"></div></div>
-  </div>
-  <script type="module" src="../../../shared/js/admin-shell.js"></script>
-  <script type="module" src="../../../shared/js/course-center.js"></script>
+  <p>正在跳转到课程库的待编排视图……</p>
+  <script>
+    // CR-2026-021：课程内容编排并入课程库，本页保留为占位跳转页并保留传入参数。
+    const params = new URLSearchParams(location.search);
+    params.set('tab', 'arrange');
+    window.location.replace(`library.html?${params.toString()}`);
+  </script>
 </body>
 </html>
