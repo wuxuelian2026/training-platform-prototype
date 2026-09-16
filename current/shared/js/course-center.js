@@ -3,6 +3,7 @@ import { demoId, demoTime, readDemoState, removeDemoRecord, updateDemoRecord, up
 import { applicationSeed, courseIdForApplication } from './course-seed.js';
 import { courseAgesText, courseArchiveFor, persistCourseDisplay } from './course-display.js';
 import { courseArchiveSeed } from './course-display.js';
+import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 
 const courseRoot = document.querySelector('[data-course-page]');
 
@@ -125,7 +126,16 @@ function syncLibraryCourse(item) {
   persistLibrary(record);
 }
 
-const state = { page: courseRoot?.dataset.coursePage || '', applicationTab: '待审核', applicationFilters: {}, contentFilters: {}, resourceFilters: {}, libraryFilters: {}, selectedGroup: '音乐类', selectedCategory: '声乐', pageSize: 20, modal: null };
+const state = { page: courseRoot?.dataset.coursePage || '', applicationTab: '', applicationFilters: {}, contentFilters: {}, resourceFilters: {}, libraryFilters: {}, selectedGroup: '音乐类', selectedCategory: '声乐', pageSize: 20, modal: null };
+
+// 申报状态页签：取值只读 spec/states 的 SM-COURSE-APPLICATION，「全部」是不加状态过滤的默认项。
+const applicationStatusTabs = () => {
+  const machine = machinesForPage('courses/applications').find((item) => item.id === 'SM-COURSE-APPLICATION');
+  return [
+    { value: '', label: '全部' },
+    ...(machine ? stateLabelsOf(machine).map((label) => ({ value: label, label })) : [])
+  ];
+};
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const root = () => document.querySelector('#course-root');
@@ -184,15 +194,15 @@ function renderPage() {
 }
 
 function renderApplications(page) {
-  const tabs = ['待审核', '已处理', '全部申报'];
-  const tabRecords = state.applicationTab === '待审核' ? applications.filter(item => item.status === '待审核') : state.applicationTab === '已处理' ? applications.filter(item => ['已通过', '已驳回'].includes(item.status)) : applications;
+  const tabs = applicationStatusTabs();
+  const activeTab = tabs.some((tab) => tab.value === state.applicationTab) ? state.applicationTab : '';
+  const tabRecords = activeTab ? applications.filter(item => item.status === activeTab) : applications;
   const filtered = tabRecords.filter(item => !state.applicationFilters.teacher || item.teacher.includes(state.applicationFilters.teacher)).filter(item => !state.applicationFilters.major || item.major === state.applicationFilters.major).filter(item => !state.applicationFilters.keyword || `${item.name}${item.id}`.includes(state.applicationFilters.keyword)).filter(item => !state.applicationFilters.status || item.status === state.applicationFilters.status);
-  const statusFilter = state.applicationTab === '全部申报'
-    ? filterField('申报状态', selectWithValues('status', ['待审核', '已通过', '已驳回', '已撤销'], state.applicationFilters.status || '', '全部状态'))
-    : state.applicationTab === '已处理'
-      ? filterField('审批结果', selectWithValues('status', ['已通过', '已驳回'], state.applicationFilters.status || '', '全部结果'))
-      : '';
-  page.innerHTML = `<div class="course-page">${pageShell('课程申报', '', '<button class="button" type="button" data-action="export-applications">导出列表</button>')}<section class="course-surface"><div class="course-tabs">${tabs.map(tabName => `<button type="button" class="course-tab${state.applicationTab === tabName ? ' active' : ''}" data-action="application-tab" data-value="${tabName}">${tabName} <small>(${state.applicationTab === tabName ? filtered.length : applications.filter(item => tabName === '待审核' ? item.status === '待审核' : tabName === '已处理' ? ['已通过', '已驳回'].includes(item.status) : true).length})</small></button>`).join('')}</div><form class="course-filter" data-form="application-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('申报教师', `<input name="teacher" value="${escapeHtml(state.applicationFilters.teacher || '')}" placeholder="输入教师姓名" />`)}${filterField('所属专业', professionalFilter('major', state.applicationFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.applicationFilters.keyword || '')}" placeholder="课程名称或申报编号" />`)}${statusFilter}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>申报列表</strong><span> 当前显示 ${filtered.length} 条</span></div><div class="course-legend"><span class="course-legend-item">待教研审核</span><span class="course-legend-item success">可进入编排</span><span class="course-legend-item warning">需修改</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>申报编号</th><th>课程名称</th><th>课程类型</th><th>申报教师</th><th>所属专业</th><th>申报时间</th><th>申报状态</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td>${item.id}</td><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${escapeHtml(item.intro.slice(0, 28))}…</span></td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.submittedAt)}</td><td>${tag(item.status)}</td><td><div class="course-actions">${button('查看详情', 'application-detail', `data-id="${item.id}"`)}${item.status === '待审核' ? button('审批', 'application-review', `data-id="${item.id}"`) : ''}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无申报数据</strong><span>调整筛选条件后重试，或等待教师提交新的课程申报。</span></div>'}</div>${pagination(filtered.length)}</section></div>`;
+  // 具体状态页签本身已经限定了状态，只有「全部」页签才需要状态下拉补充筛选。
+  const statusFilter = activeTab === ''
+    ? filterField('申报状态', selectWithValues('status', tabs.filter(tab => tab.value).map(tab => tab.value), state.applicationFilters.status || '', '全部状态'))
+    : '';
+  page.innerHTML = `<div class="course-page">${pageShell('课程申报', '', '<button class="button" type="button" data-action="export-applications">导出列表</button>')}<section class="course-surface"><div class="course-tabs">${tabs.map(tab => `<button type="button" class="course-tab${activeTab === tab.value ? ' active' : ''}" data-action="application-tab" data-value="${tab.value}">${tab.label} <small>(${applications.filter(item => !tab.value || item.status === tab.value).length})</small></button>`).join('')}</div><form class="course-filter" data-form="application-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('申报教师', `<input name="teacher" value="${escapeHtml(state.applicationFilters.teacher || '')}" placeholder="输入教师姓名" />`)}${filterField('所属专业', professionalFilter('major', state.applicationFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.applicationFilters.keyword || '')}" placeholder="课程名称或申报编号" />`)}${statusFilter}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>申报列表</strong><span> 当前显示 ${filtered.length} 条</span></div><div class="course-legend"><span class="course-legend-item">待教研审核</span><span class="course-legend-item success">可进入编排</span><span class="course-legend-item warning">需修改</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>申报编号</th><th>课程名称</th><th>课程类型</th><th>申报教师</th><th>所属专业</th><th>申报时间</th><th>申报状态</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td>${item.id}</td><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${escapeHtml(item.intro.slice(0, 28))}…</span></td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.submittedAt)}</td><td>${tag(item.status)}</td><td><div class="course-actions">${button('查看详情', 'application-detail', `data-id="${item.id}"`)}${item.status === '待审核' ? button('审批', 'application-review', `data-id="${item.id}"`) : ''}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无申报数据</strong><span>调整筛选条件后重试，或等待教师提交新的课程申报。</span></div>'}</div>${pagination(filtered.length)}</section></div>`;
 }
 
 function renderContent(page) {
@@ -433,7 +443,7 @@ function handleClick(event) {
     return;
   }
   if (action === 'close-modal') closeModal();
-  if (action === 'application-tab') { state.applicationTab = target.dataset.value; state.applicationFilters.status = ''; renderApplications(root()); }
+  if (action === 'application-tab') { state.applicationTab = target.dataset.value || ''; state.applicationFilters.status = ''; renderApplications(root()); }
   if (action === 'export-applications') showToast('列表导出任务已创建，数据将按当前权限脱敏');
   if (action === 'application-detail') openApplicationDetail(target.dataset.id);
   if (action === 'application-review') openApplicationDetail(target.dataset.id, true);
