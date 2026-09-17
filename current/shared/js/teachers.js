@@ -572,14 +572,37 @@ function highlightCertificateRow(row) {
   window.setTimeout(() => row.classList.remove('certificate-duplicate-row'), 2400);
 }
 
+// UI 复核 CR-2026-028（UI-028-01）：命中重复时给出「已存在 + 查看既有记录 + 返回修改」的明确路径，
+// 而不是只用一行 toast；既有记录定位到表单内的既有行，返回修改聚焦到重复行证书编号。
+function openCertificateDuplicateDialog({ existingRow, conflictRow, item, teacherName }) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'modal-dialog small-dialog';
+  dialog.dataset.certificateDuplicate = 'true';
+  dialog.innerHTML = `<div class="modal-card"><div class="modal-header"><div><h2>该证书编号已存在</h2><p>同一教师下证书类型与证书编号同时相同即为重复，不能新增第二条记录。</p></div><button type="button" class="icon-button modal-close" data-dialog-close title="关闭" aria-label="关闭">×</button></div><dl class="info-grid"><div><dt>教师</dt><dd>${importEsc(teacherName || '本次建档教师')}</dd></div><div><dt>证书类型</dt><dd>${importEsc(item.type)}</dd></div><div><dt>证书编号</dt><dd>${importEsc(item.number)}</dd></div></dl><p class="form-error" role="alert">既有记录在本表单的第 ${[...existingRow.parentElement.children].indexOf(existingRow) + 1} 行；如需更新材料，请对既有记录重新上传，而不是新增一行。</p><div class="modal-actions"><button type="button" class="button" data-duplicate-action="back">返回修改</button><button type="button" class="button primary" data-duplicate-action="view">查看既有记录</button></div></div>`;
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  dialog.addEventListener('click', (event) => {
+    if (event.target.closest('[data-dialog-close]')) { dialog.close(); return; }
+    const action = event.target.closest('[data-duplicate-action]')?.dataset.duplicateAction;
+    if (!action) return;
+    dialog.close();
+    if (action === 'view') highlightCertificateRow(existingRow);
+    else {
+      highlightCertificateRow(conflictRow);
+      conflictRow?.querySelector('[data-certificate-number]')?.focus();
+    }
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+}
+
 function validateTeacherCertificateRows(form) {
   const collected = certificateRowsOf(form);
   const seen = new Map();
   for (const item of collected) {
     const key = certificateDedupKey(item);
     if (seen.has(key)) {
-      highlightCertificateRow(item.row);
-      toast(`同一教师下 ${item.type} ${item.number} 已存在，请勿重复录入；如需更换文件请对既有证书重新上传。`, 'error');
+      const teacherName = form.querySelector('[name="name"]')?.value.trim() || '';
+      openCertificateDuplicateDialog({ existingRow: seen.get(key).row, conflictRow: item.row, item, teacherName });
       return false;
     }
     seen.set(key, item);

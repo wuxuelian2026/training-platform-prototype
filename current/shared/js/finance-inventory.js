@@ -1,4 +1,5 @@
 import { readDemoState, upsertDemoRecord } from './demo-store.js';
+import { readAdminSession } from './admin-auth.js';
 
 const opsRoot = document.querySelector('[data-finance-page], [data-inventory-page]');
 const opsPage = opsRoot?.dataset.financePage || opsRoot?.dataset.inventoryPage;
@@ -100,7 +101,9 @@ function syncOrderAfterOfflineRefund(orderNo, orderType) {
 function openOfflineRefundForm() {
   const candidates = offlineRefundCandidates();
   const options = candidates.map((item) => `<option value="${esc(item.orderNo)}">${esc(item.orderNo)} · ${esc(item.student)} · ${esc(item.course)} · 待退 ${money(item.pending)}</option>`).join('');
-  const body = `<label class="form-field wide"><span>关联订单 <b class="required-mark">*</b></span><select name="orderNo" required><option value="">请选择订单</option>${options}</select><small data-refund-hint>仅可登记待退金额大于 0 的订单；实收金额取该订单收款记录合计，不以订单金额代替。</small></label>${field('退款金额', 'amount', 'number', '不得超过待退金额')}${select('退款方式', 'channel', ['银行转账', '现金', '微信支付', '支付宝'], false, false)}<label class="form-field wide"><span>退款原因 <b class="required-mark">*</b></span><textarea name="reason" maxlength="200" placeholder="填写线下退款原因"></textarea></label>${field('退款时间', 'time', 'datetime-local')}<label class="form-field wide"><span>备注</span><textarea name="remark" maxlength="200" placeholder="凭证号、经办说明等"></textarea></label><p class="ops-danger" data-refund-error role="alert" hidden></p>`;
+  // CR-2026-036 §3 登记要素：关联订单号／退款金额／退款方式／退款原因／退款时间／经办人（取当前操作者）／凭证附件（选填）／财务备注。
+  const operator = readAdminSession()?.name || '周财务';
+  const body = `<label class="form-field wide"><span>关联订单 <b class="required-mark">*</b></span><select name="orderNo" required><option value="">请选择订单</option>${options}</select><small data-refund-hint>仅可登记待退金额大于 0 的订单；实收金额取该订单收款记录合计，不以订单金额代替。</small></label>${field('退款金额', 'amount', 'number', '不得超过待退金额')}${select('退款方式', 'channel', ['银行转账', '现金', '微信支付', '支付宝'], false, false)}<label class="form-field wide"><span>退款原因 <b class="required-mark">*</b></span><textarea name="reason" maxlength="200" placeholder="填写线下退款原因"></textarea></label>${field('退款时间', 'time', 'datetime-local')}<label class="form-field"><span>经办人</span><input class="readonly-field" readonly value="${esc(operator)}" aria-label="经办人取当前操作者，不可手工指定"></label><label class="form-field"><span>凭证附件</span><input type="file" name="voucher" accept=".jpg,.jpeg,.png,.pdf" aria-label="转账凭据或收据，选填"></label><label class="form-field wide"><span>财务备注</span><textarea name="remark" maxlength="200" placeholder="补充说明，如凭据号或经办说明"></textarea></label><p class="ops-danger" data-refund-error role="alert" hidden></p>`;
   const dialog = openDialog('登记线下退款', '线下退款没有渠道回调，登记成功即视为退款完成，订单状态直接变为已退款。', `<form id="ops-form" class="ops-dialog-grid">${body}</form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="ops-form" class="button primary">确认登记</button>');
   const form = dialog.querySelector('#ops-form');
   const error = dialog.querySelector('[data-refund-error]');
@@ -127,7 +130,8 @@ function openOfflineRefundForm() {
     if (amount > pending) { error.textContent = `退款金额不得超过待退金额 ${money(pending)}。`; error.hidden = false; return; }
     const candidate = offlineRefundCandidates().find((item) => item.orderNo === orderNo) || {};
     if (candidate.status === '已取消') { error.textContent = '已取消订单不得登记退款。'; error.hidden = false; return; }
-    const record = { id: `refund-${Date.now()}`, no: `RF${Date.now()}`, orderNo, student: candidate.student || '—', phone: '—', course: candidate.course || '—', orderType: candidate.orderType || '面授课程', amount, reason: String(data.get('reason') || '').trim() || '线下退款登记', channel: String(data.get('channel') || '银行转账'), time: String(data.get('time') || '').replace('T', ' ') || '2026-09-17 16:00', status: '已退款', source: '线下', expectedAt: '登记即时完成（线下）', remark: String(data.get('remark') || '').trim() };
+    const voucherName = form.querySelector('[name="voucher"]')?.files?.[0]?.name || '';
+    const record = { id: `refund-${Date.now()}`, no: `RF${Date.now()}`, orderNo, student: candidate.student || '—', phone: '—', course: candidate.course || '—', orderType: candidate.orderType || '面授课程', amount, reason: String(data.get('reason') || '').trim() || '线下退款登记', channel: String(data.get('channel') || '银行转账'), time: String(data.get('time') || '').replace('T', ' ') || '2026-09-17 16:00', status: '已退款', source: '线下', expectedAt: '登记即时完成（线下）', operator, voucher: voucherName, remark: String(data.get('remark') || '').trim() };
     refunds.unshift(record);
     upsertDemoRecord('refunds', record);
     syncOrderAfterOfflineRefund(orderNo, record.orderType);
