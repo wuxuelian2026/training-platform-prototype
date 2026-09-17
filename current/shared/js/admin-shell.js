@@ -76,7 +76,7 @@ const navGroups = [
   {
     icon: '务', label: '教务执行监管', items: [
       ['场', '场地管理', '/admin/pages/academic/venues.html', 'academic'],
-      ['排', '排班管理', '/admin/pages/academic/scheduling.html', 'academic'],
+      ['排', '班级排课', '/admin/pages/academic/scheduling.html', 'academic'],
       ['表', '课表管理', '/admin/pages/academic/timetable.html', 'academic'],
       ['勤', '考勤监控', '/admin/pages/academic/attendance.html', 'academic'],
       ['作', '作业批阅监管', '/admin/pages/academic/homework.html', 'academic'],

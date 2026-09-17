@@ -84,6 +84,130 @@ export const TEACHER_FACTS = [
     contracts: [
       { number: 'CT2026010018', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['书法基础班', '中国画基础'], majors: ['书法', '中国画'] }
     ]
+  },
+  {
+    id: 'teacher-linyue', name: '林悦', profileStatus: '已建档', accountStatus: 'active',
+    majors: ['钢琴'],
+    teachingYears: 7, professionalTitle: '讲师',
+    tagline: '用清晰的方法建立稳定的演奏习惯。',
+    introduction: '从事钢琴基础与进阶教学，重视识谱、节奏和触键训练。',
+    certificates: [
+      { id: 'cert-linyue', name: '钢琴教师资格证', type: '教师资格证', status: '已通过', expiresAt: '2029-06-30', majors: ['钢琴'] }
+    ],
+    contracts: [
+      { number: 'CT2026010022', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['钢琴基础'], majors: ['钢琴'] }
+    ]
+  },
+  {
+    id: 'teacher-sunning', name: '孙宁', profileStatus: '已建档', accountStatus: 'inactive',
+    majors: ['古筝'],
+    teachingYears: 4, professionalTitle: '助教',
+    tagline: '从指法与节奏开始，逐步建立乐曲表达。',
+    introduction: '负责古筝启蒙课程，关注手型、节奏和练习习惯。',
+    certificates: [
+      { id: 'cert-sunning', name: '古筝教师资格证', type: '艺术等级证', status: '待审核', expiresAt: '2029-12-31', majors: ['古筝'] }
+    ],
+    contracts: [
+      { number: 'CT2026090023', status: '待教师签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['古筝启蒙'], majors: ['古筝'] }
+    ]
+  },
+  {
+    id: 'teacher-hejing', name: '何静', profileStatus: '已建档', accountStatus: 'frozen',
+    majors: ['中国画'],
+    teachingYears: 10, professionalTitle: '副教授',
+    tagline: '在笔墨训练中理解构图与意境。',
+    introduction: '长期从事中国画基础教学，擅长花鸟画与基础构图训练。',
+    certificates: [
+      { id: 'cert-hejing', name: '中国画专业资格证', type: '艺术等级证', status: '已通过', expiresAt: '2030-08-31', majors: ['中国画'] }
+    ],
+    contracts: [
+      { number: 'CT2026010024', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['中国画基础'], majors: ['中国画'] }
+    ]
+  },
+  {
+    id: 'teacher-gaoyuan', name: '高远', profileStatus: '待完善', accountStatus: 'active',
+    majors: ['民族民间舞'],
+    teachingYears: 3, professionalTitle: '助教',
+    tagline: '从节奏与体态进入民族舞的表达。',
+    introduction: '主要承担民族民间舞基础训练与组合练习。',
+    certificates: [
+      { id: 'cert-gaoyuan', name: '民族舞教师资格证', type: '艺术等级证', status: '已通过', expiresAt: '2028-03-31', majors: ['民族民间舞'] }
+    ],
+    contracts: [
+      { number: 'CT2026010025', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['民族舞基础'], majors: ['民族民间舞'] }
+    ]
+  },
+  {
+    id: 'teacher-luoxin', name: '罗欣', profileStatus: '已建档', departedAt: '2026-08-31', accountStatus: 'active',
+    majors: ['戏剧表演'],
+    teachingYears: 11, professionalTitle: '高级教师',
+    tagline: '让角色行动建立在真实感受之上。',
+    introduction: '从事戏剧表演与台词教学，重视角色分析和舞台行动。',
+    certificates: [
+      { id: 'cert-luoxin', name: '戏剧表演教师资格证', type: '教师资格证', status: '已通过', expiresAt: '2028-12-31', majors: ['戏剧表演'] }
+    ],
+    contracts: [
+      { number: 'CT2025010026', status: '已终止', startAt: '2025-01-01', endAt: '2026-08-31', courses: ['戏剧表演基础'], majors: ['戏剧表演'] }
+    ]
+  },
+  {
+    id: 'teacher-dengqi', name: '邓琪', profileStatus: '已建档', accountStatus: 'active',
+    majors: ['朗诵与主持'],
+    teachingYears: 6, professionalTitle: '讲师',
+    tagline: '从声音、节奏和表达逻辑建立舞台自信。',
+    introduction: '承担朗诵、主持与语言表达课程教学。',
+    certificates: [
+      { id: 'cert-dengqi', name: '播音主持教师资格证', type: '教师资格证', status: '已驳回', expiresAt: '2029-05-31', majors: ['朗诵与主持'] }
+    ],
+    contracts: [
+      { number: 'CT2026010027', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['朗诵与主持基础'], majors: ['朗诵与主持'] }
+    ]
+  },
+  {
+    id: 'teacher-tangwen', name: '唐雯', profileStatus: '已建档', accountStatus: 'active',
+    majors: ['少儿绘画'],
+    teachingYears: 5, professionalTitle: '讲师',
+    tagline: '把观察、想象和表达放进每一次创作。',
+    introduction: '专注少儿绘画启蒙与创意表达课程。',
+    certificates: [
+      { id: 'cert-tangwen', name: '美术教师资格证', type: '教师资格证', status: '已撤销', expiresAt: '2030-06-30', majors: ['少儿绘画'] }
+    ],
+    contracts: [
+      { number: 'CT2026090028', status: '待学校签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['少儿创意绘画'], majors: ['少儿绘画'] }
+    ]
+  },
+  {
+    id: 'teacher-xufan', name: '徐帆', profileStatus: '已建档', accountStatus: 'active',
+    majors: ['芭蕾舞'],
+    teachingYears: 9, professionalTitle: '讲师',
+    tagline: '用规范训练建立轻盈、稳定的身体控制。',
+    introduction: '负责芭蕾基础、形体与舞台组合教学。',
+    certificates: [
+      { id: 'cert-xufan', name: '芭蕾舞教师资格证', type: '艺术等级证', status: '已通过', expiresAt: '2026-10-10', majors: ['芭蕾舞'] }
+    ],
+    contracts: [
+      { number: 'CT2026010029', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['芭蕾形体基础'], majors: ['芭蕾舞'] }
+    ]
+  },
+  {
+    id: 'teacher-penglu', name: '彭露', profileStatus: '待完善', accountStatus: 'inactive',
+    majors: ['书法'],
+    teachingYears: 2, professionalTitle: '助教',
+    tagline: '从基本笔画开始建立书写秩序。',
+    introduction: '协助书法启蒙与硬笔基础课程教学。',
+    certificates: [],
+    contracts: []
+  },
+  {
+    id: 'teacher-hanyu', name: '韩宇', profileStatus: '已建档', accountStatus: 'frozen',
+    majors: ['声乐演唱'],
+    teachingYears: 8, professionalTitle: '讲师',
+    tagline: '让声音训练服务于作品表达。',
+    introduction: '从事成人声乐与艺术歌曲演唱教学。',
+    certificates: [
+      { id: 'cert-hanyu', name: '声乐教师资格证', type: '教师资格证', status: '已通过', expiresAt: '2029-09-30', majors: ['声乐演唱'] }
+    ],
+    contracts: []
   }
 ];
 

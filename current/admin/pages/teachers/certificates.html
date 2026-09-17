@@ -29,7 +29,7 @@
           <label class="form-field"><span>证书类型</span><select id="certificate-type"><option value="">全部类型</option><option>学历证书</option><option>教师资格证</option><option>艺术等级证</option><option>其他</option></select></label>
           <label class="form-field"><span>教师姓名</span><input id="certificate-teacher" placeholder="请输入教师姓名" /></label>
           <label class="form-field"><span>有效期范围</span><div class="date-range"><input id="certificate-date-start" type="date" aria-label="有效期开始日期" /><span>至</span><input id="certificate-date-end" type="date" aria-label="有效期结束日期" /></div></label>
-          <label class="form-field"><span>录入来源</span><select id="certificate-source"><option value="">全部来源</option><option>后台录入</option><option>教师端上传</option></select></label>
+          <label class="form-field"><span>文件来源</span><select id="certificate-source"><option value="">全部来源</option><option>学校录入</option><option>本人上传</option><option>系统生成</option></select></label>
         </div>
         <div class="filter-actions"><button type="reset" class="button">重置</button><button type="submit" class="button primary">查询</button></div>
       </form>
@@ -38,7 +38,7 @@
       <div class="table-note" id="certificate-count">共4条证书 · 当前页显示4条 · 证书审核状态与有效性分开展示</div>
       <div class="table-wrap certificate-table-wrap">
         <table id="certificates-table">
-          <thead><tr><th>教师姓名</th><th>证书名称</th><th>适用专业</th><th>证书编号</th><th>证书类型</th><th>发证机构</th><th>有效期截止</th><th>证书审核状态</th><th>证书有效性</th><th>来源</th><th>录入人</th><th>文件版本</th><th>证书文件</th><th>受影响课次</th><th>操作</th></tr></thead>
+          <thead><tr><th>教师姓名</th><th>证书名称</th><th>适用专业</th><th>证书编号</th><th>证书类型</th><th>发证机构</th><th>有效期截止</th><th>证书审核状态</th><th>证书有效性</th><th>文件来源</th><th>录入人</th><th>文件版本</th><th>证书文件</th><th>受影响课次</th><th>操作</th></tr></thead>
           <tbody>
             <tr data-certificate-id="cert-chen" data-teacher="陈晨" data-name="教师资格证" data-number="JSZG-2024-0921" data-type="教师资格证" data-issuer="湖北省教育厅" data-expiry="2034-06-30" data-status="待审核" data-validity="有效" data-source="教师端上传" data-entered-by="陈晨" data-file="教师资格证-JSZG-2024-0921.pdf" data-uploaded-at="2026-09-05 10:24">
               <td><a class="link" href="profile.html?teacher=陈晨">陈晨</a></td><td>教师资格证</td><td>JSZG-2024-0921</td><td><span class="tag brand">教师资格证</span></td><td>湖北省教育厅</td><td>2034-06-30</td><td data-cell="review"><span class="tag amber">待审核</span></td><td><span class="tag green">有效</span></td><td>教师端上传</td><td>陈晨</td><td>v1</td><td class="file-actions"><button type="button" class="icon-button" data-action="preview" title="预览证书" aria-label="预览证书">⌕</button><button type="button" class="icon-button" data-action="download" title="下载证书" aria-label="下载证书">↓</button></td><td class="action-cell" data-cell="actions"><button type="button" class="text-button" data-action="review">审核</button><button type="button" class="text-button" data-action="view">查看</button><button type="button" class="text-button" data-action="withdraw">撤回</button><button type="button" class="text-button danger-link" data-action="delete">删除</button></td>

@@ -8,6 +8,7 @@ import { demoId, demoTime, getCurrentAccountId, readDemoState, upsertDemoRecord,
 import { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } from './course-seed.js';
 import { courseAgesText } from './course-display.js';
 import { teacherFactsById } from './teacher-facts.js';
+import { certificateSourceLabel, findDuplicateCertificate } from './certificate-source.js';
 import { mountRichEditor, richTextValue } from './rich-editor.js';
 import { TEACHER_PROFILE_EDITABLE_FIELDS as teacherProfileEditableFields, TEACHER_PROFILE_GROUPS as teacherProfileGroups, TEACHER_PROFILE_GROUP_NOTE as teacherProfileGroupNote, teacherProfileMask } from './teacher-profile-fields.js';
 
@@ -95,6 +96,9 @@ teacherState.certificates = teacherState.certificates.map(item => {
   };
 });
 teacherState.contracts = Array.isArray(teacherState.contracts) ? teacherState.contracts : teacherContractDefaults.map(item => ({ ...item }));
+// CR-2026-028 §3.2：教师端只展示文件来源文案（学校录入／本人上传／系统生成），
+// 内部枚举（后台录入／教师端上传）不外露，业务来源口径不下发到教师端。
+teacherState.certificates = teacherState.certificates.map(item => ({ ...item, source: certificateSourceLabel(item.source) }));
 teacherState.graduationRecords = Array.isArray(teacherState.graduationRecords) ? teacherState.graduationRecords : teacherGraduationDefaults.map(item => ({ ...item }));
 const storedTeacherMessages = Array.isArray(teacherState.messages) ? teacherState.messages : [];
 const knownTeacherMessages = teacherMessageDefaults.map(item => ({ ...item, read: storedTeacherMessages.find(row => row.id === item.id)?.read ?? item.read }));
@@ -346,15 +350,19 @@ function currentTeacher() {
   return teacherAccounts.find(item => item.id === requested) || teacherAccounts[0];
 }
 function nextApplicationId() {
-  const used = teacherApplicationRecords().map(item => Number((item.id.match(/^CR-\d{4}-(\d{4})$/) || [])[1])).filter(Number.isFinite);
+  const used = allApplicationRecords().map(item => Number((item.id.match(/^CR-\d{4}-(\d{4})$/) || [])[1])).filter(Number.isFinite);
   const next = (used.length ? Math.max(...used) : 0) + 1;
   return `CR-${new Date().getFullYear()}-${String(next).padStart(4, '0')}`;
 }
 function applicationTone(status) { return status === '已通过' ? 'green' : status === '待审核' ? 'amber' : 'gray'; }
-function teacherApplicationRecords() {
+function allApplicationRecords() {
   const shared = readDemoState().applications || [];
   const merged = teacherApplications.map(item => ({ ...item, ...(shared.find(record => record.id === item.id) || {}) }));
   return [...merged, ...shared.filter(record => !teacherApplications.some(item => item.id === record.id))].map(applicationWithStatus).filter(item => item.status !== '草稿');
+}
+function teacherApplicationRecords() {
+  const teacher = currentTeacher();
+  return allApplicationRecords().filter(item => item.teacherId ? item.teacherId === teacher.id : item.teacher === teacher.name);
 }
 function applicationWithStatus(item) {
   const shared = readDemoState().applications.some(record => record.id === item.id);
@@ -418,11 +426,31 @@ function applicationDetailActions(item) {
   if (item.status === '待审核') return `${back}<button type="button" class="mp-button secondary teacher-application-withdraw" data-application-detail-action="withdraw">撤销申报</button>`;
   return `<a class="mp-button secondary full" href="${relativePath('/teacher/pages/applications.html')}">返回申报列表</a>`;
 }
+// CR-2026-034 §3.2：仅“已通过”的申报展示后续进度，取值来自课程主体的编排状态；
+// 待审核、已驳回、已撤销以及课程主体尚未生成时一律不展示。
+function applicationArrangeProgressLabel(courseStatus) {
+  if (!courseStatus) return '';
+  return courseStatus === '已完成' ? '已完成编排' : '已进入编排';
+}
+function renderApplicationArrangeProgress(item) {
+  if (item.status !== '已通过') return;
+  const courseId = item.courseId || courseIdForApplication(item.id);
+  const course = (readDemoState().courses || []).find(record => record.id === courseId);
+  const label = applicationArrangeProgressLabel(course?.status);
+  if (!label) return;
+  const detail = course?.status === '已完成'
+    ? '教研已完成课程内容编排，课程进入课程库，可按需发布商品或班级。'
+    : '教研正在编排课程内容，编排完成后课程会进入课程库。';
+  const anchor = document.querySelector('.teacher-application-review-note') || document.querySelector('.teacher-application-view-head');
+  anchor?.insertAdjacentHTML('afterend',
+    `<section class="teacher-application-arrange-progress"><span>后续进度</span><div>${tPill(label, 'green')}<p>${tEsc(detail)}</p></div></section>`);
+}
 function renderApplicationDetail() {
   const item = currentApplication();
   const [reviewTitle, reviewText] = applicationReviewCopy(item);
   tLayout(tStack(`<section class="teacher-application-view-head"><div><span>${tEsc(item.date)} 提交</span><h2>${tEsc(item.name)}</h2><p>申报编号 ${tEsc(item.id)}</p></div>${tPill(item.status, applicationTone(item.status))}</section>`,
     item.review ? `<section class="teacher-application-review-note"><span>最近一次审核意见</span><p>${tEsc(item.review)}</p><small>${tEsc(reviewTitle)}${item.reviewedAt ? ` · ${tEsc(item.reviewedAt)}` : ''}</small></section>` : '', `<section class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>只读</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(item.teacher || '—')}</strong></div><div><span>教师工号</span><strong>${tEsc(item.teacherNo || '—')}</strong></div><div><span>教学单位</span><strong>${tEsc(item.teacherUnit || '—')}</strong></div><div><span>专业方向</span><strong>${tEsc(item.teacherProfessional || item.professional || item.major || '—')}</strong></div><div><span>职称</span><strong>${tEsc(item.teacherTitle || '—')}</strong></div></div></section>`, `<section class="teacher-form-section teacher-application-view-content"><div class="teacher-form-section-head"><h3>申报内容</h3><span>只读</span></div><dl class="teacher-application-view-rows"><div><dt>申报编号</dt><dd>${tEsc(item.id)}</dd></div><div><dt>派生课程编号</dt><dd>${tEsc(item.courseId || courseIdForApplication(item.id))}</dd></div><div><dt>课程名称</dt><dd>${tEsc(item.name)}</dd></div><div><dt>所属专业</dt><dd>艺术学 · ${tEsc(item.professional)}</dd></div><div><dt>课程类型</dt><dd>${tEsc(item.type)}</dd></div><div><dt>难度等级</dt><dd>${tEsc(item.difficulty || '—')}</dd></div><div><dt>适合年龄</dt><dd>${tEsc(courseAgesText(item) || '—')}</dd></div>${item.type === '面授课程' ? `<div><dt>总课时</dt><dd>${tEsc(item.hours)}课时</dd></div>` : ''}<div class="wide"><dt>课程简介</dt><dd>${tEsc(item.intro)}</dd></div><div class="wide"><dt>附加材料</dt><dd>${item.file ? tEsc(item.file) : '未上传'}</dd></div></dl></section>`, `<section class="teacher-application-review ${item.status === '已驳回' ? 'rejected' : ''}"><div>${tPill(item.status, applicationTone(item.status))}<h3>${reviewTitle}</h3></div><p>${tEsc(reviewText)}</p>${item.reviewedBy ? `<small>审核人：${tEsc(item.reviewedBy)} · 审核时间：${tEsc(item.reviewedAt || '待记录')}</small>` : ''}</section>`, `<div class="teacher-application-detail-actions">${applicationDetailActions(item)}</div>`));
+  renderApplicationArrangeProgress(item);
 }
 function validateApplication() {
   const name = document.querySelector('#application-name')?.value.trim();
@@ -468,6 +496,7 @@ function initApplicationForm() {
       file: existing?.file || '',
       attachment: existing?.attachment || existing?.file || '',
       // I1-DEC-23: identity comes from the signed-in teacher profile, never a hardcoded name.
+      teacherId: existing?.teacherId || teacherProfile.id,
       teacher: existing?.teacher || teacherProfile.name,
       teacherNo: existing?.teacherNo || teacherProfile.no,
       teacherUnit: existing?.teacherUnit || teacherProfile.unit,
@@ -824,6 +853,15 @@ function openTeacherCertificateForm(item = null) {
   dialog.querySelectorAll('[data-certificate-close]').forEach(button => button.addEventListener('click', close));
   dialog.querySelector('[data-certificate-permanent]')?.addEventListener('change', event => { const expiry = dialog.querySelector('#certificate-expiry'); expiry.disabled = event.target.checked; if (event.target.checked) expiry.value = ''; });
   fileInput?.addEventListener('change', () => { dialog.querySelector('[data-certificate-file-name]').textContent = fileInput.files[0]?.name || '未选择文件'; error.hidden = true; });
+  // CR-2026-028 §2.4：查重提示里的“查看既有记录”直接打开该条证书，不新增记录。
+  form.addEventListener('click', event => {
+    const existing = event.target.closest('[data-certificate-existing]');
+    if (!existing) return;
+    const record = teacherState.certificates.find(entry => entry.id === existing.dataset.certificateExisting);
+    if (!record) return;
+    close();
+    openTeacherCertificateDetail(record);
+  });
   form.addEventListener('submit', event => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(form).entries());
@@ -832,8 +870,16 @@ function openTeacherCertificateForm(item = null) {
     if (!values.type) { error.textContent = '请选择证书类型。'; error.hidden = false; dialog.querySelector('#certificate-type').focus(); return; }
     if (!values.issuer.trim()) { error.textContent = '请输入发证机构。'; error.hidden = false; dialog.querySelector('#certificate-issuer').focus(); return; }
     if (!fileInput.files.length) { error.textContent = '请选择证书文件。'; error.hidden = false; fileInput.focus(); return; }
+    // CR-2026-028 §2.4：教师端上传命中重复时提示“该证书已存在”，引导到既有记录，不新增记录。
+    // 例外只有一种：对既有证书重新上传文件，走既有记录的版本升级（excludeId 排除自身）。
+    const duplicate = findDuplicateCertificate(teacherState.certificates, { type: values.type, number: values.number }, item?.id || '');
+    if (duplicate) {
+      error.innerHTML = `该证书已存在：${tEsc(duplicate.name)}（${tEsc(duplicate.number)} · ${tEsc(duplicate.status)}）。<button type="button" class="mp-button secondary" data-certificate-existing="${tEsc(duplicate.id)}">查看既有记录</button>`;
+      error.hidden = false;
+      return;
+    }
     const nextExpiry = values.expiresAt || '';
-    const next = { ...(item || {}), id: item?.id || `cert-${Date.now()}`, name: values.name.trim(), number: values.number.trim(), type: values.type, issuer: values.issuer.trim(), issuedAt: values.issuedAt || '', expiresAt: nextExpiry, status: '待审核', validity: calculateCertificateValidity(nextExpiry), source: '教师端上传', file: fileInput.files[0].name, reviewedAt: '', reviewNote: '已重新提交，等待教研审核。' };
+    const next = { ...(item || {}), id: item?.id || `cert-${Date.now()}`, name: values.name.trim(), number: values.number.trim(), type: values.type, issuer: values.issuer.trim(), issuedAt: values.issuedAt || '', expiresAt: nextExpiry, status: '待审核', validity: calculateCertificateValidity(nextExpiry), source: certificateSourceLabel('teacher_upload'), file: fileInput.files[0].name, reviewedAt: '', reviewNote: '已重新提交，等待教研审核。' };
     teacherState.certificates = item ? teacherState.certificates.map(record => record.id === item.id ? next : record) : [next, ...teacherState.certificates];
     saveTeacher(); close(); teacherCertificateFilter = '全部'; renderTeacherCertificates(); bindTeacherCertificateEvents(); tToast(isReupload ? '证书已重新提交审核' : '证书已提交审核');
   });

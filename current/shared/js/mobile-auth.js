@@ -14,7 +14,7 @@ const loginPanels = document.querySelectorAll('[data-login-panel]');
 const loginMessage = document.querySelector('#login-message');
 const accountSelect = document.querySelector('#demo-account');
 if (accountSelect) accountSelect.value = getCurrentAccountId();
-// I1-DEC-23: the login page offers two teacher seed accounts so identity carrying can be demoed.
+// I1-DEC-23: eligible teacher seed accounts are available so identity carrying and per-teacher data isolation can be demoed.
 const learnerAccountOptions = accountSelect ? [...accountSelect.options].map(option => ({ value: option.value, label: option.textContent })) : [];
 const fillDemoAccounts = role => {
   if (!accountSelect) return;

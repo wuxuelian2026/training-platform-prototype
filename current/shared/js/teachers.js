@@ -5,6 +5,7 @@ import { readDemoState, writeDemoState } from './demo-store.js';
 import { readXlsxSheetRows } from './xlsx-lite.js';
 import { toLocalDateString } from './date-utils.js';
 import { teacherFactsById } from './teacher-facts.js';
+import { certificateDedupKey } from './certificate-source.js';
 import { permissionsOfRole } from './permissions.js';
 import { TEACHER_PROFILE_LABELS, teacherProfileMask } from './teacher-profile-fields.js';
 import { explainTeacherCapacity, summarizeTeacherCapacity } from './teacher-capacity.js';
@@ -178,7 +179,7 @@ function applyTeacherFilters() {
   });
   const empty = document.querySelector('.teacher-empty-row');
   if (empty) empty.hidden = visible !== 0;
-  text('teacher-count', `共${28 + importedTeacherCount}名教师 · 当前筛选显示${visible}名 · 按最近授课时间倒序`);
+  text('teacher-count', `共${38 + importedTeacherCount}名教师 · 当前筛选显示${visible}名 · 按最近授课时间倒序`);
 }
 
 function resetTeacherImport() {
@@ -548,6 +549,41 @@ function initTeacherList() {
   applyTeacherFilters();
 }
 
+// CR-2026-028 §2.2：后台录入的证书信息行查重。
+// 判定口径为“同一教师下证书类型 + 证书编号相同”。建档表单承载的这位教师就是“同一教师”，
+// 因此同一张表单内出现重复行即为重复录入：命中后定位到既有行并拦截保存，不静默创建第二条记录。
+// 跨记录的重复由建档唯一性（身份证号唯一）在进入本表单前拦截。
+function certificateRowsOf(form) {
+  return [...form.querySelectorAll('[data-certificate-list] tr')].map((row) => ({
+    row,
+    name: row.children[0]?.querySelector('input')?.value.trim() || '',
+    number: row.children[1]?.querySelector('input')?.value.trim() || '',
+    type: row.children[2]?.querySelector('select')?.value || ''
+  })).filter((item) => item.number && item.type && item.type !== '选择类型');
+}
+
+function highlightCertificateRow(row) {
+  if (!row) return;
+  row.classList.add('certificate-duplicate-row');
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  window.setTimeout(() => row.classList.remove('certificate-duplicate-row'), 2400);
+}
+
+function validateTeacherCertificateRows(form) {
+  const collected = certificateRowsOf(form);
+  const seen = new Map();
+  for (const item of collected) {
+    const key = certificateDedupKey(item);
+    if (seen.has(key)) {
+      highlightCertificateRow(item.row);
+      toast(`同一教师下 ${item.type} ${item.number} 已存在，请勿重复录入；如需更换文件请对既有证书重新上传。`, 'error');
+      return false;
+    }
+    seen.set(key, item);
+  }
+  return true;
+}
+
 function initTeacherCreate() {
   const form = document.querySelector('#teacher-form');
   mountRichEditor(form?.querySelector('[data-rich-editor]'));
@@ -605,6 +641,8 @@ function initTeacherCreate() {
     const idCard = form.querySelector('[name="idCard"]')?.value || '';
     if (!/^\d{11}$/.test(phone)) { toast('手机号必须为11位数字。', 'error'); return; }
     if (!/^\d{17}[\dXx]$/.test(idCard)) { toast('身份证号必须为18位有效格式。', 'error'); return; }
+    // CR-2026-028 §2.2：后台录入保存前执行查重，命中不静默创建第二条记录。
+    if (!validateTeacherCertificateRows(form)) return;
     const result = form.querySelector('[data-build-result]');
     if (result) result.hidden = false;
     toast('教师已建档；账号邀请发送失败，可重新发送。', 'error');

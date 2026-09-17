@@ -62,26 +62,23 @@ export const ACADEMIC_FIELD_SPEC = {
         '通知仅发送给目标范围内当前可用的账号。'
       ]
     },
-    // 表单结构：步骤式（layout: steps）。创建班级含课程、班级信息、排课与冲突校验四段，
-    // 属于复杂表单；定价与报名时间属于招生动作，不在本表单内。
+    // CR-2026-043：排课只引用已有 class_id，班级和招生字段只读带入。
     'academic/scheduling': {
       layout: 'steps',
       groups: [
-        { heading: '第 1 步 选择课程', fields: [
-          { id: 'FD-ACADEMIC-014', label: '关联课程', type: '下拉', length: '必选 1 门', required: '是', note: '只能选择课程库中已完成编排的面授课程，或有效轻量课程档案' },
-          { id: 'FD-ACADEMIC-031', label: '课程名称', type: '文本（只读）', length: '—', required: '系统继承', note: '由所选课程自动带入', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-ACADEMIC-032', label: '所属专业', type: '文本（只读）', length: '—', required: '系统继承', note: '由所选课程自动带入', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-ACADEMIC-033', label: '总课时', type: '只读', length: '正整数', required: '系统继承', note: '从所选课程自动继承，等于课次数，用于生成课次和结业统计', constraints: { readOnly: true, min: 1, integer: true } }
+        { heading: '第 1 步 选择已有班级', fields: [
+          { id: 'FD-ACADEMIC-014', label: '已有班级', type: '下拉', length: '必选 1 个 class_id', required: '是', note: '从面授班级选择，不在排课页新建班级' },
+          { id: 'FD-ACADEMIC-031', label: '课程与版本', type: '文本（只读）', length: '—', required: '系统继承', note: '由班级锁定的 course_id + course_version 带入', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-ACADEMIC-015', label: '班级名称', type: '文本（只读）', length: '≤ 50 字', required: '系统继承', note: '由 class_id 带入，不可在排课页修改', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-ACADEMIC-016', label: '批次与容量', type: '文本（只读）', length: '—', required: '系统继承', note: '由班级招生配置带入', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-ACADEMIC-033', label: '总课时', type: '只读', length: '正整数', required: '系统继承', note: '从班级引用课程版本继承，等于课次数', constraints: { readOnly: true, min: 1, integer: true } }
         ] },
-        { heading: '第 2 步 班级基本信息', fields: [
-          { id: 'FD-ACADEMIC-015', label: '班级名称', type: '文本', length: '≤ 50 字', required: '是', note: '班级对外名称，需与批次、专业和班型一致', constraints: { maxLength: 50 } },
-          { id: 'FD-ACADEMIC-016', label: '所属批次', type: '下拉', length: '必选 1 个', required: '是', note: '决定批次归属与统计口径' },
+        { heading: '第 2 步 教师与场地', fields: [
           { id: 'FD-ACADEMIC-017', label: '授课教师', type: '下拉', length: '可选教师', required: '是', note: '需满足该专业可排课条件' },
           { id: 'FD-ACADEMIC-018', label: '授课校区', type: '下拉', length: '预置校区', required: '是', note: '与教室需匹配' },
           { id: 'FD-ACADEMIC-034', label: '授课教学楼', type: '下拉', length: '预置楼栋', required: '是', note: '关联该校区下的教学楼' },
           { id: 'FD-ACADEMIC-019', label: '授课教室', type: '下拉', length: '预置教室', required: '是', note: '关联该教学楼下的教室，需满足容量与时间无冲突' },
-          { id: 'FD-ACADEMIC-025', label: '招生人数上限', type: '数字', length: '≥ 1 的整数', required: '是', note: '不得大于教室容量；名额以支付成功为占用时点' },
-          { id: 'FD-ACADEMIC-035', label: '最低开班人数', type: '数字', length: '≥ 1 的整数', required: '否', note: '默认 5 人；未达最低人数时不开班' }
+          { id: 'FD-ACADEMIC-025', label: '招生容量', type: '只读', length: '正整数', required: '系统继承', note: '来自班级；发布时校验教室容量不得小于该值', constraints: { readOnly: true, derived: true } }
         ] },
         { heading: '第 3 步 排课配置', fields: [
           { id: 'FD-ACADEMIC-020', label: '每周上课日', type: '复选框组', length: '至少 1 天', required: '是', note: '决定课次重复规则' },
@@ -97,9 +94,9 @@ export const ACADEMIC_FIELD_SPEC = {
         ] }
       ],
       notes: [
-        '创建班级由教务在排班管理完成，保存后班级状态为“未发布”；定价、报名时间与前台展示由招生的发布班级动作设置。',
-        '保存草稿不生成正式课次；发布后按排课配置生成课次并进入冲突校验。',
-        '排班页实时预览课次与资源冲突；矩阵空位可直接带入创建班级。',
+        '面授班级是唯一建班入口；班级排课必须引用已有 class_id，不得生成新的班级主体。',
+        '保存草稿后状态为“排班草稿”，不生成正式课次且学员端不可见；确认并发布后一次生成全部课次。',
+        '排班页实时预览课次与资源冲突；矩阵空位只能带入场地与时段，仍须选择已有待排班班级。',
         '时间默认吸附到最近的 15 分钟刻度；偏离刻度时强制提示修正后再保存。',
         '教师、教室或时段存在冲突时必须先修正，修正后才允许发布。',
         '一次课就是一个课次，课时费按课次数计算。',

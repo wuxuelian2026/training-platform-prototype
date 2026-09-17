@@ -9,7 +9,6 @@
 //      历史版本不做字段级差异对比，也不提供版本回退。
 import { demoTime, readDemoState, upsertDemoRecord } from './demo-store.js';
 import { courseArchiveSeed } from './course-display.js';
-import { richTextPlain } from './rich-editor.js';
 import { toCanonicalCourseId } from './course-seed.js';
 import { classSeed } from './class-seed.js';
 import { allProducts } from './product-seed.js';
@@ -17,7 +16,6 @@ import { allProducts } from './product-seed.js';
 // 承诺类字段：变更这些字段才会触发版本升级（编排结构单列，后以结构签名比较）。
 export const COURSE_PROMISE_FIELDS = [
   ['name', '课程名称'],
-  ['archive', '课程档案类型'],
   ['type', '课程类型'],
   ['major', '所属专业'],
   ['teacher', '申报教师'],
@@ -30,8 +28,8 @@ export const COURSE_PROMISE_FIELDS = [
 export const COURSE_PROMISE_LABELS = COURSE_PROMISE_FIELDS.map(([, label]) => label).join('、');
 export const COURSE_VERSION_FALLBACK_AT = '2026-09-08 10:00';
 
-// 售卖单元引用的课程主键：完整课程用课程主体编号，轻量档案用档案编号。
-export const courseArchiveKey = (record) => (record?.archive === '完整课程' ? toCanonicalCourseId(record?.sourceCourseId) : record?.id || '');
+// 售卖单元始终引用课程主体编号，旧档案编号仅作兼容回退。
+export const courseArchiveKey = (record) => toCanonicalCourseId(record?.sourceCourseId || record?.id);
 
 export function mergedClasses() {
   const stored = (readDemoState().classes || []).filter((item) => item && typeof item === 'object');
@@ -78,14 +76,10 @@ export function courseStructure(chapters) {
 }
 
 export function courseSnapshot(record, structure = null) {
-  // 课程大纲是富文本：版本摘要只保留纯文本，避免快照里出现标记。
-  const outline = record?.outline ? richTextPlain(record.outline) : '';
-  const shape = record?.archive === '轻量课程档案'
-    ? { key: `outline:${outline}`, summary: outline ? `课程大纲：${outline.slice(0, 40)}${outline.length > 40 ? '…' : ''}` : '课程大纲：未填写' }
-    : (structure || { key: '', summary: '未编排' });
+  const shape = structure || { key: '', summary: '未编排' };
   return {
     name: record?.name || '',
-    archive: record?.archive || '',
+    source: record?.source || '',
     type: record?.type || '',
     major: record?.major || '',
     teacher: record?.teacher || '',
@@ -156,7 +150,7 @@ export function courseReferences(record) {
   const key = courseArchiveKey(record);
   const shared = readDemoState();
   const products = allProducts(shared).filter((item) => toCanonicalCourseId(item.courseId) === key && item.status === '已上架');
-  const classes = mergedClasses().filter((item) => toCanonicalCourseId(item.courseId) === key && item.display === '已展示');
+  const classes = mergedClasses().filter((item) => toCanonicalCourseId(item.courseId) === key && item.scheduleStatus === '已发布');
   return {
     key,
     products,

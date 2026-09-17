@@ -1,4 +1,4 @@
-// 课程展示信息（CR-2026-020：运营素��下沉到售卖单元）。
+// 课程展示信息（CR-2026-020：运营素材下沉到售卖单元）。
 //
 // 教学属性（难度等级、适合年龄）仍由课程档案承载，教师在申报时维护、后台编排可改、发布时只读带入；
 // 运营四字段（课程封面、图文详情、课程标签、C 端推荐语）改为各自维护在
@@ -7,7 +7,7 @@
 // 本模块是课程档案与售卖单元展示素材的统一读写入口，供 course-center.js（课程库）、
 // sales-crm.js（发布表单）与 learner.js（学员端展示）共用。
 import { readDemoState, upsertDemoRecord } from './demo-store.js';
-import { toCanonicalCourseId } from './course-seed.js';
+import { courseMockSeed, toCanonicalCourseId } from './course-seed.js';
 
 // 版本条目：CR-2026-025 要求历史版本整体快照可查（字段值、编排结构摘要、操作人与时间）。
 const archiveVersion = (version, at, operator, changes, snapshot) => ({ version, at, operator, changes, snapshot });
@@ -15,7 +15,7 @@ const archiveVersion = (version, at, operator, changes, snapshot) => ({ version,
 // 课程档案基线：只保留档案字段、教学属性与版本轨，不含运营四字段。
 const COURSE_ARCHIVE_SEED = [
   {
-    id: 'LIB-001', sourceCourseId: 'COURSE-002', name: '声乐演唱技巧', archive: '完整课程', type: '视频课程', major: '声乐演唱', teacher: '陈晨', hours: 12, status: '已完成', difficulty: '中级', ages: ['青少年', '成人'], updatedAt: '2026-08-26 17:20',
+    id: 'LIB-001', sourceCourseId: 'COURSE-002', source: '教师申报', name: '声乐演唱技巧', archive: '完整课程', type: '视频课程', major: '声乐演唱', teacher: '陈晨', hours: 12, status: '已完成', difficulty: '中级', ages: ['青少年', '成人'], updatedAt: '2026-08-26 17:20',
     version: 2,
     versions: [
       archiveVersion(1, '2026-08-18 09:30', '教研管理员', ['建档'], { name: '声乐演唱技巧', archive: '完整课程', type: '视频课程', major: '声乐演唱', teacher: '陈晨', hours: 10, difficulty: '初级', ages: ['成人'], structureKey: '', structure: '未编排' }),
@@ -23,12 +23,12 @@ const COURSE_ARCHIVE_SEED = [
     ]
   },
   {
-    id: 'LIB-006', sourceCourseId: 'COURSE-006', name: '艺术歌曲示范课', archive: '完整课程', type: '视频课程', major: '声乐演唱', teacher: '陈晨', hours: 8, status: '已完成', difficulty: '中级', ages: ['成人'], updatedAt: '2026-08-15 09:00',
+    id: 'LIB-006', sourceCourseId: 'COURSE-006', source: '教师申报', name: '艺术歌曲示范课', archive: '完整课程', type: '视频课程', major: '声乐演唱', teacher: '陈晨', hours: 8, status: '已完成', difficulty: '中级', ages: ['成人'], updatedAt: '2026-08-15 09:00',
     version: 1,
     versions: [archiveVersion(1, '2026-08-15 09:00', '教研管理员', ['建档'], { name: '艺术歌曲示范课', archive: '完整课程', type: '视频课程', major: '声乐演唱', teacher: '陈晨', hours: 8, difficulty: '中级', ages: ['成人'], structureKey: '', structure: '1 个章节 · 2 个课时' })]
   },
   {
-    id: 'LIB-002', sourceCourseId: 'COURSE-001', name: '舞蹈基本功', archive: '完整课程', type: '面授课程', major: '中国舞', teacher: '王玥', hours: 16, status: '已完成', difficulty: '初级', ages: ['少儿'], updatedAt: '2026-09-02 14:40',
+    id: 'LIB-002', sourceCourseId: 'COURSE-001', source: '教师申报', name: '舞蹈基本功', archive: '完整课程', type: '面授课程', major: '中国舞', teacher: '王玥', hours: 16, status: '已完成', difficulty: '初级', ages: ['少儿'], updatedAt: '2026-09-02 14:40',
     version: 2,
     versions: [
       archiveVersion(1, '2026-08-20 10:15', '教研管理员', ['建档'], { name: '舞蹈基本功', archive: '完整课程', type: '面授课程', major: '中国舞', teacher: '王玥', hours: 12, difficulty: '启蒙', ages: ['少儿'], structureKey: '', structure: '1 个章节 · 2 个课时' }),
@@ -36,20 +36,53 @@ const COURSE_ARCHIVE_SEED = [
     ]
   },
   {
-    id: 'LIB-003', sourceCourseId: 'LIB-003', name: '少儿美术兴趣班', archive: '轻量课程档案', type: '面授课程', major: '少儿绘画', teacher: '李青', hours: 20, difficulty: '启蒙', ages: ['少儿'], detail: '以主题创作和材料体验激发少儿绘画兴趣。', outline: '第一阶段：色彩与线条（7课次）；第二阶段：主题创作（7课次）；第三阶段：作品展示（6课次）。', updatedAt: '2026-08-18 11:00',
+    id: 'LIB-003', sourceCourseId: 'LIB-003', source: '后台新增', name: '少儿美术兴趣班', archive: '轻量课程档案', type: '面授课程', major: '少儿绘画', teacher: '李青', hours: 20, status: '已完成', difficulty: '启蒙', ages: ['少儿'], updatedAt: '2026-08-18 11:00',
     version: 1,
     versions: [archiveVersion(1, '2026-08-18 11:00', '教研管理员', ['建档'], { name: '少儿美术兴趣班', archive: '轻量课程档案', type: '面授课程', major: '少儿绘画', teacher: '李青', hours: 20, difficulty: '启蒙', ages: ['少儿'], structureKey: '', structure: '课程大纲：第一阶段：色彩与线条（7课次）…' })]
   },
   {
-    id: 'LIB-004', sourceCourseId: 'LIB-004', name: '朗诵与主持基础', archive: '轻量课程档案', type: '面授课程', major: '朗诵与主持', teacher: '赵可', hours: 16, difficulty: '初级', ages: ['青少年'], detail: '训练普通话、气息和舞台表达，适合青少年入门。', outline: '', updatedAt: '2026-08-22 15:10',
+    id: 'LIB-004', sourceCourseId: 'LIB-004', source: '后台新增', name: '朗诵与主持基础', archive: '轻量课程档案', type: '面授课程', major: '朗诵与主持', teacher: '赵可', hours: 16, status: '已完成', difficulty: '初级', ages: ['青少年'], updatedAt: '2026-08-22 15:10',
     version: 1,
     versions: [archiveVersion(1, '2026-08-22 15:10', '教研管理员', ['建档'], { name: '朗诵与主持基础', archive: '轻量课程档案', type: '面授课程', major: '朗诵与主持', teacher: '赵可', hours: 16, difficulty: '初级', ages: ['青少年'], structureKey: '', structure: '课程大纲：未填写' })]
   },
   {
-    id: 'LIB-005', sourceCourseId: 'LIB-005', name: '古筝入门体验课', archive: '轻量课程档案', type: '面授课程', major: '古筝', teacher: '周宁', hours: 8, difficulty: '启蒙', ages: ['少儿', '成人'], detail: '通过基础指法和短曲体验，帮助学员认识古筝。', outline: '第1阶段：认识古筝与基本指法；第2阶段：短曲体验。', updatedAt: '2026-08-25 09:20',
+    id: 'LIB-005', sourceCourseId: 'LIB-005', source: '后台新增', name: '古筝入门体验课', archive: '轻量课程档案', type: '面授课程', major: '古筝', teacher: '周宁', hours: 8, status: '已完成', difficulty: '启蒙', ages: ['少儿', '成人'], updatedAt: '2026-08-25 09:20',
     version: 1,
     versions: [archiveVersion(1, '2026-08-25 09:20', '教研管理员', ['建档'], { name: '古筝入门体验课', archive: '轻量课程档案', type: '面授课程', major: '古筝', teacher: '周宁', hours: 8, difficulty: '启蒙', ages: ['少儿', '成人'], structureKey: '', structure: '课程大纲：第1阶段：认识古筝与基本指法…' })]
-  }
+  },
+  ...courseMockSeed().filter((course) => course.status === '已完成').map((course) => {
+    const lessonCount = course.chapters.reduce((sum, chapter) => sum + chapter.lessons.length, 0);
+    const structureKey = JSON.stringify(course.chapters.map((chapter) => [chapter.name, chapter.lessons.map((lesson) => lesson.name)]));
+    return {
+      id: `LIB-${course.id}`,
+      sourceCourseId: course.id,
+      source: course.source,
+      name: course.name,
+      archive: '完整课程',
+      type: course.type,
+      major: course.major,
+      teacher: course.teacher,
+      hours: course.hours,
+      status: '已完成',
+      difficulty: course.difficulty,
+      ages: [...course.ages],
+      updatedAt: course.updatedAt,
+      version: 1,
+      versions: [archiveVersion(1, course.updatedAt, '教研管理员', ['建档', '编排结构'], {
+        name: course.name,
+        source: course.source,
+        archive: '完整课程',
+        type: course.type,
+        major: course.major,
+        teacher: course.teacher,
+        hours: course.hours,
+        difficulty: course.difficulty,
+        ages: [...course.ages],
+        structureKey,
+        structure: `${course.chapters.length} 个章节 · ${lessonCount} 个课时`
+      })]
+    };
+  })
 ];
 
 export const COURSE_DISPLAY_UNSET = '未配置';
@@ -75,6 +108,7 @@ export function courseArchiveDefaults(course = {}) {
   return {
     id: `LIB-${course.id || Date.now()}`,
     sourceCourseId: toCanonicalCourseId(course.id),
+    source: course.source || (course.applicationId ? '教师申报' : '后台新增'),
     archive: '完整课程',
     name: course.name || '',
     type: course.type || '',

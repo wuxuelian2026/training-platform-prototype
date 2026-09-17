@@ -1,10 +1,17 @@
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 import { sessionsFrom, teacherFactsByName } from './teacher-facts.js';
+import { certificateSourceLabel } from './certificate-source.js';
 
 const table = document.querySelector('#certificates-table');
 const filterForm = document.querySelector('#certificate-filter');
 const emptyRow = table?.querySelector('.certificate-empty');
 const rows = table ? [...table.querySelectorAll('tbody tr[data-certificate-id]')] : [];
+// CR-2026-028 §3.3：来源与文件版本列在渲染期会被“适用专业／受影响课次”插列推移，
+// 先按静态列位打上 data-cell 标记，后续更新按标记定位，不再依赖列序号。
+rows.forEach((row) => {
+  row.children[8]?.setAttribute('data-cell', 'source');
+  row.children[10]?.setAttribute('data-cell', 'file-version');
+});
 let activeRow = null;
 let toastTimer;
 
@@ -160,6 +167,20 @@ function rowData(row) {
   };
 }
 
+// CR-2026-028 §3.3.1：后台来源列展示文件来源（学校录入／本人上传／系统生成），
+// 与教师端“我的证书”同一套文案；存储值保持旧枚举，展示统一走映射。
+function syncCertificateSourceCells() {
+  rows.forEach((row) => {
+    const cell = row.querySelector('[data-cell="source"]');
+    if (cell) cell.textContent = certificateSourceLabel(row.dataset.source);
+  });
+}
+
+function updateFileVersionCell(row) {
+  const cell = row.querySelector('[data-cell="file-version"]');
+  if (cell) cell.textContent = row.dataset.fileVersion || 'v1';
+}
+
 function updateStatusCell(row) {
   const cell = row.querySelector('[data-cell="review"]');
   if (!cell) return;
@@ -227,7 +248,7 @@ function applyFilters() {
       && (!validity || row.dataset.validity === validity)
       && (!type || row.dataset.type === type)
       && (!teacher || row.dataset.teacher.includes(teacher))
-      && (!source || row.dataset.source === source)
+      && (!source || certificateSourceLabel(row.dataset.source) === source)
       && (!start || row.dataset.expiry >= start)
       && (!end || row.dataset.expiry <= end);
     row.hidden = !matches;
@@ -257,7 +278,7 @@ function openDetail(row) {
   text('detail-type', data.type);
   text('detail-issuer', data.issuer);
   text('detail-expiry', data.expiry);
-  text('detail-source', data.source);
+  text('detail-source', certificateSourceLabel(data.source));
   text('detail-entered-by', data.enteredBy);
   text('detail-uploaded-at', data.uploadedAt);
   text('detail-file', data.file);
@@ -406,8 +427,9 @@ document.querySelector('#reupload-form')?.addEventListener('submit', (event) => 
   const currentVersion = Number(String(activeRow.dataset.fileVersion || 'v1').replace(/[^0-9]/g, '')) || 1;
   activeRow.dataset.previousReview = activeRow.dataset.reviewNote || '';
   activeRow.dataset.fileVersion = `v${currentVersion + 1}`;
-  if (activeRow.children[10]) activeRow.children[10].textContent = activeRow.dataset.fileVersion;
-  if (activeRow.children[8]) activeRow.children[8].textContent = activeRow.dataset.source;
+  // 列位标记定位，避免插入列后把文件版本写进“录入人”、把来源写进“证书有效性”。
+  updateFileVersionCell(activeRow);
+  syncCertificateSourceCells();
   updateStatusCell(activeRow);
   updateActionCell(activeRow);
   applyFilters();
@@ -424,4 +446,6 @@ if (queryValidity) document.querySelector('#certificate-validity').value = query
 if (queryTeacher) document.querySelector('#certificate-teacher').value = queryTeacher;
 // 操作列由 updateActionCell 统一渲染，静态标记只作占位，避免静态与动态分叉成两套动作。
 rows.forEach(updateActionCell);
+syncCertificateSourceCells();
+rows.forEach(updateFileVersionCell);
 applyFilters();

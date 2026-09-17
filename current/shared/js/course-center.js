@@ -1,10 +1,10 @@
 import { relativePath } from './paths.js';
 import { demoId, demoTime, readDemoState, removeDemoRecord, updateDemoRecord, upsertDemoRecord } from './demo-store.js';
-import { applicationSeed, courseIdForApplication, teacherAccounts, toCanonicalCourseId } from './course-seed.js';
+import { applicationSeed, courseIdForApplication, courseMockSeed, teacherAccounts, toCanonicalCourseId } from './course-seed.js';
 import { COURSE_PROMISE_LABELS, changedPromiseFields, commitCourseVersion, courseArchiveKey, courseReferences, courseSnapshot, courseStructure, courseVersionOf, ensureVersionTrack, refreshCurrentSnapshot, referenceLabel } from './course-version.js';
 import { courseAgesText, courseArchiveFor, persistCourseTeaching } from './course-display.js';
 import { courseArchiveSeed } from './course-display.js';
-import { mountRichEditor, richTextToHtml, richTextValue } from './rich-editor.js';
+import { TEACHER_FACTS } from './teacher-facts.js';
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 
 const courseRoot = document.querySelector('[data-course-page]');
@@ -23,7 +23,8 @@ const contentCourses = [
   { id: 'COURSE-002', name: '声乐演唱技巧', type: '视频课程', major: '声乐演唱', teacher: '陈晨', hours: 12, status: '已完成', updatedAt: '2026-08-26 17:20', chapters: [{ name: '第一章：演唱基础', desc: '气息和发声基础。', lessons: [{ name: '气息支持', target: '理解并完成腹式呼吸练习', duration: 36, kind: '理论', description: '建立气息支撑的基本概念。', resources: ['res-001'] }, { name: '共鸣位置', target: '找到自然共鸣位置', duration: 42, kind: '示范', description: '通过示范建立共鸣感受。', resources: ['res-003'] }] }, { name: '第二章：作品处理', desc: '作品分析与表达。', lessons: [{ name: '咬字与吐字', target: '完成作品咬字练习', duration: 40, kind: '练习', description: '围绕歌词完成清晰咬字。', resources: ['res-004'] }] }] },
   { id: 'COURSE-003', name: '少儿国画入门', type: '面授课程', major: '中国画', teacher: '李青', hours: 20, status: '待编排', updatedAt: '2026-09-06 11:30', chapters: [] },
   { id: 'COURSE-004', name: '古筝基础与乐曲赏析', type: '视频课程', major: '古筝', teacher: '周宁', hours: 10, status: '待编排', updatedAt: '2026-09-05 16:10', chapters: [] },
-  { id: 'COURSE-005', name: '戏剧表演基础', type: '面授课程', major: '戏剧表演', teacher: '赵可', hours: 16, status: '编排中', updatedAt: '2026-09-03 10:45', chapters: [{ name: '第一章：舞台表达', desc: '台词和形体训练。', lessons: [{ name: '台词气息', target: '完成台词气息控制', duration: 45, kind: '综合', description: '结合文本完成舞台表达。', resources: [] }] }] }
+  { id: 'COURSE-005', name: '戏剧表演基础', type: '面授课程', major: '戏剧表演', teacher: '赵可', hours: 16, status: '编排中', updatedAt: '2026-09-03 10:45', chapters: [{ name: '第一章：舞台表达', desc: '台词和形体训练。', lessons: [{ name: '台词气息', target: '完成台词气息控制', duration: 45, kind: '综合', description: '结合文本完成舞台表达。', resources: [] }] }] },
+  ...courseMockSeed()
 ];
 
 const resources = [
@@ -37,9 +38,9 @@ const resources = [
 
 // CR-2026-012：课程档案（教学属性）与售卖单元展示素材的读写入口统一在 shared/js/course-display.js。
 const library = courseArchiveSeed();
-// CR-2026-025：课程档案的编排结构来自课程主体；轻量档案以课程大纲参与承诺类变更判定。
-const courseChaptersOf = (record) => (record?.archive === '完整课程' ? (contentCourses.find((item) => item.id === courseArchiveKey(record))?.chapters || []) : []);
-const courseStructureOf = (record) => (record?.archive === '完整课程' ? courseStructure(courseChaptersOf(record)) : null);
+// 课程大纲以课程主体的章节与课时为准；旧数据未迁移时兼容读取档案内结构。
+const courseChaptersOf = (record) => contentCourses.find((item) => item.id === courseArchiveKey(record))?.chapters || record?.chapters || [];
+const courseStructureOf = (record) => courseStructure(courseChaptersOf(record));
 
 const catalog = {
   groupStatus: { '音乐类': '启用', '舞蹈类': '启用', '美术类': '停用', '戏剧类': '启用' },
@@ -96,6 +97,15 @@ for (let index = applications.length - 1; index >= 0; index -= 1) {
 appendShared(contentCourses, sharedDemo.courses);
 appendShared(resources, sharedDemo.resources);
 mergeSharedRecords(library, sharedDemo.library);
+// CR-2026-041：取消“完整／轻量”业务分类，课程只按来源追溯，并统一进入编排三态。
+contentCourses.forEach((course) => { course.source ||= course.applicationId ? '教师申报' : '后台新增'; });
+library.forEach((record) => {
+  // 旧存储记录仍带 archive 字段，仅用于一次性推断课程来源；新数据不再写入该字段，页面也不展示分类。
+  record.source ||= record.archive === '轻量课程档案' ? '后台新增' : '教师申报';
+  const courseId = courseArchiveKey(record);
+  if (contentCourses.some((course) => course.id === courseId)) return;
+  contentCourses.push({ id: courseId, source: record.source, name: record.name, type: record.type, major: record.major, teacher: record.teacher, hours: record.hours, status: record.status || '已完成', updatedAt: record.updatedAt || demoTime(), chapters: JSON.parse(JSON.stringify(record.chapters || [])), difficulty: record.difficulty || '', ages: [...(record.ages || [])] });
+});
 syncResourceReferences();
 function applicationCourseId(item) {
   return !item.courseId || item.courseId === 'COURSE-NEW' ? courseIdForApplication(item.id) : item.courseId;
@@ -121,18 +131,18 @@ function persistLibrary(item) { upsertDemoRecord('library', item); }
 function persistResource(item) { upsertDemoRecord('resources', item); }
 function courseFromApplication(item) {
   // CR-2026-012 / CR-2026-014：申报阶段维护的教学属性随课程主体带入，编排页默认读取这里。
-  return { id: applicationCourseId(item), applicationId: item.id, name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: Number(item.hours) || 1, status: '待编排', updatedAt: demoTime(), chapters: [], difficulty: item.difficulty || '', ages: Array.isArray(item.ages) ? [...item.ages] : [] };
+  return { id: applicationCourseId(item), applicationId: item.id, source: '教师申报', name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: Number(item.hours) || 1, status: '待编排', updatedAt: demoTime(), chapters: [], difficulty: item.difficulty || '', ages: Array.isArray(item.ages) ? [...item.ages] : [] };
 }
 function syncLibraryCourse(item) {
   const existing = library.find(record => record.sourceCourseId === item.id);
-  const record = existing || { id: `LIB-${item.id}`, sourceCourseId: item.id, archive: '完整课程', name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: item.hours, status: '已完成', difficulty: '', ages: [], detail: '' };
+  const record = existing || { id: `LIB-${item.id}`, sourceCourseId: item.id, source: item.source || '教师申报', archive: '完整课程', name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: item.hours, status: '已完成', difficulty: '', ages: [] };
   // 教学属性来自申报；只有档案里还没有值时，才用课程主体带的申报值补齐，不覆盖编排阶段的修改。
-  Object.assign(record, { sourceCourseId: item.id, name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: item.hours, status: '已完成', difficulty: record.difficulty || item.difficulty || '', ages: (record.ages && record.ages.length ? record.ages : item.ages) || [] });
+  Object.assign(record, { sourceCourseId: item.id, source: item.source || record.source || '教师申报', name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: item.hours, status: '已完成', difficulty: record.difficulty || item.difficulty || '', ages: (record.ages && record.ages.length ? record.ages : item.ages) || [] });
   if (!existing) library.unshift(record);
   persistLibrary(record);
 }
 
-const state = { page: courseRoot?.dataset.coursePage || '', applicationTab: '', libraryTab: new URLSearchParams(location.search).get('tab') === 'all' ? 'all' : 'arrange', applicationFilters: {}, contentFilters: {}, resourceFilters: {}, libraryFilters: {}, selectedGroup: '音乐类', selectedCategory: '声乐', pageSize: 20, modal: null };
+const state = { page: courseRoot?.dataset.coursePage || '', applicationTab: '', libraryTab: new URLSearchParams(location.search).get('tab') === 'all' ? 'all' : 'arrange', applicationFilters: {}, contentFilters: {}, resourceFilters: {}, libraryFilters: {}, selectedGroup: '音乐类', selectedCategory: '声乐', pageSize: 20, modal: null, reviewResult: null };
 
 // 申报状态页签：取值只读 spec/states 的 SM-COURSE-APPLICATION，「全部」是不加状态过滤的默认项。
 const applicationStatusTabs = () => {
@@ -174,11 +184,18 @@ const modal = (title, subtitle, content, options = {}) => {
 };
 const closeModal = () => { if (state.modal?.open) state.modal.close(); else state.modal?.remove(); state.modal = null; };
 const button = (label, action, attrs = '', className = '') => `<button type="button" class="text-button ${className}" data-action="${action}" ${attrs}>${escapeHtml(label)}</button>`;
-const pageShell = (title, description, actions = '') => `<div class="page-head"><div><h1>${escapeHtml(title)}</h1>${description ? `<p>${escapeHtml(description)}</p>` : ''}</div><div class="toolbar-actions">${actions}</div></div>`;
+const pageShell = (title, description, actions = '') => {
+  const toolbar = title === '课程内容编排'
+    ? `${actions}<button class="button primary" type="button" data-action="new-direct-course">新增面授课程</button>`
+    : title === '课程库' ? '' : actions;
+  return `<div class="page-head"><div><h1>${escapeHtml(title)}</h1>${description ? `<p>${escapeHtml(description)}</p>` : ''}</div><div class="toolbar-actions">${toolbar}</div></div>`;
+};
 const filterField = (label, input) => `<div class="course-field"><label>${escapeHtml(label)}</label>${input}</div>`;
 const select = (name, values, selected = '', allLabel = '全部') => `<select name="${name}">${allLabel ? option('', selected === '') .replace('</option>', `>${allLabel}</option>`) : ''}${values.map(value => option(value, selected === value)).join('')}</select>`;
 const selectWithValues = (name, values, selected = '', allLabel = '全部') => `<select name="${name}">${allLabel ? `<option value="">${allLabel}</option>` : ''}${values.map(value => option(value, selected === value)).join('')}</select>`;
-const professionalFilter = (name, selected = '') => `<select name="${name}"><option value="">全部专业</option>${catalog.majors.map(item => option(item.name, item.name === selected)).join('')}</select>`;
+// CR-2026-034 §2.3.4：停用专业不再出现在新的申报与筛选项；已选中的停用专业保留，
+// 否则编辑既有课程时当前值会从下拉里消失。
+const professionalFilter = (name, selected = '') => `<select name="${name}"><option value="">全部专业</option>${catalog.majors.filter(item => item.status === '启用' || item.name === selected).map(item => option(item.name, item.name === selected)).join('')}</select>`;
 const pagination = (count, label = '条记录') => `<div class="course-pagination"><span>共 ${count} ${label}</span><div class="course-pagination-controls"><label for="page-size">每页</label><select id="page-size" data-action="page-size"><option value="10"${state.pageSize === 10 ? ' selected' : ''}>10条</option><option value="20"${state.pageSize === 20 ? ' selected' : ''}>20条</option><option value="50"${state.pageSize === 50 ? ' selected' : ''}>50条</option></select><button class="button" type="button" disabled>上一页</button><button class="button" type="button" disabled>下一页</button></div></div>`;
 
 function init() {
@@ -224,13 +241,16 @@ function renderApplications(page) {
 }
 
 function renderContent(page) {
-  const filtered = contentCourses.filter(item => !state.contentFilters.status || item.status === state.contentFilters.status).filter(item => !state.contentFilters.type || item.type === state.contentFilters.type).filter(item => !state.contentFilters.major || item.major === state.contentFilters.major).filter(item => !state.contentFilters.keyword || `${item.name}${item.teacher}`.includes(state.contentFilters.keyword));
-  page.innerHTML = `<div class="course-page">${pageShell('课程内容编排', '', '<button class="button" type="button" data-action="refresh-content">刷新列表</button>')}<section class="course-surface"><form class="course-filter" data-form="content-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('编排状态', selectWithValues('status', ['待编排', '编排中', '已完成'], state.contentFilters.status || '', '全部状态'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.contentFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.contentFilters.major))}${filterField('申报教师', `<input name="keyword" value="${escapeHtml(state.contentFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>待编排课程</strong><span> 共 ${filtered.length} 条，按最近编辑时间排序</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程名称</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>编排状态</th><th>上次编辑时间</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${item.id}</span></td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${item.hours} 课时</td><td>${tag(item.status)}</td><td>${escapeHtml(item.updatedAt)}</td><td><div class="course-actions">${button(item.status === '待编排' ? '开始编排' : item.status === '编排中' ? '继续编排' : '查看', 'content-workbench', `data-id="${item.id}"`)}${item.status === '已完成' ? button('查看编排', 'content-workbench', `data-id="${item.id}"`) : ''}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无课程</strong><span>只有审核通过的完整课程会进入内容编排。</span></div>'}</div>${pagination(filtered.length, '门课程')}</section></div>`;
+  const filtered = contentCourses.filter(item => item.status !== '已完成').filter(item => !state.contentFilters.status || item.status === state.contentFilters.status).filter(item => !state.contentFilters.type || item.type === state.contentFilters.type).filter(item => !state.contentFilters.major || item.major === state.contentFilters.major).filter(item => !state.contentFilters.keyword || `${item.name}${item.teacher}`.includes(state.contentFilters.keyword));
+  page.innerHTML = `<div class="course-page">${pageShell('课程内容编排', '', '<button class="button" type="button" data-action="refresh-content">刷新列表</button>')}<section class="course-surface"><form class="course-filter" data-form="content-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('编排状态', selectWithValues('status', ['待编排', '编排中'], state.contentFilters.status || '', '全部状态'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.contentFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.contentFilters.major))}${filterField('申报教师', `<input name="keyword" value="${escapeHtml(state.contentFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>待编排课程</strong><span> 共 ${filtered.length} 条，按最近编辑时间排序</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程名称</th><th>课程来源</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>编排状态</th><th>上次编辑时间</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${item.id}</span></td><td>${escapeHtml(item.source || (item.applicationId ? '教师申报' : '后台新增'))}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${item.hours} 课时</td><td>${tag(item.status)}</td><td>${escapeHtml(item.updatedAt)}</td><td><div class="course-actions">${button(item.status === '待编排' ? '开始编排' : '继续编排', 'content-workbench', `data-id="${item.id}"`)}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无待编排课程</strong><span>教师申报通过或后台新增的面授课程会进入此处。</span></div>'}</div>${pagination(filtered.length, '门课程')}</section></div>`;
   const queryId = new URLSearchParams(window.location.search).get('courseId');
   if (queryId && !state.modal) openWorkbench(queryId);
 }
 
 function renderResources(page) {
+  // CR-2026-034 §2.3.2：专业引用清单可深链定位到对应资源。
+  const resourceQuery = new URLSearchParams(location.search).get('keyword');
+  if (resourceQuery !== null) state.resourceFilters.keyword = resourceQuery;
   const filtered = resources.filter(item => !state.resourceFilters.type || item.type === state.resourceFilters.type).filter(item => !state.resourceFilters.major || item.major === state.resourceFilters.major).filter(item => !state.resourceFilters.teacher || item.teacher.includes(state.resourceFilters.teacher)).filter(item => !state.resourceFilters.keyword || item.name.includes(state.resourceFilters.keyword));
   page.innerHTML = `<div class="course-page">${pageShell('教学资源库', '', '<button class="button primary" type="button" data-action="upload-resource">上传资源</button>')}<section class="course-surface"><form class="course-filter" data-form="resource-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('资源类型', selectWithValues('type', ['教学视频', '课件PPT', '乐谱PDF', '音频示范', '其他'], state.resourceFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.resourceFilters.major))}${filterField('上传教师', `<input name="teacher" value="${escapeHtml(state.resourceFilters.teacher || '')}" placeholder="输入教师姓名" />`)}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.resourceFilters.keyword || '')}" placeholder="资源名称" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>资源列表</strong><span> 当前显示 ${filtered.length} 条</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>资源名称</th><th>资源类型</th><th>所属专业</th><th>适用等级</th><th>文件大小</th><th>上传教师</th><th>上传时间</th><th>引用次数</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${item.references ? `已被 ${item.references} 门课程引用` : '暂未被课程引用'}</span></td><td>${tag(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.level)}</td><td>${escapeHtml(item.size)}</td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.uploadedAt)}</td><td>${item.references}</td><td><div class="course-actions">${button('预览', 'resource-preview', `data-id="${item.id}"`)}${button('编辑', 'resource-edit', `data-id="${item.id}"`)}${button('删除', 'resource-delete', `data-id="${item.id}"`, 'danger-link')}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无资源</strong><span>上传教学视频、课件或附件，供课程编排引用。</span></div>'}</div>${pagination(filtered.length, '个资源')}</section></div>`;
 }
@@ -255,51 +275,103 @@ function versionNotice(record, references, version) {
   return `<p class="course-hint course-version-notice">该课程已被 ${escapeHtml(referenceLabel(references))} 引用：保存时若变更承诺类字段（${COURSE_PROMISE_LABELS}），将生成 v${version + 1}，旧版本 v${version} 保留。</p>`;
 }
 function applyArchiveChange(record, patch, chapters = null) {
-  const structure = record.archive === '轻量课程档案' ? null : courseStructure(chapters || courseChaptersOf(record));
   ensureVersionTrack(record);
-  refreshCurrentSnapshot(record, structure);
-  const before = courseSnapshot(record, structure);
+  const beforeStructure = courseStructureOf(record);
+  refreshCurrentSnapshot(record, beforeStructure);
+  const before = courseSnapshot(record, beforeStructure);
   Object.assign(record, patch);
-  const after = courseSnapshot(record, structure);
+  if (chapters) record.chapters = chapters;
+  const afterStructure = chapters ? courseStructure(chapters) : courseStructureOf(record);
+  const after = courseSnapshot(record, afterStructure);
   const references = courseReferences(record);
-  const result = commitCourseVersion(record, { changed: changedPromiseFields(before, after), structure, references });
-  // 完整课程的档案字段与课程主体同源，档案改动同步回课程主体，避免两处口径分叉。
-  if (record.archive === '完整课程') {
-    const course = contentCourses.find((item) => item.id === courseArchiveKey(record));
-    if (course) {
-      Object.assign(course, { name: record.name, type: record.type, major: record.major, teacher: record.teacher, hours: record.hours, difficulty: record.difficulty, ages: [...record.ages] });
-      persistCourse(course);
-      persistCourseTeaching(course, { difficulty: record.difficulty, ages: [...record.ages] });
-    }
+  const result = commitCourseVersion(record, { changed: changedPromiseFields(before, after), structure: afterStructure, references });
+  // 全部课程的基本信息与大纲均回写课程主体，避免查看与编辑两套数据。
+  const course = contentCourses.find((item) => item.id === courseArchiveKey(record));
+  if (course) {
+    Object.assign(course, { name: record.name, type: record.type, major: record.major, teacher: record.teacher, hours: record.hours, difficulty: record.difficulty, ages: [...record.ages], chapters: chapters || course.chapters, updatedAt: demoTime() });
+    persistCourse(course);
+    persistCourseTeaching(course, { difficulty: record.difficulty, ages: [...record.ages] });
   }
   return result;
 }
+// CR-2026-034 §4.1：停用只拦新的发布动作，不改写已购学习权限、在售商品、已发布班级与历史订单。
+function openLibraryDisableDialog(item) {
+  modal('停用课程', `${courseArchiveKey(item)} · ${item.name}`, `<form data-form="library-disable" data-id="${escapeHtml(item.id)}"><section class="course-detail-section wide"><p class="course-hint">停用后该课程不再出现在「发布商品」与「发布班级」的课程选择项中。已购学员的学习权限、已在售商品、已发布班级与已排课次、历史订单与计薪均不受影响，也不会自动下架商品或关停班级。</p><div class="course-field wide"><label for="library-disable-reason">停用原因 <span class="sub-cell">必填，≤200 字</span></label><textarea id="library-disable-reason" name="reason" maxlength="200" required placeholder="例如：专业取消、内容过时、建错课程"></textarea><p class="course-error" data-error></p></div></section><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button danger-button" type="submit">确认停用</button></div></form>`, { large: true });
+}
+
+// §4.3：只有「后台新增」且无任何引用的课程档案允许物理删除；教师申报课程有来源追溯要求，只能停用。
+function deleteLibraryRecord(id) {
+  const item = library.find((record) => record.id === id);
+  if (!item) return;
+  if ((item.source || '教师申报') !== '后台新增') { showToast('教师申报课程有来源追溯要求，只能停用，不能删除', 'error'); return; }
+  if (courseReferences(item).count > 0) { showToast('该课程已被售卖单元引用，只能停用，不能删除', 'error'); return; }
+  if (!window.confirm(`删除不可逆：确认删除课程「${item.name}」（${courseArchiveKey(item)}）？`)) return;
+  library.splice(library.indexOf(item), 1);
+  removeDemoRecord('library', item.id);
+  renderLibrary(root());
+  showToast('课程档案已删除');
+}
+
+function toggleLibraryEnabled(id) {
+  const item = library.find((record) => record.id === id);
+  if (!item) return;
+  if (!item.disabledAt) { openLibraryDisableDialog(item); return; }
+  item.disabledAt = '';
+  item.disabledBy = '';
+  item.disabledReason = '';
+  persistLibrary(item);
+  renderLibrary(root());
+  showToast(`课程「${item.name}」已启用，版本号继续递增，不重置`);
+}
+
 function libraryRow(item) {
   const key = courseArchiveKey(item);
   const version = syncLibraryVersion(item);
   const references = courseReferences(item);
+  // CR-2026-034 §4.1：停用是发布准入开关（时间戳为空表示启用），不是课程生命周期状态。
+  const disabled = Boolean(item.disabledAt);
+  // §4.3：只有「后台新增」来源且从未被售卖单元引用的档案允许物理删除；教师申报课程只能停用。
+  const deletable = (item.source || '教师申报') === '后台新增' && references.count === 0;
   const actions = [
     button('查看', 'library-view', `data-id="${item.id}"`),
     button('编辑', 'library-edit', `data-id="${item.id}"`),
     button('历史版本', 'library-versions', `data-id="${item.id}"`),
-    item.type === '视频课程' && item.archive === '完整课程' && item.status === '已完成' ? button('发布商品', 'publish-product', `data-id="${item.id}"`) : '',
-    item.type === '面授课程' ? button('发布班级', 'publish-class', `data-id="${item.id}"`) : '',
-    item.archive === '完整课程' ? button('查看编排', 'library-workbench', `data-id="${item.id}"`) : ''
+    button(disabled ? '启用' : '停用', 'library-toggle-enabled', `data-id="${item.id}"`, disabled ? '' : 'danger-link'),
+    deletable ? button('删除', 'library-delete', `data-id="${item.id}"`, 'danger-link') : '',
+    item.type === '视频课程' && item.status === '已完成' && !disabled ? button('发布商品', 'publish-product', `data-id="${item.id}"`) : '',
+    item.type === '面授课程' && !disabled ? button('发布班级', 'publish-class', `data-id="${item.id}"`) : '',
   ].join('');
-  return `<tr><td><span class="primary-cell">${escapeHtml(key || '—')}</span><span class="sub-cell">${item.archive === '完整课程' ? '来源课程主体' : '轻量档案'}</span></td><td><span class="primary-cell">${escapeHtml(item.name)}</span></td><td>${tag(item.archive)}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${item.hours} 课时</td><td><button type="button" class="text-button course-version-link" data-action="library-versions" data-id="${item.id}">v${version}</button><span class="sub-cell">${escapeHtml(referenceLabel(references))}</span></td><td><div class="course-actions">${actions}</div></td></tr>`;
+  const statusCell = disabled
+    ? `<span class="tag red">已停用</span><span class="sub-cell">${escapeHtml(item.disabledAt)} · ${escapeHtml(item.disabledBy || '—')} · 原因：${escapeHtml(item.disabledReason || '未填写')}</span>`
+    : '<span class="tag green">启用</span>';
+  return `<tr><td><span class="primary-cell">${escapeHtml(key || '—')}</span></td><td><span class="primary-cell">${escapeHtml(item.name)}</span></td><td>${escapeHtml(item.source || '教师申报')}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${item.hours} 课时</td><td>${statusCell}</td><td><button type="button" class="text-button course-version-link" data-action="library-versions" data-id="${item.id}">v${version}</button><span class="sub-cell">${escapeHtml(referenceLabel(references))}</span></td><td><div class="course-actions">${actions}</div></td></tr>`;
 }
 
 // CR-2026-025：全部课程页签（行内操作拆分为查看 / 编辑 / 历史版本，新增版本号列）。
 function renderLibraryAllView(page) {
-  const filtered = library.filter(item => !state.libraryFilters.archive || item.archive === state.libraryFilters.archive).filter(item => !state.libraryFilters.type || item.type === state.libraryFilters.type).filter(item => !state.libraryFilters.major || item.major === state.libraryFilters.major).filter(item => !state.libraryFilters.keyword || `${item.name}${item.teacher}`.includes(state.libraryFilters.keyword));
-  page.innerHTML = `<div class="course-page">${pageShell('课程库', '', '<button class="button primary" type="button" data-action="new-lightweight">新建轻量课程档案</button>')}<section class="course-surface"><form class="course-filter" data-form="library-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('课程档案类型', selectWithValues('archive', ['完整课程', '轻量课程档案'], state.libraryFilters.archive || '', '全部类型'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.libraryFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.libraryFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.libraryFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>课程档案</strong><span> 当前显示 ${filtered.length} 条</span></div><div class="course-legend"><span class="course-legend-item success">版本号可点击查看历史版本</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程编号</th><th>课程名称</th><th>课程档案类型</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>版本号</th><th>操作</th></tr></thead><tbody>${filtered.map(libraryRow).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无课程档案</strong><span>审核通过并完成编排的完整课程，或新建的轻量档案会出现在这里。</span></div>'}</div>${pagination(filtered.length, '个课程档案')}</section></div>`;
+  const completed = library.filter((item) => contentCourses.find((course) => course.id === courseArchiveKey(item))?.status === '已完成' || (!contentCourses.some((course) => course.id === courseArchiveKey(item)) && item.status === '已完成'));
+  // CR-2026-034 §4.1.3：启用状态筛选取值 全部／启用／已停用，默认全部。
+  const enabledFilter = state.libraryFilters.enabled || '';
+  const filtered = completed.filter(item => !state.libraryFilters.source || (item.source || '教师申报') === state.libraryFilters.source).filter(item => !state.libraryFilters.type || item.type === state.libraryFilters.type).filter(item => !state.libraryFilters.major || item.major === state.libraryFilters.major).filter(item => !state.libraryFilters.keyword || `${item.name}${item.teacher}`.includes(state.libraryFilters.keyword)).filter((item) => !enabledFilter || (enabledFilter === '已停用' ? Boolean(item.disabledAt) : !item.disabledAt));
+  page.innerHTML = `<div class="course-page">${pageShell('课程库', '', '<button class="button primary" type="button" data-action="new-direct-course">新增面授课程</button>')}<section class="course-surface"><form class="course-filter" data-form="library-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('课程来源', selectWithValues('source', ['教师申报', '后台新增'], state.libraryFilters.source || '', '全部来源'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.libraryFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.libraryFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.libraryFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>已完成课程</strong><span> 当前显示 ${filtered.length} 条</span></div><div class="course-legend"><span class="course-legend-item success">版本号可点击查看历史版本</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程编号</th><th>课程名称</th><th>课程来源</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>版本号</th><th>操作</th></tr></thead><tbody>${filtered.map(libraryRow).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无已完成课程</strong><span>课程完成编排后会进入全部课程。</span></div>'}</div>${pagination(filtered.length, '门课程')}</section></div>`;
 }
 
 // CR-2026-021：课程内容编排并入课程库，一个页面两个视图（内容编排 / 全部课程），视图状态进 URL。
 // 2026-09-16：页签名由“待编排”改为“内容编排”；“待编排”仅保留为编排状态取值，不再作为页签名。
 function libraryTabBar() {
-  const tabs = [['arrange', '内容编排', contentCourses.length], ['all', '全部课程', library.length]];
+  const tabs = [['arrange', '内容编排', contentCourses.filter(item => item.status !== '已完成').length], ['all', '全部课程', contentCourses.filter(item => item.status === '已完成').length]];
   return `<div class="course-tabs">${tabs.map(([value, label, count]) => `<button type="button" class="course-tab${state.libraryTab === value ? ' active' : ''}" data-action="library-tab" data-value="${value}">${label} <small>(${count})</small></button>`).join('')}</div>`;
+}
+
+// CR-2026-034 §4.1.3：全部课程页签增加启用状态筛选与列，默认「全部」。
+// 注入到既有筛选表单内，提交与重置沿用统一筛选链路。
+function mountLibraryEnabledFilter(pageEl) {
+  const grid = pageEl.querySelector('.course-filter-grid');
+  if (grid && !grid.querySelector('[name="enabled"]')) {
+    grid.insertAdjacentHTML('afterbegin', filterField('启用状态', `<select name="enabled"><option value="">全部状态</option><option${state.libraryFilters.enabled === '启用' ? ' selected' : ''}>启用</option><option${state.libraryFilters.enabled === '已停用' ? ' selected' : ''}>已停用</option></select>`));
+  }
+  const versionHeader = [...pageEl.querySelectorAll('thead th')].find((th) => th.textContent.trim() === '版本号');
+  versionHeader?.insertAdjacentHTML('beforebegin', '<th>启用状态</th>');
 }
 
 function renderLibrary(page) {
@@ -312,11 +384,18 @@ function renderLibrary(page) {
     const heading = pageEl.querySelector('.page-head h1');
     if (heading) heading.textContent = '课程库';
     pageEl.querySelector('.page-head')?.insertAdjacentHTML('afterend', libraryTabBar());
+    if (view === 'all') mountLibraryEnabledFilter(pageEl);
   }
   page.innerHTML = holder.innerHTML;
+  // CR-2026-034 §2.3.2：引用清单里的课程可深链定位到课程库对应课程。
+  const deepLinkCourseId = new URLSearchParams(location.search).get('courseId');
+  if (view === 'all' && deepLinkCourseId && !state.modal) {
+    const record = library.find((item) => courseArchiveKey(item) === toCanonicalCourseId(deepLinkCourseId));
+    if (record) openLibraryView(record.id);
+  }
 }
 
-// 只读详情：档案字段、版本号与编排摘要，不出现任何可写控件。
+// 全部课程的统一查看入口：基本信息／课程大纲两个只读页签。
 function openLibraryView(id) {
   const item = library.find(record => record.id === id);
   if (!item) return;
@@ -324,22 +403,22 @@ function openLibraryView(id) {
   const version = syncLibraryVersion(item);
   const references = courseReferences(item);
   const chapters = courseChaptersOf(item);
-  const outline = String(item.outline || '').trim();
-  const structureBlock = item.archive === '完整课程'
-    ? (chapters.length
-      ? `<ul class="course-version-outline">${chapters.map(chapter => `<li><strong>${escapeHtml(chapter.name)}</strong><small>${(chapter.lessons || []).length} 个课时</small></li>`).join('')}</ul>`
-      : '<p class="course-hint">该课程尚未编排章节。</p>')
-    : `<div class="course-hint course-rich-text">${richTextToHtml(outline, '未填写课程大纲')}</div>`;
   const current = refreshCurrentSnapshot(item, courseStructureOf(item));
-  modal('课程档案详情', `${key} · ${item.name}`, `<div class="course-version-summary"><div><span>当前版本</span><strong>v${version}</strong><small>自建档起单调递增，不因下架或重命名重置</small></div><div><span>引用情况</span><strong>${escapeHtml(referenceLabel(references))}</strong><small>在售商品与已展示班级决定是否生成新版本</small></div></div><section class="course-detail-section wide"><h3>档案字段（只读）</h3><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(key || '—')}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程档案类型</dt><dd>${escapeHtml(item.archive)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>总课时</dt><dd>${item.hours} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(item.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(item) || '未填写')}</dd></div>${item.archive === '轻量课程档案' ? `<div class="wide"><dt>简短课程介绍</dt><dd>${escapeHtml(item.detail || '未填写')}</dd></div>` : ''}</dl></section><section class="course-detail-section wide"><h3>编排摘要</h3>${structureBlock}</section><section class="course-detail-section wide"><h3>展示素材</h3><p class="course-hint">课程封面、图文详情、标签与 C 端推荐语按售卖单元维护，本页只读展示，不提供写入入口。</p></section><p class="course-hint">当前版本 v${version} 生成于 ${escapeHtml(current?.at || '—')}，操作人 ${escapeHtml(current?.operator || '—')}，变更字段：${escapeHtml((current?.changes || []).join('、') || '—')}。</p><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button><button class="button" type="button" data-action="library-versions" data-id="${item.id}">历史版本</button><button class="button primary" type="button" data-action="library-edit" data-id="${item.id}">编辑档案</button></div>`, { large: true });
+  let activeTab = 'basic';
+  const dialog = modal('课程详情', `${key} · ${item.name}`, '<div data-course-detail-root></div>', { large: true });
+  const holder = dialog.querySelector('[data-course-detail-root]');
+  const tabs = () => `<div class="course-tabs"><button type="button" class="course-tab${activeTab === 'basic' ? ' active' : ''}" data-course-detail-tab="basic">基本信息</button><button type="button" class="course-tab${activeTab === 'outline' ? ' active' : ''}" data-course-detail-tab="outline">课程大纲</button></div>`;
+  const basic = () => `<section class="course-detail-section wide"><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(key)}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>总课时</dt><dd>${item.hours} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(item.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(item) || '未填写')}</dd></div></dl></section>`;
+  const outline = () => chapters.length ? `<div class="course-outline-readonly">${chapters.map((chapter, chapterIndex) => `<section class="course-detail-section wide"><h3>第 ${chapterIndex + 1} 章 · ${escapeHtml(chapter.name)}</h3><p class="course-hint">${escapeHtml(chapter.desc || '暂无章节描述')}</p><div class="lesson-list">${(chapter.lessons || []).map((lesson, lessonIndex) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>第 ${lessonIndex + 1} 课时 · ${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target || '未填写教学目标')}</p></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${(lesson.resources || []).length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section>`).join('')}</div>` : '<div class="course-empty"><strong>暂无课程大纲</strong><span>尚未维护章节与课时。</span></div>';
+  const render = () => { holder.innerHTML = `${tabs()}<div class="course-version-summary"><div><span>当前版本</span><strong>v${version}</strong><small>${escapeHtml(item.source || '教师申报')}</small></div><div><span>引用情况</span><strong>${escapeHtml(referenceLabel(references))}</strong><small>${escapeHtml(current?.at || '—')} · ${escapeHtml(current?.operator || '—')}</small></div></div>${activeTab === 'basic' ? basic() : outline()}<div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button><button class="button" type="button" data-action="library-versions" data-id="${item.id}">历史版本</button><button class="button primary" type="button" data-action="library-edit" data-id="${item.id}">编辑</button></div>`; };
+  dialog.addEventListener('click', event => { const tab = event.target.closest('[data-course-detail-tab]')?.dataset.courseDetailTab; if (tab) { activeTab = tab; render(); } });
+  render();
 }
 
-// 编辑入口：轻量档案走轻量表单，完整课程走课程档案表单（课程档案类型与课程类型不可改）。
 function openLibraryEdit(id) {
   const item = library.find(record => record.id === id);
   if (!item) return;
-  if (item.archive === '轻量课程档案') openLightweightForm(id);
-  else openCourseArchiveForm(id);
+  openCourseArchiveForm(id);
 }
 
 function openCourseArchiveForm(id) {
@@ -348,19 +427,50 @@ function openCourseArchiveForm(id) {
   const key = courseArchiveKey(item);
   const version = syncLibraryVersion(item);
   const references = courseReferences(item);
+  const course = contentCourses.find(record => record.id === key);
+  const draft = { ...item, ages: [...(item.ages || [])], chapters: JSON.parse(JSON.stringify(course?.chapters || item.chapters || [])) };
   const teacherNames = [...new Set([item.teacher, ...teacherAccounts.map(teacher => teacher.name)].filter(Boolean))];
-  const dialog = modal('编辑课程档案', `${key} · ${item.name}`, `<form data-form="course-archive-form" data-id="${item.id}"><div class="course-detail-grid"><div class="course-field"><label>课程编号</label><input class="readonly-field" value="${escapeHtml(key)}" readonly /></div><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required maxlength="30" value="${escapeHtml(item.name)}" /></div><div class="course-field"><label>课程档案类型</label><input class="readonly-field" value="${escapeHtml(item.archive)}" readonly /></div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="${escapeHtml(item.type)}" readonly /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major', item.major)}</div><div class="course-field"><label>申报教师 <span class="sub-cell">必填</span></label><select name="teacher">${teacherNames.map(name => option(name, name === item.teacher)).join('')}</select></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="${item.hours}" /></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', ['启蒙', '初级', '中级', '高级', '考级冲刺'], item.difficulty, '')}</div><div class="course-field wide"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" ${(item.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div></div>${versionNotice(item, references, version)}<div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button" type="button" data-action="library-versions" data-id="${item.id}">历史版本</button><button class="button primary" type="submit">保存档案</button></div></form>`, { large: true });
-  dialog.querySelector('form').addEventListener('submit', event => {
-    event.preventDefault();
-    const data = new FormData(event.target);
+  let activeTab = 'basic';
+  let activeChapter = 0;
+  const dialog = modal('编辑课程', `${key} · ${item.name}`, '<div data-course-edit-root></div>', { large: true });
+  const holder = dialog.querySelector('[data-course-edit-root]');
+  const collectBasic = () => {
+    const form = holder.querySelector('[data-course-edit-basic]');
+    if (!form) return true;
+    const data = new FormData(form);
     const name = String(data.get('name') || '').trim();
-    if (!name || !data.get('major') || !data.get('teacher') || Number(data.get('hours')) <= 0) { showToast('请补齐课程名称、所属专业、申报教师和总课时', 'error'); return; }
-    if (!data.get('difficulty') || !data.getAll('ages').length) { showToast('请选择难度等级和适合年龄（教学属性必填）', 'error'); return; }
-    const result = applyArchiveChange(item, { name, major: data.get('major'), teacher: data.get('teacher'), hours: Number(data.get('hours')), difficulty: data.get('difficulty'), ages: data.getAll('ages') });
+    if (!name || !data.get('major') || !data.get('teacher') || Number(data.get('hours')) <= 0) { showToast('请补齐课程名称、所属专业、申报教师和总课时', 'error'); return false; }
+    if (!data.get('difficulty') || !data.getAll('ages').length) { showToast('请选择难度等级和适合年龄（教学属性必填）', 'error'); return false; }
+    Object.assign(draft, { name, major: data.get('major'), teacher: data.get('teacher'), hours: Number(data.get('hours')), difficulty: data.get('difficulty'), ages: data.getAll('ages') });
+    return true;
+  };
+  const tabs = () => `<div class="course-tabs"><button type="button" class="course-tab${activeTab === 'basic' ? ' active' : ''}" data-course-edit-tab="basic">基本信息</button><button type="button" class="course-tab${activeTab === 'outline' ? ' active' : ''}" data-course-edit-tab="outline">课程大纲</button></div>`;
+  const basic = () => `<form data-course-edit-basic><div class="course-detail-grid"><div class="course-field"><label>课程编号</label><input class="readonly-field" value="${escapeHtml(key)}" readonly /></div><div class="course-field"><label>课程来源</label><input class="readonly-field" value="${escapeHtml(item.source || '教师申报')}" readonly /></div><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required maxlength="30" value="${escapeHtml(draft.name)}" /></div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="${escapeHtml(draft.type)}" readonly /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major', draft.major)}</div><div class="course-field"><label>申报教师 <span class="sub-cell">必填</span></label><select name="teacher">${teacherNames.map(name => option(name, name === draft.teacher)).join('')}</select></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="${draft.hours}" /></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', ['启蒙', '初级', '中级', '高级', '考级冲刺'], draft.difficulty, '')}</div><div class="course-field wide"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" ${draft.ages.includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div></div></form>`;
+  const outline = () => { const chapter = draft.chapters[activeChapter]; return `<div class="course-workbench"><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>章节结构</h3><p>${draft.chapters.length} 个章节</p></div><button class="button" type="button" data-course-edit="add-chapter">添加章节</button></div><div class="chapter-list">${draft.chapters.map((entry, index) => `<div class="chapter-item${index === activeChapter ? ' active' : ''}" data-course-edit="select-chapter" data-index="${index}"><div><strong>${escapeHtml(entry.name)}</strong><small>${entry.lessons.length} 个课时 · ${escapeHtml(entry.desc || '暂无章节描述')}</small></div><div class="chapter-item-actions"><button type="button" data-course-edit="edit-chapter" data-index="${index}">编辑</button><button type="button" data-course-edit="delete-chapter" data-index="${index}">删</button></div></div>`).join('') || '<div class="course-empty"><strong>暂无章节</strong></div>'}</div></section><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>${chapter ? escapeHtml(chapter.name) : '课时数据'}</h3><p>${chapter ? escapeHtml(chapter.desc || '维护该章节的课时') : '请选择左侧章节'}</p></div>${chapter ? '<button class="button" type="button" data-course-edit="add-lesson">添加课时</button>' : ''}</div><div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target)}</p></div><div class="chapter-item-actions"><button type="button" data-course-edit="edit-lesson" data-index="${index}">编辑</button><button type="button" data-course-edit="delete-lesson" data-index="${index}">删</button></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${(lesson.resources || []).length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span><button class="button" type="button" data-course-edit="resource" data-index="${index}">引用资源</button></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section></div>`; };
+  const render = () => { holder.innerHTML = `${tabs()}${activeTab === 'basic' ? basic() : outline()}${versionNotice(item, references, version)}<div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button" type="button" data-action="library-versions" data-id="${item.id}">历史版本</button><button class="button primary" type="button" data-course-edit="save">保存</button></div>`; };
+  dialog.addEventListener('click', event => {
+    const tab = event.target.closest('[data-course-edit-tab]')?.dataset.courseEditTab;
+    if (tab) { if (activeTab === 'basic' && !collectBasic()) return; activeTab = tab; render(); return; }
+    const target = event.target.closest('[data-course-edit]');
+    if (!target) return;
+    const action = target.dataset.courseEdit;
+    if (action === 'select-chapter') { activeChapter = Number(target.dataset.index); render(); }
+    if (action === 'add-chapter' || action === 'edit-chapter') openChapterForm(draft, action === 'edit-chapter' ? Number(target.dataset.index) : null, () => { activeChapter = Math.max(0, draft.chapters.length - 1); render(); });
+    if (action === 'delete-chapter' && window.confirm('删除章节会同时删除其下课时，确认继续？')) { draft.chapters.splice(Number(target.dataset.index), 1); activeChapter = Math.max(0, activeChapter - 1); render(); }
+    if (action === 'add-lesson' || action === 'edit-lesson') openLessonForm(draft, activeChapter, action === 'edit-lesson' ? Number(target.dataset.index) : null, render);
+    if (action === 'delete-lesson' && window.confirm('确认删除该课时？')) { draft.chapters[activeChapter].lessons.splice(Number(target.dataset.index), 1); render(); }
+    if (action === 'resource') openResourcePicker(draft, activeChapter, Number(target.dataset.index), render);
+    if (action !== 'save') return;
+    if (activeTab === 'basic' && !collectBasic()) return;
+    if (!draft.chapters.length || draft.chapters.some(chapter => !chapter.lessons.length)) { showToast('请补齐章节与课时', 'error'); return; }
+    const result = applyArchiveChange(item, { name: draft.name, major: draft.major, teacher: draft.teacher, hours: draft.hours, difficulty: draft.difficulty, ages: [...draft.ages] }, draft.chapters);
+    if (course) { Object.assign(course, { name: draft.name, major: draft.major, teacher: draft.teacher, hours: draft.hours, difficulty: draft.difficulty, ages: [...draft.ages], chapters: draft.chapters, updatedAt: demoTime() }); persistCourse(course); }
+    persistLibrary(item);
     closeModal();
     renderLibrary(root());
-    showToast(versionResultMessage(result, '课程档案已保存'));
+    showToast(versionResultMessage(result, '课程已保存'));
   });
+  render();
 }
 
 // 历史版本列表：版本号、生成时间、操作人、变更摘要与当前版本标识；不提供差异对比与回退。
@@ -385,8 +495,34 @@ function openLibraryVersionDetail(id, version) {
   const snapshot = entry.snapshot || {};
   const currentVersion = courseVersionOf(item);
   const isCurrent = entry.version === currentVersion;
-  modal(isCurrent ? '当前版本详情（只读）' : `历史版本详情 v${entry.version}（只读）`, `${courseArchiveKey(item)} · ${item.name}`, `<div class="course-version-summary"><div><span>版本号</span><strong>v${entry.version}</strong><small>${isCurrent ? '当前版本' : '历史版本，永久只读'}</small></div><div><span>生成时间 / 操作人</span><strong>${escapeHtml(entry.at || '—')}</strong><small>${escapeHtml(entry.operator || '—')}</small></div></div><section class="course-detail-section wide"><h3>版本快照</h3><dl class="course-detail-list"><div><dt>课程名称</dt><dd>${escapeHtml(snapshot.name || '—')}</dd></div><div><dt>课程档案类型</dt><dd>${escapeHtml(snapshot.archive || '—')}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(snapshot.type || '—')}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(snapshot.major || '—')}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(snapshot.teacher || '—')}</dd></div><div><dt>总课时</dt><dd>${escapeHtml(String(snapshot.hours ?? '—'))} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(snapshot.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml((snapshot.ages || []).join('、') || '未填写')}</dd></div><div class="wide"><dt>编排结构摘要</dt><dd>${escapeHtml(snapshot.structure || '—')}</dd></div><div class="wide"><dt>本版本变更字段</dt><dd>${escapeHtml((entry.changes || []).join('、') || '—')}</dd></div></dl></section><p class="course-hint">历史版本为整体快照，不提供与当前版本的字段级差异对比，也不提供回退入口。</p><div class="course-modal-actions"><button class="button" type="button" data-action="library-versions" data-id="${item.id}">返回版本列表</button><button class="button primary" type="button" data-action="close-modal">关闭</button></div>`, { large: true });
+  modal(isCurrent ? '当前版本详情（只读）' : `历史版本详情 v${entry.version}（只读）`, `${courseArchiveKey(item)} · ${item.name}`, `<div class="course-version-summary"><div><span>版本号</span><strong>v${entry.version}</strong><small>${isCurrent ? '当前版本' : '历史版本，永久只读'}</small></div><div><span>生成时间 / 操作人</span><strong>${escapeHtml(entry.at || '—')}</strong><small>${escapeHtml(entry.operator || '—')}</small></div></div><section class="course-detail-section wide"><h3>版本快照</h3><dl class="course-detail-list"><div><dt>课程名称</dt><dd>${escapeHtml(snapshot.name || '—')}</dd></div><div><dt>课程来源</dt><dd>${escapeHtml(snapshot.source || item.source || '—')}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(snapshot.type || '—')}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(snapshot.major || '—')}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(snapshot.teacher || '—')}</dd></div><div><dt>总课时</dt><dd>${escapeHtml(String(snapshot.hours ?? '—'))} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(snapshot.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml((snapshot.ages || []).join('、') || '未填写')}</dd></div><div class="wide"><dt>编排结构摘要</dt><dd>${escapeHtml(snapshot.structure || '—')}</dd></div><div class="wide"><dt>本版本变更字段</dt><dd>${escapeHtml((entry.changes || []).join('、') || '—')}</dd></div></dl></section><p class="course-hint">历史版本为整体快照，不提供与当前版本的字段级差异对比，也不提供回退入口。</p><div class="course-modal-actions"><button class="button" type="button" data-action="library-versions" data-id="${item.id}">返回版本列表</button><button class="button primary" type="button" data-action="close-modal">关闭</button></div>`, { large: true });
 }
+
+// CR-2026-034 §2.2：专业引用统计由数据实时派生，不用种子里的静态值；
+// 展示与停用／删除守卫共用同一份结果，避免出现“显示 0 却被拦截”。
+function majorCourseRecords(majorName) {
+  const seen = new Set();
+  const records = [];
+  [...contentCourses, ...library].forEach((record) => {
+    if (record.major !== majorName) return;
+    const canonicalId = contentCourses.includes(record) ? toCanonicalCourseId(record.id) : courseArchiveKey(record);
+    if (seen.has(canonicalId)) return;
+    seen.add(canonicalId);
+    records.push(record);
+  });
+  return records;
+}
+
+function majorReferences(majorName) {
+  return {
+    teachers: TEACHER_FACTS.filter((facts) => (facts.majors || []).includes(majorName)),
+    courses: majorCourseRecords(majorName),
+    resources: resources.filter((resource) => resource.major === majorName)
+  };
+}
+
+const majorReferenceTotal = (references) => references.teachers.length + references.courses.length + references.resources.length;
+const majorReferenceSummary = (references) => `教师 ${references.teachers.length} · 课程 ${references.courses.length} · 资源 ${references.resources.length}`;
 
 function renderCatalog(page) {
   const groups = Object.keys(professionalTree);
@@ -408,7 +544,7 @@ function renderCatalog(page) {
     const groupMajors = catalog.majors.filter((item) => item.group === group);
     const categoryNodes = categories.map((category) => {
       const majors = catalog.majors.filter((item) => item.parent === category.name && item.group === group);
-      const majorNodes = majors.map((major) => `<li class="catalog-tree-node catalog-tree-major"><div class="catalog-tree-row">${caret('', false)}<span class="catalog-tree-copy"><strong>${escapeHtml(major.name)}</strong><small>关联教师 ${major.teachers} · 关联课程 ${major.courses} · 资源引用 ${major.resources}</small></span>${nodeActions('major', major)}</div></li>`).join('');
+      const majorNodes = majors.map((major) => { const references = majorReferences(major.name); return `<li class="catalog-tree-node catalog-tree-major"><div class="catalog-tree-row">${caret('', false)}<span class="catalog-tree-copy"><strong>${escapeHtml(major.name)}</strong><small>${majorReferenceSummary(references)}</small></span>${nodeActions('major', major)}</div></li>`; }).join('');
       const categoryKey = `category:${category.id}`;
       return `<li class="catalog-tree-node catalog-tree-category"><div class="catalog-tree-row">${caret(categoryKey, majors.length > 0)}<button type="button" class="catalog-tree-copy catalog-tree-button" data-action="catalog-select-category" data-value="${escapeHtml(category.name)}"><strong>${escapeHtml(category.name)}</strong><small>${majors.length} 个专业</small></button>${nodeActions('category', category)}</div>${majors.length ? `<ul class="catalog-tree-children"${isOpen(categoryKey) ? '' : ' hidden'}>${majorNodes}</ul>` : ''}</li>`;
     }).join('');
@@ -416,9 +552,6 @@ function renderCatalog(page) {
     return `<li class="catalog-tree-node catalog-tree-group"><div class="catalog-tree-row">${caret(groupKey, categories.length > 0)}<button type="button" class="catalog-tree-copy catalog-tree-button" data-action="catalog-select-group" data-value="${escapeHtml(group)}"><strong>${escapeHtml(group)}</strong><small>${categories.length} 个分类 · ${groupMajors.length} 个专业</small></button>${nodeActions('group', group)}</div>${categories.length ? `<ul class="catalog-tree-children"${isOpen(groupKey) ? '' : ' hidden'}>${categoryNodes}</ul>` : ''}</li>`;
   }).join('');
 
-  const teacherCount = catalog.majors.reduce((sum, item) => sum + item.teachers, 0);
-  const courseCount = catalog.majors.reduce((sum, item) => sum + item.courses, 0);
-  const resourceCount = catalog.majors.reduce((sum, item) => sum + item.resources, 0);
   page.innerHTML = `<div class="course-page">${pageShell('专业目录维护', '', '<button class="button primary" type="button" data-action="catalog-add" data-type="group">新增目录</button>')}<section class="catalog-panel catalog-tree-panel"><div class="catalog-panel-head"><div><span class="catalog-kicker">CATALOG TREE</span><h2>目录树</h2><p>展开门类查看分类与专业</p></div><div class="catalog-tree-actions"><button class="button" type="button" data-action="catalog-add" data-type="category">新增分类</button><button class="button" type="button" data-action="catalog-add" data-type="major">新增专业</button></div></div><ul class="catalog-tree">${groupNodes}</ul></section></div>`;
 }
 
@@ -436,6 +569,12 @@ function renderApplicationReview(page) {
   const item = applications.find((record) => record.id === applicationId);
   if (!item) {
     page.innerHTML = `<div class="course-page">${pageShell('课程申报审批', '', `<a class="button" href="${escapeHtml(returnUrl)}">返回列表</a>`)}<section class="course-surface"><div class="course-empty"><strong>未找到该申报</strong><span>申报编号 ${escapeHtml(applicationId || '未提供')} 不存在或已被撤销，请返回列表重新选择。</span></div></section></div>`;
+    return;
+  }
+  // CR-2026-034 §3.1.1：审批通过后就地给出「查看该课程编排」入口，无需回列表再找课程。
+  if (state.reviewResult?.id === item.id) {
+    const courseId = state.reviewResult.courseId;
+    page.innerHTML = `<div class="course-page">${pageShell('课程申报审批', `${item.id} · ${item.name}`, `<a class="button" href="${escapeHtml(state.reviewResult.back)}">返回列表</a>`)}<section class="course-surface"><div class="course-detail-section wide"><h3>审批已通过</h3><p class="course-hint">申报已通过，课程「${escapeHtml(item.name)}」已进入课程编排，当前状态为待编排。</p><dl class="course-detail-list"><div><dt>申报编号</dt><dd>${escapeHtml(item.id)}</dd></div><div><dt>派生课程编号</dt><dd>${escapeHtml(courseId)}</dd></div><div><dt>编排状态</dt><dd>${tag('待编排')}</dd></div></dl><div class="course-modal-actions"><a class="button" href="${escapeHtml(state.reviewResult.back)}">返回列表</a><a class="button primary" href="${relativePath(`/admin/pages/courses/library.html?tab=arrange&courseId=${encodeURIComponent(courseId)}`)}">查看该课程编排</a></div></div></section></div>`;
     return;
   }
   const canReview = window.hbyxPermissions ? window.hbyxPermissions.can('PERM-COURSE-002') : true;
@@ -462,6 +601,7 @@ function openApplicationDetail(id, reviewMode = false) {
 function openWorkbench(id) {
   const item = contentCourses.find(record => record.id === id);
   if (!item) return;
+  const readOnly = item.status === '已完成';
   let activeChapter = 0;
   // CR-2026-025：编排结构（章节与课时组成）属承诺类变更，保存时按入口快照比较后提交版本。
   const workbenchLibrary = library.find((record) => courseArchiveKey(record) === toCanonicalCourseId(item.id)) || null;
@@ -496,6 +636,12 @@ function openWorkbench(id) {
     const chapter = item.chapters[activeChapter];
     const lessonCount = item.chapters.reduce((sum, current) => sum + current.lessons.length, 0);
     const videoReady = item.type !== '视频课程' || item.chapters.length > 0 && item.chapters.every(current => current.lessons.length > 0 && current.lessons.every(lesson => lesson.resources.some(resourceId => resources.find(resource => resource.id === resourceId)?.type === '教学视频')));
+    if (readOnly) {
+      const basicInfo = `<section class="course-detail-section wide"><h3>课程基本信息</h3><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(item.id)}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>总课时</dt><dd>${item.hours} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(teaching.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(teaching.ages.join('、') || '未填写')}</dd></div></dl></section>`;
+      const chapters = `<div class="course-workbench"><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>章节结构</h3><p>${item.chapters.length} 个章节 · ${lessonCount} 个课时</p></div></div><div class="chapter-list">${item.chapters.map((current, index) => `<button type="button" class="chapter-item${index === activeChapter ? ' active' : ''}" data-workbench="select-chapter" data-index="${index}"><span><strong>${escapeHtml(current.name)}</strong><small>${current.lessons.length} 个课时 · ${escapeHtml(current.desc || '暂无章节描述')}</small></span></button>`).join('') || '<div class="course-empty"><strong>暂无章节</strong></div>'}</div></section><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>${chapter ? escapeHtml(chapter.name) : '课时数据'}</h3><p>${chapter ? escapeHtml(chapter.desc || '暂无章节描述') : '请选择左侧章节'}</p></div></div><div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>第 ${index + 1} 课时 · ${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target || '未填写教学目标')}</p></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${lesson.resources.length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section></div>`;
+      dialog.querySelector('#workbench-content').innerHTML = `${basicInfo}${chapters}<div class="course-workbench-footer"><div><span class="tag green">编排已完成 · 只读</span></div><div class="toolbar-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div></div>`;
+      return;
+    }
     dialog.querySelector('#workbench-content').innerHTML = `${teachingPanel()}<div class="course-workbench"><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>章节结构</h3><p>${item.chapters.length} 个章节 · ${lessonCount} 个课时</p></div><button class="button" type="button" data-workbench="add-chapter">添加章节</button></div><div class="chapter-list">${item.chapters.map((current, index) => `<div class="chapter-item${index === activeChapter ? ' active' : ''}" data-workbench="select-chapter" data-index="${index}"><div><strong>${escapeHtml(current.name)}</strong><small>${current.lessons.length} 个课时 · ${escapeHtml(current.desc || '暂无章节描述')}</small></div><div class="chapter-item-actions"><button type="button" data-workbench="edit-chapter" data-index="${index}" aria-label="编辑章节">编辑</button><button type="button" data-workbench="delete-chapter" data-index="${index}" aria-label="删除章节">删</button></div></div>`).join('') || '<div class="course-empty"><strong>还没有章节</strong><span>先添加章节，再添加课时。</span></div>'}</div></section><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>${chapter ? escapeHtml(chapter.name) : '选择章节'}</h3><p>${chapter ? escapeHtml(chapter.desc || '编辑章节下的课时内容') : '请选择左侧章节'}</p></div>${chapter ? '<button class="button" type="button" data-workbench="add-lesson">添加课时</button>' : ''}</div><div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target)}</p></div><div class="chapter-item-actions"><button type="button" data-workbench="edit-lesson" data-chapter="${activeChapter}" data-index="${index}">编辑</button><button type="button" data-workbench="delete-lesson" data-chapter="${activeChapter}" data-index="${index}">删</button></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span class="${item.type === '视频课程' && !lesson.resources.some(resourceId => resources.find(resource => resource.id === resourceId)?.type === '教学视频') ? 'missing' : ''}">${lesson.resources.length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).join('、') : item.type === '视频课程' ? '未关联视频资源' : '未关联资源（可选）'}</span><button class="button" type="button" data-workbench="resource" data-chapter="${activeChapter}" data-index="${index}">引用资源</button></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong><span>请添加至少一个课时并完成教学目标。</span></div>'}</div></section></div><div class="course-workbench-footer"><div>${item.type === '视频课程' && !videoReady ? '<span class="tag red">视频课程还缺少必填视频资源</span>' : '<span class="tag green">当前结构可保存</span>'}<div class="course-progress"><span style="width:${Math.min(100, item.hours ? Math.round(lessonCount / item.hours * 100) : 0)}%"></span></div></div><div class="toolbar-actions"><button class="button" type="button" data-workbench="save">保存草稿</button>${item.status !== '已完成' ? '<button class="button primary" type="button" data-workbench="complete">完成编排</button>' : ''}</div></div>`;
   };
   dialog.addEventListener('click', event => {
@@ -596,15 +742,36 @@ function openResourcePreview(id) {
   modal('资源预览', `${item.name} · ${item.type}`, `<div class="course-preview${documentPreview ? ' document' : ''}"><div><strong>${documentPreview ? '文档预览' : item.ext === 'video' ? '视频预览' : item.ext === 'audio' ? '音频预览' : '图片预览'}</strong><small>${escapeHtml(item.name)}<br />文件预览暂不可用。</small></div></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div>`);
 }
 
-function openLightweightForm(id = null) {
-  const current = id ? library.find(item => item.id === id) : { name: '', major: '', hours: 16, detail: '', difficulty: '启蒙', ages: ['少儿'], outline: '' };
-  // CR-2026-025：已引用课程保存前提示将生成的版本号与被引用数量。
-  const notice = id && current ? versionNotice(current, courseReferences(current), syncLibraryVersion(current)) : '';
-  const dialog = modal(id ? '编辑轻量课程档案' : '新建轻量课程档案', '轻量档案只用于快速报名班级，不进入课程内容编排', `<form data-form="lightweight-form" data-id="${id || ''}"><div class="course-detail-grid"><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required value="${escapeHtml(current.name)}" placeholder="填写课程名称" /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major', current.major)}</div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="面授课程" readonly /></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="${current.hours}" /></div><div class="course-field wide"><label>简短课程介绍 <span class="sub-cell">必填</span></label><textarea name="detail" required placeholder="填写快速报名详情页使用的介绍">${escapeHtml(current.detail)}</textarea></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', ['启蒙', '初级', '中级', '高级', '考级冲刺'], current.difficulty, '')}</div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" ${(current.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div><div class="course-field wide"><label>课程大纲 <span class="sub-cell">富文本 · 编排结构参与版本升级</span></label><div class="rich-editor-field" data-rich-editor data-name="outline" data-aria-label="课程大纲" data-placeholder="可选：填写课程大纲，不作为教学执行前置条件（≤2000 字）" data-min-height="160px" data-max-length="2000" data-value="${escapeHtml(current.outline || '')}"></div></div>${notice}<div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button>${id ? `<button class="button" type="button" data-action="library-versions" data-id="${id}">历史版本</button>` : ''}<button class="button primary" type="submit">保存档案</button></div></form>`, { large: true });
-  // 课程大纲是富文本字段：与图文详情、教师简介复用同一个编辑器组件。
-  mountRichEditor(dialog.querySelector('[data-rich-editor]'));
-  dialog.addEventListener('rich-editor:message', event => showToast(event.detail.message, event.detail.kind));
-  dialog.querySelector('form').addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); if (!data.get('name').trim() || !data.get('major') || !data.get('detail').trim() || Number(data.get('hours')) <= 0) { showToast('请补齐课程名称、专业、介绍和总课时', 'error'); return; } if (!data.get('difficulty') || !data.getAll('ages').length) { showToast('请选择难度等级和适合年龄（教学属性必填）', 'error'); return; } const patch = { name: data.get('name').trim(), major: data.get('major'), hours: Number(data.get('hours')), difficulty: data.get('difficulty'), ages: data.getAll('ages'), detail: data.get('detail').trim(), outline: richTextValue(data.get('outline')) }; if (id) { const result = applyArchiveChange(current, patch); closeModal(); renderLibrary(root()); showToast(versionResultMessage(result, '轻量课程档案已保存')); return; } const record = { id: `LIB-${Date.now()}`, archive: '轻量课程档案', type: '面授课程', teacher: '李教务', ...patch }; library.unshift(record); ensureVersionTrack(record); refreshCurrentSnapshot(record, null); persistLibrary(record); closeModal(); renderLibrary(root()); showToast('轻量课程档案已创建，建档版本 v1'); });
+// 后台新增面授课程只建立基本信息，保存后统一进入待编排。
+function openDirectCourseForm() {
+  const teacherNames = [...new Set(teacherAccounts.map(teacher => teacher.name).filter(Boolean))];
+  const generatedId = `COURSE-${String(Date.now()).slice(-8)}`;
+  const dialog = modal('新增面授课程', '保存基本信息后进入内容编排', `<form data-form="direct-course"><div class="course-detail-grid"><div class="course-field"><label>课程编号 <span class="sub-cell">必填</span></label><input name="courseNumber" required maxlength="30" value="${generatedId}" /></div><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required maxlength="30" placeholder="填写课程名称" /></div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="面授课程" readonly /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major')}</div><div class="course-field"><label>申报教师 <span class="sub-cell">必填</span></label><select name="teacher" required><option value="">请选择</option>${teacherNames.map(name => option(name, false)).join('')}</select></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="1" /></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', ['启蒙', '初级', '中级', '高级', '考级冲刺'], '启蒙', '')}</div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" />${value}</label>`).join('')}</div></div></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存并进入待编排</button></div></form>`, { large: true });
+  dialog.querySelector('form').addEventListener('submit', event => {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    const courseNumber = String(data.get('courseNumber') || '').trim();
+    const name = String(data.get('name') || '').trim();
+    const ages = data.getAll('ages');
+    if (!courseNumber || !name || !data.get('major') || !data.get('teacher') || Number(data.get('hours')) <= 0 || !data.get('difficulty') || !ages.length) {
+      showToast('请补齐课程基本信息', 'error');
+      return;
+    }
+    if (contentCourses.some(item => item.id === courseNumber) || library.some(item => courseArchiveKey(item) === courseNumber)) {
+      showToast(`课程编号 ${courseNumber} 已存在，请更换`, 'error');
+      return;
+    }
+    const course = { id: courseNumber, source: '后台新增', name, type: '面授课程', major: data.get('major'), teacher: data.get('teacher'), hours: Number(data.get('hours')), difficulty: data.get('difficulty'), ages, status: '待编排', updatedAt: demoTime(), chapters: [] };
+    contentCourses.unshift(course);
+    persistCourse(course);
+    closeModal();
+    state.libraryTab = 'arrange';
+    const url = new URL(location.href);
+    url.searchParams.set('tab', 'arrange');
+    history.replaceState(null, '', url);
+    renderLibrary(root());
+    showToast('面授课程已创建，状态为待编排');
+  });
 }
 
 function openCatalogForm(type, id = null) {
@@ -632,6 +799,7 @@ function handleClick(event) {
   }
   if (action === 'close-modal') closeModal();
   if (action === 'application-tab') {
+    state.reviewResult = null;
     state.applicationTab = target.dataset.value || '';
     state.applicationFilters.status = '';
     const url = new URL(location.href);
@@ -661,21 +829,18 @@ function handleClick(event) {
   if (action === 'resource-preview') openResourcePreview(target.dataset.id);
   if (action === 'resource-edit') openResourceForm(target.dataset.id);
   if (action === 'resource-delete') deleteResource(target.dataset.id);
-  if (action === 'new-lightweight') openLightweightForm();
+  if (action === 'new-direct-course') openDirectCourseForm();
   if (action === 'publish-product' || action === 'publish-class') {
     const item = library.find(record => record.id === target.dataset.id);
     const route = action === 'publish-product' ? '/admin/pages/mall/products.html' : '/admin/pages/crm/classes.html';
-    if (item?.sourceCourseId) window.location.href = relativePath(`${route}?courseId=${encodeURIComponent(item.sourceCourseId)}`);
+    if (item) window.location.href = relativePath(`${route}?courseId=${encodeURIComponent(courseArchiveKey(item))}`);
   }
   if (action === 'library-view') openLibraryView(target.dataset.id);
   if (action === 'library-edit') openLibraryEdit(target.dataset.id);
   if (action === 'library-versions') openLibraryVersions(target.dataset.id);
   if (action === 'library-version-detail') openLibraryVersionDetail(target.dataset.id, Number(target.dataset.version));
-  if (action === 'library-workbench') {
-    const item = library.find(record => record.id === target.dataset.id);
-    const courseId = item ? courseArchiveKey(item) : '';
-    if (courseId) window.location.href = `content.html?courseId=${encodeURIComponent(courseId)}`;
-  }
+  if (action === 'library-toggle-enabled') toggleLibraryEnabled(target.dataset.id);
+  if (action === 'library-delete') deleteLibraryRecord(target.dataset.id);
   if (action === 'catalog-add') openCatalogForm(target.dataset.type);
   if (action === 'catalog-tree-toggle') { const key = target.dataset.key; if (state.expandedCatalog.has(key)) state.expandedCatalog.delete(key); else state.expandedCatalog.add(key); renderCatalog(root()); }
   if (action === 'catalog-select-group') { state.selectedGroup = target.dataset.value; state.selectedCategory = catalog.categories.find(item => item.parent === state.selectedGroup)?.name || ''; renderCatalog(root()); }
@@ -683,6 +848,8 @@ function handleClick(event) {
   if (action === 'catalog-edit') { const type = target.dataset.type; const id = type === 'group' ? target.dataset.value : target.dataset.id; openCatalogForm(type, id); }
   if (action === 'catalog-toggle') toggleCatalog(target.dataset.type, target.dataset.id, target.dataset.value);
   if (action === 'catalog-delete') deleteCatalog(target.dataset.type, target.dataset.id, target.dataset.value);
+  if (action === 'catalog-toggle-confirm') confirmCatalogToggle(target.dataset.id);
+  if (action === 'catalog-delete-confirm') confirmCatalogDelete(target.dataset.id);
 }
 
 function handleChange(event) {
@@ -728,7 +895,32 @@ function handleSubmit(event) {
     if (!item) return;
     applyApplicationReview(item, result, opinion);
     const back = new URLSearchParams(location.search).get('return') || '/admin/pages/courses/applications.html';
+    if (result === 'approved') {
+      // CR-2026-034 §3.1.1：通过后留在审批页给出编排入口，教师端与列表状态已同步落库。
+      state.reviewResult = { id: item.id, courseId: item.courseId || courseIdForApplication(item.id), back };
+      renderApplicationReview(root());
+      showToast('申报已通过，课程已进入内容编排');
+      return;
+    }
+    state.reviewResult = null;
     location.href = back;
+    return;
+  }
+  // CR-2026-034 §4.1：停用必须填写原因，写入停用时间／操作人／原因；清空即可恢复。
+  if (form.dataset.form === 'library-disable') {
+    event.preventDefault();
+    const reason = String(new FormData(form).get('reason') || '').trim();
+    const error = form.querySelector('[data-error]');
+    if (!reason) { if (error) error.textContent = '停用原因必填'; return; }
+    const item = library.find((record) => record.id === form.dataset.id);
+    if (!item) return;
+    item.disabledAt = demoTime();
+    item.disabledBy = '教研管理员';
+    item.disabledReason = reason;
+    persistLibrary(item);
+    closeModal();
+    renderLibrary(root());
+    showToast(`课程「${item.name}」已停用；既有商品、班级、订单与学习权限不受影响`);
     return;
   }
   if (form.dataset.form === 'application-review-form') {
@@ -755,8 +947,58 @@ function deleteResource(id) {
   if (window.confirm('该资源暂未被课时引用，确认删除？')) { resources.splice(resources.indexOf(item), 1); removeDemoRecord('resources', id); renderResources(root()); showToast('资源已删除'); }
 }
 
+// CR-2026-034 §2.3：停用／删除专业前先展示引用清单，按教师／课程／资源分组并可跳转。
+function catalogReferenceGroups(references) {
+  const group = (label, items, render) => `<div class="catalog-reference-group"><div class="catalog-reference-head"><span>${label}</span><strong>${items.length}</strong></div>${items.length ? `<ul>${items.map(render).join('')}</ul>` : '<p class="catalog-reference-empty">无引用</p>'}</div>`;
+  const teacherLink = (item) => `<li><a href="${relativePath(`/admin/pages/teachers/profile.html?teacher=${encodeURIComponent(item.name)}`)}">${escapeHtml(item.name)}</a><small>授课专业：${escapeHtml((item.majors || []).join('、') || '—')}</small></li>`;
+  const courseLink = (item) => {
+    const courseId = contentCourses.includes(item) ? toCanonicalCourseId(item.id) : courseArchiveKey(item);
+    return `<li><a href="${relativePath(`/admin/pages/courses/library.html?tab=all&courseId=${encodeURIComponent(courseId)}`)}">${escapeHtml(item.name || courseId)}</a><small>${escapeHtml(courseId)} · ${escapeHtml(item.type || '—')}</small></li>`;
+  };
+  const resourceLink = (item) => `<li><a href="${relativePath(`/admin/pages/courses/resources.html?keyword=${encodeURIComponent(item.name)}`)}">${escapeHtml(item.name)}</a><small>${escapeHtml(item.type)} · ${escapeHtml(item.level)}</small></li>`;
+  return `<div class="catalog-reference-list">${group('教师', references.teachers, teacherLink)}${group('课程', references.courses, courseLink)}${group('资源', references.resources, resourceLink)}</div>`;
+}
+
+function openCatalogReferenceDialog(major, intent) {
+  const references = majorReferences(major.name);
+  const total = majorReferenceTotal(references);
+  const canDelete = total === 0;
+  const stopping = major.status === '启用';
+  const intro = intent === 'delete'
+    ? (canDelete ? '该专业当前没有任何引用，可以物理删除；删除后不可恢复。' : '该专业仍被引用，只能停用，不能删除。')
+    : `停用后不再出现在新的申报与筛选项；已发布课程与班级的既有专业值不受影响。`;
+  const confirm = intent === 'delete' && canDelete
+    ? `<button type="button" class="button danger-button" data-action="catalog-delete-confirm" data-id="${major.id}">确认删除</button>`
+    : `<button type="button" class="button primary" data-action="catalog-toggle-confirm" data-id="${major.id}">确认${stopping ? '停用' : '启用'}</button>`;
+  modal(`${intent === 'delete' ? '删除' : stopping ? '停用' : '启用'}专业「${major.name}」`, `${major.name} · ${majorReferenceSummary(references)}`, `<section class="course-detail-section wide"><p class="course-hint">${intro}</p></section>${catalogReferenceGroups(references)}<div class="course-modal-actions"><button type="button" class="button" data-action="close-modal">取消</button>${confirm}</div>`, { large: true });
+}
+
+function confirmCatalogToggle(id) {
+  const item = catalog.majors.find((record) => record.id === id);
+  if (!item) return;
+  item.status = item.status === '启用' ? '停用' : '启用';
+  closeModal();
+  renderCatalog(root());
+  showToast(`${item.name}已${item.status}`);
+}
+
+function confirmCatalogDelete(id) {
+  const item = catalog.majors.find((record) => record.id === id);
+  if (!item) return;
+  if (majorReferenceTotal(majorReferences(item.name)) > 0) { closeModal(); showToast('该专业已被引用，不可删除', 'error'); return; }
+  catalog.majors.splice(catalog.majors.indexOf(item), 1);
+  closeModal();
+  renderCatalog(root());
+  showToast('专业已删除');
+}
+
 function toggleCatalog(type, id, value) {
   if (type === 'group') { catalog.groupStatus[value] = catalog.groupStatus[value] === '启用' ? '停用' : '启用'; renderCatalog(root()); showToast(`${value}已${catalog.groupStatus[value]}`); return; }
+  if (type === 'major') {
+    const major = catalog.majors.find((record) => record.id === id);
+    if (major) openCatalogReferenceDialog(major, 'toggle');
+    return;
+  }
   const collection = type === 'category' ? catalog.categories : catalog.majors;
   const item = collection.find(record => record.id === id);
   if (item) { item.status = item.status === '启用' ? '停用' : '启用'; renderCatalog(root()); showToast(`${item.name}已${item.status}`); }
@@ -779,8 +1021,8 @@ function deleteCatalog(type, id, value) {
   }
   const item = catalog.majors.find(record => record.id === id);
   if (!item) return;
-  if (item.teachers || item.courses || item.resources) { showToast('该专业已被引用，不可删除', 'error'); return; }
-  if (window.confirm(`确认删除专业“${item.name}”？`)) { catalog.majors.splice(catalog.majors.indexOf(item), 1); renderCatalog(root()); showToast('专业已删除'); }
+  // CR-2026-034 §2.3.1：删除前先出引用清单；有引用时清单里只提供「停用」。
+  openCatalogReferenceDialog(item, 'delete');
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

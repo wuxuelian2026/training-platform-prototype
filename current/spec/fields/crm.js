@@ -6,32 +6,44 @@ import { COURSE_DISPLAY_FIELDS, COURSE_TEACHING_FIELDS, courseFieldRows } from '
 export const CRM_FIELD_SPEC = {
   module: '面授招生与CRM',
   pages: {
-    // 表单结构：单表。发布班级只负责招生侧的定价、报名窗口与前台展示，字段少且无排课动作；
-    // 入口在班级列表按行触发，班级、教师、教室与排课配置由教务的「创建班级」维护。
+    // CR-2026-043：面授班级只维护班级主体、招生和展示信息，教学排课在 academic/scheduling 完成。
     'crm/classes': {
       groups: [
-        { heading: '发布班级字段', fields: [
+        { heading: '关联课程', fields: [
+          { id: 'FD-CRM-052', label: '关联课程', type: '下拉', length: '必选 1 门', required: '是', note: '只能选择已完成编排的面授课程' },
+          { id: 'FD-CRM-053', label: '引用课程版本', type: '只读', length: 'v1 起单调递增', required: '系统记录', note: '创建班级时锁定；课程升版后班级不自动跟随', constraints: { readOnly: true, system: true } },
+          { id: 'FD-CRM-054', label: '课程基本信息', type: '只读信息组', length: '8 项', required: '系统继承', note: '课程编号、名称、类型、专业、申报教师、总课时、难度、适合年龄', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-055', label: '课程大纲', type: '只读结构', length: '章节 + 课时', required: '系统继承', note: '展示关联版本的章节和课时，班级页不可修改', constraints: { readOnly: true, derived: true } }
+        ] },
+        { heading: '班级与招生', fields: [
+          { id: 'FD-CRM-056', label: '班级名称', type: '文本', length: '2–50 字', required: '是', note: '招生列表和课表中的班级名称', constraints: { minLength: 2, maxLength: 50 } },
+          { id: 'FD-CRM-057', label: '所属批次', type: '下拉', length: '春季 / 暑假 / 秋季 / 寒假', required: '是', note: '班级归属批次' },
+          { id: 'FD-CRM-068', label: '招生容量', type: '整数', length: '大于 0', required: '是', note: '支付成功时占用名额', constraints: { min: 1, integer: true } }
+        ] },
+        { heading: '招生与试听', fields: [
           { id: 'FD-CRM-013', label: '课程定价', type: '金额', length: '大于 0', required: '是', note: '报名支付金额', constraints: { exclusiveMin: 0 } },
+          { id: 'FD-CRM-069', label: '是否支持试听', type: '开关', length: '是 / 否', required: '是', note: '关闭后试听收费、价格和说明不生效' },
           { id: 'FD-CRM-036', label: '试听是否收费', type: '开关', length: '是 / 否', required: '否', note: '默认免费' },
+          { id: 'FD-CRM-070', label: '试听价格', type: '金额', length: '大于 0', required: '收费试听时必填', note: '关闭试听或免费试听时不保存', constraints: { exclusiveMin: 0 } },
+          { id: 'FD-CRM-071', label: '试听说明', type: '多行文本', length: '≤ 200 字', required: '否', note: '说明适用人群与注意事项', constraints: { maxLength: 200 } },
           { id: 'FD-CRM-037', label: '报名开始时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '开始时间之前不可报名', constraints: { format: 'YYYY-MM-DD HH:mm' } },
           { id: 'FD-CRM-014', label: '报名截止时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '截止后不再接受报名；需晚于报名开始时间', constraints: { format: 'YYYY-MM-DD HH:mm' } },
           { id: 'FD-CRM-015', label: '快速报名入口', type: '开关', length: '是 / 否', required: '是', note: '决定前台展示入口：是→快速报名 Tab，否→课表入口；不改变课程关联' },
-          { id: 'FD-CRM-038', label: '发布方式', type: '单选', length: '立即发布 / 定时发布 / 仅保存', required: '否', note: '默认仅保存；选择定时发布需指定发布时间', constraints: { options: ['立即发布', '定时发布', '仅保存'] } },
-          { id: 'FD-CRM-039', label: '前台展示状态', type: '只读', length: '未发布 / 已发布', required: '系统计算', note: '仅保存为未发布；立即发布或定时发布到点后为已发布', constraints: { readOnly: true, system: true } },
           // CR-2026-020：教学属性只读带入；运营四字段写在该班级记录自身。
-          ...courseFieldRows('CRM', 46, COURSE_TEACHING_FIELDS, { type: '文本（只读）', required: '系统继承', note: '完整课程取自申报与编排链路，轻量课程档案取档案弹窗，发布班级时只读', constraints: { readOnly: true, derived: true } }),
+          ...courseFieldRows('CRM', 46, COURSE_TEACHING_FIELDS, { type: '文本（只读）', required: '系统继承', note: '课程基本信息与课程大纲取自关联课程的当前引用版本，发布班级时只读，不在班级表单内编辑', constraints: { readOnly: true, derived: true } }),
           ...courseFieldRows('CRM', 48, COURSE_DISPLAY_FIELDS)
         ] }
       ],
       notes: [
-        '发布班级由招生在班级列表按行触发，只能对状态为“未发布”的班级操作；班级本身由教务的「创建班级」维护，本表单不创建班级。',
-        '班级运营状态与前台展示状态分别维护，快速报名开关只决定学员端入口，不改变班级归属。',
-        '发布后班级状态由“未发布”转为“招生中”，并开放报名入口。',
+        '创建和编辑面授班级使用“关联课程／班级与招生／展示信息”三段式工作台，保存后生成唯一 class_id 并进入“待排班”。',
+        '授课教师、校区、教室和上课规则统一在班级排课维护；本页不生成正式课次。',
+        '班级是否可见、是否可报名和主状态由已发布排班、报名窗口、剩余名额、快速报名开关和取消状态统一派生。',
         '名额以支付成功为占用时点，不以进入支付页或创建订单为准。',
         '支付成功后自动分配所选班级，不设置人工待分班。',
         '报名截止时间之后不再接受新的报名或支付。',
         '课程封面、图文详情、课程标签与 C 端推荐语写在该班级记录自身（售卖单元级存储），不写入课程档案；字段定义与发布商品共用同一份规格。',
-        '完整课程首次发布必须上传课程封面；轻量课程档案的课程封面可选填。同一班级二次发布时运营四字段只读带入，修改只影响本班级；同一课程的其他班级不受影响。'
+        '创建班级时可保存展示信息；确认并发布排班前必须具备封面。展示信息修改只影响本班级。',
+        '班级详情使用“班级概览／课程内容／教学安排／招生设置／学员与记录”五页签，详情内容全部只读。'
       ]
     },
     'crm/leads': {

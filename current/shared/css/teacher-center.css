@@ -124,3 +124,6 @@
   .teacher-build-result { align-items: stretch; flex-direction: column; }
   .month-switcher { width: 100%; justify-content: space-between; }
 }
+
+/* CR-2026-028 §2.2：证书录入命中重复时定位到的既有行高亮，便于运营直接核对。 */
+.certificate-duplicate-row { outline: 2px solid var(--danger, #d94b4b); outline-offset: -2px; background: rgba(217, 75, 75, 0.08); }

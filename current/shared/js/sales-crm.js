@@ -6,8 +6,9 @@ import { cloneProductSeed } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseDisplayConfigured, courseDisplayTags, persistSaleUnitDisplay, productForCourse, saleUnitDisplay } from './course-display.js';
 import { versionForCourseId } from './course-version.js';
 import { mountRichEditor, richTextToHtml, richTextValue } from './rich-editor.js';
+import { deriveClassStatus } from './class-lifecycle.js';
 import { mergeVenues, resolveVenueId } from './venue-seed.js';
-import { DEFAULT_LESSON_DURATION, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
+import { DEFAULT_LESSON_DURATION, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions as buildLessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
 
 const businessRoot = document.querySelector('[data-business-page]');
 const businessPage = businessRoot?.dataset.businessPage;
@@ -16,6 +17,7 @@ let businessActive = null;
 let businessToastTimer;
 
 const professionalOptions = ['音乐类', '舞蹈类', '美术类', '戏剧类'];
+const lessonDurationOptions = buildLessonDurationOptions().map(option => Number(option.value));
 // RM-F-01: the mall module no longer keeps its own course copy — it reads the shared publishable catalog.
 const courseCatalog = cloneCourseCatalogSeed();
 const businessParams = new URLSearchParams(window.location.search);
@@ -88,13 +90,15 @@ function sharedCourseCatalog() {
   const rows = [
     ...(shared.courses || []).filter(item => item.status === '已完成'),
     // CR-2026-025：课程档案改名或调整课时后，发布商品／班级带入的课程主体同步取最新值。
-    ...(shared.library || []).map(item => ({ ...item, id: item.archive === '轻量课程档案' ? item.id : (item.sourceCourseId || item.id) }))
+    ...(shared.library || []).map(item => ({ ...item, id: item.sourceCourseId || item.id }))
   ];
   rows.forEach(item => {
     const patch = {};
     ['name', 'type', 'major', 'teacher', 'hours'].forEach(key => { if (item[key] !== undefined) patch[key] = item[key]; });
     if (item.archive) patch.archive = item.archive;
     if (item.status) patch.status = item.status;
+    // CR-2026-034 §4.1.2：停用标记随课程档案带入发布候选，停用课程不出现在新的发布选择项里。
+    patch.disabledAt = item.disabledAt || '';
     const existing = courseCatalog.find(course => course.id === item.id);
     if (existing) Object.assign(existing, patch);
     else courseCatalog.push({ id: item.id, ...patch });
@@ -139,9 +143,9 @@ function showToast(message, kind = 'success') {
   window.clearTimeout(businessToastTimer); businessToastTimer = window.setTimeout(() => { element.hidden = true; }, 2800);
 }
 function closeBusinessDialog() { document.querySelector('[data-business-dialog]')?.remove(); }
-function openBusinessDialog(title, subtitle, body, actions = '<button type="button" class="button" data-dialog-close>关闭</button>') {
+function openBusinessDialog(title, subtitle, body, actions = '<button type="button" class="button" data-dialog-close>关闭</button>', options = {}) {
   closeBusinessDialog();
-  const dialog = document.createElement('dialog'); dialog.className = 'sales-dialog'; dialog.dataset.businessDialog = 'true';
+  const dialog = document.createElement('dialog'); dialog.className = `sales-dialog${options.workspace ? ' sales-workspace-dialog' : ''}`; dialog.dataset.businessDialog = 'true';
   dialog.innerHTML = `<div class="sales-dialog-card"><div class="sales-dialog-header"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(subtitle)}</p></div><button type="button" class="icon-button" data-dialog-close title="关闭" aria-label="关闭">×</button></div>${body}<div class="sales-dialog-actions">${actions}</div></div>`;
   document.body.append(dialog); dialog.showModal(); return dialog;
 }
@@ -169,7 +173,7 @@ function renderRows(rows, columns, filter) {
 function businessCourse(id = businessParams.get('courseId')) { return courseCatalog.find(item => item.id === id) || null; }
 function requiredInput(label, name, value = '', type = 'text', placeholder = '') { return `<label class="form-field"><span>${label}<b class="required-mark">*</b></span><input name="${name}" type="${type}" value="${escapeHtml(value)}" placeholder="${placeholder}"${type === 'number' ? ' min="0" step="0.01"' : ''} required></label>`; }
 function requiredSelect(label, name, options, value = '') { return `<label class="form-field"><span>${label}<b class="required-mark">*</b></span><select name="${name}" required><option value="">请选择${label}</option>${options.map(option => `<option value="${escapeHtml(option)}" ${option === value ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}</select></label>`; }
-function courseSummary(course, note) { return `<div class="sales-dialog-summary sales-course-summary"><div><span>课程主体</span><strong>${escapeHtml(course?.name || '未带入课程')}</strong><small>${escapeHtml(course?.id || '请从课程库进入发布')}</small></div><div><span>课程类型 / 档案</span><strong>${escapeHtml(course?.type || '—')}</strong><small>${escapeHtml(course?.archive || '—')}</small></div><div><span>教师 / 总课时</span><strong>${escapeHtml(course ? `${course.teacher} · ${course.hours}课时` : '—')}</strong><small>${escapeHtml(note || '课程主体只读带入')}</small></div></div>`; }
+function courseSummary(course, note) { return `<div class="sales-dialog-summary sales-course-summary"><div><span>课程主体</span><strong>${escapeHtml(course?.name || '未带入课程')}</strong><small>${escapeHtml(course?.id || '请选择关联课程')}</small></div><div><span>课程类型 / 来源</span><strong>${escapeHtml(course?.type || '—')}</strong><small>${escapeHtml(course?.source || (course?.applicationId ? '教师申报' : '后台新增'))}</small></div><div><span>教师 / 总课时</span><strong>${escapeHtml(course ? `${course.teacher} · ${course.hours}课时` : '—')}</strong><small>${escapeHtml(note || '课程主体只读带入')}</small></div></div>`; }
 function checkBusinessForm(form) { if (!form.reportValidity()) return false; return true; }
 
 // CR-2026-025 §4：商品与班级在发布时记录所引用的课程版本号，在售期间不随课程档案升级自动跟随；
@@ -185,32 +189,64 @@ function courseTeachingRow(course) {
   const archive = courseArchiveFor(course);
   return `<label class="form-field"><span>难度等级</span><input value="${escapeHtml(archive?.difficulty || '—')}" readonly class="readonly-field" /></label><label class="form-field"><span>适合年龄</span><input value="${escapeHtml(courseAgesText(archive) || '—')}" readonly class="readonly-field" /></label>`;
 }
+
+function courseContentRecord(course) {
+  if (!course) return null;
+  const shared = readDemoState();
+  return (shared.courses || []).find(item => item.id === course.id)
+    || (shared.library || []).find(item => (item.sourceCourseId || item.id) === course.id)
+    || course;
+}
+function courseReadonlyContent(course) {
+  if (!course) return '<div class="empty">请先选择关联课程。</div>';
+  const record = courseContentRecord(course) || course;
+  const archive = courseArchiveFor(course) || record;
+  const chapters = Array.isArray(record.chapters) ? record.chapters : [];
+  const outline = chapters.length
+    ? chapters.map((chapter, chapterIndex) => `<section class="sales-outline-chapter"><h4>第 ${chapterIndex + 1} 章 · ${escapeHtml(chapter.name)}</h4><p>${escapeHtml(chapter.desc || '暂无章节描述')}</p><div class="sales-outline-lessons">${(chapter.lessons || []).map((lesson, lessonIndex) => `<div><strong>第 ${lessonIndex + 1} 课时 · ${escapeHtml(lesson.name)}</strong><span>${escapeHtml(lesson.target || lesson.description || '暂无课时说明')} · ${Number(lesson.duration) || '—'} 分钟</span></div>`).join('') || '<span class="sub-cell">暂无课时</span>'}</div></section>`).join('')
+    : '<div class="empty">该演示课程暂无可回显的章节与课时数据。</div>';
+  return `<div class="sales-course-readonly"><section><h3>课程基本信息</h3><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(course.id)}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(course.name)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(course.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(course.major || '—')}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(course.teacher || '—')}</dd></div><div><dt>总课时</dt><dd>${Number(course.hours) || '—'} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(archive?.difficulty || '—')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(archive) || '—')}</dd></div></dl></section><section><h3>课程大纲</h3>${outline}</section></div>`;
+}
+function workspaceTabs(items, active) {
+  return `<div class="sales-workspace-tabs" role="tablist">${items.map(([key, label, index]) => `<button type="button" role="tab" data-workspace-tab="${key}" class="${key === active ? 'active' : ''}">${index ? `<span>${index}</span>` : ''}${label}</button>`).join('')}</div>`;
+}
+function initWorkspace(dialog, active = 'course') {
+  const activate = (key) => {
+    dialog.querySelectorAll('[data-workspace-tab]').forEach(item => { const selected = item.dataset.workspaceTab === key; item.classList.toggle('active', selected); item.setAttribute('aria-selected', String(selected)); });
+    dialog.querySelectorAll('[data-workspace-panel]').forEach(item => { item.hidden = item.dataset.workspacePanel !== key; });
+  };
+  dialog.querySelectorAll('[data-workspace-tab]').forEach(item => item.addEventListener('click', () => activate(item.dataset.workspaceTab)));
+  activate(active);
+}
 // CR-2026-020：运营四字段写在售卖单元自身（商品或班级），不再写入课程档案。
 function courseDisplaySection(course, unit = {}, { editDisplay = false, unitLabel = '商品' } = {}) {
   const archive = saleUnitDisplay(unit);
   const configured = courseDisplayConfigured(archive);
   const editable = editDisplay || !configured;
-  const coverRequired = !configured && course?.archive === '完整课程';
+  const coverRequired = !configured;
   const lockedAttr = editable ? '' : 'readonly class="readonly-field"';
   const coverCell = editable
-    ? `<input type="file" name="cover" accept="image/*" data-display-input />${archive?.coverFile ? `<small>当前封面：${escapeHtml(archive.coverFile)}</small>` : coverRequired ? '<small>完整课程首次发布必须上传课程封面</small>' : '<small>轻量课程档案可以不上传封面</small>'}`
+    ? `<input type="file" name="cover" accept="image/*" data-display-input />${archive?.coverFile ? `<small>当前封面：${escapeHtml(archive.coverFile)}</small>` : '<small>可先存草稿；发布前必须上传展示封面</small>'}`
     : `<input class="readonly-field" readonly value="${escapeHtml(archive?.coverFile || archive?.cover || '未配置')}" />`;
   // 图文详情是富文本字段：编辑态挂 RichEditor，只读态渲染清洗后的 HTML 用隐藏字段原样回存。
   const detailCell = editable
     ? `<div class="rich-editor-field" data-rich-editor data-name="detail" data-display-input data-aria-label="图文详情" data-placeholder="只作用于本单元的对外展示，学员端详情展示，≤2000 字" data-min-height="160px" data-max-length="2000" data-value="${escapeHtml(archive?.detail || '')}"></div>`
     : `<div class="sales-display-preview" data-display-input><input type="hidden" name="detail" value="${escapeHtml(archive?.detail || '')}" />${richTextToHtml(archive?.detail, '<span class="sub-cell">未配置</span>')}</div>`;
-  return `<div class="form-field wide sales-display-section"><span>课程展示信息<b class="required-mark">售卖单元级存储</b></span><div class="sales-display-grid"><label class="form-field"><span>课程封面${coverRequired ? ' *' : ''}</span>${coverCell}</label><label class="form-field"><span>C 端推荐语</span><input name="recommendation" maxlength="30" data-display-input ${lockedAttr} value="${escapeHtml(archive?.recommendation || '')}" placeholder="不超过30字" /></label><label class="form-field wide"><span>图文详情</span>${detailCell}</label><label class="form-field wide"><span>课程标签</span><input name="tags" data-display-input ${lockedAttr} value="${escapeHtml(courseDisplayTags(archive).join(','))}" placeholder="多个标签用逗号分隔" /></label></div><div class="sales-display-actions">${editable ? '' : '<button type="button" class="button" data-display-edit>修改展示信息</button>'}<span class="sales-display-warning">${editable ? `修改后只影响${unitLabel}的对外展示：封面、图文详情、标签与 C 端推荐语，不影响同课程的其他售卖单元。` : '已按上次发布的值只读带入；需要调整时点击“修改展示信息”。'}</span></div></div>`;
+  return `<div class="form-field wide sales-display-section"><span>课程展示信息<b class="required-mark">售卖单元级存储</b></span><div class="sales-display-grid"><label class="form-field"><span>课程封面${coverRequired ? '（发布必填）' : ''}</span>${coverCell}</label><label class="form-field"><span>C 端推荐语</span><input name="recommendation" maxlength="30" data-display-input ${lockedAttr} value="${escapeHtml(archive?.recommendation || '')}" placeholder="不超过30字" /></label><label class="form-field wide"><span>图文详情</span>${detailCell}</label><label class="form-field wide"><span>课程标签</span><input name="tags" data-display-input ${lockedAttr} value="${escapeHtml(courseDisplayTags(archive).join(','))}" placeholder="多个标签用逗号分隔" /></label></div><div class="sales-display-actions">${editable ? '' : '<button type="button" class="button" data-display-edit>修改展示信息</button>'}<span class="sales-display-warning">${editable ? `修改后只影响${unitLabel}的对外展示：封面、图文详情、标签与 C 端推荐语，不影响同课程的其他售卖单元。` : '已按上次发布的值只读带入；需要调整时点击“修改展示信息”。'}</span></div></div>`;
 }
 function openProductForm(row = null, options = {}) {
   const course = businessCourse(options.courseId || row?.courseId || businessParams.get('courseId'));
   const displayUnit = row || {};
   const displayEdit = Boolean(options.editDisplay) || !courseDisplayConfigured(displayUnit);
-  const videoCourses = courseCatalog.filter(item => item.type === '视频课程' && (item.archive === '完整课程' || item.status === '已完成'));
+  // CR-2026-034 §4.1.2：已停用课程不再作为新的发布候选；编辑既有商品时仍可读回原课程。
+  const videoCourses = courseCatalog.filter(item => item.type === '视频课程' && item.status === '已完成' && (!item.disabledAt || item.id === row?.courseId));
   const courseField = course
     ? `${courseSummary(course, '仅允许已完成的视频课程发布商品')}<input type="hidden" name="courseId" value="${escapeHtml(course.id)}">`
     : requiredSelect('关联课程', 'courseId', videoCourses.map(item => item.name));
-  const body = `<form id="business-dialog-form" class="sales-dialog-grid">${courseField}<label class="form-field"><span>课程名称</span><input value="${escapeHtml(course?.name || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>所属专业</span><input value="${escapeHtml(course?.major || '')}" readonly class="readonly-field" /></label><label class="form-field"><span>总课时数</span><input value="${escapeHtml(String(course?.hours || ''))}" readonly class="readonly-field" /></label>${course ? courseVersionRow(course, row) : ''}${requiredInput('商品名称', 'name', row?.name || course?.name || '', 'text', '请输入商品名称')}${requiredInput('售卖价格', 'price', row?.price || '', 'number', '请输入售价')}<label class="form-field"><span>试看策略<b class="required-mark">*</b></span><select name="preview" id="preview-policy" required><option ${row?.preview !== '允许试看' ? 'selected' : ''}>不允许试看</option><option ${row?.preview === '允许试看' ? 'selected' : ''}>允许试看</option></select></label><label class="form-field"><span>试看课时<b class="required-mark">*</b></span><select name="previewHours" id="preview-hours" required ${row?.preview !== '允许试看' ? 'disabled' : ''}><option ${row?.previewHours === '第1课时' ? 'selected' : ''}>第1课时</option></select></label>${course ? courseTeachingRow(course) : ''}${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '商品' }) : ''}<label class="form-field"><span>上下架时间</span><input name="shelfAt" value="${escapeHtml(row?.shelfAt || '')}" placeholder="YYYY-MM-DD HH:mm"></label><label class="form-field"><span>商品状态</span><input value="${escapeHtml(row?.status || '草稿')}" readonly class="readonly-field" /></label></form>`;
-  const dialog = openBusinessDialog(row ? '编辑商品' : '发布商品', '从课程库带入课程主体；视频商品只允许一门课程一个有效商品。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存草稿</button>');
+  const shelfMode = row?.shelfMode || (row?.shelfAt ? '定时上架' : row?.status === '已上架' ? '立即上架' : '仅保存');
+  const body = `<form id="business-dialog-form" class="sales-workspace-form">${workspaceTabs([['course', '关联课程', 1], ['sale', '销售设置', 2], ['display', '展示信息', 3]], 'course')}<section data-workspace-panel="course" class="sales-workspace-panel"><div class="sales-section-head"><div><span>01</span><h3>关联课程</h3></div><p>商品仅保存课程编号与版本，基本信息和课程大纲只读引用。</p></div><div class="sales-dialog-grid">${courseField}${course ? courseVersionRow(course, row) : ''}</div>${courseReadonlyContent(course)}</section><section data-workspace-panel="sale" class="sales-workspace-panel" hidden><div class="sales-section-head"><div><span>02</span><h3>销售设置</h3></div><p>定价、试看和上架方式属于商品，不回写课程。</p></div><div class="sales-dialog-grid">${requiredInput('商品名称', 'name', row?.name || course?.name || '', 'text', '请输入商品名称')}${requiredInput('售卖价格', 'price', row?.price || '', 'number', '请输入售价')}<label class="form-field"><span>试看策略<b class="required-mark">*</b></span><select name="preview" id="preview-policy" required><option ${row?.preview !== '允许试看' ? 'selected' : ''}>不允许试看</option><option ${row?.preview === '允许试看' ? 'selected' : ''}>允许试看</option></select></label><label class="form-field"><span>试看课时</span><select name="previewHours" id="preview-hours" ${row?.preview !== '允许试看' ? 'disabled' : ''}><option ${row?.previewHours === '第1课时' ? 'selected' : ''}>第1课时</option></select></label><label class="form-field"><span>上架方式</span><select name="shelfMode" data-publish-mode><option ${shelfMode === '仅保存' ? 'selected' : ''}>仅保存</option><option ${shelfMode === '立即上架' ? 'selected' : ''}>立即上架</option><option ${shelfMode === '定时上架' ? 'selected' : ''}>定时上架</option></select></label><label class="form-field"><span>定时上架时间</span><input name="shelfAt" type="datetime-local" data-publish-at value="${escapeHtml(row?.shelfAt || '').replace(' ', 'T')}"></label><label class="form-field"><span>商品状态</span><input value="${escapeHtml(row?.status || '草稿')}" readonly class="readonly-field" /></label></div></section><section data-workspace-panel="display" class="sales-workspace-panel" hidden><div class="sales-section-head"><div><span>03</span><h3>展示信息</h3></div><p>仅影响本商品在学员端的展示。</p></div>${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '商品' }) : '<div class="empty">请先选择关联课程。</div>'}</section></form>`;
+  const dialog = openBusinessDialog(row ? '编辑商品' : '发布商品', '商品 = 课程引用 + 销售设置 + 展示信息。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存商品</button>', { workspace: true });
+  initWorkspace(dialog);
   // 图文详情使用富文本编辑器组件；与教师简介（teachers/create）复用同一组件。
   mountRichEditor(dialog.querySelector('[data-rich-editor]'));
   dialog.addEventListener('rich-editor:message', (event) => showToast(event.detail.message, event.detail.kind));
@@ -233,6 +269,11 @@ function openProductForm(row = null, options = {}) {
   });
   const preview = dialog.querySelector('#preview-policy'); const previewHours = dialog.querySelector('#preview-hours');
   preview?.addEventListener('change', () => { previewHours.disabled = preview.value !== '允许试看'; if (previewHours.disabled) previewHours.value = ''; else previewHours.value = '第1课时'; });
+  const shelfModeField = dialog.querySelector('[name="shelfMode"]');
+  const shelfAtField = dialog.querySelector('[name="shelfAt"]');
+  const refreshShelfFields = () => { if (shelfAtField) { shelfAtField.disabled = shelfModeField?.value !== '定时上架'; shelfAtField.required = shelfModeField?.value === '定时上架'; } };
+  shelfModeField?.addEventListener('change', refreshShelfFields);
+  refreshShelfFields();
   dialog.querySelector('#business-dialog-form')?.addEventListener('submit', event => {
     event.preventDefault(); if (!checkBusinessForm(event.currentTarget)) return;
     const data = new FormData(event.currentTarget); const selected = businessCourse(data.get('courseId')) || videoCourses.find(item => item.name === data.get('courseId'));
@@ -246,13 +287,16 @@ function openProductForm(row = null, options = {}) {
       return;
     }
     const nextPrice = Number(data.get('price')).toFixed(2);
+    if (Number(nextPrice) <= 0) { showToast('售卖价格必须大于 0', 'error'); return; }
     const priceChanged = Boolean(row) && Number(row.price) !== Number(nextPrice);
     const priceChanges = row ? [...(row.priceChanges || [])] : [];
     if (priceChanged) priceChanges.unshift({ at: demoTime(), operator: '平台运营', from: '¥' + Number(row.price).toFixed(2), to: '¥' + nextPrice });
-    const record = { id: row?.id || demoId('product'), courseId: selected.id, name: String(data.get('name')).trim(), course: selected.name, price: nextPrice, sales: row?.sales || '0', status: row?.status || '草稿', updated: row?.updated || '—', preview: data.get('preview'), previewHours: data.get('previewHours'), shelfAt: String(data.get('shelfAt') || '').trim(), priceChanges, courseVersion: Number(data.get('courseVersion')) || versionForCourseId(selected.id) };
+    const nextShelfMode = String(data.get('shelfMode') || '仅保存');
+    const shelfAt = String(data.get('shelfAt') || '').replace('T', ' ');
+    const record = { id: row?.id || demoId('product'), courseId: selected.id, name: String(data.get('name')).trim(), course: selected.name, price: nextPrice, sales: row?.sales || '0', status: nextShelfMode === '立即上架' ? '已上架' : (nextShelfMode === '定时上架' ? '草稿' : (row?.status === '已上架' ? '已上架' : '草稿')), updated: row?.updated || '—', preview: data.get('preview'), previewHours: data.get('previewHours'), shelfMode: nextShelfMode, shelfAt, priceChanges, courseVersion: Number(data.get('courseVersion')) || versionForCourseId(selected.id) };
     // CR-2026-020：课程封面、图文详情、课程标签与 C 端推荐语写在商品自身。
     const coverFile = event.currentTarget.querySelector('[name="cover"]')?.files?.[0]?.name || displayUnit.coverFile || '';
-    if (!courseDisplayConfigured(displayUnit) && selected.archive === '完整课程' && !coverFile) { showToast('完整课程首次发布需先上传课程封面', 'error'); return; }
+    if (nextShelfMode !== '仅保存' && !courseDisplayConfigured(displayUnit) && !coverFile) { showToast('上架前需先上传商品封面', 'error'); return; }
     Object.assign(record, {
       coverFile,
       cover: coverFile ? '已配置' : (displayUnit.cover || COURSE_DISPLAY_UNSET),
@@ -293,18 +337,17 @@ function findClassConflicts(record) {
     .filter(row => row.teacher === record.teacher || (row.campus === record.campus && row.classroom === record.classroom));
 }
 function openClassForm(row = null, options = {}) {
-  const course = businessCourse(row?.courseId || businessParams.get('courseId'));
+  const course = businessCourse(options.courseId || row?.courseId || businessParams.get('courseId'));
   const displayUnit = row || classRecordFor(row?.id);
   const displayEdit = Boolean(options.editDisplay) || !courseDisplayConfigured(displayUnit);
-  const classCourses = courseCatalog.filter(item => item.type === '面授课程');
+  // CR-2026-034 §4.1.2：已停用课程不再作为新的建班候选；编辑既有班级时仍可读回原课程。
+  const classCourses = courseCatalog.filter(item => item.type === '面授课程' && (item.status === '已完成' || item.id === row?.courseId) && (!item.disabledAt || item.id === row?.courseId));
   const courseField = course
-    ? `${courseSummary(course, course.archive === '完整课程' ? '完整课程需已完成编排' : '轻量课程档案可直接发布班级')}<input type="hidden" name="courseId" value="${escapeHtml(course.id)}">`
+    ? `${courseSummary(course, '仅允许已完成的面授课程创建班级')}<input type="hidden" name="courseId" value="${escapeHtml(course.id)}">`
     : requiredSelect('关联课程', 'courseId', classCourses.map(item => item.name));
-  const scheduleParts = parseClassSchedule(row?.schedule);
-  const lessonDuration = Number(row?.lessonDuration || DEFAULT_LESSON_DURATION);
-  const startValue = snapToStep(scheduleParts.start || TIMELINE_START);
-  const body = `<form id="business-dialog-form" class="sales-dialog-grid">${course ? courseSummary(course, course.archive === '完整课程' ? '展示信息写入本班级；完整课程首次发布必须上传课程封面' : '轻量课程档案：展示信息写入本班级，课程封面选填') : ''}${course ? courseTeachingRow(course) : ''}${course ? courseVersionRow(course, row) : ''}${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '本班级' }) : ''}${requiredInput('课程定价', 'price', row?.price || '', 'number', '请输入课程定价')}<label class="form-field"><span>试听是否收费</span><select name="trialFee"><option>否</option><option>是</option></select></label><label class="form-field"><span>报名开始时间</span><input name="enrollStart" type="datetime-local" value="${escapeHtml(row?.enrollStart || '').replace(' ', 'T')}"></label>${requiredInput('报名截止时间', 'deadline', row?.deadline || '', 'datetime-local', '')}<label class="form-field wide"><span>发布方式</span><select name="publishMode"><option>仅保存</option><option>立即发布</option><option>定时发布</option></select></label><label class="form-field sales-switch-field"><span>快速报名入口</span><span class="sales-switch-control"><input name="fast" type="checkbox" ${row?.fast === '是' ? 'checked' : ''}></span></label><label class="form-field"><span>前台展示状态</span><input class="readonly-field" readonly value="${row?.display || '未发布'}"></label></form>`;
-  const dialog = openBusinessDialog(`发布班级 · ${row?.name || ''}`, '在已创建的班级上设置定价、报名窗口与前台展示；班级与排课由教务的「创建班级」维护。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存发布设置</button>');
+  const body = `<form id="business-dialog-form" class="sales-workspace-form">${workspaceTabs([['course', '关联课程', 1], ['enrollment', '班级与招生', 2], ['display', '展示信息', 3]], 'course')}<section data-workspace-panel="course" class="sales-workspace-panel"><div class="sales-section-head"><div><span>01</span><h3>关联课程</h3></div><p>班级必须关联一门已完成面授课程，并锁定引用版本。</p></div><div class="sales-dialog-grid">${courseField}${course ? courseVersionRow(course, row) : ''}</div>${courseReadonlyContent(course)}</section><section data-workspace-panel="enrollment" class="sales-workspace-panel" hidden><div class="sales-section-head"><div><span>02</span><h3>班级与招生</h3></div><p>创建班级主体和招生配置；教师、场地与上课规则在班级排课维护。</p></div><div class="sales-dialog-grid">${requiredInput('班级名称', 'name', row?.name || '', 'text', '请输入班级名称')}${requiredSelect('所属批次', 'batch', ['春季', '暑假', '秋季', '寒假'], row?.batch || '')}${requiredInput('招生容量', 'capacity', row?.capacity || '', 'number', '请输入容量')}${requiredInput('课程定价', 'price', row?.price || '', 'number', '请输入课程定价')}<label class="form-field"><span>是否支持试听</span><select name="trialEnabled"><option ${row?.trialEnabled !== '否' ? 'selected' : ''}>是</option><option ${row?.trialEnabled === '否' ? 'selected' : ''}>否</option></select></label><label class="form-field"><span>试听是否收费</span><select name="trialFee"><option ${row?.trialFee !== '是' ? 'selected' : ''}>否</option><option ${row?.trialFee === '是' ? 'selected' : ''}>是</option></select></label><label class="form-field"><span>试听价格</span><input name="trialPrice" type="number" min="0" step="0.01" value="${escapeHtml(row?.trialPrice || '')}" placeholder="收费试听时必填"></label><label class="form-field wide"><span>试听说明</span><textarea name="trialNote" maxlength="200">${escapeHtml(row?.trialNote || '')}</textarea></label><label class="form-field"><span>报名开始时间<b class="required-mark">*</b></span><input name="enrollStart" type="datetime-local" required value="${escapeHtml(row?.enrollStart || '').replace(' ', 'T')}"></label>${requiredInput('报名截止时间', 'deadline', row?.deadline || '', 'datetime-local', '')}<label class="form-field sales-switch-field"><span>快速报名入口</span><span class="sales-switch-control"><input name="fast" type="checkbox" ${row?.fast === '是' ? 'checked' : ''}></span></label><label class="form-field"><span>班级状态</span><input class="readonly-field" readonly value="${deriveClassStatus(row)}"></label></div></section><section data-workspace-panel="display" class="sales-workspace-panel" hidden><div class="sales-section-head"><div><span>03</span><h3>展示信息</h3></div><p>排班确认发布后，学员端读取本班级展示信息。</p></div>${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '本班级' }) : '<div class="empty">请先选择关联课程。</div>'}</section></form>`;
+  const dialog = openBusinessDialog(`${row ? '编辑' : '创建'}面授班级`, '第一步创建班级；保存后前往班级排课。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存并去排课</button>', { workspace: true });
+  initWorkspace(dialog);
   // 图文详情使用富文本编辑器组件；与教师简介（teachers/create）复用同一组件。
   mountRichEditor(dialog.querySelector('[data-rich-editor]'));
   dialog.addEventListener('rich-editor:message', (event) => showToast(event.detail.message, event.detail.kind));
@@ -318,105 +361,57 @@ function openClassForm(row = null, options = {}) {
     event.currentTarget.textContent = `已同步至 v${latest}`;
     showToast(`引用课程版本已同步至 v${latest}；本次发布按新版本引用，已支付订单不受影响`);
   });
+  dialog.querySelector('[name="courseId"]')?.addEventListener('change', (event) => {
+    const selected = businessCourse(event.target.value) || classCourses.find(item => item.name === event.target.value);
+    if (!selected) return;
+    closeBusinessDialog();
+    openClassForm(row, { ...options, courseId: selected.id });
+  });
   const form = dialog.querySelector('#business-dialog-form');
-  const conflictHint = dialog.querySelector('[data-conflict-hint]');
-  const refreshScheduleHint = () => {
-    // 发布班级弹窗只维护定价与报名窗口，排课配置由教务的「创建班级」负责，这里没有冲突提示元素。
-    if (!conflictHint) return;
-    const data = new FormData(form);
-    const selected = businessCourse(data.get('courseId')) || classCourses.find(item => item.name === data.get('courseId'));
-    const duration = Number(data.get('lessonDuration')) || DEFAULT_LESSON_DURATION;
-    const startField = form.querySelector('[name=startTime]');
-    const rawStart = String(data.get('startTime') || '');
-    const snappedStart = rawStart ? snapToStep(rawStart) : '';
-    // OD-S11: normalise the control to the 15-minute grid as soon as a value is entered, so the value
-    // stays valid for the native `step` constraint and the adjustment can be echoed before saving.
-    if (startField && snappedStart && rawStart !== snappedStart) { startField.dataset.snappedFrom = rawStart; startField.value = snappedStart; }
-    const snappedEnd = snappedStart ? lessonEndTime(snappedStart, duration) : '';
-    const endField = form.querySelector('[name=endTime]');
-    if (endField && snappedEnd) endField.value = snappedEnd;
-    const preview = { id: row?.id || 'preview', display: row?.display || '未发布', teacher: String(data.get('teacher') || '').trim(), campus: data.get('campus'), classroom: String(data.get('classroom') || '').trim(), weekday: String(data.get('weekday') || ''), startTime: snappedStart, endTime: snappedEnd };
-    const lessons = Number(selected?.hours || row?.lessons || 0);
-    const sessions = buildClassSessions(lessons, preview.weekday, snappedStart, duration, String(data.get('firstLessonDate') || ''), preview.classroom);
-    const conflicts = preview.weekday && preview.startTime && preview.endTime ? findClassConflicts(preview) : [];
-    const snapNote = rawStart && snappedStart !== rawStart ? ` · 开始时间 ${rawStart} 非 15 分钟刻度，已吸附为 ${snappedStart}` : '';
-    const rangeNote = snappedStart && !isWithinTimeline(snappedStart, duration) ? ' · 上课时间超出 08:00–21:00 时间轴' : '';
-    conflictHint.textContent = `${lessons ? `按总课时生成 ${sessions.length} 个课次（每课次 ${duration} 分钟，1 课时 = 1 课次）` : '课程总课时缺失，暂不生成课次'}${snapNote}${rangeNote}${conflicts.length ? ` · 冲突：${conflicts.map(item => item.name).join('、')}` : ' · 暂无教师或教室冲突'}`;
-    conflictHint.classList.toggle('conflict', conflicts.length > 0);
-    // 末次上课日期随总课时、每周上课日和首次上课日期实时推算；发布后按课次变动重算。
-    const totalField = form.querySelector('[name=totalLessons]');
-    if (totalField) totalField.value = lessons ? String(lessons) : '';
-    const lastField = form.querySelector('[name=lastLessonDate]');
-    if (lastField) lastField.value = sessions.length ? sessions[sessions.length - 1].date : '';
+  const trialEnabledField = form?.querySelector('[name="trialEnabled"]');
+  const trialFeeField = form?.querySelector('[name="trialFee"]');
+  const trialPriceField = form?.querySelector('[name="trialPrice"]');
+  const refreshEnrollmentFields = () => {
+    const trialDisabled = trialEnabledField?.value === '否';
+    if (trialFeeField) trialFeeField.disabled = trialDisabled;
+    if (trialPriceField) { trialPriceField.disabled = trialDisabled || trialFeeField?.value !== '是'; trialPriceField.required = !trialDisabled && trialFeeField?.value === '是'; }
   };
-  form?.addEventListener('input', refreshScheduleHint);
-  form?.addEventListener('change', refreshScheduleHint);
-  refreshScheduleHint();
+  trialEnabledField?.addEventListener('change', refreshEnrollmentFields);
+  trialFeeField?.addEventListener('change', refreshEnrollmentFields);
+  refreshEnrollmentFields();
   dialog.querySelector('#business-dialog-form')?.addEventListener('submit', event => {
     event.preventDefault(); if (!checkBusinessForm(event.currentTarget)) return;
     const data = new FormData(event.currentTarget);
-    // 发布班级：只维护定价、报名窗口与前台展示；班级信息与排课配置由教务的「创建班级」维护。
-    if (!event.currentTarget.querySelector('[name=courseId]')) {
-      const target = row;
-      const className = target?.name || '';
-      if (!target) { showToast('请从班级列表选择要发布的班级', 'error'); return; }
-      const mode = String(data.get('publishMode') || '仅保存');
-      target.price = Number(data.get('price')) || target.price;
-      target.deadline = String(data.get('deadline') || target.deadline || '');
-      target.fast = data.get('fast') === 'on' ? '是' : '否';
-      target.display = mode === '仅保存' ? '未发布' : '已发布';
-      if (course) {
-        // CR-2026-012 增补：完整课程与轻量课程档案都在发布班级时维护运营四字段。
-        const coverFile = event.currentTarget.querySelector('[name="cover"]')?.files?.[0]?.name || displayUnit.coverFile || '';
-        if (!courseDisplayConfigured(displayUnit) && course.archive === '完整课程' && !coverFile) { showToast('完整课程首次发布需先上传课程封面', 'error'); return; }
-        // CR-2026-020：运营四字段写在本班级记录上，同一课程的其他班级不受影响。
-        Object.assign(target, {
-          coverFile,
-          cover: coverFile ? '已配置' : (displayUnit.cover || COURSE_DISPLAY_UNSET),
-          displayDetail: richTextValue(data.get('detail')),
-          tags: String(data.get('tags') || '').split(/[，,、\s]+/).map(value => value.trim()).filter(Boolean),
-          recommendation: String(data.get('recommendation') || '').trim()
-        });
-        persistSaleUnitDisplay('classes', target);
-      }
-      persistClass(target);
-      closeBusinessDialog(); renderClasses();
-      showToast(mode === '仅保存' ? `已保存为未发布：${className}` : `已发布：${className}`);
-      return;
-    }
     const selected = businessCourse(data.get('courseId')) || classCourses.find(item => item.name === data.get('courseId'));
     if (!selected || selected.type !== '面授课程') { showToast('请选择面授课程后再保存', 'error'); return; }
-    if (selected.archive === '完整课程' && selected.status !== '已完成') { showToast('完整课程需完成编排后才能发布班级', 'error'); return; }
-    const weekday = String(data.get('weekday') || '');
-    const rawStartTime = String(data.get('startTime') || '');
-    const lessonDuration = Number(data.get('lessonDuration')) || DEFAULT_LESSON_DURATION;
-    const firstLessonDate = String(data.get('firstLessonDate') || '');
-    if (!weekday || !rawStartTime) { showToast('请填写每周上课日和上课开始时间', 'error'); return; }
-    // OD-S11: snap to the nearest 15-minute tick and echo the adjustment before saving.
-    const startTime = snapToStep(rawStartTime);
-    const endTime = lessonEndTime(startTime, lessonDuration);
-    const snappedFrom = event.currentTarget.querySelector('[name=startTime]')?.dataset.snappedFrom || '';
-    let snapEcho = '';
-    if (startTime !== rawStartTime || snappedFrom) {
-      const shownFrom = snappedFrom || rawStartTime;
-      const startField = event.currentTarget.querySelector('[name=startTime]');
-      if (startField) startField.value = startTime;
-      const endField = event.currentTarget.querySelector('[name=endTime]');
-      if (endField) endField.value = endTime;
-      snapEcho = `（开始时间 ${shownFrom} 已吸附为 ${startTime}，结束时间 ${endTime}）`;
-      showToast(`开始时间 ${shownFrom} 非 15 分钟刻度，已吸附为 ${startTime}（结束时间 ${endTime}）`);
-    }
-    if (!isWithinTimeline(startTime, lessonDuration)) { showToast(`上课时间需落在 08:00–21:00 时间轴内，当前 ${startTime}–${endTime} 超出范围`, 'error'); return; }
-    const record = { id: row?.id || demoId('class'), courseId: selected.id, archive: selected.archive, name: String(data.get('name')).trim(), course: selected.name, batch: data.get('batch'), teacher: String(data.get('teacher')).trim(), category: selected.major.includes('中国') ? '舞蹈类' : selected.major.includes('声乐') ? '音乐类' : '美术类', campus: data.get('campus'), classroom: String(data.get('classroom')).trim(), schedule: composeClassSchedule(weekday, startTime, endTime), weekday, startTime, endTime, lessonDuration, firstLessonDate, price: Number(data.get('price')).toFixed(2), deadline: data.get('deadline').replace('T', ' '), courseVersion: Number(data.get('courseVersion')) || versionForCourseId(selected.id), enrolled: row?.enrolled || 0, capacity: data.get('capacity'), lessons: Number(selected.hours) || Number(row?.lessons) || 0, status: row?.status || '未发布', display: row?.display || '未发布', fast: data.get('fast') === 'on' ? '是' : '否', created: row?.created || toLocalDateString() };
-    // RM-T-F04: total lessons == session count; each session runs for the chosen lesson duration.
-    record.sessions = buildClassSessions(record.lessons, weekday, startTime, lessonDuration, firstLessonDate, record.classroom, record.batch === '暑假' ? '2026暑期' : '2026秋季');
+    if (selected.status !== '已完成') { showToast('课程需完成编排后才能创建班级', 'error'); return; }
+    const enrollStart = String(data.get('enrollStart') || '').replace('T', ' ');
+    const deadline = String(data.get('deadline') || '').replace('T', ' ');
+    if (enrollStart && deadline && deadline <= enrollStart) { showToast('报名截止时间必须晚于报名开始时间', 'error'); return; }
+    const trialEnabled = String(data.get('trialEnabled') || '否');
+    const trialFee = trialEnabled === '是' ? String(data.get('trialFee') || '否') : '否';
+    const trialPrice = trialEnabled === '是' && trialFee === '是' ? Number(data.get('trialPrice') || 0) : 0;
+    if (trialEnabled === '是' && trialFee === '是' && trialPrice <= 0) { showToast('收费试听时，试听价格必须大于 0', 'error'); return; }
+    const price = Number(data.get('price'));
+    const capacity = Number(data.get('capacity'));
+    if (price <= 0) { showToast('课程定价必须大于 0', 'error'); return; }
+    if (!Number.isInteger(capacity) || capacity <= 0) { showToast('招生容量必须是大于 0 的整数', 'error'); return; }
+    const record = { ...(row || {}), id: row?.id || demoId('class'), courseId: selected.id, source: selected.source || (selected.applicationId ? '教师申报' : '后台新增'), name: String(data.get('name')).trim(), className: String(data.get('name')).trim(), course: selected.name, courseName: selected.name, batch: data.get('batch'), category: selected.major.includes('中国') ? '舞蹈类' : selected.major.includes('声乐') ? '音乐类' : '美术类', professional: selected.major, price: price.toFixed(2), enrollStart, deadline, trialEnabled, trialFee, trialPrice: trialPrice ? trialPrice.toFixed(2) : '', trialNote: trialEnabled === '是' ? String(data.get('trialNote') || '').trim() : '', courseVersion: Number(data.get('courseVersion')) || versionForCourseId(selected.id), enrolled: row?.enrolled || 0, capacity, lessons: Number(selected.hours) || Number(row?.lessons) || 0, status: row?.id ? deriveClassStatus(row) : '待排班', display: row?.display || '未发布', scheduleStatus: row?.scheduleStatus || '未排班', scheduleVersion: Number(row?.scheduleVersion || 0), sessions: Array.isArray(row?.sessions) ? row.sessions : [], fast: data.get('fast') === 'on' ? '是' : '否', created: row?.created || toLocalDateString() };
     if (!row?.id) record.enrolled = 0;
     // I1-O-03: teacher and classroom conflicts block publishing until resolved.
-    const conflicts = findClassConflicts(record);
-    if (conflicts.length) { showToast(`排课冲突：${conflicts.map(item => `${item.name}（${item.teacher} · ${item.campus}${item.classroom}）`).join('、')}，请调整教师、教室或上课时间`, 'error'); return; }
+    const coverFile = event.currentTarget.querySelector('[name="cover"]')?.files?.[0]?.name || displayUnit?.coverFile || '';
+    Object.assign(record, {
+      coverFile,
+      cover: coverFile ? '已配置' : (displayUnit?.cover || COURSE_DISPLAY_UNSET),
+      displayDetail: richTextValue(data.get('detail')),
+      tags: String(data.get('tags') || '').split(/[，,、\s]+/).map(value => value.trim()).filter(Boolean),
+      recommendation: String(data.get('recommendation') || '').trim()
+    });
     if (row) Object.assign(row, record); else dataSets.classes.unshift(record);
+    persistSaleUnitDisplay('classes', record);
     persistClass(record);
-    closeBusinessDialog(); renderClasses(); showToast(`${row ? '班级信息已保存' : '班级草稿已保存，已加入班级列表'}${snapEcho}`);
+    closeBusinessDialog();
+    location.href = `/admin/pages/academic/scheduling.html?classId=${encodeURIComponent(record.id)}`;
   });
 }
 
@@ -425,7 +420,7 @@ function renderProducts() {
   // stay editable; the edit dialog annotates that re-pricing only affects later orders.
   const productRowActions = (status) => status === '已上架'
     ? '<button class="text-button" data-business-action="product-view">查看</button><button class="text-button" data-business-action="product-edit">编辑</button><button class="text-button danger-link" data-business-action="product-unpublish">下架</button>'
-    : '<button class="text-button" data-business-action="product-edit">编辑</button><button class="text-button" data-business-action="product-publish">上架</button>';
+    : '<button class="text-button" data-business-action="product-view">查看</button><button class="text-button" data-business-action="product-edit">编辑</button><button class="text-button" data-business-action="product-publish">上架</button>';
   businessData = dataSets.products;
   const salesTotal = dataSets.products.reduce((sum, row) => sum + Number(row.sales || 0), 0);
   const metrics = metricCards([
@@ -485,17 +480,18 @@ function renderBatches() {
 
 function renderClasses() {
   businessData = dataSets.classes;
+  businessData.forEach(row => { row.status = deriveClassStatus(row); });
   const enrolledTotal = dataSets.classes.reduce((sum, row) => sum + Number(row.enrolled || 0), 0);
   const metrics = metricCards([
-    ['招生中', dataSets.classes.filter(row => row.status === '招生中').length, '前台已展示'],
-    ['已下架', dataSets.classes.filter(row => row.display === '已下架').length, '运营状态不变'],
-    ['未发布', dataSets.classes.filter(row => row.status === '未发布').length, '待配置后发布'],
+    ['招生中', dataSets.classes.filter(row => row.status === '招生中').length, '已发布且可报名'],
+    ['待排班', dataSets.classes.filter(row => row.status === '待排班').length, '等待配置排班'],
+    ['排班草稿', dataSets.classes.filter(row => row.status === '排班草稿').length, '尚未生成正式课次'],
     ['已报名', enrolledTotal, '当前示例班级合计', Math.min(Math.round((enrolledTotal / 60) * 100), 100)]
   ]);
-  pageFrame('面授班级', '', '', metrics + filterPanel('class-filter', selectField('班级状态', 'status', ['未发布', '招生中', '已满员', '进行中', '已结束']) + selectField('所属批次', 'batch', ['春季', '暑假', '秋季', '寒假']) + selectField('所属专业', 'category', professionalOptions) + selectField('前台展示状态', 'display', ['未发布', '已展示', '已下架']) + inputField('关键词', 'keyword', '班级名称 / 课程名称', true)) + table('<thead><tr><th>班级名称</th><th>关联课程</th><th>批次</th><th>教师</th><th>报名/容量</th><th>运营状态</th><th>前台展示</th><th>快速报名</th><th>操作</th></tr></thead>'));
-  const rows = (row) => `<td><a class="reference-link" href="#">${row.name}</a></td><td>${row.course}</td><td>${row.batch}</td><td>${row.teacher}</td><td>${row.enrolled} / ${row.capacity}</td><td>${tag(row.status)}</td><td>${tag(row.display)}</td><td>${row.fast}</td><td class="action-cell">${row.status === '未发布' ? '<button class="text-button" data-business-action="class-edit">编辑</button><button class="text-button" data-business-action="class-publish">发布</button>' : row.display === '已展示' ? '<button class="text-button" data-business-action="class-view">查看</button><button class="text-button danger-link" data-business-action="class-unpublish">下架</button>' : '<button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-publish">上架</button>'}</td>`;
+  pageFrame('面授班级', '', '<button class="button primary" data-business-action="class-create">创建面授班级</button>', metrics + filterPanel('class-filter', selectField('班级状态', 'status', ['待排班', '排班草稿', '报名未开始', '招生中', '已满员', '进行中', '已结束', '已取消']) + selectField('所属批次', 'batch', ['春季', '暑假', '秋季', '寒假']) + selectField('所属专业', 'category', professionalOptions) + inputField('关键词', 'keyword', '班级名称 / 课程名称', true)) + table('<thead><tr><th>班级名称</th><th>关联课程</th><th>批次</th><th>教师</th><th>报名/容量</th><th>班级状态</th><th>排班版本</th><th>快速报名</th><th>操作</th></tr></thead>'));
+  const rows = (row) => `<td><a class="reference-link" href="#">${row.name}</a></td><td>${row.course}</td><td>${row.batch}</td><td>${row.teacher || '待排班'}</td><td>${row.enrolled} / ${row.capacity}</td><td>${tag(row.status)}</td><td>${row.scheduleVersion ? `v${row.scheduleVersion}` : '—'}</td><td>${row.fast}</td><td class="action-cell"><button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-edit">编辑</button>${['待排班', '排班草稿'].includes(row.status) ? '<button class="text-button" data-business-action="class-schedule">去排课</button>' : ''}</td>`;
   renderRows(businessData, rows, () => true);
-  document.querySelector('#class-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, batch, category, display, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!batch.value || row.batch === batch.value) && (!category.value || row.category === category.value) && (!display.value || row.display === display.value) && (!keyword.value.trim() || `${row.name}${row.course}`.includes(keyword.value.trim()))); });
+  document.querySelector('#class-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, batch, category, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!batch.value || row.batch === batch.value) && (!category.value || row.category === category.value) && (!keyword.value.trim() || `${row.name}${row.course}`.includes(keyword.value.trim()))); });
 }
 
 function renderTrials() {
@@ -573,6 +569,35 @@ function openOrderDetail(row) {
   return openBusinessDialog('订单详情', `${row.number} · ${row.name}`, `<div class="course-detail-grid">${body}</div>`, '<button type="button" class="button" data-dialog-close>关闭</button>');
 }
 
+function readonlyRows(rows) {
+  return `<dl class="course-detail-list">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value ?? '—'))}</dd></div>`).join('')}</dl>`;
+}
+function saleUnitDisplayReadonly(row) {
+  return `<div class="sales-display-readonly"><div><span>展示封面</span><strong>${escapeHtml(row.coverFile || row.cover || '未配置')}</strong></div><div><span>C 端推荐语</span><strong>${escapeHtml(row.recommendation || row.recommend || '未配置')}</strong></div><div><span>课程标签</span><strong>${escapeHtml(courseDisplayTags(row).join('、') || '未配置')}</strong></div><div class="wide"><span>图文详情</span><section class="sales-display-preview">${richTextToHtml(row.displayDetail || row.detail, '<span class="sub-cell">未配置</span>')}</section></div></div>`;
+}
+function openProductDetail(row) {
+  const course = businessCourse(row.courseId);
+  const changes = Array.isArray(row.priceChanges) ? row.priceChanges : [];
+  const changeRows = changes.length ? changes.map(change => `<tr><td>${escapeHtml(change.at || '—')}</td><td>${escapeHtml(change.item || '售价')}</td><td>${escapeHtml(change.from || '—')}</td><td>${escapeHtml(change.to || '—')}</td><td>${escapeHtml(change.operator || '—')}</td></tr>`).join('') : '<tr><td colspan="5">暂无变更记录</td></tr>';
+  const body = `${workspaceTabs([['overview', '商品概览'], ['course', '课程内容'], ['sale', '展示与销售'], ['changes', '变更记录']], 'overview')}<section data-workspace-panel="overview" class="sales-workspace-panel">${readonlyRows([['商品编号', row.id], ['商品名称', row.name], ['商品状态', row.status], ['售卖价格', `¥${row.price}`], ['销售数量', row.sales], ['关联课程', row.course], ['引用版本', `v${row.courseVersion || 1}`], ['上架时间', row.updated || row.shelfAt || '—']])}</section><section data-workspace-panel="course" class="sales-workspace-panel" hidden>${courseReadonlyContent(course)}</section><section data-workspace-panel="sale" class="sales-workspace-panel" hidden>${readonlyRows([['售卖价格', `¥${row.price}`], ['试看策略', row.preview], ['试看课时', row.previewHours || '—'], ['商品状态', row.status], ['定时上架', row.shelfAt || '—']])}${saleUnitDisplayReadonly(row)}</section><section data-workspace-panel="changes" class="sales-workspace-panel" hidden><div class="sales-table-wrap"><table><thead><tr><th>生效时间</th><th>变更项</th><th>变更前</th><th>变更后</th><th>操作人</th></tr></thead><tbody>${changeRows}</tbody></table></div></section>`;
+  const dialog = openBusinessDialog('商品详情', `${row.name} · ${row.status}`, body, '<button type="button" class="button" data-dialog-close>关闭</button><button type="button" class="button primary" data-business-action="product-edit-detail">编辑商品</button>', { workspace: true });
+  dialog.querySelector('[data-business-action="product-edit-detail"]')?.addEventListener('click', () => { closeBusinessDialog(); openProductForm(row); });
+  initWorkspace(dialog, 'overview');
+}
+function openClassDetail(row) {
+  const course = businessCourse(row.courseId);
+  const shared = readDemoState();
+  const enrollments = (shared.enrollments || []).filter(item => item.classId === row.id && item.status === '已报名');
+  const students = shared.students || [];
+  const roster = enrollments.length ? enrollments.map(item => { const student = students.find(entry => entry.id === item.studentId); return `<tr><td>${escapeHtml(student?.name || item.studentId)}</td><td>${escapeHtml(item.enrolledAt || '—')}</td><td>已报名 / 已分班</td></tr>`; }).join('') : '<tr><td colspan="3">暂无学员报名</td></tr>';
+  const sessions = Array.isArray(row.sessions) ? row.sessions : [];
+  const body = `${workspaceTabs([['overview', '班级概览'], ['course', '课程内容'], ['teaching', '教学安排'], ['enrollment', '招生设置'], ['students', '学员与记录']], 'overview')}<section data-workspace-panel="overview" class="sales-workspace-panel">${readonlyRows([['班级编号', row.id], ['班级名称', row.name], ['关联课程', row.course], ['引用版本', `v${row.courseVersion || 1}`], ['运营状态', row.status], ['前台展示', row.display], ['定价', `¥${row.price}`], ['报名 / 容量', `${row.enrolled || 0} / ${row.capacity || 0}`]])}</section><section data-workspace-panel="course" class="sales-workspace-panel" hidden>${courseReadonlyContent(course)}</section><section data-workspace-panel="teaching" class="sales-workspace-panel" hidden>${readonlyRows([['所属批次', row.batch], ['授课教师', row.teacher], ['校区', row.campus], ['教室', row.classroom], ['上课规则', row.schedule], ['首次上课', row.firstLessonDate || '—'], ['课次时长', `${row.lessonDuration || DEFAULT_LESSON_DURATION} 分钟`], ['已生成课次', sessions.length]])}</section><section data-workspace-panel="enrollment" class="sales-workspace-panel" hidden>${readonlyRows([['课程定价', `¥${row.price}`], ['报名开始', row.enrollStart || '—'], ['报名截止', row.deadline || '—'], ['快速报名', row.fast], ['支持试听', row.trialEnabled || '是'], ['试听收费', row.trialFee || '否'], ['试听价格', row.trialFee === '是' ? `¥${row.trialPrice || 0}` : '免费'], ['试听说明', row.trialNote || '—']])}${saleUnitDisplayReadonly(row)}</section><section data-workspace-panel="students" class="sales-workspace-panel" hidden><div class="sales-dialog-summary"><div><span>已报名</span><strong>${row.enrolled || 0}</strong></div><div><span>招生容量</span><strong>${row.capacity || 0}</strong></div><div><span>剩余名额</span><strong>${Math.max(0, Number(row.capacity || 0) - Number(row.enrolled || 0))}</strong></div></div><div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>状态</th></tr></thead><tbody>${roster}</tbody></table></div></section>`;
+  const scheduleAction = ['待排班', '排班草稿'].includes(deriveClassStatus(row)) ? `<a class="button primary" href="/admin/pages/academic/scheduling.html?classId=${encodeURIComponent(row.id)}">去排课</a>` : '';
+  const dialog = openBusinessDialog('班级详情', `${row.name} · ${deriveClassStatus(row)}`, body, `<button type="button" class="button" data-dialog-close>关闭</button><button type="button" class="button" data-business-action="class-edit-detail">编辑班级</button>${scheduleAction}`, { workspace: true });
+  dialog.querySelector('[data-business-action="class-edit-detail"]')?.addEventListener('click', () => { closeBusinessDialog(); openClassForm(row); });
+  initWorkspace(dialog, 'overview');
+}
+
 function openDetail(row, kind) {
   const labels = kind === 'product' ? [['商品名称', row.name], ['关联课程', row.course], ['售价', `¥${row.price}`], ['销售数量', row.sales], ['商品状态', row.status], ['上架时间', row.updated]] : kind === 'order' ? [['订单号', row.number], ['课程类型', row.type], ['学员', row.student], ['订单金额', `¥${row.amount}`], ['订单状态', row.status], ['关联状态', row.fulfillment], ['关联班级 / 权限', row.linked], ['下单时间', row.time]] : kind === 'class' ? [['班级名称', row.name], ['关联课程', row.course], ['授课教师', row.teacher], ['报名情况', `${row.enrolled} / ${row.capacity}`], ['运营状态', row.status], ['前台展示状态', row.display]] : kind === 'trial' ? [['学员', row.student], ['家长手机号', row.phone], ['目标课程', row.course], ['试听时间', row.time], ['校区', row.campus], ['试听状态', row.status]] : kind === 'lead' ? [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course], ['来源', row.source], ['线索状态', row.status]] : [['线索编号', row.number], ['联系人', row.student], ['意向课程', row.course], ['试听状态', row.trial], ['报名状态', row.status], ['报名班级', row.className]];
   openBusinessDialog(`${kind === 'product' ? '商品' : kind === 'order' || kind === 'offline' ? '订单' : kind === 'class' ? '班级' : kind === 'trial' ? '试听预约' : kind === 'lead' ? '线索' : '报名转化'}详情`, '查看当前记录的完整字段和状态。', `<div class="sales-detail-list">${labels.map(([label, value]) => `<div><span>${label}</span><strong>${label.includes('状态') ? tag(value) : escapeHtml(value)}</strong></div>`).join('')}</div>`);
@@ -596,7 +621,7 @@ function openSimpleForm(title, subtitle, fields, onSubmitMessage) {
 }
 
 function handleBusinessAction(action, row) {
-  if (action === 'product-view') { openDetail(row, 'product'); appendProductChangeLog(row); return; }
+  if (action === 'product-view') return openProductDetail(row);
   if (action === 'product-create' || action === 'product-edit') return openProductForm(row);
   // RM-F-09: one-click demo reset so a live review never depends on pre-seeded results.
   if (action === 'demo-reset') {
@@ -608,12 +633,9 @@ function handleBusinessAction(action, row) {
   }
   if (action === 'product-publish' || action === 'product-unpublish') { row.status = action === 'product-publish' ? '已上架' : '已下架'; row.updated = action === 'product-publish' ? demoTime() : row.updated; persistProduct(row); renderProducts(); showToast(action === 'product-publish' ? '商品已上架，学员端可购买。' : '商品已下架，历史订单不受影响。'); return; }
   if (action === 'order-view') return openOrderDetail(row);
-  if (action === 'class-view') { openDetail(row, 'class'); appendClassRosterSection(row); return; }
+  if (action === 'class-view') return openClassDetail(row);
   if (action === 'class-create' || action === 'class-edit') return openClassForm(row);
-  if (action === 'class-publish') return openClassForm(row);
-  if (action === 'class-unpublish') {
-    row.display = '已下架'; persistClass(row); renderClasses(); showToast('班级已下架，学员端不再展示，运营状态保持不变。'); return;
-  }
+  if (action === 'class-schedule') { location.href = `/admin/pages/academic/scheduling.html?classId=${encodeURIComponent(row.id)}`; return; }
   if (action === 'trial-view') return openDetail(row, 'trial');
   if (action === 'trial-confirm') { row.status = '已确认'; renderTrials(); showToast('试听时间已确认，已发送学员通知。'); return; }
   if (action === 'trial-create') return openSimpleForm('登记试听', '从线索带入学员信息，填写试听时间、校区和教师。', inputField('学员姓名', 'student', '请输入学员姓名') + inputField('家长手机号', 'phone', '请输入手机号') + inputField('学员年龄', 'age', '如 8 岁') + inputField('目标课程', 'course', '请输入目标课程') + inputField('试听时间', 'time', '2026-09-20 09:00') + selectField('试听校区', 'campus', ['龙泉校区', '南湖校区']) + selectField('试听教师', 'teacher', ['王玥', '陈晨', '赵老师']) + '<label class="form-field wide"><span>备注</span><textarea name="remark" placeholder="选填，记录试听安排或特殊说明"></textarea></label>', '试听记录已登记。');
@@ -635,7 +657,7 @@ document.addEventListener('click', (event) => {
   const row = rowElement ? businessData.find((item) => item.id === rowElement.dataset.rowId) : null;
   // RM-U-02: both publish and unpublish require a second confirmation; publishing states that the
   // course becomes visible in the mini program.
-  if (action === 'product-publish' || action === 'product-unpublish' || action === 'class-unpublish') {
+  if (action === 'product-publish' || action === 'product-unpublish') {
     if (!row) return;
     const subject = action === 'product-publish'
       ? `确认上架商品“${row.name}”？确认后小程序端可见，未购买账号可按商品价格购买。`
@@ -652,7 +674,7 @@ document.addEventListener('click', (event) => {
   handleBusinessAction(action, row);
 });
 document.addEventListener('click', (event) => { const confirm = event.target.closest('[data-confirm-action]'); if (!confirm) return; const action = confirm.dataset.confirmAction; closeBusinessDialog(); const rowId = businessActive; if (rowId) { const row = businessData.find((item) => item.id === rowId); handleBusinessAction(action, row); } });
-document.addEventListener('click', (event) => { const actionElement = event.target.closest('[data-business-action]'); const row = actionElement?.closest('tr[data-row-id]'); if (actionElement && row && ['product-publish', 'product-unpublish', 'class-unpublish'].includes(actionElement.dataset.businessAction)) businessActive = row.dataset.rowId; });
+document.addEventListener('click', (event) => { const actionElement = event.target.closest('[data-business-action]'); const row = actionElement?.closest('tr[data-row-id]'); if (actionElement && row && ['product-publish', 'product-unpublish'].includes(actionElement.dataset.businessAction)) businessActive = row.dataset.rowId; });
 
 subscribeDemoState(() => {
   syncSharedBusinessData();
@@ -676,13 +698,12 @@ if (businessPage === 'orders') renderOrders();
 if (businessPage === 'batches') renderBatches();
 if (businessPage === 'classes') {
   renderClasses();
-  // CR-2026-012：课程库「发布班级」带课程编号进入本页时直接打开该课程的发布表单，
-  // 完整课程与轻量课程档案都能在此维护写入课程档案的展示信息。
+  // 课程库入口带入课程及版本，仍进入同一个面授班级创建工作台。
   const requestedClassCourseId = businessParams.get('courseId');
   if (requestedClassCourseId) {
     const targetClass = dataSets.classes.find(item => item.courseId === requestedClassCourseId);
     if (targetClass) openClassForm(targetClass);
-    else showToast('该课程还没有可发布的班级，请先由教务创建班级', 'error');
+    else openClassForm(null, { courseId: requestedClassCourseId });
   }
 }
 if (businessPage === 'trials') renderTrials();

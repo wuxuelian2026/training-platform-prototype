@@ -46,16 +46,17 @@ export const LEARNER_APP_FIELD_SPEC = {
       groups: [
         { heading: '快速报名字段', fields: [
           { id: 'FD-LAPP-014', label: '报名学员', type: '单选', length: '账号下关联学员', required: '是', note: '面授报名必须选择具体学员；默认当前学员', constraints: { required: true } },
-          { id: 'FD-LAPP-015', label: '班级信息', type: '只读', length: '—', required: '系统展示', note: '展示班级、教师、校区、教室、上课时间、总课时与剩余名额', constraints: { readOnly: true, system: true } },
-          { id: 'FD-LAPP-016', label: '快速报名确认', type: '开关', length: '是 / 否', required: '是', note: '确认后进入支付；名额以支付成功为占用时点', constraints: { boolean: true } },
-          { id: 'FD-LAPP-017', label: '立即报名', type: '按钮', length: '—', required: '是', note: '校验学员、名额与重复报名后生成面授订单', constraints: { action: true } }
+          { id: 'FD-LAPP-015', label: '班级快照', type: '只读', length: '—', required: '系统展示', note: '按 classId 展示班级、课程、教师、首课日期、时间、校区、教室、课次、价格、余位与招生状态', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-016', label: '追溯版本', type: '只读', length: 'courseVersion + scheduleVersion', required: '系统展示', note: '内部锁定课程版本与已发布排班版本，MVP 不强制显示版本号', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-017', label: '试听政策', type: '只读', length: '支持与否 + 收费方式 + 说明', required: '是', note: '只展示政策并联系课程顾问，不提供自助试听预约', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-034', label: '报名动作', type: '按钮', length: '立即报名 / 继续支付 / 已报名 / 退款处理中', required: '是', note: '按登录、学员档案、订单与 bookable 结果决定唯一主动作', constraints: { action: true } }
         ] }
       ],
       notes: [
-        '必须先选择报名学员；班级状态须为招生中（已满员、已下架或已结束不提供报名入口）。',
-        '同一账号同一学员同一班级不得重复报名，已支付订单不得重复提交。',
-        '校验通过生成面授订单并进入支付页，进入支付页不占用名额；支付成功后按所选班级自动分班并占用名额。',
-        '支付成功后名额占用失败时订单进入“退款中”并自动全额原路退款，不生成报名与分班记录、不自动调班。'
+        '路由显式使用 classId，不得用 courseId 代替班级主键。',
+        '班级可见、可报、快速频道曝光三项独立；学员可见状态只使用即将开放、可报名、已满员、报名结束。',
+        '同一 account_id + student_id + class_id 不得产生重复有效报名或重复待支付订单。',
+        '名额以支付成功为准。提交订单不占用名额。'
       ]
     },
 

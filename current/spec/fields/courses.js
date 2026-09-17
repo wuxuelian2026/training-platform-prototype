@@ -12,7 +12,7 @@ export const COURSE_TEACHING_FIELDS = [
 ];
 
 export const COURSE_DISPLAY_FIELDS = [
-  { label: '课程封面', type: '图片上传', length: '单个图片', required: '完整课程首次发布必填', note: '售卖单元级存储；完整课程首次发布必填，轻量课程档案可选填，未上传时使用系统默认封面', constraints: { maxFiles: 1, image: true } },
+  { label: '课程封面', type: '图片上传', length: '单个图片', required: '发布时必填', note: '售卖单元级存储；草稿可为空，首次上架商品或发布班级前必须上传', constraints: { maxFiles: 1, image: true } },
   { label: '图文详情', type: '富文本', length: '≤ 2000 字', required: '否', note: '售卖单元级存储，学员端课程详情展示；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 2000, richText: true } },
   { label: '课程标签', type: '标签输入', length: '单个标签 ≤ 12 字', required: '否', note: '售卖单元级存储，列表卡片与详情页展示' },
   { label: 'C 端推荐语', type: '文本', length: '≤ 30 字', required: '否', note: '售卖单元级存储，学员端展示的推荐语', constraints: { maxLength: 30 } }
@@ -39,13 +39,20 @@ export const COURSE_FIELD_SPEC = {
           { id: 'FD-COURSE-028', label: '上级节点', type: '下拉', length: '按层级选择门类或分类', required: '门类外必填', note: '分类挂到门类，专业挂到分类；门类没有上级', constraints: { dictionary: '目录树' } },
           { id: 'FD-COURSE-002', label: '图标', type: '文本', length: '≤ 20 字', required: '否', note: '仅门类使用，小程序端展示', constraints: { maxLength: 20 } },
           { id: 'FD-COURSE-003', label: '排序', type: '数字', length: '0 及以上整数', required: '否', note: '同级内数字越小越靠前', constraints: { min: 0, integer: true } }
+        ] },
+        // CR-2026-034 §2：专业节点的引用统计与停用／删除前的引用清单。
+        { heading: '专业引用统计与退出字段', fields: [
+          { id: 'FD-COURSE-062', label: '专业引用统计', type: '只读', length: '教师 x · 课程 y · 资源 z', required: '系统派生', note: '专业节点直接展示三项计数，数量为 0 时显示 0，便于识别未被使用的专业；计数由数据实时派生，与停用／删除守卫同源', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-063', label: '引用清单', type: '只读列表', length: '按教师 / 课程 / 资源分组', required: '停用或删除前展示', note: '点击停用或删除先展示引用清单，条目可点击跳转到教师详情、课程库对应课程与资源库对应资源', constraints: { readOnly: true } },
+          { id: 'FD-COURSE-064', label: '停用专业', type: '按钮', length: '—', required: '是', note: '停用后不再出现在新的申报与筛选项；已发布课程与班级的既有专业值不受影响；有引用的专业只能停用，不得删除', constraints: { action: true } },
+          { id: 'FD-COURSE-065', label: '删除专业', type: '按钮', length: '—', required: '引用清单为空时可用', note: '只有引用清单为空才允许物理删除；有引用时清单内只提供停用', constraints: { action: true } }
         ] }
       ],
       notes: [
         '目录为门类 → 分类 → 专业三级，三级共用一张表单，按当前层级显示上级节点。',
         '后台列表按目录树展示，可逐级展开查看分类与专业。',
         '专业是全系统课程、资源和排课的引用来源。',
-        '已被课程或教师引用的目录不允许直接删除，需先停用。',
+        '已被课程或教师引用的目录不允许直接删除，需先停用；停用与删除的判定与专业节点展示的引用统计使用同一份派生结果。',
         '所有引用专业的功能均按同一目录取值，不在模块内单独维护。'
       ]
     },
@@ -63,7 +70,8 @@ export const COURSE_FIELD_SPEC = {
         '通过后课程进入课程库；驳回后申报人可修改并重新提交。',
         '审批记录保留审批人、审批时间与意见。',
         '审批不改变课程申报的量纲与编号规则。',
-        '通过时可填写备注；驳回时必须填写原因。'
+        '通过时可填写备注；驳回时必须填写原因。',
+        'CR-2026-034：通过后当场给出“查看该课程编排”入口，跳转课程库内容编排视图并定位到该课程，不必回列表再检索。'
       ]
     },
     'courses/resources': {
@@ -95,21 +103,31 @@ export const COURSE_FIELD_SPEC = {
 
     'courses/library': {
       groups: [
-        { heading: '新建轻量课程档案字段', fields: [
-          { id: 'FD-COURSE-016', label: '课程名称', type: '文本', length: '2–30 字', required: '是', note: '轻量档案名称，用于快速报名班级', constraints: { minLength: 2, maxLength: 30 } },
+        { heading: '后台新增面授课程基本信息', fields: [
+          { id: 'FD-COURSE-055', label: '课程编号', type: '文本', length: '≤ 30 字', required: '是', note: '课程唯一编号，创建后只读且不可重复', constraints: { maxLength: 30, unique: true } },
+          { id: 'FD-COURSE-016', label: '课程名称', type: '文本', length: '2–30 字', required: '是', note: '面授课程名称', constraints: { minLength: 2, maxLength: 30 } },
           { id: 'FD-COURSE-017', label: '所属专业', type: '下拉', length: '专业目录', required: '是', note: '按专业目录引用' },
-          { id: 'FD-COURSE-018', label: '课程类型', type: '文本（只读）', length: '面授课程', required: '系统固定', note: '轻量档案仅用于面授快速报名', constraints: { system: true, readOnly: true } },
+          { id: 'FD-COURSE-018', label: '课程类型', type: '文本（只读）', length: '面授课程', required: '系统固定', note: '后台新增入口固定创建面授课程', constraints: { system: true, readOnly: true } },
+          { id: 'FD-COURSE-056', label: '申报教师', type: '下拉', length: '教师档案', required: '是', note: '引用已建档教师' },
           { id: 'FD-COURSE-019', label: '总课时', type: '数字', length: '≥ 1 的整数', required: '是', note: '单位：课次数' },
-          { id: 'FD-COURSE-020', label: '简短课程介绍', type: '多行文本', length: '≤ 500 字', required: '是', note: '快速报名详情页展示', constraints: { maxLength: 500 } },
-          { id: 'FD-COURSE-030', label: '课程大纲', type: '富文本', length: '≤ 2000 字', required: '否', note: '可选展示内容，不作为教学执行前置条件；教学执行按课次开展；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 2000, richText: true } }
+          { id: 'FD-COURSE-053', label: '难度等级', type: '下拉', length: '启蒙 / 初级 / 中级 / 高级 / 考级冲刺', required: '是', note: '作为课程教学属性' },
+          { id: 'FD-COURSE-054', label: '适合年龄', type: '多选', length: '全年龄段 / 少儿 / 青少年 / 成人', required: '是', note: '至少选择一项' }
         ] },
         // CR-2026-025：全部课程页签的行内查看／编辑拆分与版本号、历史版本入口。
         { heading: '查看与版本字段', fields: [
-          { id: 'FD-COURSE-046', label: '查看', type: '按钮', length: '—', required: '是', note: '打开只读详情，展示档案字段、版本号与编排摘要，不提供写入控件', constraints: { action: true } },
-          { id: 'FD-COURSE-047', label: '编辑', type: '按钮', length: '—', required: '是', note: '打开可编辑档案表单，保存按版本规则决定是否生成新版本', constraints: { action: true } },
+          { id: 'FD-COURSE-046', label: '查看', type: '按钮', length: '—', required: '是', note: '打开基本信息／课程大纲两个只读页签，不提供写入控件', constraints: { action: true } },
+          { id: 'FD-COURSE-047', label: '编辑', type: '按钮', length: '—', required: '是', note: '打开基本信息／课程大纲两个可编辑页签；基本字段或章节课时保存时统一执行版本规则', constraints: { action: true } },
           { id: 'FD-COURSE-048', label: '版本号', type: '只读', length: 'v1 起单调递增', required: '系统生成', note: '当前版本；存在历史版本时点击进入该课程的历史版本列表', constraints: { readOnly: true, system: true } },
           { id: 'FD-COURSE-049', label: '历史版本', type: '按钮', length: '—', required: '是', note: '打开版本历史列表，历史版本整体快照只读且可回溯', constraints: { action: true } },
           { id: 'FD-COURSE-050', label: '变更摘要', type: '只读', length: '变更字段清单', required: '系统生成', note: '历史版本列表中的本版本变更字段与操作人、生成时间并列展示', constraints: { readOnly: true, system: true } }
+        ] },
+        // CR-2026-034 §4：课程档案采用停用开关（不新增状态机），停用只拦新的发布动作。
+        { heading: '课程档案启用与退出字段', fields: [
+          { id: 'FD-COURSE-057', label: '启用状态', type: '只读', length: '启用 / 已停用', required: '系统派生', note: '由停用日期派生：停用日期为空即启用，非空展示“已停用”并附停用时间、操作人与原因', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-058', label: '启用状态筛选', type: '下拉', length: '全部 / 启用 / 已停用', required: '否', note: '仅在“全部课程”页签展示，默认全部', constraints: { options: ['全部', '启用', '已停用'] } },
+          { id: 'FD-COURSE-059', label: '停用', type: '按钮', length: '—', required: '是', note: '弹出停用确认并填写停用原因（必填，≤200 字）；停用后不再出现在发布商品与发布班级的候选课程中，不自动下架在售商品、不关停已发布班级、不回收已购学习权限', constraints: { action: true } },
+          { id: 'FD-COURSE-060', label: '启用', type: '按钮', length: '—', required: '是', note: '清空停用日期后恢复发布准入；版本号继续递增，不重置', constraints: { action: true } },
+          { id: 'FD-COURSE-061', label: '删除', type: '按钮', length: '—', required: '条件可用', note: '仅“后台新增”来源且未被任何售卖单元引用的课程可删除，删除前二次确认并写明名称与编号；教师申报课程有来源追溯要求，只能停用', constraints: { action: true } }
         ] },
         // CR-2026-021：课程内容编排并入课程库，编排工作台字段随页面并入。
         { heading: '教学属性字段（编排）', fields: courseFieldRows('COURSE', 44, COURSE_TEACHING_FIELDS) },
@@ -129,14 +147,15 @@ export const COURSE_FIELD_SPEC = {
         ] }
       ],
       notes: [
+        '“新增面授课程”仅维护 8 项基本信息，保存后生成待编排课程，入口仅放在内容编排视图。',
         '编排工作台按“章节 → 课时”两层结构维护，章节可增删改并拖拽排序，课时挂在章节下。',
-        '编排保存后直接生效，不设二次审核；完成编排后课程进入课程库。',
+        '教师申报通过与后台新增课程均进入待编排；完成编排后进入全部课程。',
         '视频课程完成编排前强制校验每个课时都关联了视频资源；面授课程的资源关联为可选。',
         '面授课程完成编排时校验课时总数等于申报总课时，不一致时阻止完成并提示补齐或删除。',
-        '轻量课程档案只用于快速报名班级，不进入课程内容编排。',
-        '课程库记录来源课程编号，与课程中心的内容编排相互独立。',
-        '课程库区分完整课程与轻量课程档案：完整课程需完成编排后才能发布商品或班级，轻量档案只用于快速报名班级。',
-        '封面、难度等级、适合年龄、图文详情、课程标签和 C 端推荐语在「课程展示信息」维护，完整课程与轻量课程共用。'
+        '全部课程的查看与编辑均分为基本信息、课程大纲两个页签；查看全部只读，编辑可修改基本字段及章节课时。',
+        '课程展示信息在视频商品或面授班级上维护，不写入课程基本信息或课程大纲。',
+        'CR-2026-034：课程档案用停用日期表达“能否再发布”，不新增课程生命周期状态；停用只拦新的发布动作，不自动下架在售商品、不关停已发布班级、不回收已购学习权限、不改写历史订单与计薪。',
+        'CR-2026-034：仅“后台新增”来源且未被任何售卖单元引用的课程可物理删除；教师申报课程有来源追溯要求，只能停用。'
       ]
     }
   }

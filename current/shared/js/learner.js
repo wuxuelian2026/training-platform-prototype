@@ -12,6 +12,7 @@ import { allProducts, productForCourse } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, saleUnitDisplay } from './course-display.js';
 import { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } from './teacher-facts.js';
 import { isRichMarkup, richTextToHtml, sanitizeRichText } from './rich-editor.js';
+import { classSalesProjection } from './class-lifecycle.js';
 
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
@@ -25,33 +26,45 @@ const homeBanners = resolveHomeBanners(readDemoState());
 
 // P0-1 / P0-2: learner classes are projected from the canonical class seed, so the admin CRM and the
 // learner app always show the same class key, name, enrollment count and 快速报名 switch value.
+const learnerCourseCopy = {
+  'COURSE-CR-2026-0001': { intro: '从身体控制、节奏训练到基本舞姿，建立少儿中国舞的基础训练体系。', detail: ['课程根据少儿身体发展特点安排训练强度，通过热身、基本功、组合练习和课堂展示形成完整学习过程。'], outline: [{ title: '第一阶段 · 身体启蒙', note: '4课次' }, { title: '第二阶段 · 基本功训练', note: '6课次' }, { title: '第三阶段 · 舞蹈组合', note: '6课次' }] },
+  'LIB-003': { intro: '以主题创作和材料体验为主，帮助少儿建立绘画兴趣和基本表现方法。', detail: ['课程围绕色彩、造型和材料体验展开，每次课完成一件小作品。'], outline: [{ title: '第一阶段 · 色彩与线条', note: '7课次' }, { title: '第二阶段 · 主题创作', note: '7课次' }, { title: '第三阶段 · 作品展示', note: '6课次' }] },
+  'COURSE-CR-2026-0003': { intro: '以笔墨体验和传统题材临摹为主，适合零基础少儿建立国画兴趣。', detail: ['从认识工具、执笔与用墨开始，逐步完成基础题材练习。'], outline: [{ title: '第一阶段 · 笔墨入门', note: '8课次' }, { title: '第二阶段 · 传统题材', note: '12课次' }] }
+};
 const learnerClassCopy = {
   'class-001': { intro: '围绕基本功、身韵组合和课堂展示，帮助少儿学员建立规范动作与舞蹈表现力。', detail: ['课程根据少儿身体发展特点安排训练强度，通过热身、基本功、组合练习和课堂展示形成完整学习过程。', '教师会在课堂中持续观察动作完成情况，并提供阶段性练习建议。'], outline: [{ title: '第一阶段 · 身体启蒙', note: '4课次' }, { title: '第二阶段 · 基本功训练', note: '6课次' }, { title: '第三阶段 · 舞蹈组合', note: '6课次' }] },
   'class-002': { intro: '以主题创作和材料体验为主，帮助少儿建立绘画兴趣和基本表现方法。', detail: ['课程围绕色彩、造型和材料体验展开，每次课完成一件小作品。'], outline: [{ title: '第一阶段 · 色彩与线条', note: '7课次' }, { title: '第二阶段 · 主题创作', note: '7课次' }, { title: '第三阶段 · 作品展示', note: '6课次' }] },
   'class-003': { intro: '在基本功之上加入身韵组合与舞台表现训练，适合已完成启蒙阶段、希望继续提升的少儿学员。', detail: ['课程按提升班节奏训练基本功稳定性和动作连贯性，并加入组合与舞台表现内容。', '教师会在每次课后给出练习建议，便于家长协助学员复习。'], outline: [{ title: '第一阶段 · 基本功巩固', note: '4课次' }, { title: '第二阶段 · 身韵组合', note: '6课次' }, { title: '第三阶段 · 舞台呈现', note: '6课次' }] }
 };
-const learnerClassCourses = classSeed.filter(item => item.display === '已展示').map(item => {
-  const remaining = Math.max(0, Number(item.capacity || 0) - Number(item.enrolled || 0));
+function classToLearnerItem(item) {
+  const projection = classSalesProjection(item);
+  const courseCopy = learnerCourseCopy[item.courseId] || learnerClassCopy[item.id] || {};
   return {
-    id: item.id, type: 'class', name: item.name, className: item.className, courseName: item.courseName,
+    id: item.id, classId: item.id, type: 'class', objectType: 'class', name: item.name, className: item.className || item.name, courseName: item.courseName || item.course,
     courseId: item.courseId,
     teacher: item.teacher, category: item.category, discipline: item.discipline, field: item.field, professional: item.professional,
     level: item.level, age: item.age, hours: item.lessons, lessons: item.lessons, price: Number(item.price),
     season: item.season, campus: item.campus, classroom: item.classroom, schedule: item.schedule,
-    seats: `${remaining}/${item.capacity}`, classStatus: Number(item.enrolled || 0) >= Number(item.capacity || 0) ? '已满员' : item.status,
+    seats: `${projection.remainingSeats}/${item.capacity}`, remainingSeats: projection.remainingSeats, classStatus: projection.learnerStatus, learnerStatus: projection.learnerStatus,
     deadline: String(item.deadline || '').slice(0, 10), fast: item.fast, capacity: Number(item.capacity || 0), enrolled: Number(item.enrolled || 0),
-    status: '可报名', ...(learnerClassCopy[item.id] || {})
+    status: projection.learnerStatus, enrollable: projection.bookable, bookable: projection.bookable, visible: projection.visible,
+    visibleInFastChannel: projection.visibleInFastChannel, unavailableReason: projection.unavailableReason?.message || '', unavailableReasonCode: projection.unavailableReason?.code || '',
+    courseVersion: Number(item.courseVersion || 1), scheduleVersion: Number(item.scheduleVersion || 1), firstLessonDate: item.firstLessonDate || item.sessions?.[0]?.date || '',
+    trialEnabled: item.trialEnabled || '是', trialFee: item.trialFee || '否', trialPrice: item.trialPrice || '', trialNote: item.trialNote || '请联系课程顾问了解试听安排。',
+    ...courseCopy
   };
-});
+}
+
+const learnerClassCourses = classSeed.map(classToLearnerItem);
 
 const demo = {
   phone: '138****2026',
   wechatAuthorized: true,
   students: [{ id: 'student-001', name: '林知夏', gender: '女', birthMonth: '2017-05', relation: '女儿' }, { id: 'student-002', name: '林知远', gender: '男', birthMonth: '2015-10', relation: '儿子' }],
   courses: [
-    { id: 'COURSE-CR-2026-0002', type: 'video', name: '声乐演唱技巧', teacher: '陈晨', category: '音乐表演', discipline: '音乐', field: '音乐表演', professional: '声乐演唱', level: '中级', age: '成人', hours: 12, price: 1280, progress: 45, chapter: '第3章 · 作品演唱', status: '可购买', intro: '从发声、气息、共鸣到作品演唱，建立清晰、可反复练习的声乐训练路径。', detail: ['课程从呼吸与发声基础开始，逐步进入共鸣位置、咬字处理和作品表达，适合已有基础、希望系统提升演唱能力的学员。', '每节课包含教师示范、训练重点和课后练习建议，可按自己的节奏重复观看。'], outline: [{ title: '第1章 · 发声基础', note: '4课时' }, { title: '第2章 · 气息与共鸣', note: '4课时' }, { title: '第3章 · 作品演唱', note: '4课时' }] },
-    ...learnerClassCourses
+    { id: 'COURSE-CR-2026-0002', type: 'video', objectType: 'course', name: '声乐演唱技巧', teacher: '陈晨', category: '音乐表演', discipline: '音乐', field: '音乐表演', professional: '声乐演唱', level: '中级', age: '成人', hours: 12, price: 1280, progress: 45, chapter: '第3章 · 作品演唱', status: '可购买', intro: '从发声、气息、共鸣到作品演唱，建立清晰、可反复练习的声乐训练路径。', detail: ['课程从呼吸与发声基础开始，逐步进入共鸣位置、咬字处理和作品表达，适合已有基础、希望系统提升演唱能力的学员。', '每节课包含教师示范、训练重点和课后练习建议，可按自己的节奏重复观看。'], outline: [{ title: '第1章 · 发声基础', note: '4课时' }, { title: '第2章 · 气息与共鸣', note: '4课时' }, { title: '第3章 · 作品演唱', note: '4课时' }] }
   ],
+  classOptions: learnerClassCourses,
   // CR-2026-022 §2.3：名师数据只保留展示字段，取值来自教师档案
   // （FD-TEACHER-002 姓名、FD-TEACHER-010 授课专业、FD-TEACHER-011 从教年限、
   //  FD-TEACHER-012 职称、FD-TEACHER-024 一句话简介、FD-TEACHER-025 简介）；
@@ -119,18 +132,61 @@ function applyCourseDisplay(item) {
     recommendation: display.recommendation
   };
 }
-function sharedLearnerCourses(shared) {
+function sharedLearnerCatalog(shared) {
   const validRows = (rows) => (Array.isArray(rows) ? rows : []).filter(item => item && typeof item === 'object');
-  const courses = validRows(shared.courses).filter(item => item.status === '已完成').map(item => ({
-    id: item.id, type: item.type === '视频课程' ? 'video' : 'class', name: item.name, courseName: item.name, teacher: item.teacher, category: item.major, discipline: item.discipline || item.major, field: item.field || item.major, professional: item.professional || item.major, level: item.level || '初级', age: item.age || '全年龄', hours: Number(item.hours) || 1, lessons: Number(item.hours) || 1, progress: 0, status: '待售', price: 0, intro: item.intro || '', outline: (item.chapters || []).map(chapter => ({ title: chapter.name, note: `${chapter.lessons?.length || 0}课时` }))
+  const courseRows = validRows(shared.courses).filter(item => item.status === '已完成').map(item => ({
+    id: toCanonicalCourseId(item.id), type: item.type === '视频课程' ? 'video' : 'class', objectType: 'course', name: item.name, courseName: item.name, teacher: item.teacher, category: item.major, discipline: item.discipline || item.major, field: item.field || item.major, professional: item.professional || item.major, level: item.level || item.difficulty || '初级', age: item.age || (Array.isArray(item.ages) ? item.ages.join('、') : '') || '全年龄', hours: Number(item.hours) || 1, lessons: Number(item.hours) || 1, progress: 0, status: '待售', price: 0, intro: item.intro || '', outline: (item.chapters || []).map(chapter => ({ title: chapter.name, note: `${chapter.lessons?.length || 0}课时` }))
   }));
   const products = allProducts(shared).filter(item => item.status === '已上架');
-  return courses.filter(item => item.type !== 'video' || products.some(product => product.courseId === item.id)).map(item => {
+  const videos = courseRows.filter(item => item.type === 'video' && products.some(product => toCanonicalCourseId(product.courseId) === item.id)).map(item => {
     const product = products.find(row => row.courseId === item.id);
-    return product ? { ...item, price: Number(product.price || 0), status: '可购买', preview: product.preview, previewHours: product.previewHours } : item;
-  }).concat(validRows(shared.classes).filter(item => item.display === '已展示').map(item => ({
-    id: item.id, courseId: item.courseId, type: 'class', name: item.name, className: item.className || item.name, courseName: item.courseName || item.course, teacher: item.teacher, category: item.category, discipline: item.discipline || item.category, field: item.field || item.category, professional: item.professional || item.category, level: item.level || '初级', age: item.age || '全年龄', hours: Number(item.lessons || item.hours || 0), lessons: Number(item.lessons || item.hours || 0), price: Number(item.price || 0), season: item.batch, campus: item.campus, classroom: item.classroom, schedule: item.schedule, seats: `${Math.max(0, Number(item.capacity || 0) - Number(item.enrolled || 0))}/${item.capacity}`, classStatus: Number(item.enrolled || 0) >= Number(item.capacity || 0) ? '已满员' : item.status || '招生中', deadline: item.deadline, status: '可报名', fast: item.fast || '否', capacity: Number(item.capacity || 0), enrolled: Number(item.enrolled || 0), intro: item.intro || ''
-  }))).map(applyCourseDisplay);
+    return applyCourseDisplay(product ? { ...item, price: Number(product.price || 0), status: '可购买', preview: product.preview, previewHours: product.previewHours } : item);
+  });
+
+  const storedClasses = validRows(shared.classes);
+  const classRecords = classSeed.map(seed => ({ ...seed, ...(storedClasses.find(row => row.id === seed.id) || {}) }));
+  storedClasses.filter(row => !classSeed.some(seed => seed.id === row.id)).forEach(row => classRecords.push(row));
+  const classes = classRecords.map(classToLearnerItem).map(applyCourseDisplay);
+  const offlineCourseIds = new Set([
+    ...courseRows.filter(item => item.type === 'class').map(item => item.id),
+    ...classes.map(item => toCanonicalCourseId(item.courseId)).filter(Boolean)
+  ]);
+  const offlineCourses = [...offlineCourseIds].map(courseId => {
+    const related = classes.filter(item => toCanonicalCourseId(item.courseId) === courseId);
+    const visibleClasses = related.filter(item => item.visible);
+    const bookableClasses = visibleClasses.filter(item => item.bookable);
+    const source = courseRows.find(item => item.id === courseId) || {};
+    const archive = courseArchiveFor(courseId);
+    const sample = related[0] || {};
+    const copy = learnerCourseCopy[courseId] || {};
+    const minimumPrice = bookableClasses.length ? Math.min(...bookableClasses.map(item => Number(item.price || 0))) : 0;
+    return {
+      ...source,
+      ...copy,
+      id: courseId,
+      courseId,
+      type: 'class',
+      objectType: 'course',
+      name: archive?.name || source.name || sample.courseName || sample.course || '面授课程',
+      courseName: archive?.name || source.name || sample.courseName || sample.course || '面授课程',
+      category: archive?.major || source.category || sample.category,
+      discipline: source.discipline || sample.discipline || archive?.major,
+      field: source.field || sample.field || archive?.major,
+      professional: archive?.major || source.professional || sample.professional,
+      level: archive?.difficulty || source.level || sample.level || '初级',
+      age: courseAgesText(archive) || source.age || sample.age || '全年龄',
+      hours: Number(archive?.hours || source.hours || sample.hours || 0),
+      lessons: Number(archive?.hours || source.hours || sample.lessons || 0),
+      courseVersion: Number(archive?.version || sample.courseVersion || 1),
+      classOptions: visibleClasses,
+      bookableClassCount: bookableClasses.length,
+      minimumPrice,
+      price: minimumPrice,
+      status: bookableClasses.length ? `${bookableClasses.length}个班可报` : '暂无可报班级',
+      bookable: bookableClasses.length > 0
+    };
+  });
+  return { courses: [...videos, ...offlineCourses], classes };
 }
 
 function readState() {
@@ -165,7 +221,8 @@ function readState() {
     const accountId = shared.currentAccountId || 'account-001';
     const learners = [...accountStudents(accountId)];
     const accountOrders = (shared.orders || []).filter(order => order.accountId === accountId);
-    const sharedCourses = sharedLearnerCourses(shared);
+    const sharedCatalog = sharedLearnerCatalog(shared);
+    const sharedCourses = sharedCatalog.courses;
     const sharedCourseIds = new Set(sharedCourses.map(item => item.id));
     const mergedCourses = [...knownCourses, ...additionalCourses.filter(item => !item.id || !item.id.startsWith('class-') && !item.id.startsWith('COURSE-') || sharedCourseIds.has(item.id))];
     sharedCourses.forEach(item => { const index = mergedCourses.findIndex(row => row.id === item.id); if (index < 0) mergedCourses.push(item); else mergedCourses[index] = { ...mergedCourses[index], ...item }; });
@@ -203,7 +260,7 @@ function readState() {
     })();
     const featuredTeacherIds = new Set(shared.featuredTeacherIds || []);
     const featuredTeachers = [...knownTeachers, ...additionalTeachers].filter(item => featuredTeacherIds.has(item.id));
-    return { ...demo, ...stored, accountId, students: learners.length ? learners : demo.students, currentStudentId: learners.some(item => item.id === stored.currentStudentId) ? stored.currentStudentId : learners[0]?.id || demo.currentStudentId, courses: sellableCourses, allCourses: displayCourses, teachers: featuredTeachers, allTeachers: [...knownTeachers, ...additionalTeachers], orders: mergedOrders, consultations: [...knownConsultations, ...additionalConsultations], messages: [...knownMessages, ...additionalMessages] };
+    return { ...demo, ...stored, accountId, students: learners, currentStudentId: learners.some(item => item.id === stored.currentStudentId) ? stored.currentStudentId : learners[0]?.id || '', courses: sellableCourses, allCourses: displayCourses, classOptions: sharedCatalog.classes, teachers: featuredTeachers, allTeachers: [...knownTeachers, ...additionalTeachers], orders: mergedOrders, consultations: [...knownConsultations, ...additionalConsultations], messages: [...knownMessages, ...additionalMessages] };
   } catch (error) { console.warn('学员端演示数据合并失败，回退到内置演示数据。', error); return { ...demo }; }
 }
 let state = readState();
@@ -220,7 +277,7 @@ function currentStudent() { return state.students.find(item => item.id === state
 // I1-DEC-25 / RM-U-01: video orders belong to the purchasing account, so the learner-facing pages
 // show the account instead of a student selector. Class orders keep the current-student display.
 function purchaseAccount() { const shared = readDemoState(); return (shared.accounts || []).find(item => item.id === state.accountId) || { name: '当前购买账号', phone: '' }; }
-function course(id = params.get('courseId')) { return state.courses.find(item => item.id === id) || (state.allCourses || []).find(item => item.id === id) || state.courses[0]; }
+function course(id = params.get('courseId')) { return state.courses.find(item => item.id === id) || (state.classOptions || []).find(item => item.id === id) || (state.allCourses || []).find(item => item.id === id) || state.courses[0]; }
 function esc(value) { return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])); }
 function go(url) { location.href = relativePath(url); }
 function pill(text, tone = '') { return `<span class="mp-pill ${tone}">${esc(text)}</span>`; }
@@ -228,22 +285,28 @@ function button(text, attrs = '', cls = '') { return `<button class="mp-button $
 function card(content, cls = '') { return `<section class="mp-card ${cls}">${content}</section>`; }
 function stack(...content) { return `<div class="mp-stack">${content.join('')}</div>`; }
 function toast(message) { const node = document.createElement('div'); node.className = 'mp-toast'; node.textContent = message; document.body.appendChild(node); setTimeout(() => node.remove(), 2200); }
-function courseMeta(item) { return `${item.type === 'video' ? '视频课程' : '面授课程'} · ${item.teacher}老师 · ${item.category}`; }
-function courseLink(item, label = '查看详情') { return item.type === 'video' ? `/learner/pages/course-detail.html?courseId=${item.id}` : `/learner/pages/class-detail.html?courseId=${item.id}`; }
+function courseMeta(item) { return item.objectType === 'class' ? `面授班级 · ${item.teacher}老师 · ${item.category}` : `${item.type === 'video' ? '视频课程' : '面授课程'} · ${item.professional || item.category}`; }
+function courseLink(item) { return item.objectType === 'class' ? `/learner/pages/class-detail.html?courseId=${item.id}` : `/learner/pages/course-detail.html?courseId=${item.id}`; }
 function listItem(item, action = '') { return `<a class="mp-item" href="${courseLink(item)}"><div><strong>${esc(item.name)}</strong><small>${esc(courseMeta(item))}</small>${item.type === 'class' ? `<p>${esc(item.campus)} · ${esc(item.schedule)} · 剩余${esc(item.seats.split('/')[0])}名额</p>` : `<p>共${item.hours}课时 · 已学习${item.progress}%</p>`}</div><div>${action || `<span class="mp-link">查看</span>`}</div></a>`; }
 function courseCard(item) {
   const isClass = item.type === 'class';
+  if (isClass) {
+    const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
+    const statusTone = item.bookableClassCount > 0 ? 'green' : 'gray';
+    const priceText = item.bookableClassCount > 0 ? `${money2(item.minimumPrice)}起` : '待开班';
+    return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}"><div class="mp-course-cover class-cover" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>面授课程</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">${priceText}</strong></div><div class="mp-course-tags">${pill(item.professional || item.category)}${pill(item.level || '初级', 'gray')}${pill(item.age || '全年龄', 'gray')}</div><div class="mp-course-teacher-row"><span class="mp-course-hours">共${esc(item.hours)}课时</span><span class="mp-course-status">${pill(item.status, statusTone)}</span></div></div></a>`;
+  }
   const teacher = state.teachers.find(row => row.name === item.teacher);
   const teacherName = teacher?.name || item.teacher;
   const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
   const professionalTag = pill(item.professional || item.category);
   const detailTags = [item.level, isClass ? item.age : ''].filter(Boolean).map(tag => pill(tag, 'gray')).join('');
-  const status = isClass ? item.classStatus || '招生中' : '';
+  const status = '';
   const statusTag = status ? `<span class="mp-course-status">${pill(status, status.includes('满') ? 'gray' : 'green')}</span>` : '';
   // CR-2026-012：卡片读取课程档案的课程标签与 C 端推荐语。
   const archiveTags = (item.tags || []).slice(0, 2).map(value => pill(value, 'gray')).join('');
   const recommendLine = item.recommendation ? `<p class="mp-course-recommend">${esc(item.recommendation)}</p>` : '';
-  return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${item.id}"><div class="mp-course-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>${isClass ? '面授课程' : '视频课程'}</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">${money2(item.price)}</strong></div><div class="mp-course-tags">${professionalTag}${detailTags}${archiveTags}${statusTag}</div><div class="mp-course-teacher-row"><div class="mp-course-teacher"><span class="mp-avatar mp-course-avatar" aria-hidden="true">${esc(teacherName.slice(0, 1))}</span><span class="mp-course-teacher-name">${esc(teacherName)}</span></div><span class="mp-course-hours">共${esc(item.hours)}课时</span></div>${recommendLine}</div></a>`;
+  return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${item.id}"><div class="mp-course-cover video-cover" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>视频课程</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">${money2(item.price)}</strong></div><div class="mp-course-tags">${professionalTag}${detailTags}${archiveTags}${statusTag}</div><div class="mp-course-teacher-row"><div class="mp-course-teacher"><span class="mp-avatar mp-course-avatar" aria-hidden="true">${esc(teacherName.slice(0, 1))}</span><span class="mp-course-teacher-name">${esc(teacherName)}</span></div><span class="mp-course-hours">共${esc(item.hours)}课时</span></div>${recommendLine}</div></a>`;
 }
 function teacherLink(item) { return `/learner/pages/teacher-detail.html?teacherId=${item.id}`; }
 function isLoggedIn() { return sessionStorage.getItem('hbyx-mini-logged-in') === '1'; }
@@ -295,7 +358,7 @@ function renderCourses() {
   const initialProfessional = params.get('professional') || (state.courses.some(item => item.professional === requestedCategory) ? requestedCategory : '');
   const levels = ['启蒙', '初级', '中级', '高级'];
   const ages = ['少儿', '青少年', '成人'];
-  const campuses = [...new Set(state.courses.filter(item => item.type === 'class').map(item => item.campus).filter(Boolean))];
+  const campuses = [...new Set((state.classOptions || []).filter(item => item.visible).map(item => item.campus).filter(Boolean))];
   const optionList = (options, selected, emptyText) => `<option value="">${emptyText}</option>${options.map(option => `<option value="${esc(option)}" ${option === selected ? 'selected' : ''}>${esc(option)}</option>`).join('')}`;
   const initialMatch = state.courses.find(item => (initialProfessional && item.professional === initialProfessional) || (initialField && item.field === initialField));
   const selectedMajor = {
@@ -310,7 +373,7 @@ function renderCourses() {
       children: [...new Set(state.courses.filter(item => item.discipline === discipline && item.field === field).map(item => item.professional).filter(Boolean))]
     }))
   }));
-  layout(stack(`<form id="course-search-form" class="mp-course-search" role="search"><input id="course-search" aria-label="搜索课程或老师" placeholder="搜索课程或老师" value="${esc(params.get('q') || '')}"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form>`, `<section class="mp-course-browser" aria-label="课程浏览"><div class="mp-tabs mp-course-type-tabs" role="tablist"><button class="mp-tab active" type="button" data-course-tab="all" role="tab" aria-selected="true">全部</button><button class="mp-tab" type="button" data-course-tab="class" role="tab" aria-selected="false">面授课程</button><button class="mp-tab" type="button" data-course-tab="video" role="tab" aria-selected="false">视频课程</button></div><div class="mp-course-filter-row" aria-label="课程筛选条件"><button id="course-profession-trigger" class="mp-course-filter-chip" type="button" aria-haspopup="dialog" aria-controls="course-profession-dialog" aria-expanded="false"><span id="course-profession-value">专业</span><i aria-hidden="true">⌄</i></button><button id="course-level-trigger" class="mp-course-filter-chip" type="button"><span>难度</span><i aria-hidden="true">⌄</i></button><button id="course-age-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>适合年龄</span><i aria-hidden="true">⌄</i></button><button id="course-campus-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>校区</span><i aria-hidden="true">⌄</i></button><button id="course-more-filter" class="mp-course-filter-chip mp-course-filter-more" type="button"><span>筛选</span><i aria-hidden="true">☷</i></button></div></section>`, `<section class="mp-course-list-section"><div class="mp-course-list-head"><h2>课程列表</h2><span id="course-result-count" class="mp-muted"></span></div><div id="course-list" class="mp-list"></div></section>`, `<dialog id="course-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="course-cascade-title"><header class="mp-cascade-head"><div><h2 id="course-cascade-title">选择专业</h2><p id="course-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="course-cascade-path" class="mp-cascade-path"></div><div id="course-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="course-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="course-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`, `<dialog id="course-choice-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-choice-title"><header class="mp-cascade-head"><div><h2 id="course-choice-title">选择筛选条件</h2><p>点击选项后立即生效</p></div><button class="mp-cascade-close" type="button" data-choice-close aria-label="关闭筛选">×</button></header><div id="course-choice-options" class="mp-cascade-options" role="listbox"></div></section></dialog>`, `<dialog id="course-more-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-more-title"><header class="mp-cascade-head"><div><h2 id="course-more-title">更多筛选</h2><p>按招生状态缩小课程范围</p></div><button class="mp-cascade-close" type="button" data-more-close aria-label="关闭更多筛选">×</button></header><label class="mp-course-toggle"><span><strong>仅看可报名课程</strong><small>隐藏已满员的面授班级</small></span><input id="course-open-only" type="checkbox" role="switch"></label><footer class="mp-cascade-actions"><button id="course-filter-reset" class="mp-button secondary" type="button">重置</button><button id="course-more-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`));
+  layout(stack(`<form id="course-search-form" class="mp-course-search" role="search"><input id="course-search" aria-label="搜索课程或老师" placeholder="搜索课程或老师" value="${esc(params.get('q') || '')}"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form>`, `<section class="mp-course-browser" aria-label="课程浏览"><div class="mp-tabs mp-course-type-tabs" role="tablist"><button class="mp-tab active" type="button" data-course-tab="all" role="tab" aria-selected="true">全部</button><button class="mp-tab" type="button" data-course-tab="class" role="tab" aria-selected="false">面授课程</button><button class="mp-tab" type="button" data-course-tab="video" role="tab" aria-selected="false">视频课程</button></div><div class="mp-course-filter-row" aria-label="课程筛选条件"><button id="course-profession-trigger" class="mp-course-filter-chip" type="button" aria-haspopup="dialog" aria-controls="course-profession-dialog" aria-expanded="false"><span id="course-profession-value">专业</span><i aria-hidden="true">⌄</i></button><button id="course-level-trigger" class="mp-course-filter-chip" type="button"><span>难度</span><i aria-hidden="true">⌄</i></button><button id="course-age-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>适合年龄</span><i aria-hidden="true">⌄</i></button><button id="course-campus-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>校区</span><i aria-hidden="true">⌄</i></button><button id="course-more-filter" class="mp-course-filter-chip mp-course-filter-more" type="button"><span>筛选</span><i aria-hidden="true">☷</i></button></div></section>`, `<section class="mp-course-list-section"><div class="mp-course-list-head"><h2>课程列表</h2><span id="course-result-count" class="mp-muted"></span></div><div id="course-list" class="mp-list"></div></section>`, `<dialog id="course-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="course-cascade-title"><header class="mp-cascade-head"><div><h2 id="course-cascade-title">选择专业</h2><p id="course-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="course-cascade-path" class="mp-cascade-path"></div><div id="course-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="course-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="course-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`, `<dialog id="course-choice-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-choice-title"><header class="mp-cascade-head"><div><h2 id="course-choice-title">选择筛选条件</h2><p>点击选项后立即生效</p></div><button class="mp-cascade-close" type="button" data-choice-close aria-label="关闭筛选">×</button></header><div id="course-choice-options" class="mp-cascade-options" role="listbox"></div></section></dialog>`, `<dialog id="course-more-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-more-title"><header class="mp-cascade-head"><div><h2 id="course-more-title">更多筛选</h2><p>按招生状态缩小课程范围</p></div><button class="mp-cascade-close" type="button" data-more-close aria-label="关闭更多筛选">×</button></header><label class="mp-course-toggle"><span><strong>仅看可报名课程</strong><small>只展示至少有一个可报班级的面授课程</small></span><input id="course-open-only" type="checkbox" role="switch"></label><footer class="mp-cascade-actions"><button id="course-filter-reset" class="mp-button secondary" type="button">重置</button><button id="course-more-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`));
   const professionTrigger = document.querySelector('#course-profession-trigger');
   const professionValue = document.querySelector('#course-profession-value');
   const cascadeDialog = document.querySelector('#course-profession-dialog');
@@ -393,9 +456,10 @@ function renderCourses() {
     const keyword = document.querySelector('#course-search').value.trim().toLowerCase();
     const { discipline, field, professional } = selectedMajor;
     const items = state.courses.filter(item => {
-      const searchable = `${item.name}${item.teacher}${item.category}${item.discipline || ''}${item.field || ''}${item.professional || ''}${item.campus || ''}`.toLowerCase();
+      const searchable = `${item.name}${item.type === 'video' ? item.teacher : ''}${item.category}${item.discipline || ''}${item.field || ''}${item.professional || ''}`.toLowerCase();
       const categoryMatch = !categoryFilter || [item.discipline, item.field, item.professional, item.category].filter(Boolean).some(value => value.includes(categoryFilter));
-      return (activeCourseTab === 'all' || item.type === activeCourseTab) && categoryMatch && (!discipline || item.discipline === discipline) && (!field || item.field === field) && (!professional || item.professional === professional) && (!level || item.level === level) && (activeCourseTab !== 'class' || !age || item.age === age) && (activeCourseTab !== 'class' || !campus || item.campus === campus) && (!openOnly || item.type !== 'class' || item.classStatus !== '已满员') && (item.type !== 'class' || item.fast !== '是') && searchable.includes(keyword);
+      const campusMatch = !campus || (item.classOptions || []).some(option => option.campus === campus);
+      return (activeCourseTab === 'all' || item.type === activeCourseTab) && categoryMatch && (!discipline || item.discipline === discipline) && (!field || item.field === field) && (!professional || item.professional === professional) && (!level || item.level === level) && (activeCourseTab !== 'class' || !age || String(item.age).includes(age)) && (activeCourseTab !== 'class' || campusMatch) && (!openOnly || item.type !== 'class' || item.bookable) && searchable.includes(keyword);
     });
     document.querySelector('#course-list').innerHTML = items.length ? items.map(item => courseCard(item)).join('') : `<div class="mp-empty">暂无符合条件的课程</div>`;
     document.querySelector('#course-result-count').textContent = `${items.length}门课程`;
@@ -480,7 +544,28 @@ function hasPurchasedVideo(item) {
   return (shared.videoEntitlements || []).some(entitlement => entitlement.accountId === state.accountId && entitlement.courseId === item.id && entitlement.status === '生效') || state.orders.some(order => order.accountId === state.accountId && order.courseId === item.id && order.status === '已支付');
 }
 function videoLessonLink(item, index, preview = false) { return `/learner/pages/video.html?courseId=${encodeURIComponent(item.id)}&chapter=${index}${preview ? '&preview=1' : ''}`; }
+function offlineClassSummary(item) {
+  const action = item.bookable
+    ? `<a class="mp-button" href="/learner/pages/fast-registration-detail.html?classId=${encodeURIComponent(item.id)}">选择此班</a>`
+    : `<button class="mp-button secondary" type="button" disabled>${esc(item.learnerStatus)}</button>`;
+  return `<article class="mp-registration-card"><header class="mp-registration-head"><div class="mp-registration-title"><small>班级</small><h3>${esc(item.className || item.name)}</h3></div><div class="mp-registration-status">${pill(item.learnerStatus, item.bookable ? 'green' : 'gray')}<span>${esc(item.bookable ? `剩余 ${item.remainingSeats} 名` : item.unavailableReason)}</span></div></header><dl class="mp-registration-facts"><div><dt>授课教师</dt><dd>${esc(item.teacher)}</dd></div><div><dt>首课日期</dt><dd>${esc(item.firstLessonDate || '待定')}</dd></div><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule || '以开课通知为准')}</dd></div><div class="wide"><dt>校区与教室</dt><dd>${esc(item.campus || '待定')} · ${esc(item.classroom || '待定')}</dd></div><div><dt>课程定价</dt><dd>${money2(item.price)}</dd></div><div><dt>剩余名额</dt><dd>${esc(item.remainingSeats)} / ${esc(item.capacity)}</dd></div></dl><footer class="mp-registration-footer"><span class="mp-muted">${esc(item.unavailableReason || '报名开放中')}</span>${action}</footer></article>`;
+}
+function renderOfflineCourseDetail(item) {
+  const detailTab = params.get('tab') === 'outline' ? 'outline' : 'intro';
+  const classes = item.classOptions || [];
+  const detailParagraphs = (item.detail || [item.intro]).filter(Boolean).map(text => `<p>${esc(text)}</p>`).join('') || '<p class="mp-muted">课程介绍暂未维护。</p>';
+  const outline = Array.isArray(item.outline) ? item.outline : [];
+  const outlineContent = outline.length ? `<div class="mp-course-detail-outline">${outline.map((chapter, index) => `<div class="mp-course-detail-chapter"><span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></div>`).join('')}</div>` : '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
+  const coverMark = (item.professional || item.name).slice(0, 1);
+  layout(stack(
+    `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${pill('面授课程', 'light')}${pill(item.status, item.bookable ? 'green' : 'gray')}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">课程档案</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2></div><dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div><div><dt>适合年龄</dt><dd>${esc(item.age)}</dd></div><div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div><dt>可报班级</dt><dd>${esc(item.bookableClassCount)}个</dd></div></dl></div></section>`,
+    `<section class="mp-course-detail-tab-section"><div class="mp-tabs mp-course-detail-tabs" role="tablist"><button class="mp-tab ${detailTab === 'intro' ? 'active' : ''}" type="button" data-course-detail-tab="intro">课程介绍</button><button class="mp-tab ${detailTab === 'outline' ? 'active' : ''}" type="button" data-course-detail-tab="outline">课程大纲</button></div>${detailTab === 'outline' ? card(outlineContent, 'mp-course-detail-section') : card(`<h3>课程介绍</h3><article class="mp-rich-content mp-course-detail-content">${detailParagraphs}</article>`, 'mp-course-detail-section')}</section>`,
+    `<section class="mp-course-list-section"><div class="mp-course-list-head"><h2>选择班级</h2><span class="mp-muted">${classes.length}个可见班级</span></div><div class="mp-registration-list">${classes.length ? classes.map(offlineClassSummary).join('') : '<div class="mp-empty">暂无可报班级</div>'}</div></section>`
+  ));
+  document.querySelectorAll('[data-course-detail-tab]').forEach(tab => tab.addEventListener('click', () => go(`/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}&tab=${tab.dataset.courseDetailTab}`)));
+}
 function renderCourseDetail(item = course('COURSE-CR-2026-0002')) {
+  if (item.type === 'class' && item.objectType === 'course') { renderOfflineCourseDetail(item); return; }
   const isClass = item.type === 'class';
   const teacher = state.teachers.find(row => row.name === item.teacher);
   const status = isClass ? item.classStatus || '招生中' : (item.sellable === false ? (item.product?.status || '未上架') : item.status || '可购买');
@@ -517,16 +602,15 @@ function renderCourseDetail(item = course('COURSE-CR-2026-0002')) {
 function fastRegistrationCard(item) {
   const className = item.className || item.name;
   const courseName = item.courseName || item.name.replace(/班$/, '');
-  const available = item.classStatus !== '已满员' && Number(item.seats?.split('/')[0] || 0) > 0;
-  const seatText = available ? `剩余 ${item.seats} 名额` : '名额已满';
+  const available = item.bookable === true;
+  const seatText = available ? `剩余 ${item.remainingSeats} 名额` : (item.unavailableReason || item.learnerStatus);
   const action = available
-    ? `<a class="mp-button" href="/learner/pages/fast-registration-detail.html?courseId=${item.id}">立即报名</a>`
-    : '<button class="mp-button secondary" type="button" disabled>已满员</button>';
-  return `<article class="mp-registration-card"><header class="mp-registration-head"><div class="mp-registration-title"><small>班级</small><h3>${esc(className)}</h3></div><div class="mp-registration-status">${pill(item.classStatus || (available ? '招生中' : '已满员'), available ? 'green' : 'gray')}<span>${esc(seatText)}</span></div></header><div class="mp-registration-course"><div><span>课程</span><strong>${esc(courseName)}</strong></div><div><span>专业</span><strong>${esc(item.professional || item.category)}</strong></div></div><dl class="mp-registration-facts"><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule)}</dd></div><div class="wide"><dt>上课教室</dt><dd>${esc(item.campus)} · ${esc(item.classroom || '教室待定')}</dd></div><div><dt>授课教师</dt><dd>${esc(item.teacher)}</dd></div><div><dt>课次</dt><dd>${esc(item.lessons || item.hours)}课次</dd></div></dl><footer class="mp-registration-footer"><div class="mp-registration-fee"><span>费用</span><strong>${money2(item.price)}</strong></div>${action}</footer></article>`;
+    ? `<a class="mp-button" href="/learner/pages/fast-registration-detail.html?classId=${encodeURIComponent(item.id)}">立即报名</a>`
+    : `<button class="mp-button secondary" type="button" disabled>${esc(item.learnerStatus || '暂不可报名')}</button>`;
+  return `<article class="mp-registration-card"><header class="mp-registration-head"><div class="mp-registration-title"><small>班级</small><h3>${esc(className)}</h3></div><div class="mp-registration-status">${pill(item.learnerStatus, available ? 'green' : 'gray')}<span>${esc(seatText)}</span></div></header><div class="mp-registration-course"><div><span>课程</span><strong>${esc(courseName)}</strong></div><div><span>专业</span><strong>${esc(item.professional || item.category)}</strong></div></div><dl class="mp-registration-facts"><div><dt>首课日期</dt><dd>${esc(item.firstLessonDate || '待定')}</dd></div><div><dt>授课教师</dt><dd>${esc(item.teacher)}</dd></div><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule)}</dd></div><div class="wide"><dt>上课教室</dt><dd>${esc(item.campus)} · ${esc(item.classroom || '教室待定')}</dd></div><div><dt>课次</dt><dd>${esc(item.lessons || item.hours)}课次</dd></div><div><dt>剩余名额</dt><dd>${esc(item.remainingSeats)} / ${esc(item.capacity)}</dd></div></dl><footer class="mp-registration-footer"><div class="mp-registration-fee"><span>费用</span><strong>${money2(item.price)}</strong></div>${action}</footer></article>`;
 }
 function renderFastRegistration() {
-  // P0-2: the 快速报名 tab only carries classes whose 快速报名入口 is switched on.
-  const classItems = state.courses.filter(item => item.type === 'class' && item.fast === '是');
+  const classItems = (state.classOptions || []).filter(item => item.visibleInFastChannel && !['CLASS_STARTED', 'CLASS_CANCELLED'].includes(item.unavailableReasonCode));
   const campusOptions = [...new Set(classItems.map(item => item.campus).filter(Boolean))];
   const disciplineOptions = [...new Set(state.courses.map(item => item.discipline).filter(Boolean))];
   const professionalTree = disciplineOptions.map(discipline => ({
@@ -596,7 +680,7 @@ function renderFastRegistration() {
   };
   const draw = () => {
     const activeSeason = document.querySelector('[data-season].active')?.dataset.season || '秋季';
-    const items = classItems.filter(item => (item.season || '秋季') === activeSeason && (!selectedMajor.discipline || item.discipline === selectedMajor.discipline) && (!selectedMajor.field || item.field === selectedMajor.field) && (!selectedMajor.professional || item.professional === selectedMajor.professional) && (!selectedCampus || item.campus === selectedCampus) && scheduleMatches(item.schedule, selectedWeekday) && (!openOnly || (item.classStatus !== '已满员' && Number(item.seats?.split('/')[0] || 0) > 0)));
+    const items = classItems.filter(item => (item.season || '秋季') === activeSeason && (!selectedMajor.discipline || item.discipline === selectedMajor.discipline) && (!selectedMajor.field || item.field === selectedMajor.field) && (!selectedMajor.professional || item.professional === selectedMajor.professional) && (!selectedCampus || item.campus === selectedCampus) && scheduleMatches(item.schedule, selectedWeekday) && (!openOnly || item.bookable));
     document.querySelector('#fast-batch-title').textContent = `2026年${activeSeason}`;
     document.querySelector('#fast-result-count').textContent = `${items.length}个班级`;
     document.querySelector('#class-list').innerHTML = items.length ? items.map(fastRegistrationCard).join('') : '<div class="mp-empty">当前条件下暂无可报名班级</div>';
@@ -673,8 +757,9 @@ function renderFastRegistration() {
   draw();
 }
 function renderFastRegistrationDetail(item = course('class-001')) {
-  const available = item.classStatus !== '已满员' && Number(item.seats?.split('/')[0] || 0) > 0;
-  const status = item.classStatus || (available ? '招生中' : '已满员');
+  if (!item || item.objectType !== 'class') { layout('<div class="mp-empty">未找到该班级</div>'); return; }
+  const available = item.bookable === true;
+  const status = item.learnerStatus;
   const statusTone = available ? 'green' : 'gray';
   const coverMark = (item.professional || item.name).slice(0, 1);
   const detailBody = item.detailHtml
@@ -688,14 +773,32 @@ function renderFastRegistrationDetail(item = course('class-001')) {
   const detailContent = detailTab === 'outline'
     ? card(`<div class="mp-section-head"><h3>课程大纲</h3><span class="mp-muted">${hasOutline ? `共${item.outline.length}章` : '待完善'}</span></div>${outlineContent}`, 'mp-fast-detail-section')
     : card(`<h3>课程简介</h3><article class="mp-rich-content mp-fast-detail-content">${detailBody}</article>`, 'mp-fast-detail-section');
-  const action = available ? detailActions(item) : `<div class="mp-bottom-actions mp-course-detail-actions"><button class="mp-button secondary" type="button" data-action="consult">咨询</button><button class="mp-button secondary" type="button" data-action="share">分享</button><button class="mp-button mp-course-detail-primary" type="button" disabled>已满员</button></div>`;
+  const currentStudentId = state.currentStudentId;
+  const classOrders = state.orders.filter(order => order.accountId === state.accountId && (order.classId === item.id || order.courseId === item.id) && (!order.studentId || order.studentId === currentStudentId));
+  const paidOrder = classOrders.find(order => order.status === '已支付');
+  const refundingOrder = classOrders.find(order => order.status === '退款中');
+  const pendingOrder = classOrders.find(order => order.status === '待支付');
+  const detailUrl = `/learner/pages/fast-registration-detail.html?classId=${encodeURIComponent(item.id)}`;
+  let primaryAction = `<button class="mp-button mp-course-detail-primary" type="button" disabled>${esc(item.unavailableReason || status)}</button>`;
+  if (!isLoggedIn()) primaryAction = `<a class="mp-button mp-course-detail-primary" href="/login.html?role=learner&redirect=${encodeURIComponent(detailUrl)}">登录后报名</a>`;
+  else if (!state.students.length) primaryAction = '<a class="mp-button mp-course-detail-primary" href="/learner/pages/student-edit.html">添加学员</a>';
+  else if (refundingOrder) primaryAction = '<button class="mp-button mp-course-detail-primary" type="button" disabled>退款处理中</button>';
+  else if (paidOrder) primaryAction = `<a class="mp-button mp-course-detail-primary" href="/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.id)}">已报名，查看班级</a>`;
+  else if (pendingOrder) primaryAction = `<a class="mp-button mp-course-detail-primary" href="/learner/pages/payment.html?classId=${encodeURIComponent(item.id)}&orderId=${encodeURIComponent(pendingOrder.id)}">继续支付</a>`;
+  else if (available) primaryAction = `<a class="mp-button mp-course-detail-primary" href="/learner/pages/payment.html?classId=${encodeURIComponent(item.id)}">立即报名</a>`;
+  const studentBlock = isLoggedIn() ? card(`<div class="mp-section-head"><h3>报名学员</h3><a class="mp-link" href="/learner/pages/student-management.html">管理学员</a></div>${state.students.length ? `<label class="mp-field"><span>选择学员</span><select id="fast-student-select">${state.students.map(student => `<option value="${student.id}" ${student.id === currentStudentId ? 'selected' : ''}>${esc(student.name)}</option>`).join('')}</select></label>` : '<div class="mp-empty">尚未添加学员档案</div>'}`, 'mp-fast-detail-section') : '';
+  const action = `<div class="mp-bottom-actions mp-course-detail-actions"><button class="mp-button secondary" type="button" data-action="consult">咨询</button><button class="mp-button secondary" type="button" data-action="share">分享</button>${primaryAction}</div>`;
   layout(stack(
     `<section class="mp-fast-detail-hero"><div class="mp-fast-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${pill('快速报名', 'light')}${pill(status, statusTone)}</div></div><div class="mp-fast-detail-summary"><h2>${esc(item.className || item.name)}</h2><p>${esc(item.courseName || item.name)} · ${esc(item.professional || item.category)}</p><strong class="mp-fast-detail-price">${money2(item.price)}</strong></div></section>`,
-    card(`<div class="mp-section-head"><h3>报名信息</h3>${pill(status, statusTone)}</div><dl class="mp-fast-detail-facts"><div><dt>授课教师</dt><dd>${esc(item.teacher)}老师</dd></div><div><dt>上课教室</dt><dd>${esc(item.campus)} · ${esc(item.classroom || '待定')}</dd></div><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule || '以开课通知为准')}</dd></div><div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div><dt>剩余名额</dt><dd>${available ? esc(item.seats) : '已满员'}</dd></div><div><dt>报名截止</dt><dd>${esc(item.deadline || '以招生通知为准')}</dd></div></dl>`, 'mp-fast-detail-section'),
+    card(`<div class="mp-section-head"><h3>报名信息</h3>${pill(status, statusTone)}</div><dl class="mp-fast-detail-facts"><div><dt>授课教师</dt><dd>${esc(item.teacher)}老师</dd></div><div><dt>首课日期</dt><dd>${esc(item.firstLessonDate || '待定')}</dd></div><div class="wide"><dt>上课教室</dt><dd>${esc(item.campus)} · ${esc(item.classroom || '待定')}</dd></div><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule || '以开课通知为准')}</dd></div><div><dt>总课次</dt><dd>${esc(item.hours)}课次</dd></div><div><dt>剩余名额</dt><dd>${esc(item.remainingSeats)} / ${esc(item.capacity)}</dd></div><div><dt>报名截止</dt><dd>${esc(item.deadline || '以招生通知为准')}</dd></div></dl>${item.unavailableReason ? `<p class="mp-notice">${esc(item.unavailableReason)}</p>` : ''}`, 'mp-fast-detail-section'),
+    card(`<div class="mp-section-head"><h3>试听说明</h3>${pill(item.trialEnabled === '否' ? '不支持试听' : item.trialFee === '是' ? '收费试听' : '可咨询试听', 'gray')}</div><p>${esc(item.trialNote || '请联系课程顾问了解试听安排。')}</p><button class="mp-button secondary" type="button" data-action="consult">联系课程顾问了解试听安排</button>`, 'mp-fast-detail-section'),
     `<section class="mp-fast-detail-tab-section"><div class="mp-tabs mp-course-detail-tabs" role="tablist" aria-label="课程内容切换"><button class="mp-tab ${detailTab === 'intro' ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === 'intro'}" data-fast-detail-tab="intro">课程简介</button><button class="mp-tab ${detailTab === 'outline' ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === 'outline'}" data-fast-detail-tab="outline">课程大纲</button></div>${detailContent}</section>`,
+    studentBlock,
+    card('<p class="mp-notice">名额以支付成功为准。提交订单不占用名额。</p>', 'mp-fast-detail-section'),
     action
   ));
-  document.querySelectorAll('[data-fast-detail-tab]').forEach(tab => tab.addEventListener('click', () => go(`/learner/pages/fast-registration-detail.html?courseId=${encodeURIComponent(item.id)}&tab=${tab.dataset.fastDetailTab}`)));
+  document.querySelector('#fast-student-select')?.addEventListener('change', event => { state.currentStudentId = event.target.value; saveState(); renderFastRegistrationDetail(item); });
+  document.querySelectorAll('[data-fast-detail-tab]').forEach(tab => tab.addEventListener('click', () => go(`/learner/pages/fast-registration-detail.html?classId=${encodeURIComponent(item.id)}&tab=${tab.dataset.fastDetailTab}`)));
 }
 function classLearningRecord(item) { return learningRecords().find(record => record.courseId === item.id && record.type === 'class'); }
 function classStatusLabel(record, item) { return record?.status === 'ended' ? '已结束' : record?.status === 'upcoming' ? '待开课' : record ? '学习中' : item.classStatus || '招生中'; }
@@ -738,12 +841,19 @@ function studentEnrolledCount(shared, classId) {
 function renderPayment() {
   if (!isLoggedIn()) { const redirect = `${location.pathname}${location.search}`; go(`/login.html?role=learner&redirect=${encodeURIComponent(redirect)}`); return; }
   const selectedOrder = state.orders.find(order => order.id === params.get('orderId'));
-  const item = course(selectedOrder?.courseId || params.get('courseId') || 'COURSE-CR-2026-0002');
+  const item = course(selectedOrder?.classId || selectedOrder?.courseId || params.get('classId') || params.get('courseId') || 'COURSE-CR-2026-0002');
+  if (item.objectType === 'class' && !state.students.length) {
+    layout(stack(card('<div class="mp-empty"><strong>请先添加学员</strong><p>面授报名必须关联具体学员，添加后可返回当前班级继续报名。</p></div>'), '<a class="mp-button full" href="/learner/pages/student-edit.html">添加学员</a>', `<a class="mp-button secondary full" href="/learner/pages/fast-registration-detail.html?classId=${encodeURIComponent(item.id)}">返回班级</a>`));
+    return;
+  }
+  const orderMatchesItem = order => item.objectType === 'class'
+    ? (order.classId === item.id || (!order.classId && order.courseId === item.id))
+    : order.courseId === item.id;
   // RM-F-03: an account that already paid for this course never reaches a second payment; it gets a
   // direct entry into learning instead.
-  const paidOrder = state.orders.find(order => order.accountId === state.accountId && order.courseId === item.id && order.status === '已支付' && (item.type !== 'class' || (order.classId === item.id && order.studentId === state.currentStudentId)));
+  const paidOrder = state.orders.find(order => order.accountId === state.accountId && orderMatchesItem(order) && order.status === '已支付' && (item.objectType !== 'class' || order.studentId === state.currentStudentId));
   if (paidOrder) {
-    const isClassOrder = item.type === 'class';
+    const isClassOrder = item.objectType === 'class';
     layout(stack(card(`<div class="mp-payment-state success">${pill(isClassOrder ? '已报名' : '已支付', 'green')}<h2>${isClassOrder ? '该班级已完成报名' : '该课程已完成支付'}</h2><p>当前账号已有${isClassOrder ? '该学员的报名' : '该课程的有效订单'}，不支持重复购买。</p></div>`), isClassOrder
       ? `<a class="mp-button full" href="${courseLink(item)}">查看班级</a>`
       : '<a class="mp-button full" href="/learner/pages/learning.html">进入学习</a>', `<a class="mp-button secondary full" href="/learner/pages/order-detail.html?orderId=${encodeURIComponent(paidOrder.id)}">查看订单</a>`));
@@ -752,23 +862,23 @@ function renderPayment() {
   if (selectedOrder?.status === '已支付') { layout(stack(card(`<div class="mp-payment-state success">${pill('已支付', 'green')}<h2>该课程已完成支付</h2><p>当前账号已有生效订单，不支持重复购买。</p></div>`), `<a class="mp-button full" href="/learner/pages/order-detail.html?orderId=${encodeURIComponent(selectedOrder.id)}">查看订单详情</a>`, `<a class="mp-button secondary full" href="${courseLink(item)}">返回课程</a>`)); return; }
   // P1-4: no orderId in the URL means "find the resumable order for the selected student" — an absent
   // order must not short-circuit into the first branch of the ternary.
-  const activeOrder = (selectedOrder && isPaymentResumable(selectedOrder)) ? selectedOrder : state.orders.find(order => order.accountId === state.accountId && order.courseId === item.id && (item.type !== 'class' || order.studentId === state.currentStudentId) && isPaymentResumable(order));
+  const activeOrder = (selectedOrder && isPaymentResumable(selectedOrder)) ? selectedOrder : state.orders.find(order => order.accountId === state.accountId && orderMatchesItem(order) && (item.objectType !== 'class' || order.studentId === state.currentStudentId) && isPaymentResumable(order));
   const previousStatus = activeOrder ? paymentStatusLabel(activeOrder) : '待支付';
   const stateNotice = activeOrder?.status === '已取消' ? `<div class="mp-notice">${esc(activeOrder.paymentReason || '订单已取消')}，继续支付将复用原订单号。</div>` : '';
-  const isClassItem = item.type === 'class';
+  const isClassItem = item.objectType === 'class';
   const account = purchaseAccount();
   const subjectRow = isClassItem
     ? `<div class="mp-row"><span class="mp-label">当前学员</span><select id="student-select" style="border:0;background:transparent;color:var(--ink);text-align:right">${state.students.map(student => `<option value="${student.id}" ${student.id === state.currentStudentId ? 'selected' : ''}>${esc(student.name)}</option>`).join('')}</select></div>`
     : `<div class="mp-row"><span class="mp-label">购买账号</span><strong>${esc(account.name)}${account.phone ? `（${esc(account.phone)}）` : ''}</strong></div>`;
-  layout(stack(card(`<div class="mp-pills">${pill(item.type === 'video' ? '视频课程' : '面授课程')}${activeOrder ? pill(previousStatus, 'amber') : ''}</div><h2 style="margin-top:10px">${esc(item.name)}</h2><p>${esc(courseMeta(item))}</p>${stateNotice}<div class="mp-divider"></div>${subjectRow}<div class="mp-row"><span class="mp-label">应付金额</span><strong class="mp-price">${money2(item.price)}</strong></div>${activeOrder ? `<div class="mp-payment-order-ref">订单号：${esc(activeOrder.id)}</div>` : ''}`), card(`<div class="mp-field"><label for="payment-outcome">支付结果（演示）</label><select id="payment-outcome"><option value="success">支付成功</option>${item.type === 'class' ? '<option value="seat-failed">支付成功但最终占位失败</option>' : ''}<option value="cancelled">用户取消</option><option value="timeout">支付超时</option></select></div><label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--muted);margin-top:12px"><input id="agreement" type="checkbox" style="margin-top:3px">我已阅读并同意用户协议、隐私政策和课程报名须知</label><div id="payment-error" class="mp-notice" hidden style="margin-top:12px"></div>`), `<div class="mp-actions"><button class="mp-button full" id="pay-button" type="button">${activeOrder ? '继续支付' : '确认支付'}</button><a class="mp-button secondary full" href="/learner/pages/orders.html">返回订单</a></div>`));
+  layout(stack(card(`<div class="mp-pills">${pill(item.type === 'video' ? '视频课程' : '面授课程')}${activeOrder ? pill(previousStatus, 'amber') : ''}</div><h2 style="margin-top:10px">${esc(item.name)}</h2><p>${esc(courseMeta(item))}</p>${stateNotice}<div class="mp-divider"></div>${subjectRow}<div class="mp-row"><span class="mp-label">应付金额</span><strong class="mp-price">${money2(item.price)}</strong></div>${isClassItem ? '<p class="mp-notice">名额以支付成功为准。提交订单不占用名额。</p>' : ''}${activeOrder ? `<div class="mp-payment-order-ref">订单号：${esc(activeOrder.id)}</div>` : ''}`), card(`<div class="mp-field"><label for="payment-outcome">支付结果（演示）</label><select id="payment-outcome"><option value="success">支付成功</option>${isClassItem ? '<option value="seat-failed">支付成功但最终占位失败</option>' : ''}<option value="cancelled">用户取消</option><option value="timeout">支付超时</option></select></div><label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--muted);margin-top:12px"><input id="agreement" type="checkbox" style="margin-top:3px">我已阅读并同意用户协议、隐私政策和课程报名须知</label><div id="payment-error" class="mp-notice" hidden style="margin-top:12px"></div>`), `<div class="mp-actions"><button class="mp-button full" id="pay-button" type="button">${activeOrder ? '继续支付' : '确认支付'}</button><a class="mp-button secondary full" href="/learner/pages/orders.html">返回订单</a></div>`));
   // P1-4: switching the student re-resolves the resumable order instead of keeping the previous one.
   document.querySelector('#student-select')?.addEventListener('change', event => { state.currentStudentId = event.target.value; saveState(); renderPayment(); });
   document.querySelector('#pay-button').addEventListener('click', () => {
     if (!document.querySelector('#agreement').checked) { const error = document.querySelector('#payment-error'); error.hidden = false; error.textContent = '请先勾选用户协议和报名须知'; return; }
-    const now = demoTime(); const outcome = document.querySelector('#payment-outcome').value; const shared = readDemoState(); const isClass = item.type === 'class';
+    const now = demoTime(); const outcome = document.querySelector('#payment-outcome').value; const shared = readDemoState(); const isClass = item.objectType === 'class';
     const classRecord = (shared.classes || []).find(row => row.id === item.id);
     // RM-F-03: learner-side orders (seed/session) and shared-store orders are both authoritative here.
-    const paidMatcher = order => order.accountId === state.accountId && order.courseId === item.id && order.status === '已支付' && (!isClass || (order.classId === item.id && order.studentId === state.currentStudentId));
+    const paidMatcher = order => order.accountId === state.accountId && orderMatchesItem(order) && order.status === '已支付' && (!isClass || order.studentId === state.currentStudentId);
     const paidDuplicate = state.orders.find(paidMatcher) || (shared.orders || []).find(paidMatcher);
     if (paidDuplicate) {
       if (isClass) { toast('当前学员已报名该班级，不支持重复报名', 'error'); return; }
@@ -777,7 +887,7 @@ function renderPayment() {
       return;
     }
     // P1-4: match the resumable order for the student selected at submit time.
-    const submitOrder = (selectedOrder && isPaymentResumable(selectedOrder)) ? selectedOrder : state.orders.find(order => order.accountId === state.accountId && order.courseId === item.id && (!isClass || order.studentId === state.currentStudentId) && isPaymentResumable(order));
+    const submitOrder = (selectedOrder && isPaymentResumable(selectedOrder)) ? selectedOrder : state.orders.find(order => order.accountId === state.accountId && orderMatchesItem(order) && (!isClass || order.studentId === state.currentStudentId) && isPaymentResumable(order));
     // P2-7 / I1-DEC-12: re-read the class record and re-check capacity right before the atomic deduction.
     if (isClass && outcome !== 'seat-failed') {
       const latestClass = (readDemoState().classes || []).find(row => row.id === item.id) || classRecord || course(item.id);
@@ -785,8 +895,9 @@ function renderPayment() {
       if (capacity && enrolled >= capacity) { toast('该班级名额已被占满，本次报名未成功，请选择其他班级', 'error'); return; }
       if (studentEnrolledCount(shared, item.id) >= 1) { toast('当前学员已报名该班级，不支持重复报名', 'error'); return; }
     }
-    const existing = submitOrder || { id: `OD${Date.now()}`, courseId: item.id, amount: item.price, studentId: isClass ? state.currentStudentId : '', accountId: state.accountId, classId: isClass ? item.id : '', createdAt: now, paidAt: '' };
-    const patch = { ...existing, accountId: state.accountId, courseId: item.id, amount: item.price, studentId: isClass ? state.currentStudentId : '', classId: isClass ? item.id : '', updatedAt: now };
+    const existing = submitOrder || { id: `OD${Date.now()}`, courseId: isClass ? item.courseId : item.id, amount: item.price, studentId: isClass ? state.currentStudentId : '', accountId: state.accountId, classId: isClass ? item.id : '', createdAt: now, paidAt: '' };
+    const patch = { ...existing, accountId: state.accountId, courseId: isClass ? item.courseId : item.id, amount: item.price, studentId: isClass ? state.currentStudentId : '', classId: isClass ? item.id : '', updatedAt: now };
+    if (isClass) patch.snapshot = { classId: item.id, className: item.className || item.name, courseId: item.courseId, courseVersion: item.courseVersion, scheduleVersion: item.scheduleVersion, price: Number(item.price), teacher: item.teacher, firstLessonDate: item.firstLessonDate, schedule: item.schedule, campus: item.campus, classroom: item.classroom, trialEnabled: item.trialEnabled, trialFee: item.trialFee, trialPrice: item.trialPrice, trialNote: item.trialNote };
     if (outcome === 'seat-failed') {
       patch.status = '退款中'; patch.paidAt = now; patch.paymentState = '已到账'; patch.paymentRecordId = patch.paymentRecordId || `PAY-${patch.id}`; patch.refundStatus = '处理中'; patch.refundRetryCount = 0; patch.merchantRefundNo = patch.merchantRefundNo || `MR-${patch.paymentRecordId}`; patch.refundBusinessKey = `seat_refund:${patch.paymentRecordId}`; patch.refundType = '系统免审批原路全额退款'; patch.paymentReason = '支付成功且支付记录已到账，但最终名额占用失败；已发起免审批全额原路退款。未生成报名和分班，不增加人数，不自动调班，不保留资金。可重新选择同专业、适龄且有余位班级。'; patch.cancelType = 'seat-allocation-failed';
       upsertDemoRecord('orders', patch);
@@ -876,7 +987,7 @@ function sortPendingOrders(orders) {
 }
 const sortHistoryOrders = (orders) => [...orders].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 function orderCard(order) {
-  const item = course(order.courseId);
+  const item = course(order.classId || order.courseId);
   const student = state.students.find(row => row.id === order.studentId) || currentStudent();
   const times = orderTimes(order);
   const isClass = item.type === 'class';
@@ -914,7 +1025,7 @@ function renderOrders() {
         return `<section class="mp-order-section"><div class="mp-order-section-head"><h3>${section.title}</h3><span>${rows.length} 笔 · ${section.note}</span></div>${body}</section>`;
       }).join('');
     }
-    list.querySelectorAll('[data-order-action="pay"]').forEach(node => node.addEventListener('click', () => go(`/learner/pages/payment.html?courseId=${encodeURIComponent(node.dataset.courseId)}&orderId=${encodeURIComponent(node.dataset.orderId)}`)));
+    list.querySelectorAll('[data-order-action="pay"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); go(`/learner/pages/payment.html?${order?.classId ? `classId=${encodeURIComponent(order.classId)}` : `courseId=${encodeURIComponent(node.dataset.courseId)}`}&orderId=${encodeURIComponent(node.dataset.orderId)}`); }));
     list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); if (!order) return; order.status = '退款中'; order.refundAt = order.refundAt || '刚刚'; order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.refundAmount ?? order.amount); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || '用户申请退款'; saveState(); draw(); toast('退款申请已提交，等待后台审核'); }));
   };
   document.querySelectorAll('[data-order-tab]').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('[data-order-tab]').forEach(item => item.classList.remove('active')); tab.classList.add('active'); draw(); }));
@@ -942,8 +1053,8 @@ function renderOrderDetail() {
   const selectedOrder = state.orders.find(row => row.id === params.get('orderId'));
   const orderIdParam = params.get('orderId');
   if (orderIdParam && !selectedOrder) { layout(stack(card('<div class="mp-empty"><strong>未找到该订单</strong><p>订单不存在或已失效，请返回订单列表查看当前记录。</p></div>'), '<a class="mp-button secondary full" href="/learner/pages/orders.html">返回我的订单</a>')); return; }
-  const item = course(selectedOrder?.courseId || params.get('courseId') || 'COURSE-CR-2026-0002');
-  const order = selectedOrder || state.orders.find(row => row.courseId === item.id);
+  const item = course(selectedOrder?.classId || selectedOrder?.courseId || params.get('classId') || params.get('courseId') || 'COURSE-CR-2026-0002');
+  const order = selectedOrder || state.orders.find(row => row.classId === item.id || row.courseId === item.id);
   if (!order) { layout(stack(card('<div class="mp-empty"><strong>未找到该订单</strong><p>订单不存在或已失效，请返回订单列表查看当前记录。</p></div>'), '<a class="mp-button secondary full" href="/learner/pages/orders.html">返回我的订单</a>')); return; }
   const student = state.students.find(row => row.id === order.studentId) || currentStudent();
   const times = orderTimes(order);
@@ -956,7 +1067,7 @@ function renderOrderDetail() {
   const association = orderAssociation(order, item, isClass);
   const refundable = order.status === '退款中' || order.status === '已退款';
   const primaryAction = isPaymentResumable(order)
-    ? `<a class="mp-button full" href="/learner/pages/payment.html?courseId=${encodeURIComponent(item.id)}&orderId=${encodeURIComponent(order.id)}">${order.status === '待支付' ? '去支付' : '继续支付'}</a>`
+    ? `<a class="mp-button full" href="/learner/pages/payment.html?${isClass ? `classId=${encodeURIComponent(item.id)}` : `courseId=${encodeURIComponent(item.id)}`}&orderId=${encodeURIComponent(order.id)}">${order.status === '待支付' ? '去支付' : '继续支付'}</a>`
     : isClass && isPaid
       ? `<a class="mp-button full" href="${courseLink(item)}">查看班级</a>`
       : isPaid
@@ -975,7 +1086,7 @@ function renderOrderDetail() {
 }
 
 function renderSeatFailureOrder(order, item, student) {
-  const candidates = state.courses.filter(candidate => candidate.type === 'class' && candidate.id !== item.id && candidate.classStatus === '招生中' && candidate.professional === item.professional && candidate.age === item.age && Number(candidate.seats?.split('/')[0] || 0) > 0);
+  const candidates = (state.classOptions || []).filter(candidate => candidate.id !== item.id && candidate.bookable && candidate.professional === item.professional && candidate.age === item.age);
   const candidateMarkup = candidates.length ? candidates.map(candidate => `<article class="mp-order-recommendation"><div><strong>${esc(candidate.className || candidate.name)}</strong><p>${esc(candidate.teacher)}老师 · ${esc(candidate.campus)} · ${esc(candidate.classroom || '教室待定')}</p><p>${esc(candidate.schedule || '时间待定')} · 余${esc(candidate.seats)} · ${money2(candidate.price)} · 截止${esc(candidate.deadline || '待定')}</p></div><button class="mp-button" type="button" data-action="seat-retry" data-course-id="${esc(candidate.id)}">重新报名</button></article>`).join('') : '<div class="mp-empty">暂无符合条件的班级，请返回班级列表或查看退款进度。</div>';
   layout(stack(
     card(`<div class="mp-order-detail-status">${pill(order.status === '已退款' ? '报名未成功，退款已完成' : '报名未成功，退款处理中', order.status === '已退款' ? 'green' : 'amber')}<span class="mp-muted">面授课程订单</span></div><div class="mp-order-status-copy">支付成功且支付记录已到账，${order.status === '已退款' ? '退款渠道已确认全额原路退款完成。' : '已发起全额原路退款，等待渠道回调。'}</div>`),
@@ -1276,7 +1387,39 @@ document.addEventListener('click', event => {
   renderOrderDetail();
   toast(success ? '退款成功回调已确认' : '退款失败，已进入重试');
 });
-document.addEventListener('click', event => { const action = event.target.closest('[data-action]')?.dataset.action; if (!action) return; if (action === 'seat-retry') { const courseId = event.target.closest('[data-course-id]').dataset.courseId; const dialog = document.createElement('dialog'); dialog.innerHTML = `<form method="dialog" class="mp-dialog-card"><h2>确认重新报名</h2><p>将进入所选班级的报名支付页面，当前订单退款流程不变。</p><div class="mp-actions"><button value="cancel" class="mp-button secondary">取消</button><button value="confirm" class="mp-button">确认重新报名</button></div></form>`; document.body.appendChild(dialog); dialog.showModal(); dialog.addEventListener('close', () => { if (dialog.returnValue === 'confirm') go(`/learner/pages/payment.html?courseId=${encodeURIComponent(courseId)}`); dialog.remove(); }, { once: true }); } if (action === 'courses') go('/learner/pages/courses.html'); if (action === 'consult') showConsultDialog(); if (action === 'share') toast('课程分享卡片已生成'); if (action === 'buy') { const trigger = event.target.closest('[data-course-id]'); const courseId = trigger.dataset.courseId; const item = course(courseId); const detailPath = item.type === 'video' ? '/learner/pages/course-detail.html' : '/learner/pages/class-detail.html'; if (!isLoggedIn()) go(`/login.html?redirect=${encodeURIComponent(`${detailPath}?courseId=${courseId}`)}`); else go(`/learner/pages/payment.html?courseId=${courseId}`); } if (action === 'learning') go('/learner/pages/video.html'); if (action === 'homework') go(`/learner/pages/homework.html?courseId=${event.target.closest('[data-course-id]').dataset.courseId}`); if (action === 'switch-student') switchStudent(); if (action === 'copy-order-no') { const orderNo = event.target.closest('[data-order-no]')?.dataset.orderNo || ''; if (orderNo) copyOrderNo(orderNo); } if (action === 'refund') { const orderId = event.target.closest('[data-order-id]')?.dataset.orderId; const order = state.orders.find(row => row.id === orderId); if (order) { order.status = '退款中'; order.refundAt = order.refundAt || '刚刚'; order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.refundAmount ?? order.amount); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || '用户申请退款'; saveState(); renderOrderDetail(); } toast('退款申请已提交，等待后台审核'); } });
+document.addEventListener('click', event => {
+  const action = event.target.closest('[data-action]')?.dataset.action;
+  if (!action) return;
+  if (action === 'seat-retry') {
+    const classId = event.target.closest('[data-course-id]').dataset.courseId;
+    const dialog = document.createElement('dialog');
+    dialog.innerHTML = `<form method="dialog" class="mp-dialog-card"><h2>确认重新报名</h2><p>将进入所选班级的报名支付页面，当前订单退款流程不变。</p><div class="mp-actions"><button value="cancel" class="mp-button secondary">取消</button><button value="confirm" class="mp-button">确认重新报名</button></div></form>`;
+    document.body.appendChild(dialog);
+    dialog.showModal();
+    dialog.addEventListener('close', () => { if (dialog.returnValue === 'confirm') go(`/learner/pages/payment.html?classId=${encodeURIComponent(classId)}`); dialog.remove(); }, { once: true });
+  }
+  if (action === 'courses') go('/learner/pages/courses.html');
+  if (action === 'consult') showConsultDialog();
+  if (action === 'share') toast('课程分享卡片已生成');
+  if (action === 'buy') {
+    const item = course(event.target.closest('[data-course-id]').dataset.courseId);
+    if (item.objectType === 'class' && !item.bookable) { toast(item.unavailableReason || `当前状态为${item.learnerStatus}，暂不可报名`); return; }
+    if (item.objectType === 'class') { go(`/learner/pages/fast-registration-detail.html?classId=${encodeURIComponent(item.id)}`); return; }
+    const detailPath = `/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}`;
+    if (!isLoggedIn()) go(`/login.html?redirect=${encodeURIComponent(detailPath)}`);
+    else go(`/learner/pages/payment.html?courseId=${encodeURIComponent(item.id)}`);
+  }
+  if (action === 'learning') go('/learner/pages/video.html');
+  if (action === 'homework') go(`/learner/pages/homework.html?courseId=${event.target.closest('[data-course-id]').dataset.courseId}`);
+  if (action === 'switch-student') switchStudent();
+  if (action === 'copy-order-no') { const orderNo = event.target.closest('[data-order-no]')?.dataset.orderNo || ''; if (orderNo) copyOrderNo(orderNo); }
+  if (action === 'refund') {
+    const orderId = event.target.closest('[data-order-id]')?.dataset.orderId;
+    const order = state.orders.find(row => row.id === orderId);
+    if (order) { order.status = '退款中'; order.refundAt = order.refundAt || '刚刚'; order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.refundAmount ?? order.amount); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || '用户申请退款'; saveState(); renderOrderDetail(); }
+    toast('退款申请已提交，等待后台审核');
+  }
+});
 
 subscribeDemoState(() => {
   state = readState();
@@ -1293,7 +1436,7 @@ if (path.endsWith('/index.html') || path.endsWith('/learner/')) renderHome();
 else if (path.endsWith('/courses.html')) renderCourses();
 else if (path.endsWith('/course-detail.html')) renderCourseDetail(course());
 else if (path.endsWith('/fast-registration.html')) renderFastRegistration();
-else if (path.endsWith('/fast-registration-detail.html')) renderFastRegistrationDetail(course(params.get('courseId') || 'class-001'));
+else if (path.endsWith('/fast-registration-detail.html')) renderFastRegistrationDetail(course(params.get('classId') || params.get('courseId') || 'class-001'));
 else if (path.endsWith('/class-detail.html')) renderClassDetail(course(params.get('courseId') || 'class-001'));
 else if (path.endsWith('/payment.html')) renderPayment();
 else if (path.endsWith('/orders.html')) renderOrders();

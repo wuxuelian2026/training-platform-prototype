@@ -112,11 +112,21 @@ export const TEACHER_FIELD_SPEC = {
           { id: 'FD-TEACHER-052', label: '审核意见', type: '多行文本', length: '≤ 500 字', required: '已驳回时必填', note: '填写后同步给上传人，说明需要补充或更正的内容', constraints: { maxLength: 500, requiredWhen: 'FD-TEACHER-051=已驳回' } },
           { id: 'FD-TEACHER-053', label: '证书文件', type: '文件上传', length: '单个文件', required: '重传时必填', note: '重传产生新的文件版本，旧版本保留可追溯', constraints: { maxFiles: 1 } },
           { id: 'FD-TEACHER-054', label: '上传说明', type: '多行文本', length: '≤ 200 字', required: '否', note: '说明重传原因或补充材料', constraints: { maxLength: 200 } }
+        ] },
+        // CR-2026-028：文件来源是独立维度，与审核结果分开展示，两端文案必须一致。
+        { heading: '证书来源字段', fields: [
+          { id: 'FD-TEACHER-068', label: '文件来源', type: '只读', length: '学校录入 / 本人上传 / 系统生成', required: '系统记录', note: '由 file_source_type 映射，只在文件层回答“这份文件是谁放进系统的”；教师端“我的证书”与后台来源列共用同一套文案，不与审核结果混用', constraints: { readOnly: true, system: true } },
+          { id: 'FD-TEACHER-069', label: '文件来源筛选', type: '下拉', length: '全部 / 学校录入 / 本人上传 / 系统生成', required: '否', note: '后台证书列表按文件来源过滤，默认全部', constraints: { options: ['全部', '学校录入', '本人上传', '系统生成'] } },
+          { id: 'FD-TEACHER-070', label: '证书编号', type: '文本', length: '≤ 40 字', required: '是', note: '同一教师下“证书类型 + 证书编号”唯一；两个录入入口保存前查重，命中不得静默创建第二条记录', constraints: { maxLength: 40, unique: '同一教师下 证书类型 + 证书编号' } },
+          { id: 'FD-TEACHER-071', label: '查看既有记录', type: '按钮', length: '—', required: '查重命中时展示', note: '查重提示内提供入口，直接定位到既有证书记录；教师端命中提示“该证书已存在”并引导到既有记录或对原记录重新上传', constraints: { action: true } }
         ] }
       ],
       notes: [
         '后台录入的证书直接为“已通过”；教师端上传的证书为“待审核”。',
         '已驳回必须填写原因；教师或后台重新上传后状态回到“待审核”。',
+        'CR-2026-028：同一教师下证书类型与证书编号同时相同即为重复；两个录入入口都要在保存前查重，命中后不新增记录。',
+        'CR-2026-028：允许的例外只有一种——对既有证书重新上传文件，走既有记录的版本升级并保留旧版本。',
+        'CR-2026-028：证书来源区分为文件来源（学校录入／本人上传／系统生成）与审核结果（待审核／已通过／已驳回／已撤销）两个维度，不得混用；教师端不展示业务来源等内部口径。',
         '证书审核状态与证书有效性状态分别维护，有效性按有效期截止日期独立计算。',
         '证书缺失不作为课程申报前置条件，但课程发布、班级发布与排课按目标专业进入资质校验。',
         '证书必须标注“适用专业”，排课时按目标专业与课次日期匹配有效证书；未标注专业归属的证书不参与任何专业的资质判断。'

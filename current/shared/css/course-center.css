@@ -98,6 +98,13 @@
 .lesson-resource .missing { color: var(--danger); }
 .course-workbench-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .course-workbench-footer .toolbar-actions { justify-content: flex-end; }
+.course-stepper { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.course-step { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: #fafafa; }
+.course-step span { display: grid; flex: 0 0 24px; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: #e9e6e2; font-size: 12px; }
+.course-step strong { overflow: hidden; color: inherit; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.course-step.active { border-color: var(--brand); color: var(--brand); background: #fff8f7; }
+.course-step.active span, .course-step.done span { background: var(--brand); color: #fff; }
+.course-step.done { color: var(--text); }
 .course-progress { height: 6px; margin-top: 10px; overflow: hidden; border-radius: 3px; background: #f0f0f0; }
 .course-progress span { display: block; height: 100%; background: var(--brand); }
 .course-preview { display: grid; place-items: center; min-height: 280px; padding: 24px; background: #1f1f1f; border-radius: 4px; color: #fff; text-align: center; }
@@ -199,3 +206,13 @@
 .course-rich-text ul, .course-rich-text ol { padding-left: 20px; }
 .course-rich-text img { max-width: 100%; height: auto; }
 .rich-editor-field { min-width: 0; }
+
+/* CR-2026-034 §2.3：专业停用／删除前的引用清单。 */
+.catalog-reference-list { display: grid; gap: 12px; margin-top: 14px; }
+.catalog-reference-group { border: 1px solid var(--line, #e3e6ee); border-radius: 6px; padding: 10px 12px; }
+.catalog-reference-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-muted, #5b6478); }
+.catalog-reference-head strong { font-size: 14px; color: var(--text, #1f2532); }
+.catalog-reference-group ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.catalog-reference-group li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; }
+.catalog-reference-group li small { color: var(--text-muted, #5b6478); font-size: 12px; }
+.catalog-reference-empty { margin: 8px 0 0; font-size: 13px; color: var(--text-muted, #5b6478); }

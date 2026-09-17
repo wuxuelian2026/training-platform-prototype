@@ -1,5 +1,6 @@
 // RM-F-01: one publishable-course catalog shared by the admin mall module and the learner app.
 // Course ids here are the same ids the course library shows (course entity id / lightweight archive id).
+import { courseMockSeed } from './course-seed.js';
 
 export const courseCatalogSeed = [
   { id: 'COURSE-CR-2026-0002', name: '声乐演唱技巧', type: '视频课程', archive: '完整课程', status: '已完成', major: '声乐演唱', teacher: '陈晨', hours: 12 },
@@ -7,7 +8,19 @@ export const courseCatalogSeed = [
   { id: 'COURSE-CR-2026-0001', name: '舞蹈基本功', type: '面授课程', archive: '完整课程', status: '已完成', major: '中国舞', teacher: '王玥', hours: 16 },
   { id: 'COURSE-CR-2026-0003', name: '少儿国画入门', type: '面授课程', archive: '完整课程', status: '已完成', major: '中国画', teacher: '李青', hours: 20 },
   { id: 'LIB-003', name: '少儿美术兴趣班', type: '面授课程', archive: '轻量课程档案', major: '少儿绘画', teacher: '李青', hours: 20 },
-  { id: 'LIB-004', name: '朗诵与主持基础', type: '面授课程', archive: '轻量课程档案', major: '朗诵与主持', teacher: '赵可', hours: 16 }
+  { id: 'LIB-004', name: '朗诵与主持基础', type: '面授课程', archive: '轻量课程档案', major: '朗诵与主持', teacher: '赵可', hours: 16 },
+  ...courseMockSeed().filter((course) => course.status === '已完成').map((course) => ({
+    id: course.id,
+    name: course.name,
+    type: course.type,
+    archive: '完整课程',
+    status: course.status,
+    major: course.major,
+    teacher: course.teacher,
+    hours: course.hours,
+    difficulty: course.difficulty,
+    ages: [...course.ages]
+  }))
 ];
 
 export function cloneCourseCatalogSeed() {

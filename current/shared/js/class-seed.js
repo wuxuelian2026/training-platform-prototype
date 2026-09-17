@@ -1,6 +1,6 @@
 // Canonical offline-class seed shared by the admin CRM and the learner app.
 // P0-1: one class entity keeps one primary key, one name and one enrollment count on both ends.
-// P0-2: `fast` decides the learner entry: 是 -> 快速报名, 否 -> 精品课程.
+// CR-2026-044: legacy `fast` maps only to visibleInFastChannel; it never changes bookability.
 
 export const classSeed = [
   {
@@ -10,7 +10,7 @@ export const classSeed = [
     professional: '中国舞', discipline: '舞蹈', field: '舞蹈表演', level: '初级', age: '少儿', lessons: 16,
     campus: '龙泉校区', classroom: '综合楼302', schedule: '每周六 09:00-10:30', weekday: '周六', startTime: '09:00', endTime: '10:30', firstLessonDate: '2026-09-12',
     cover: '已配置', coverFile: '舞蹈基本功-封面.png', displayDetail: '从身体控制、节奏训练到基本舞姿，建立少儿中国舞的基础训练体系。', tags: ['中国舞', '基础'], recommendation: '从每一次站立开始建立身体控制。', price: '1680.00', deadline: '2026-09-30 23:59', enrolled: 17, capacity: 20,
-    status: '招生中', display: '已展示', fast: '否', courseVersion: 2, created: '2026-08-28'
+    status: '招生中', display: '已展示', fast: '否', courseVersion: 2, created: '2026-08-28', scheduleStatus: '已发布', scheduleVersion: 1, schedulePublishedAt: '2026-09-01 10:00'
   },
   {
     id: 'class-002', courseId: 'LIB-003', archive: '轻量课程档案',
@@ -19,7 +19,7 @@ export const classSeed = [
     professional: '少儿绘画', discipline: '绘画', field: '少儿绘画', level: '启蒙', age: '少儿', lessons: 20,
     campus: '南湖校区', classroom: '艺术楼103', schedule: '每周日 14:00-15:30', weekday: '周日', startTime: '14:00', endTime: '15:30', firstLessonDate: '2026-09-13',
     cover: '已配置', coverFile: '少儿美术兴趣班-封面.png', displayDetail: '以主题创作和材料体验激发少儿绘画兴趣。', tags: ['美术', '少儿'], recommendation: '让孩子在创作中发现自己的表达方式。', price: '2280.00', deadline: '2026-09-25 23:59', enrolled: 15, capacity: 15,
-    status: '已满员', display: '已展示', fast: '否', courseVersion: 1, created: '2026-08-18'
+    status: '已满员', display: '已展示', fast: '否', courseVersion: 1, created: '2026-08-18', scheduleStatus: '已发布', scheduleVersion: 1, schedulePublishedAt: '2026-09-01 10:10'
   },
   {
     id: 'class-003', courseId: 'COURSE-CR-2026-0001', archive: '完整课程',
@@ -28,16 +28,16 @@ export const classSeed = [
     professional: '中国舞', discipline: '舞蹈', field: '舞蹈表演', level: '初级', age: '少儿', lessons: 16,
     campus: '南湖校区', classroom: '艺术楼201', schedule: '每周日 10:00-11:30', weekday: '周日', startTime: '10:00', endTime: '11:30', firstLessonDate: '2026-09-13',
     cover: '已配置', coverFile: '少儿中国舞提高班-封面.png', displayDetail: '面向有基础学员的进阶组合训练，强化舞台表现。', tags: ['中国舞', '提高'], recommendation: '从基础走向舞台表达。', price: '1880.00', deadline: '2026-10-08 23:59', enrolled: 13, capacity: 18,
-    status: '招生中', display: '已展示', fast: '是', courseVersion: 2, created: '2026-08-30'
+    status: '招生中', display: '已展示', fast: '是', courseVersion: 2, created: '2026-08-30', scheduleStatus: '已发布', scheduleVersion: 1, schedulePublishedAt: '2026-09-02 09:30'
   },
   {
     id: 'class-004', courseId: 'COURSE-CR-2026-0003', archive: '完整课程',
     name: '国画入门工作坊', className: '2026秋季国画入门工作坊', course: '少儿国画入门', courseName: '少儿国画入门',
     batch: '秋季', season: '秋季', teacher: '李青', category: '美术类',
     professional: '中国画', discipline: '绘画', field: '中国画', level: '启蒙', age: '少儿', lessons: 20,
-    campus: '南湖校区', classroom: '艺术楼103', schedule: '每周六 14:00-15:30', weekday: '周六', startTime: '14:00', endTime: '15:30', firstLessonDate: '2026-09-12',
+    campus: '', classroom: '', schedule: '', weekday: '', startTime: '', endTime: '', firstLessonDate: '',
     cover: '未配置', coverFile: '', displayDetail: '以笔墨体验和传统题材临摹为主，适合零基础少儿建立国画兴趣。', tags: ['国画', '少儿'], recommendation: '一笔一画认识中国画。', price: '2280.00', deadline: '2026-10-15 23:59', enrolled: 0, capacity: 16,
-    status: '未发布', display: '未发布', fast: '是', courseVersion: 1, created: '2026-09-09'
+    status: '待排班', display: '未发布', fast: '是', courseVersion: 1, created: '2026-09-09', scheduleStatus: '未排班', scheduleVersion: 0, sessions: []
   }
 ];
 
