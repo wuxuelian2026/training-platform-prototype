@@ -42,6 +42,13 @@ const library = courseArchiveSeed();
 const courseChaptersOf = (record) => contentCourses.find((item) => item.id === courseArchiveKey(record))?.chapters || record?.chapters || [];
 const courseStructureOf = (record) => courseStructure(courseChaptersOf(record));
 
+// 大纲只读视图：当前版本详情与历史版本详情共用同一份渲染，避免两处结构漂移。
+function courseOutlineView(chapters, emptyHint = '尚未维护章节与课时。') {
+  const list = Array.isArray(chapters) ? chapters : [];
+  if (!list.length) return `<div class="course-empty"><strong>暂无课程大纲</strong><span>${escapeHtml(emptyHint)}</span></div>`;
+  return `<div class="course-outline-readonly">${list.map((chapter, chapterIndex) => `<section class="course-detail-section wide"><h3>第 ${chapterIndex + 1} 章 · ${escapeHtml(chapter.name)}</h3><p class="course-hint">${escapeHtml(chapter.desc || '暂无章节描述')}</p><div class="lesson-list">${(chapter.lessons || []).map((lesson, lessonIndex) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>第 ${lessonIndex + 1} 课时 · ${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target || '未填写教学目标')}</p></div></div><div class="lesson-meta"><span>${escapeHtml(String(lesson.duration ?? '—'))} 分钟</span><span>${escapeHtml(lesson.kind || '—')}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${(lesson.resources || []).length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section>`).join('')}</div>`;
+}
+
 const catalog = {
   groupStatus: { '音乐类': '启用', '舞蹈类': '启用', '美术类': '停用', '戏剧类': '启用' },
   categories: [
@@ -142,7 +149,7 @@ function syncLibraryCourse(item) {
   persistLibrary(record);
 }
 
-const state = { page: courseRoot?.dataset.coursePage || '', applicationTab: '', libraryTab: new URLSearchParams(location.search).get('tab') === 'all' ? 'all' : 'arrange', applicationFilters: {}, contentFilters: {}, resourceFilters: {}, libraryFilters: {}, selectedGroup: '音乐类', selectedCategory: '声乐', pageSize: 20, modal: null, reviewResult: null };
+const state = { page: courseRoot?.dataset.coursePage || '', applicationTab: '', libraryTab: new URLSearchParams(location.search).get('tab') === 'all' ? 'all' : 'arrange', applicationFilters: {}, contentFilters: {}, resourceFilters: {}, libraryFilters: {}, selectedGroup: '音乐类', selectedCategory: '声乐', pageSize: 20, modals: [], reviewResult: null };
 
 // 申报状态页签：取值只读 spec/states 的 SM-COURSE-APPLICATION，「全部」是不加状态过滤的默认项。
 const applicationStatusTabs = () => {
@@ -170,20 +177,34 @@ const showToast = (message, kind = 'success') => {
   window.setTimeout(() => toast.remove(), 2600);
 };
 const modal = (title, subtitle, content, options = {}) => {
-  const previousModal = state.modal;
   const dialog = document.createElement('dialog');
   dialog.className = `course-modal${options.large ? ' large' : ''}`;
   dialog.innerHTML = `<div class="course-modal-card"><div class="course-modal-header"><div><h2>${escapeHtml(title)}</h2>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div><button class="course-modal-close" type="button" aria-label="关闭">×</button></div><div class="course-modal-body">${content}</div></div>`;
   document.body.appendChild(dialog);
-  dialog.querySelector('.course-modal-close').addEventListener('click', closeModal);
-  dialog.addEventListener('click', event => { if (event.target === dialog) closeModal(); });
-  // close 事件是异步派发的，只有仍是当前弹窗时才回写状态，避免先关闭旧弹窗再打开新弹窗时被旧事件覆盖。
-  dialog.addEventListener('close', () => { dialog.remove(); if (state.modal === dialog) state.modal = previousModal || null; });
+  dialog.querySelector('.course-modal-close').addEventListener('click', () => closeModal(dialog));
+  dialog.addEventListener('click', event => { if (event.target === dialog) closeModal(dialog); });
+  // CR-2026-050 §5.4：弹窗改为栈结构，关闭时按标识出栈；不再依赖异步 close 事件恢复父层引用，
+  // 因此父层弹窗不会因执行过子表单而失去引用、也就能被自己的 × 与背板关闭。
+  dialog.addEventListener('close', () => { dialog.remove(); state.modals = state.modals.filter((entry) => entry !== dialog); });
   dialog.showModal();
-  state.modal = dialog;
+  state.modals.push(dialog);
   return dialog;
 };
-const closeModal = () => { if (state.modal?.open) state.modal.close(); else state.modal?.remove(); state.modal = null; };
+const currentModal = () => state.modals[state.modals.length - 1] || null;
+// closeModal() 关闭最上层；closeModal(target) 关闭指定层，关闭后当前层回退为栈中的上一层。
+const closeModal = (target) => {
+  const dialog = target && state.modals.includes(target) ? target : currentModal();
+  if (!dialog) return;
+  state.modals = state.modals.filter((entry) => entry !== dialog);
+  if (dialog.open) dialog.close(); else dialog.remove();
+};
+// CR-2026-050 §5.3：确认类弹窗站内化，允许叠在上一层之上，但只在同一次操作叠加一层。
+let pendingConfirm = null;
+function confirmAction({ title, message, confirmLabel = '确认', cancelLabel = '取消', tone = 'danger', detail = '', onConfirm }) {
+  pendingConfirm = typeof onConfirm === 'function' ? onConfirm : null;
+  const confirmTone = tone === 'danger' ? 'danger-button' : 'primary';
+  modal(title, '', `<section class="course-detail-section wide"><p class="course-hint">${escapeHtml(message)}</p>${detail ? `<p class="sub-cell">${escapeHtml(detail)}</p>` : ''}</section><div class="course-modal-actions"><button type="button" class="button" data-action="close-modal">${escapeHtml(cancelLabel)}</button><button type="button" class="button ${confirmTone}" data-confirm-action="run">${escapeHtml(confirmLabel)}</button></div>`);
+}
 const button = (label, action, attrs = '', className = '') => `<button type="button" class="text-button ${className}" data-action="${action}" ${attrs}>${escapeHtml(label)}</button>`;
 const pageShell = (title, description, actions = '') => {
   const toolbar = title === '课程内容编排'
@@ -245,7 +266,7 @@ function renderContent(page) {
   const filtered = contentCourses.filter(item => item.status !== '已完成').filter(item => !state.contentFilters.status || item.status === state.contentFilters.status).filter(item => !state.contentFilters.type || item.type === state.contentFilters.type).filter(item => !state.contentFilters.major || item.major === state.contentFilters.major).filter(item => !state.contentFilters.keyword || `${item.name}${item.teacher}`.includes(state.contentFilters.keyword));
   page.innerHTML = `<div class="course-page">${pageShell('课程内容编排', '', '<button class="button" type="button" data-action="refresh-content">刷新列表</button>')}<section class="course-surface"><form class="course-filter" data-form="content-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('编排状态', selectWithValues('status', ['待编排', '编排中'], state.contentFilters.status || '', '全部状态'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.contentFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.contentFilters.major))}${filterField('申报教师', `<input name="keyword" value="${escapeHtml(state.contentFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>待编排课程</strong><span> 共 ${filtered.length} 条，按最近编辑时间排序</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程名称</th><th>课程来源</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>编排状态</th><th>上次编辑时间</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${item.id}</span></td><td>${escapeHtml(item.source || (item.applicationId ? '教师申报' : '后台新增'))}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${item.hours} 课时</td><td>${tag(item.status)}</td><td>${escapeHtml(item.updatedAt)}</td><td><div class="course-actions">${button(item.status === '待编排' ? '开始编排' : '继续编排', 'content-workbench', `data-id="${item.id}"`)}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无待编排课程</strong><span>教师申报通过或后台新增的面授课程会进入此处。</span></div>'}</div>${pagination(filtered.length, '门课程')}</section></div>`;
   const queryId = new URLSearchParams(window.location.search).get('courseId');
-  if (queryId && !state.modal) openWorkbench(queryId);
+  if (queryId && !currentModal()) openWorkbench(queryId);
 }
 
 function renderResources(page) {
@@ -306,11 +327,14 @@ function deleteLibraryRecord(id) {
   if (!item) return;
   if ((item.source || '教师申报') !== '后台新增') { showToast('教师申报课程有来源追溯要求，只能停用，不能删除', 'error'); return; }
   if (courseReferences(item).count > 0) { showToast('该课程已被售卖单元引用，只能停用，不能删除', 'error'); return; }
-  if (!window.confirm(`删除不可逆：确认删除课程「${item.name}」（${courseArchiveKey(item)}）？`)) return;
-  library.splice(library.indexOf(item), 1);
-  removeDemoRecord('library', item.id);
-  renderLibrary(root());
-  showToast('课程档案已删除');
+  // CR-2026-050 §5.3：不可逆动作改用站内确认弹窗，确认文案与现状一致。
+  confirmAction({
+    title: '删除课程',
+    message: `删除不可逆：确认删除课程「${item.name}」（${courseArchiveKey(item)}）？`,
+    detail: '删除后该课程档案与其在课程库中的条目一并移除，已产生的历史订单与计薪记录不受影响。',
+    confirmLabel: '确认删除',
+    onConfirm: () => { library.splice(library.indexOf(item), 1); removeDemoRecord('library', item.id); renderLibrary(root()); showToast('课程档案已删除'); }
+  });
 }
 
 function toggleLibraryEnabled(id) {
@@ -390,7 +414,7 @@ function renderLibrary(page) {
   page.innerHTML = holder.innerHTML;
   // CR-2026-034 §2.3.2：引用清单里的课程可深链定位到课程库对应课程。
   const deepLinkCourseId = new URLSearchParams(location.search).get('courseId');
-  if (view === 'all' && deepLinkCourseId && !state.modal) {
+  if (view === 'all' && deepLinkCourseId && !currentModal()) {
     const record = library.find((item) => courseArchiveKey(item) === toCanonicalCourseId(deepLinkCourseId));
     if (record) openLibraryView(record.id);
   }
@@ -410,7 +434,7 @@ function openLibraryView(id) {
   const holder = dialog.querySelector('[data-course-detail-root]');
   const tabs = () => `<div class="course-tabs"><button type="button" class="course-tab${activeTab === 'basic' ? ' active' : ''}" data-course-detail-tab="basic">基本信息</button><button type="button" class="course-tab${activeTab === 'outline' ? ' active' : ''}" data-course-detail-tab="outline">课程大纲</button></div>`;
   const basic = () => `<section class="course-detail-section wide"><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(key)}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>总课时</dt><dd>${item.hours} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(item.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(item) || '未填写')}</dd></div></dl></section>`;
-  const outline = () => chapters.length ? `<div class="course-outline-readonly">${chapters.map((chapter, chapterIndex) => `<section class="course-detail-section wide"><h3>第 ${chapterIndex + 1} 章 · ${escapeHtml(chapter.name)}</h3><p class="course-hint">${escapeHtml(chapter.desc || '暂无章节描述')}</p><div class="lesson-list">${(chapter.lessons || []).map((lesson, lessonIndex) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>第 ${lessonIndex + 1} 课时 · ${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target || '未填写教学目标')}</p></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${(lesson.resources || []).length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section>`).join('')}</div>` : '<div class="course-empty"><strong>暂无课程大纲</strong><span>尚未维护章节与课时。</span></div>';
+  const outline = () => courseOutlineView(chapters);
   const render = () => { holder.innerHTML = `${tabs()}<div class="course-version-summary"><div><span>当前版本</span><strong>v${version}</strong><small>${escapeHtml(item.source || '教师申报')}</small></div><div><span>引用情况</span><strong>${escapeHtml(referenceLabel(references))}</strong><small>${escapeHtml(current?.at || '—')} · ${escapeHtml(current?.operator || '—')}</small></div></div>${activeTab === 'basic' ? basic() : outline()}<div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button><button class="button" type="button" data-action="library-versions" data-id="${item.id}">历史版本</button><button class="button primary" type="button" data-action="library-edit" data-id="${item.id}">编辑</button></div>`; };
   dialog.addEventListener('click', event => { const tab = event.target.closest('[data-course-detail-tab]')?.dataset.courseDetailTab; if (tab) { activeTab = tab; render(); } });
   render();
@@ -498,7 +522,18 @@ function openLibraryVersionDetail(id, version) {
   const snapshot = entry.snapshot || {};
   const currentVersion = courseVersionOf(item);
   const isCurrent = entry.version === currentVersion;
-  modal(isCurrent ? '当前版本详情（只读）' : `历史版本详情 v${entry.version}（只读）`, `${courseArchiveKey(item)} · ${item.name}`, `<div class="course-version-summary"><div><span>版本号</span><strong>v${entry.version}</strong><small>${isCurrent ? '当前版本' : '历史版本，永久只读'}</small></div><div><span>生成时间 / 操作人</span><strong>${escapeHtml(entry.at || '—')}</strong><small>${escapeHtml(entry.operator || '—')}</small></div></div><section class="course-detail-section wide"><h3>版本快照</h3><dl class="course-detail-list"><div><dt>课程名称</dt><dd>${escapeHtml(snapshot.name || '—')}</dd></div><div><dt>课程来源</dt><dd>${escapeHtml(snapshot.source || item.source || '—')}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(snapshot.type || '—')}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(snapshot.major || '—')}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(snapshot.teacher || '—')}</dd></div><div><dt>总课时</dt><dd>${escapeHtml(String(snapshot.hours ?? '—'))} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(snapshot.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml((snapshot.ages || []).join('、') || '未填写')}</dd></div><div class="wide"><dt>编排结构摘要</dt><dd>${escapeHtml(snapshot.structure || '—')}</dd></div><div class="wide"><dt>本版本变更字段</dt><dd>${escapeHtml((entry.changes || []).join('、') || '—')}</dd></div></dl></section><p class="course-hint">历史版本为整体快照，不提供与当前版本的字段级差异对比，也不提供回退入口。</p><div class="course-modal-actions"><button class="button" type="button" data-action="library-versions" data-id="${item.id}">返回版本列表</button><button class="button primary" type="button" data-action="close-modal">关闭</button></div>`, { large: true });
+  const chapters = Array.isArray(snapshot.outline) ? snapshot.outline : [];
+  let activeTab = 'basic';
+  const tabs = () => `<div class="course-tabs"><button type="button" class="course-tab${activeTab === 'basic' ? ' active' : ''}" data-version-detail-tab="basic">基本信息</button><button type="button" class="course-tab${activeTab === 'outline' ? ' active' : ''}" data-version-detail-tab="outline">课程大纲</button></div>`;
+  const basic = () => `<section class="course-detail-section wide"><h3>版本快照</h3><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(courseArchiveKey(item))}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(snapshot.name || '—')}</dd></div><div><dt>课程来源</dt><dd>${escapeHtml(snapshot.source || item.source || '—')}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(snapshot.type || '—')}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(snapshot.major || '—')}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(snapshot.teacher || '—')}</dd></div><div><dt>总课时</dt><dd>${escapeHtml(String(snapshot.hours ?? '—'))} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(snapshot.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml((snapshot.ages || []).join('、') || '未填写')}</dd></div><div class="wide"><dt>编排结构摘要</dt><dd>${escapeHtml(snapshot.structure || '—')}</dd></div><div class="wide"><dt>本版本变更字段</dt><dd>${escapeHtml((entry.changes || []).join('、') || '—')}</dd></div></dl></section>`;
+  const outline = () => chapters.length
+    ? courseOutlineView(chapters)
+    : `<div class="course-empty"><strong>暂无课程大纲</strong><span>该版本快照未留存大纲明细，仅保留编排结构摘要：${escapeHtml(snapshot.structure || '—')}</span></div>`;
+  const dialog = modal(isCurrent ? '当前版本详情（只读）' : `历史版本详情 v${entry.version}（只读）`, `${courseArchiveKey(item)} · ${item.name}`, '<div data-version-detail-root></div>', { large: true });
+  const holder = dialog.querySelector('[data-version-detail-root]');
+  const render = () => { holder.innerHTML = `<div class="course-version-summary"><div><span>版本号</span><strong>v${entry.version}</strong><small>${isCurrent ? '当前版本' : '历史版本，永久只读'}</small></div><div><span>生成时间 / 操作人</span><strong>${escapeHtml(entry.at || '—')}</strong><small>${escapeHtml(entry.operator || '—')}</small></div></div>${tabs()}${activeTab === 'basic' ? basic() : outline()}<p class="course-hint">历史版本为整体快照，不提供与当前版本的字段级差异对比，也不提供回退入口。</p><div class="course-modal-actions"><button class="button" type="button" data-action="library-versions" data-id="${item.id}">返回版本列表</button><button class="button primary" type="button" data-action="close-modal">关闭</button></div>`; };
+  dialog.addEventListener('click', event => { const tab = event.target.closest('[data-version-detail-tab]')?.dataset.versionDetailTab; if (tab) { activeTab = tab; render(); } });
+  render();
 }
 
 // CR-2026-034 §2.2：专业引用统计由数据实时派生，不用种子里的静态值；
@@ -788,6 +823,15 @@ function openCatalogForm(type, id = null) {
 }
 
 function handleClick(event) {
+  // CR-2026-050 §5.3：确认类弹窗的「确认」先于 data-action 分派处理，先出栈再执行不可逆操作。
+  const confirmButton = event.target.closest('[data-confirm-action="run"]');
+  if (confirmButton) {
+    const run = pendingConfirm;
+    pendingConfirm = null;
+    closeModal(confirmButton.closest('dialog.course-modal'));
+    if (run) run();
+    return;
+  }
   const target = event.target.closest('[data-action]');
   if (!target) return;
   const action = target.dataset.action;
@@ -947,7 +991,13 @@ function deleteResource(id) {
   // E-17: referenced resources cannot be physically deleted; unbind them from lessons first.
   const references = Number(item.references || 0);
   if (references > 0) { showToast(`该资源已被 ${references} 门课程引用，请先在课程编排中解除引用后再删除`, 'error'); return; }
-  if (window.confirm('该资源暂未被课时引用，确认删除？')) { resources.splice(resources.indexOf(item), 1); removeDemoRecord('resources', id); renderResources(root()); showToast('资源已删除'); }
+  // CR-2026-050 §5.3：资源删除同样走站内确认弹窗。
+  confirmAction({
+    title: '删除资源',
+    message: '该资源暂未被课时引用，确认删除？',
+    detail: '删除后资源库不再提供该文件，编排页面的引用选择器同步移除。',
+    onConfirm: () => { resources.splice(resources.indexOf(item), 1); removeDemoRecord('resources', id); renderResources(root()); showToast('资源已删除'); }
+  });
 }
 
 // CR-2026-034 §2.3：停用／删除专业前先展示引用清单，按教师／课程／资源分组并可跳转。
@@ -1011,7 +1061,13 @@ function deleteCatalog(type, id, value) {
   if (type === 'group') {
     const childCount = catalog.categories.filter(item => item.parent === value).length;
     if (childCount) { showToast(`该门类下还有${childCount}个分类，不可删除`, 'error'); return; }
-    if (window.confirm(`确认删除门类“${value}”？`)) { delete professionalTree[value]; delete catalog.groupStatus[value]; renderCatalog(root()); showToast('门类已删除'); }
+    // CR-2026-050 §5.3：门类删除走站内确认弹窗。
+    confirmAction({
+      title: '删除门类',
+      message: `确认删除门类“${value}”？`,
+      detail: '门类下必须没有分类才能删除；已被引用的目录只能停用。',
+      onConfirm: () => { delete professionalTree[value]; delete catalog.groupStatus[value]; renderCatalog(root()); showToast('门类已删除'); }
+    });
     return;
   }
   if (type === 'category') {
@@ -1019,7 +1075,13 @@ function deleteCatalog(type, id, value) {
     if (!item) return;
     const childCount = catalog.majors.filter(record => record.parent === item.name).length;
     if (childCount) { showToast(`该分类下还有${childCount}个专业，不可删除`, 'error'); return; }
-    if (window.confirm(`确认删除分类“${item.name}”？`)) { catalog.categories.splice(catalog.categories.indexOf(item), 1); renderCatalog(root()); showToast('分类已删除'); }
+    // CR-2026-050 §5.3：分类删除走站内确认弹窗。
+    confirmAction({
+      title: '删除分类',
+      message: `确认删除分类“${item.name}”？`,
+      detail: '分类下必须没有专业才能删除；已被引用的目录只能停用。',
+      onConfirm: () => { catalog.categories.splice(catalog.categories.indexOf(item), 1); renderCatalog(root()); showToast('分类已删除'); }
+    });
     return;
   }
   const item = catalog.majors.find(record => record.id === id);

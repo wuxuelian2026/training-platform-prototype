@@ -71,7 +71,12 @@ export function courseStructure(chapters) {
     key: JSON.stringify(list.map((chapter) => [chapter.name, (chapter.lessons || []).map((lesson) => [
       lesson.name, lesson.target, Number(lesson.duration) || 0, lesson.kind, [...(lesson.resources || [])].sort()
     ])])),
-    summary: list.length ? `${list.length} 个章节 · ${lessons} 个课时` : '暂无章节'
+    summary: list.length ? `${list.length} 个章节 · ${lessons} 个课时` : '暂无章节',
+    // 版本快照需要可还原大纲，结构签名只用于变更判定，不能替代大纲明细。
+    chapters: list.map((chapter) => ({
+      ...chapter,
+      lessons: (chapter.lessons || []).map((lesson) => ({ ...lesson, resources: [...(lesson.resources || [])] }))
+    }))
   };
 }
 
@@ -87,7 +92,11 @@ export function courseSnapshot(record, structure = null) {
     difficulty: record?.difficulty || '',
     ages: [...(record?.ages || [])],
     structureKey: shape.key,
-    structure: shape.summary
+    structure: shape.summary,
+    outline: (shape.chapters || record?.chapters || []).map((chapter) => ({
+      ...chapter,
+      lessons: (chapter.lessons || []).map((lesson) => ({ ...lesson, resources: [...(lesson.resources || [])] }))
+    }))
   };
 }
 

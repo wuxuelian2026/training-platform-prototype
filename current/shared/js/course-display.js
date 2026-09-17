@@ -79,7 +79,11 @@ const COURSE_ARCHIVE_SEED = [
         difficulty: course.difficulty,
         ages: [...course.ages],
         structureKey,
-        structure: `${course.chapters.length} 个章节 · ${lessonCount} 个课时`
+        structure: `${course.chapters.length} 个章节 · ${lessonCount} 个课时`,
+        outline: course.chapters.map((chapter) => ({
+          ...chapter,
+          lessons: (chapter.lessons || []).map((lesson) => ({ ...lesson, resources: [...(lesson.resources || [])] }))
+        }))
       })]
     };
   })
@@ -99,7 +103,14 @@ export function courseArchiveSeed() {
     versions: (record.versions || []).map((entry) => ({
       ...entry,
       changes: [...(entry.changes || [])],
-      snapshot: { ...entry.snapshot, ages: [...(entry.snapshot?.ages || [])] }
+      snapshot: {
+        ...entry.snapshot,
+        ages: [...(entry.snapshot?.ages || [])],
+        outline: (entry.snapshot?.outline || []).map((chapter) => ({
+          ...chapter,
+          lessons: (chapter.lessons || []).map((lesson) => ({ ...lesson, resources: [...(lesson.resources || [])] }))
+        }))
+      }
     }))
   }));
 }

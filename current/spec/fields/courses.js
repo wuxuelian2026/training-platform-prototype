@@ -119,7 +119,8 @@ export const COURSE_FIELD_SPEC = {
           { id: 'FD-COURSE-047', label: '编辑', type: '按钮', length: '—', required: '是', note: '打开基本信息／课程大纲两个可编辑页签；基本字段或章节课时保存时统一执行版本规则', constraints: { action: true } },
           { id: 'FD-COURSE-048', label: '版本号', type: '只读', length: 'v1 起单调递增', required: '系统生成', note: '当前版本；存在历史版本时点击进入该课程的历史版本列表', constraints: { readOnly: true, system: true } },
           { id: 'FD-COURSE-049', label: '历史版本', type: '按钮', length: '—', required: '是', note: '打开版本历史列表，历史版本整体快照只读且可回溯', constraints: { action: true } },
-          { id: 'FD-COURSE-050', label: '变更摘要', type: '只读', length: '变更字段清单', required: '系统生成', note: '历史版本列表中的本版本变更字段与操作人、生成时间并列展示', constraints: { readOnly: true, system: true } }
+          { id: 'FD-COURSE-050', label: '变更摘要', type: '只读', length: '变更字段清单', required: '系统生成', note: '历史版本列表中的本版本变更字段与操作人、生成时间并列展示', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-066', label: '版本详情页签', type: '只读', length: '基本信息 / 课程大纲', required: '是', note: '历史版本详情的只读视图与当前版本详情同构，均为基本信息与课程大纲两个页签；大纲取该版本快照留存的内容，快照未留存大纲时给出说明与结构摘要，不拼接当前最新大纲', constraints: { readOnly: true, system: true } }
         ] },
         // CR-2026-034 §4：课程档案采用停用开关（不新增状态机），停用只拦新的发布动作。
         { heading: '课程档案启用与退出字段', fields: [
@@ -153,6 +154,7 @@ export const COURSE_FIELD_SPEC = {
         '视频课程完成编排前强制校验每个课时都关联了视频资源；面授课程的资源关联为可选。',
         '面授课程完成编排时校验课时总数等于申报总课时，不一致时阻止完成并提示补齐或删除。',
         '全部课程的查看与编辑均分为基本信息、课程大纲两个页签；查看全部只读，编辑可修改基本字段及章节课时。',
+        '版本快照保存完整大纲（章节与课时的名称、教学目标、时长、类型、内容描述与关联资源），历史版本详情与当前版本详情同构，均含基本信息与课程大纲两个只读页签。',
         '课程展示信息在视频商品或面授班级上维护，不写入课程基本信息或课程大纲。',
         'CR-2026-034：课程档案用停用日期表达“能否再发布”，不新增课程生命周期状态；停用只拦新的发布动作，不自动下架在售商品、不关停已发布班级、不回收已购学习权限、不改写历史订单与计薪。',
         'CR-2026-034：仅“后台新增”来源且未被任何售卖单元引用的课程可物理删除；教师申报课程有来源追溯要求，只能停用。'
