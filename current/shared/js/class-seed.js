@@ -8,7 +8,7 @@ export const classSeed = [
     name: '少儿中国舞基础班', className: '2026秋季中国舞启蒙一班', course: '舞蹈基本功', courseName: '少儿中国舞基础',
     batch: '秋季', season: '秋季', teacher: '王玥', category: '舞蹈类',
     professional: '中国舞', discipline: '舞蹈', field: '舞蹈表演', level: '初级', age: '少儿', lessons: 16,
-    campus: '龙泉校区', classroom: '综合楼302', schedule: '每周六 09:00-10:30', weekday: '周六', startTime: '09:00', endTime: '10:30', firstLessonDate: '2026-09-12',
+    campus: '龙泉校区', classroom: '综合楼302', schedule: '每周六 09:00-10:30', weekday: '周六', startTime: '09:00', endTime: '10:30', firstLessonDate: '2026-09-19',
     cover: '已配置', coverFile: '舞蹈基本功-封面.png', displayDetail: '从身体控制、节奏训练到基本舞姿，建立少儿中国舞的基础训练体系。', tags: ['中国舞', '基础'], recommendation: '从每一次站立开始建立身体控制。', price: '1680.00', deadline: '2026-09-30 23:59', enrolled: 17, capacity: 20,
     status: '招生中', display: '已展示', fast: '否', courseVersion: 2, created: '2026-08-28', scheduleStatus: '已发布', scheduleVersion: 1, schedulePublishedAt: '2026-09-01 10:00'
   },
@@ -26,7 +26,7 @@ export const classSeed = [
     name: '少儿中国舞提高班', className: '2026秋季中国舞提高二班', course: '舞蹈基本功', courseName: '少儿中国舞提高',
     batch: '秋季', season: '秋季', teacher: '王玥', category: '舞蹈类',
     professional: '中国舞', discipline: '舞蹈', field: '舞蹈表演', level: '初级', age: '少儿', lessons: 16,
-    campus: '南湖校区', classroom: '艺术楼201', schedule: '每周日 10:00-11:30', weekday: '周日', startTime: '10:00', endTime: '11:30', firstLessonDate: '2026-09-13',
+    campus: '南湖校区', classroom: '艺术楼201', schedule: '每周日 10:00-11:30', weekday: '周日', startTime: '10:00', endTime: '11:30', firstLessonDate: '2026-09-20',
     cover: '已配置', coverFile: '少儿中国舞提高班-封面.png', displayDetail: '面向有基础学员的进阶组合训练，强化舞台表现。', tags: ['中国舞', '提高'], recommendation: '从基础走向舞台表达。', price: '1880.00', deadline: '2026-10-08 23:59', enrolled: 13, capacity: 18,
     status: '招生中', display: '已展示', fast: '是', courseVersion: 2, created: '2026-08-30', scheduleStatus: '已发布', scheduleVersion: 1, schedulePublishedAt: '2026-09-02 09:30'
   },
