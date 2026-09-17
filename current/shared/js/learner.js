@@ -7,6 +7,7 @@ import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messa
 import { accountStudents, demoId, demoTime, getCurrentAccountId, readDemoState, subscribeDemoState, upsertDemoRecord, updateDemoRecord, writeDemoState } from './demo-store.js';
 import { classSeed } from './class-seed.js';
 import { resolveHomeBanners } from './banner-seed.js';
+import { isLearnerPublicPage, isMiniLoggedIn, miniPageName, redirectMiniLogin } from './mobile-guard.js';
 import { toCanonicalCourseId } from './course-seed.js';
 import { allProducts, productForCourse } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, saleUnitDisplay } from './course-display.js';
@@ -1432,7 +1433,11 @@ subscribeDemoState(() => {
   if (path.endsWith('/order-detail.html')) renderOrderDetail();
 });
 
-if (path.endsWith('/index.html') || path.endsWith('/learner/')) renderHome();
+// CR-2026-039：需要登录的页面未登录一律直接跳转登录页并带回跳地址；
+// 学员端「我的」页（profile）保留登录入口卡片与菜单，发现类内容页仍可未登录浏览。
+if (!isLearnerPublicPage(miniPageName(path)) && !isMiniLoggedIn()) {
+  redirectMiniLogin('learner');
+} else if (path.endsWith('/index.html') || path.endsWith('/learner/')) renderHome();
 else if (path.endsWith('/courses.html')) renderCourses();
 else if (path.endsWith('/course-detail.html')) renderCourseDetail(course());
 else if (path.endsWith('/fast-registration.html')) renderFastRegistration();

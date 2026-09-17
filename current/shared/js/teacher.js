@@ -8,6 +8,7 @@ import { demoId, demoTime, getCurrentAccountId, readDemoState, upsertDemoRecord,
 import { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } from './course-seed.js';
 import { courseAgesText } from './course-display.js';
 import { teacherFactsById } from './teacher-facts.js';
+import { isMiniLoggedIn, redirectMiniLogin } from './mobile-guard.js';
 import { certificateSourceLabel, findDuplicateCertificate } from './certificate-source.js';
 import { mountRichEditor, richTextValue } from './rich-editor.js';
 import { TEACHER_PROFILE_EDITABLE_FIELDS as teacherProfileEditableFields, TEACHER_PROFILE_GROUPS as teacherProfileGroups, TEACHER_PROFILE_GROUP_NOTE as teacherProfileGroupNote, teacherProfileMask } from './teacher-profile-fields.js';
@@ -599,6 +600,21 @@ function teacherProfileRow({ mark, title, description, href, value = '', tone = 
   return `<a class="teacher-profile-row" href="${relativePath(href)}"><span class="teacher-profile-row-mark" aria-hidden="true">${tEsc(mark)}</span><span class="teacher-profile-row-copy"><strong>${tEsc(title)}</strong><small>${tEsc(description)}</small></span>${value ? `<span class="teacher-profile-row-value ${tone}">${tEsc(value)}</span>` : ''}<span class="teacher-profile-row-arrow" aria-hidden="true">›</span></a>`;
 }
 function renderProfile() {
+  // CR-2026-039 §2.2：教师端「我的」是唯一例外——未登录展示登录入口卡片与完整菜单，不直接跳转，
+  // 保证用户仍能从这里主动进入登录；其余教师端页面未登录一律跳转登录页。
+  if (!isMiniLoggedIn()) {
+    const loginFor = (target) => relativePath(`/login.html?role=teacher&redirect=${encodeURIComponent(target)}`);
+    const entries = [
+      teacherProfileRow({ mark: '档', title: '个人档案', description: '查看并维护本人基础资料', href: loginFor('/teacher/pages/profile-detail.html'), value: '登录后查看', tone: 'amber' }),
+      teacherProfileRow({ mark: '信', title: '消息通知', description: '查看排课、审核与工资通知', href: loginFor('/teacher/pages/messages.html'), value: '登录后查看', tone: 'amber' }),
+      teacherProfileRow({ mark: '证', title: '我的证书', description: '资格证书与审核记录', href: loginFor('/teacher/pages/certificates.html'), value: '登录后查看', tone: 'amber' }),
+      teacherProfileRow({ mark: '合', title: '我的合同', description: '查看协议、有效期与签署状态', href: loginFor('/teacher/pages/contracts.html'), value: '登录后查看', tone: 'amber' }),
+      teacherProfileRow({ mark: '结', title: '结业申请记录', description: '查看复核结果与补课安排', href: loginFor('/teacher/pages/graduation.html'), value: '登录后查看', tone: 'amber' }),
+      teacherProfileRow({ mark: '设', title: '设置', description: '账号设置、协议与关于我们', href: loginFor('/teacher/pages/settings.html') })
+    ].join('');
+    tLayout(tStack(`<a class="mp-profile-entry mp-profile-login-entry" href="${loginFor('/teacher/pages/profile.html')}"><div class="mp-profile-entry-head"><div><strong>登录 / 注册</strong><small>登录后查看课表、班级、申报、证书、合同与工资</small></div><span class="mp-link">去登录 ›</span></div></a>`, `<section class="teacher-profile-group"><h3>个人中心</h3><div class="teacher-profile-row-list">${entries}</div></section>`));
+    return;
+  }
   const graduationPending = teacherState.graduationRecords.filter(item => ['审核中', '需补课', '补课中'].includes(item.status)).length;
   const unreadMessages = teacherState.messages.filter(item => !item.read).length;
   const archive = teacherProfileRow({ mark: '档', title: '个人档案', description: '查看并维护本人基础资料', href: '/teacher/pages/profile-detail.html', value: '可编辑', tone: 'green' });
@@ -1265,7 +1281,11 @@ function bindScheduleCalendar() {
   }));
 }
 function bindTeacherEvents() { bindScheduleCalendar(); bindClassDetailEvents(); document.querySelectorAll('[data-class-filter]').forEach(button => button.addEventListener('click', () => { selectedClassStatus = button.dataset.classFilter; renderClasses(); bindTeacherEvents(); })); document.querySelectorAll('[data-class-detail-tab]').forEach(button => button.addEventListener('click', () => { selectedClassDetailTab = button.dataset.classDetailTab; renderClassDetail(); bindTeacherEvents(); })); document.querySelectorAll('[data-teacher-action]').forEach(button => button.addEventListener('click', () => { const action = button.dataset.teacherAction; if (action === 'start-schedule') { const now = new Date(); teacherState.lesson.started = true; teacherState.lesson.status = '上课中'; teacherState.lesson.startedAtMs = Date.now(); teacherState.lesson.startedAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; saveTeacher(); location.href = relativePath('/teacher/pages/class-detail.html'); } if (action === 'graduation') location.href = relativePath('/teacher/pages/graduation.html'); if (action === 'new-application') location.href = relativePath('/teacher/pages/application-create.html'); })); }
-if (teacherPath.endsWith('/index.html') || teacherPath.endsWith('/teacher/')) renderSchedule();
+// CR-2026-039：教师端全站需要登录，未登录直接跳转教师登录页并带回跳地址；不再逐页直渲染。
+// 唯一例外是「我的」（profile）：未登录展示登录入口卡片与完整菜单，由用户主动选择登录入口。
+const teacherPublicPage = teacherPath.endsWith('/profile.html');
+if (!isMiniLoggedIn() && !teacherPublicPage) redirectMiniLogin('teacher');
+else if (teacherPath.endsWith('/index.html') || teacherPath.endsWith('/teacher/')) renderSchedule();
 else if (teacherPath.endsWith('/class-detail.html')) renderLesson();
 else if (teacherPath.endsWith('/class-overview.html')) renderClassDetail();
 else if (teacherPath.endsWith('/classes.html')) renderClasses();
