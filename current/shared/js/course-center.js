@@ -486,9 +486,24 @@ function openCourseArchiveForm(id) {
     const action = target.dataset.courseEdit;
     if (action === 'select-chapter') { activeChapter = Number(target.dataset.index); render(); }
     if (action === 'add-chapter' || action === 'edit-chapter') openChapterForm(draft, action === 'edit-chapter' ? Number(target.dataset.index) : null, () => { activeChapter = Math.max(0, draft.chapters.length - 1); render(); });
-    if (action === 'delete-chapter' && window.confirm('删除章节会同时删除其下课时，确认继续？')) { draft.chapters.splice(Number(target.dataset.index), 1); activeChapter = Math.max(0, activeChapter - 1); render(); }
+    // CR-2026-050 §5.3：删除确认改为站内确认弹窗，不再使用原生 confirm。
+    if (action === 'delete-chapter') {
+      const chapterIndex = Number(target.dataset.index);
+      confirmAction({
+        title: '删除章节', message: '删除章节会同时删除其下课时，确认继续？',
+        detail: '删除后本次编排不再保留该章节及其课时，需保存后才生效。',
+        confirmLabel: '确认删除',
+        onConfirm: () => { draft.chapters.splice(chapterIndex, 1); activeChapter = Math.max(0, Math.min(activeChapter, draft.chapters.length - 1)); render(); }
+      });
+    }
     if (action === 'add-lesson' || action === 'edit-lesson') openLessonForm(draft, activeChapter, action === 'edit-lesson' ? Number(target.dataset.index) : null, render);
-    if (action === 'delete-lesson' && window.confirm('确认删除该课时？')) { draft.chapters[activeChapter].lessons.splice(Number(target.dataset.index), 1); render(); }
+    if (action === 'delete-lesson') {
+      const lessonIndex = Number(target.dataset.index);
+      confirmAction({
+        title: '删除课时', message: '确认删除该课时？', detail: '删除后需重新保存才会更新课程输出。', confirmLabel: '确认删除',
+        onConfirm: () => { draft.chapters[activeChapter].lessons.splice(lessonIndex, 1); render(); }
+      });
+    }
     if (action === 'resource') openResourcePicker(draft, activeChapter, Number(target.dataset.index), render);
     if (action !== 'save') return;
     if (activeTab === 'basic' && !collectBasic()) return;
@@ -715,10 +730,25 @@ function openWorkbench(id) {
     const action = target.dataset.workbench;
     if (action === 'select-chapter') { activeChapter = Number(target.dataset.index); renderWorkbench(); }
     if (action === 'add-chapter' || action === 'edit-chapter') openChapterForm(item, action === 'edit-chapter' ? Number(target.dataset.index) : null, () => { persistCourse(item); renderWorkbench(); });
-    if (action === 'delete-chapter') { if (window.confirm('删除章节会同时删除章节下的所有课时，确认继续？')) { item.chapters.splice(Number(target.dataset.index), 1); activeChapter = Math.max(0, activeChapter - 1); persistCourse(item); renderWorkbench(); showToast('章节已删除'); } }
+    if (action === 'delete-chapter') {
+      const chapterIndex = Number(target.dataset.index);
+      confirmAction({
+        title: '删除章节', message: '删除章节会同时删除章节下的所有课时，确认继续？',
+        detail: '需先保存草稿才会写入课程档案；历史版本不受影响。',
+        confirmLabel: '确认删除',
+        onConfirm: () => { item.chapters.splice(chapterIndex, 1); activeChapter = Math.max(0, Math.min(activeChapter, item.chapters.length - 1)); persistCourse(item); renderWorkbench(); showToast('章节已删除'); }
+      });
+    }
     if (action === 'add-lesson') openLessonForm(item, activeChapter, null, () => { persistCourse(item); renderWorkbench(); });
     if (action === 'edit-lesson') openLessonForm(item, Number(target.dataset.chapter), Number(target.dataset.index), () => { persistCourse(item); renderWorkbench(); });
-    if (action === 'delete-lesson') { if (window.confirm('确认删除该课时？')) { item.chapters[Number(target.dataset.chapter)].lessons.splice(Number(target.dataset.index), 1); persistCourse(item); renderWorkbench(); showToast('课时已删除'); } }
+    if (action === 'delete-lesson') {
+      const chapterIndex = Number(target.dataset.chapter);
+      const lessonIndex = Number(target.dataset.index);
+      confirmAction({
+        title: '删除课时', message: '确认删除该课时？', detail: '需先保存草稿才会写入课程档案。', confirmLabel: '确认删除',
+        onConfirm: () => { item.chapters[chapterIndex].lessons.splice(lessonIndex, 1); persistCourse(item); renderWorkbench(); showToast('课时已删除'); }
+      });
+    }
     if (action === 'resource') openResourcePicker(item, Number(target.dataset.chapter), Number(target.dataset.index), () => { persistCourse(item); renderWorkbench(); });
     if (action === 'save') { if (!saveTeaching()) return; item.status = '编排中'; item.updatedAt = demoTime(); persistCourse(item); const versionResult = commitWorkbenchVersion(); renderWorkbench(); showToast(versionResult && versionResult.bumped ? `编排草稿已保存；编排结构变更已生成 v${versionResult.version}，v${versionResult.previous} 保留` : '编排草稿已保存'); }
     if (action === 'complete') { if (!saveTeaching()) return;
