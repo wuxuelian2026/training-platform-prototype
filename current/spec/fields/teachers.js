@@ -14,6 +14,40 @@ const teacherProfileRows = (rows) => rows.map(([id, label, length, note]) => ({
   constraints: { readOnly: true, sourceFieldOf: 'teachers/create' }
 }));
 
+// CR-2026-048 §4.1：证书字段的唯一公共定义。第二步证书录入、后台证书列表页与教师详情页三处引用同一份定义，
+// 编号沿用既有 FD-TEACHER-051/053/064/068/070/071，不再各写一套，避免字段与查重口径分叉。
+const CERTIFICATE_FILE_SOURCE_FIELD = { id: 'FD-TEACHER-068', label: '文件来源', type: '只读', length: '学校录入 / 本人上传 / 系统生成', required: '系统记录', note: '由 file_source_type 映射，只在文件层回答“这份文件是谁放进系统的”；教师端“我的证书”与后台来源列共用同一套文案，不与审核结果混用', constraints: { readOnly: true, system: true } };
+const CERTIFICATE_NUMBER_UNIQUE_FIELD = { id: 'FD-TEACHER-070', label: '证书编号', type: '文本', length: '≤ 40 字', required: '是', note: '同一教师下“证书类型 + 证书编号”唯一；两个录入入口保存前查重，命中不得静默创建第二条记录', constraints: { maxLength: 40, unique: '同一教师下 证书类型 + 证书编号' } };
+const CERTIFICATE_DUPLICATE_VIEW_FIELD = { id: 'FD-TEACHER-071', label: '查看既有记录', type: '按钮', length: '—', required: '查重命中时展示', note: '查重比对范围是该教师已保存的全部证书记录；后台命中后定位到教师详情页「证书与账号」页签并高亮该条记录，教师端命中提示“该证书已存在”并引导到既有记录或对原记录重新上传', constraints: { action: true } };
+const CERTIFICATE_SOURCE_FILTER_FIELD = { id: 'FD-TEACHER-069', label: '文件来源筛选', type: '下拉', length: '全部 / 学校录入 / 本人上传 / 系统生成', required: '否', note: '后台证书列表按文件来源过滤，默认全部', constraints: { options: ['全部', '学校录入', '本人上传', '系统生成'] } };
+
+export const CERTIFICATE_FIELDS = {
+  // 录入字段：第二步与证书列表页的新增录入共用同一套字段与校验。
+  entry: [
+    { id: 'FD-TEACHER-026', label: '证书名称', type: '文本', length: '≤ 50 字', required: '是', note: '证书证件上的正式名称，用于教师列表、教师详情与教师端“我的证书”展示', constraints: { maxLength: 50 } },
+    { id: 'FD-TEACHER-027', label: '证书编号', type: '文本', length: '≤ 50 字', required: '是', note: '证书证件上的编号；同一教师下与证书类型组合唯一（FD-TEACHER-070），保存前查重', constraints: { maxLength: 50 } },
+    { id: 'FD-TEACHER-028', label: '证书类型', type: '下拉', length: '4 个预置选项', required: '是', note: '学历证书 / 教师资格证 / 艺术等级证 / 其他', constraints: { options: ['学历证书', '教师资格证', '艺术等级证', '其他'] } },
+    { id: 'FD-TEACHER-064', label: '适用专业', type: '多选', length: '至少 1 个', required: '是', note: '该证书可为哪些专业提供资质；未选择时该行不可保存，排课按目标专业与课次日期匹配', constraints: { minItems: 1, multi: true } },
+    { id: 'FD-TEACHER-029', label: '发证机构', type: '文本', length: '≤ 50 字', required: '是', note: '证书签发机构全称', constraints: { maxLength: 50 } },
+    { id: 'FD-TEACHER-030', label: '颁发日期', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '选填', constraints: { format: 'YYYY-MM-DD' } },
+    { id: 'FD-TEACHER-031', label: '有效期截止', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '勾选“永久有效”后不需要填写；有效性按本日期独立计算，与审核状态分开', constraints: { format: 'YYYY-MM-DD', disabledWhen: 'permanent' } },
+    { id: 'FD-TEACHER-032', label: '永久有效', type: '开关', length: '是 / 否', required: '否', note: '勾选后无需填写有效期截止', constraints: { boolean: true } },
+    { id: 'FD-TEACHER-033', label: '证书文件', type: '文件上传', length: '单个文件', required: '是', note: '录入时必须上传证书文件或扫描件；替换材料走既有记录的重新上传并保留旧版本', constraints: { maxFiles: 1 } },
+    { id: 'FD-TEACHER-034', label: '审核状态', type: '只读', length: '4 个状态值', required: '系统生成', note: '后台录入直接为“已通过”并记录录入人、时间与来源；教师新增为“待审核”', constraints: { system: true, readOnly: true, options: ['待审核', '已通过', '已驳回', '已撤销'] } }
+  ],
+  // 审核字段：审核仍在后台证书列表页执行，第二步与教师详情页都不提供审核入口。
+  review: [
+    { id: 'FD-TEACHER-051', label: '审核结果', type: '单选', length: '已通过 / 已驳回', required: '是', note: '决定该证书是否可用于目标专业的资质校验', constraints: { options: ['已通过', '已驳回'] } },
+    { id: 'FD-TEACHER-052', label: '审核意见', type: '多行文本', length: '≤ 500 字', required: '已驳回时必填', note: '填写后同步给上传人，说明需要补充或更正的内容', constraints: { maxLength: 500, requiredWhen: 'FD-TEACHER-051=已驳回' } },
+    { id: 'FD-TEACHER-053', label: '证书文件', type: '文件上传', length: '单个文件', required: '重传时必填', note: '重传产生新的文件版本，旧版本保留可追溯', constraints: { maxFiles: 1 } },
+    { id: 'FD-TEACHER-054', label: '上传说明', type: '多行文本', length: '≤ 200 字', required: '否', note: '说明重传原因或补充材料', constraints: { maxLength: 200 } }
+  ],
+  // 来源与查重字段：第二步与证书列表页共用；文件来源筛选只在证书列表页出现。
+  source: [CERTIFICATE_FILE_SOURCE_FIELD, CERTIFICATE_NUMBER_UNIQUE_FIELD, CERTIFICATE_DUPLICATE_VIEW_FIELD, CERTIFICATE_SOURCE_FILTER_FIELD],
+  fileSource: CERTIFICATE_FILE_SOURCE_FIELD,
+  duplicateView: CERTIFICATE_DUPLICATE_VIEW_FIELD
+};
+
 export const TEACHER_FIELD_SPEC = {
   module: '师资中心',
   pages: {
@@ -51,20 +85,17 @@ export const TEACHER_FIELD_SPEC = {
           { id: 'FD-TEACHER-024', label: '一句话简介', type: '多行文本', length: '≤ 200 字', required: '否', note: '用于教师卡片与教师详情展示，学员端按本字段取值', constraints: { maxLength: 200 } },
           { id: 'FD-TEACHER-025', label: '简介', type: '富文本', length: '≤ 2000 字', required: '否', note: '个人简介正文，作为教师详情与学员端的展示来源；学习经历、工作经历与获奖情况不在学员端展示；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 2000, richText: true } }
         ] },
-        { heading: '证书与账号', fields: [
-          { id: 'FD-TEACHER-026', label: '证书名称', type: '文本', length: '≤ 50 字', required: '条件必填', note: '新增一行证书时必填', constraints: { maxLength: 50, requiredWhen: 'certificateRow' } },
-          { id: 'FD-TEACHER-027', label: '证书编号', type: '文本', length: '≤ 50 字', required: '条件必填', note: '新增一行证书时必填', constraints: { maxLength: 50, requiredWhen: 'certificateRow' } },
-          { id: 'FD-TEACHER-028', label: '证书类型', type: '下拉', length: '4 个预置选项', required: '条件必填', note: '学历证书 / 教师资格证 / 艺术等级证 / 其他', constraints: { options: ['学历证书', '教师资格证', '艺术等级证', '其他'], requiredWhen: 'certificateRow' } },
-          { id: 'FD-TEACHER-029', label: '发证机构', type: '文本', length: '≤ 50 字', required: '条件必填', note: '新增一行证书时必填', constraints: { maxLength: 50, requiredWhen: 'certificateRow' } },
-          { id: 'FD-TEACHER-030', label: '颁发日期', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '选填', constraints: { format: 'YYYY-MM-DD' } },
-          { id: 'FD-TEACHER-031', label: '有效期截止', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '勾选“永久有效”后不需要填写', constraints: { format: 'YYYY-MM-DD', disabledWhen: 'permanent' } },
-          { id: 'FD-TEACHER-032', label: '永久有效', type: '开关', length: '是 / 否', required: '否', note: '勾选后无需填写有效期截止', constraints: { boolean: true } },
-          { id: 'FD-TEACHER-033', label: '证书文件', type: '文件上传', length: '单个文件', required: '条件必填', note: '新增一行证书时必填', constraints: { maxFiles: 1, requiredWhen: 'certificateRow' } },
-          { id: 'FD-TEACHER-034', label: '审核状态', type: '只读', length: '—', required: '系统生成', note: '后台录入直接为“已通过”并记录操作人、时间与来源；教师新增为“待审核”', constraints: { system: true, readOnly: true } }
-          ,{ id: 'FD-TEACHER-064', label: '适用专业', type: '多选', length: '至少 1 个', required: '条件必填', note: '该证书可为哪些专业提供资质；新增一行证书时必填，排课按目标专业与课次日期匹配', constraints: { minItems: 1, multi: true, requiredWhen: 'certificateRow' } },
+        // CR-2026-048 §3.1：第 4 页签只保留账号，本页签内不得出现任何证书输入控件。
+        { heading: '账号', fields: [
           { id: 'FD-TEACHER-035', label: '邀请手机号', type: '只读', length: '11 位数字', required: '系统取值', note: '取联系方式中的手机号，作为教师激活和登录身份', constraints: { readOnly: true, sourceField: 'FD-TEACHER-014' } },
           { id: 'FD-TEACHER-036', label: '初始账号状态', type: '只读', length: '未激活', required: '系统取值', note: '待完善资料不创建账号；完成建档后为未激活，教师激活后为正常', constraints: { readOnly: true, system: true } },
           { id: 'FD-TEACHER-037', label: '备注', type: '多行文本', length: '≤ 200 字', required: '否', note: '内部备注，不影响建档结果', constraints: { maxLength: 200 } }
+        ] },
+        // CR-2026-048 §3.2：第一步保存后进入第二步，字段、校验与查重规则与后台证书列表页同源（CERTIFICATE_FIELDS）。
+        { heading: '第二步：证书录入（可跳过）', fields: [
+          ...CERTIFICATE_FIELDS.entry,
+          CERTIFICATE_FIELDS.fileSource,
+          CERTIFICATE_FIELDS.duplicateView
         ] }
       ],
       notes: [
@@ -73,7 +104,9 @@ export const TEACHER_FIELD_SPEC = {
         '校验通过后资料状态为“已建档”，离职日期为空（即在职），账号状态为“未激活”。',
         '邀请失败不回退建档结果，可复用同一教师记录重新发送邀请。',
         '教师验证建档手机号、设置本人密码并同意协议后，账号状态转为“正常”，后台不设置初始密码。',
-        '证书子表不作为完成建档的必填项；证书缺失不影响课程申报，但会在课程发布、班级发布或排课时按目标专业进入资质校验。'
+        'CR-2026-048：建档只建主档，证书不再随第一步提交；第一步保存成功后自动进入第二步证书录入，第二步可跳过、可中断、可再次进入。',
+        'CR-2026-048：第二步允许 0 行，「跳过，稍后录入」与「完成」都进入该教师详情页；证书缺失不影响课程申报，但会在课程发布、班级发布或排课时按目标专业进入资质校验。',
+        'CR-2026-048：第二步保存的证书审核状态为“已通过”、文件来源为“学校录入”，并记录录入人与时间；无证书录入权限的角色完成第一步后直接进入教师详情页。'
       ]
     },
     // CR-2026-045 §5.1：教师详情页为新增教师页的只读投影，字段编号复用 FD-TEACHER-xxx，不另起编号空间。
@@ -112,8 +145,11 @@ export const TEACHER_FIELD_SPEC = {
           ['FD-TEACHER-024', '一句话简介', '≤ 200 字', '教师卡片与教师详情展示'],
           ['FD-TEACHER-025', '简介', '≤ 2000 字（富文本）', '只读渲染清洗后的富文本']
         ]) },
+        // CR-2026-048 §3.5：本页签 = 账号只读信息 + 证书只读列表 + 录入证书入口；「查看证书明细」保留。
         { heading: '证书与账号（只读）', fields: [
-          { id: 'FD-TEACHER-026', label: '证书列表', type: '只读子表', length: '按有效期为序', required: '系统展示', note: '展示证书名称、类型、适用专业、有效期、审核状态与证书编号；提供「查看证书明细」跳转，详情页不提供审核与重传入口' },
+          { id: 'FD-TEACHER-026', label: '证书列表', type: '只读子表', length: '按有效期为序', required: '系统展示', note: '展示证书名称、证书类型、适用专业、审核状态、有效性与文件来源；本页不提供审核与重传入口' },
+          { id: 'FD-TEACHER-077', label: '录入证书', type: '按钮', length: '—', required: '具备证书录入权限时展示', note: '按第二步深链重新进入 create.html?mode=wizard&step=certificate&teacher_id=<id>；无 PERM-TEACHER-004 时不展示该入口' },
+          teacherProfileRows([['FD-TEACHER-071', '查看证书明细', '—', '跳转后台证书列表页并按该教师过滤']])[0],
           ...teacherProfileRows([
             ['FD-TEACHER-035', '邀请手机号', '11 位数字（脱敏展示）', '取联系方式中的手机号'],
             ['FD-TEACHER-036', '初始账号状态', '未激活 / 正常 / 冻结', '与账号状态同源'],
@@ -133,7 +169,8 @@ export const TEACHER_FIELD_SPEC = {
         'CR-2026-045：当前能力与原因同时取决于专业、证书与合同三个维度，固定放在抬头区，不归属任一档案页签。',
         'CR-2026-045：四个档案页签与新增教师页同名同序，内容只读；「关联与记录」为详情页专属页签，不进新增页。',
         'CR-2026-045：只读字段（工号、资料状态、在职情况、账号状态、证书审核状态）不提供编辑入口；空值显示「—」，不得留白。',
-        'CR-2026-045：页签角标语义为「资料待完善 N 项」，无校验失败态；新增页角标为必填缺失计数。'
+        'CR-2026-045：页签角标语义为「资料待完善 N 项」，无校验失败态；新增页角标为必填缺失计数。',
+        'CR-2026-048：第 4 页签承载账号只读信息、证书只读列表与「录入证书」入口；「录入证书」仅在具备 PERM-TEACHER-004 时展示，按第二步深链进入，审核与重传仍留在证书列表页。'
       ]
     },
     'teachers/contracts': {
@@ -167,19 +204,10 @@ export const TEACHER_FIELD_SPEC = {
     },
     'teachers/certificates': {
       groups: [
-        { heading: '证书审核字段', fields: [
-          { id: 'FD-TEACHER-051', label: '审核结果', type: '单选', length: '已通过 / 已驳回', required: '是', note: '决定该证书是否可用于目标专业的资质校验', constraints: { options: ['已通过', '已驳回'] } },
-          { id: 'FD-TEACHER-052', label: '审核意见', type: '多行文本', length: '≤ 500 字', required: '已驳回时必填', note: '填写后同步给上传人，说明需要补充或更正的内容', constraints: { maxLength: 500, requiredWhen: 'FD-TEACHER-051=已驳回' } },
-          { id: 'FD-TEACHER-053', label: '证书文件', type: '文件上传', length: '单个文件', required: '重传时必填', note: '重传产生新的文件版本，旧版本保留可追溯', constraints: { maxFiles: 1 } },
-          { id: 'FD-TEACHER-054', label: '上传说明', type: '多行文本', length: '≤ 200 字', required: '否', note: '说明重传原因或补充材料', constraints: { maxLength: 200 } }
-        ] },
+        // CR-2026-048 §4.1：本页审核字段、来源与查重字段直接引用 CERTIFICATE_FIELDS，与第二步同源，不再各写一套。
+        { heading: '证书审核字段', fields: [...CERTIFICATE_FIELDS.review] },
         // CR-2026-028：文件来源是独立维度，与审核结果分开展示，两端文案必须一致。
-        { heading: '证书来源字段', fields: [
-          { id: 'FD-TEACHER-068', label: '文件来源', type: '只读', length: '学校录入 / 本人上传 / 系统生成', required: '系统记录', note: '由 file_source_type 映射，只在文件层回答“这份文件是谁放进系统的”；教师端“我的证书”与后台来源列共用同一套文案，不与审核结果混用', constraints: { readOnly: true, system: true } },
-          { id: 'FD-TEACHER-069', label: '文件来源筛选', type: '下拉', length: '全部 / 学校录入 / 本人上传 / 系统生成', required: '否', note: '后台证书列表按文件来源过滤，默认全部', constraints: { options: ['全部', '学校录入', '本人上传', '系统生成'] } },
-          { id: 'FD-TEACHER-070', label: '证书编号', type: '文本', length: '≤ 40 字', required: '是', note: '同一教师下“证书类型 + 证书编号”唯一；两个录入入口保存前查重，命中不得静默创建第二条记录', constraints: { maxLength: 40, unique: '同一教师下 证书类型 + 证书编号' } },
-          { id: 'FD-TEACHER-071', label: '查看既有记录', type: '按钮', length: '—', required: '查重命中时展示', note: '查重比对范围是该教师已保存的全部证书记录；后台命中后定位到教师详情页「证书与账号」页签并高亮该条记录，教师端命中提示“该证书已存在”并引导到既有记录或对原记录重新上传', constraints: { action: true } },
-        ] }
+        { heading: '证书来源字段', fields: [...CERTIFICATE_FIELDS.source] }
       ],
       notes: [
         '后台录入的证书直接为“已通过”；教师端上传的证书为“待审核”。',

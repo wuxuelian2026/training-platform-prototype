@@ -1,11 +1,11 @@
 import { relativePath } from './paths.js';
 import { readAdminSession } from './admin-auth.js';
 import { mountRichEditor } from './rich-editor.js';
-import { readDemoState, writeDemoState } from './demo-store.js';
+import { demoId, demoTime, readDemoState, upsertDemoRecord, writeDemoState } from './demo-store.js';
 import { readXlsxSheetRows } from './xlsx-lite.js';
 import { toLocalDateString } from './date-utils.js';
 import { teacherFactsById } from './teacher-facts.js';
-import { certificateDedupKey } from './certificate-source.js';
+import { certificateDedupKey, findDuplicateCertificate } from './certificate-source.js';
 import { permissionsOfRole } from './permissions.js';
 import { TEACHER_PROFILE_EDITABLE_FIELDS, TEACHER_PROFILE_LABELS, teacherProfileMask } from './teacher-profile-fields.js';
 import { explainTeacherCapacity, summarizeTeacherCapacity } from './teacher-capacity.js';
@@ -45,7 +45,7 @@ function toast(message, kind = 'success') {
 const tagClass = (value) => ({
   待完善: 'gray', 已建档: 'green', 在职: 'green', 离职: 'gray', 可申报: 'brand', 可排课: 'green', 暂停使用: 'gray',
   已签署: 'green', 待签署: 'amber', 待教师签署: 'amber', 待学校签署: 'brand', 签署中: 'brand',
-  有效: 'green', 即将到期: 'amber', 已到期: 'red', 已终止: 'gray', 无合同: 'gray',
+  有效: 'green', 即将到期: 'amber', 已到期: 'red', 已终止: 'gray', 无合同: 'gray', 已驳回: 'red', 已撤销: 'gray',
   未激活: 'gray', 正常: 'green', 冻结: 'gray', 草稿: 'gray'
 }[value] || 'gray');
 
@@ -551,20 +551,6 @@ function initTeacherList() {
   applyTeacherFilters();
 }
 
-// CR-2026-028 §2.2：后台录入的证书信息行查重。
-// 判定口径为“同一教师下证书类型 + 证书编号相同”。建档表单承载的这位教师就是“同一教师”，
-// 因此同一张表单内出现重复行即为重复录入：命中后定位到既有行并拦截保存，不静默创建第二条记录。
-// 跨记录的重复由建档唯一性（身份证号唯一）在进入本表单前拦截。
-function certificateRowsOf(form) {
-  return [...form.querySelectorAll('[data-certificate-list] tr')].map((row) => ({
-    row,
-    name: row.children[0]?.querySelector('input')?.value.trim() || '',
-    number: (row.querySelector('[data-certificate-number]') || row.children[1]?.querySelector('input'))?.value.trim() || '',
-    type: (row.querySelector('[data-certificate-type]') || row.children[2]?.querySelector('select'))?.value || '',
-    majors: [...(row.querySelector('[data-certificate-majors]')?.selectedOptions || [])].map((option) => option.textContent.trim())
-  })).filter((item) => item.number && item.type && item.type !== '选择类型');
-}
-
 function highlightCertificateRow(row) {
   if (!row) return;
   row.classList.add('certificate-duplicate-row');
@@ -574,11 +560,15 @@ function highlightCertificateRow(row) {
 
 // UI 复核 CR-2026-028（UI-028-01）：命中重复时给出「已存在 + 查看既有记录 + 返回修改」的明确路径，
 // 而不是只用一行 toast；既有记录定位到表单内的既有行，返回修改聚焦到重复行证书编号。
-function openCertificateDuplicateDialog({ existingRow, conflictRow, item, teacherName }) {
+// CR-2026-048 §3.2.2：第二步没有表单内既有行，命中时由 onView 定位到教师详情页「证书与账号」页签。
+function openCertificateDuplicateDialog({ existingRow, conflictRow, item, teacherName, onView }) {
   const dialog = document.createElement('dialog');
   dialog.className = 'modal-dialog small-dialog';
   dialog.dataset.certificateDuplicate = 'true';
-  dialog.innerHTML = `<div class="modal-card"><div class="modal-header"><div><h2>该证书编号已存在</h2><p>同一教师下证书类型与证书编号同时相同即为重复，不能新增第二条记录。</p></div><button type="button" class="icon-button modal-close" data-dialog-close title="关闭" aria-label="关闭">×</button></div><dl class="info-grid"><div><dt>教师</dt><dd>${importEsc(teacherName || '本次建档教师')}</dd></div><div><dt>证书类型</dt><dd>${importEsc(item.type)}</dd></div><div><dt>证书编号</dt><dd>${importEsc(item.number)}</dd></div></dl><p class="form-error" role="alert">既有记录在本表单的第 ${[...existingRow.parentElement.children].indexOf(existingRow) + 1} 行；如需更新材料，请对既有记录重新上传，而不是新增一行。</p><div class="modal-actions"><button type="button" class="button" data-duplicate-action="back">返回修改</button><button type="button" class="button primary" data-duplicate-action="view">查看既有记录</button></div></div>`;
+  const hint = existingRow
+    ? `既有记录在本表单的第 ${[...existingRow.parentElement.children].indexOf(existingRow) + 1} 行；如需更新材料，请对既有记录重新上传，而不是新增一行。`
+    : '该教师的证书记录中已有同类型同编号的证书；如需更新材料，请对既有记录重新上传，而不是新增一行。';
+  dialog.innerHTML = `<div class="modal-card"><div class="modal-header"><div><h2>该证书编号已存在</h2><p>同一教师下证书类型与证书编号同时相同即为重复，不能新增第二条记录。</p></div><button type="button" class="icon-button modal-close" data-dialog-close title="关闭" aria-label="关闭">×</button></div><dl class="info-grid"><div><dt>教师</dt><dd>${importEsc(teacherName || '本次建档教师')}</dd></div><div><dt>证书类型</dt><dd>${importEsc(item.type)}</dd></div><div><dt>证书编号</dt><dd>${importEsc(item.number)}</dd></div></dl><p class="form-error" role="alert">${hint}</p><div class="modal-actions"><button type="button" class="button" data-duplicate-action="back">返回修改</button><button type="button" class="button primary" data-duplicate-action="view">查看既有记录</button></div></div>`;
   document.body.appendChild(dialog);
   dialog.showModal();
   dialog.addEventListener('click', (event) => {
@@ -586,7 +576,10 @@ function openCertificateDuplicateDialog({ existingRow, conflictRow, item, teache
     const action = event.target.closest('[data-duplicate-action]')?.dataset.duplicateAction;
     if (!action) return;
     dialog.close();
-    if (action === 'view') highlightCertificateRow(existingRow);
+    if (action === 'view') {
+      if (onView) onView();
+      else highlightCertificateRow(existingRow);
+    }
     else {
       highlightCertificateRow(conflictRow);
       conflictRow?.querySelector('[data-certificate-number]')?.focus();
@@ -595,23 +588,198 @@ function openCertificateDuplicateDialog({ existingRow, conflictRow, item, teache
   dialog.addEventListener('close', () => dialog.remove());
 }
 
-function validateTeacherCertificateRows(form) {
-  const collected = certificateRowsOf(form);
-  const seen = new Map();
-  for (const item of collected) {
-    const key = certificateDedupKey(item);
-    if (seen.has(key)) {
-      const teacherName = form.querySelector('[name="name"]')?.value.trim() || '';
-      openCertificateDuplicateDialog({ existingRow: seen.get(key).row, conflictRow: item.row, item, teacherName });
-      return false;
-    }
-    seen.set(key, item);
-  }
-  return true;
+// CR-2026-045：新增教师与教师详情共用同一套四页签分组与顺序。
+// CR-2026-048 §3.1：新增页第 4 页签由「证书与账号」改为「账号」，证书子表整体移出建档表单。
+const TEACHER_TABS = ['basic', 'contact', 'experience', 'account'];
+
+// CR-2026-048 §3：两步向导共用同一路由，用 ?mode=wizard&step=profile|certificate&teacher_id= 表达步骤。
+// 第一步建档只建主档；第二步证书录入可跳过、可中断、可再次进入；两步都不新增页面。
+const CERTIFICATE_MAJOR_OPTIONS = ['中国舞', '民族民间舞', '芭蕾舞', '声乐演唱', '钢琴', '古筝', '中国画', '少儿绘画', '书法', '戏剧表演', '朗诵与主持'];
+const CERTIFICATE_TYPE_OPTIONS = ['学历证书', '教师资格证', '艺术等级证', '其他'];
+// 证书审核状态取值只读 spec/states 的 SM-TEACHER-CERTIFICATE（05-状态字典 §4），页面不新增状态取值。
+const CERTIFICATE_STATUS_VALUES = (() => {
+  const machine = machinesForPage('teachers/certificates').find((item) => item.id === 'SM-TEACHER-CERTIFICATE');
+  return new Set(machine ? stateLabelsOf(machine) : []);
+})();
+
+const wizardCertificateLink = (teacherId) => `/admin/pages/teachers/create.html?mode=wizard&step=certificate&teacher_id=${encodeURIComponent(teacherId)}`;
+const teacherProfileLink = (teacherId, query = '', hash = '') => `/admin/pages/teachers/profile.html?teacher_id=${encodeURIComponent(teacherId)}${query}${hash}`;
+
+// CR-2026-048 §3.4：证书录入与证书审核保持两个独立权限点，不放宽也不合并。
+// 取值顺序与系统管理「角色权限管理」一致：先读本地已保存的角色勾选，再回落到角色预置，便于复现无权限角色的降级路径。
+function teacherRolePermissions() {
+  const roleKey = window.hbyxPermissions?.roleKey || readAdminSession()?.role || 'academic_lead';
+  try {
+    const saved = JSON.parse(localStorage.getItem('hbyx-admin-role-permissions') || '[]');
+    const row = Array.isArray(saved) ? saved.find((item) => item.key === roleKey) : null;
+    if (row?.permissions?.length) return row.permissions;
+  } catch { /* 本地勾选不可用时回落到角色预置 */ }
+  return permissionsOfRole(roleKey);
 }
 
-// CR-2026-045：新增教师与教师详情共用同一套四页签分组与顺序。
-const TEACHER_TABS = ['basic', 'contact', 'experience', 'certificate'];
+function canManageTeacherCertificate() {
+  return teacherRolePermissions().includes('PERM-TEACHER-004');
+}
+
+// 新建档教师不在静态事实层里：主档写入演示态，详情页与第二步都从同一处回读该教师对象。
+function teacherRecordFromDemo(teacherId) {
+  return (readDemoState().teacherRecords || []).find((item) => item.id === teacherId) || null;
+}
+
+function resolveTeacherFacts(teacherId) {
+  return teacherFactsById(teacherId) || teacherRecordFromDemo(teacherId);
+}
+
+// §3.1：第一步只写主档；证书不进建档表单，表单字段按名收敛为教师对象。
+function teacherRecordFromForm(form, id) {
+  const value = (name) => String(form.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const checked = (name) => form.querySelector(`[name="${name}"]:checked`)?.value || '';
+  return {
+    id,
+    name: value('name'),
+    profileStatus: '已建档',
+    accountStatus: 'inactive',
+    departedAt: '',
+    majors: [...form.querySelectorAll('input[name="professionals[]"]')].map((input) => input.value),
+    teachingYears: Number(value('teachingYears')) || 0,
+    professionalTitle: value('title'),
+    tagline: value('tagline'),
+    introduction: form.querySelector('[data-rich-editor][data-name="introduction"] [data-editor-value]')?.value || '',
+    archive: {
+      employeeNo: form.querySelector('.readonly-field')?.value || '', personnelType: checked('person-type'),
+      gender: checked('gender'), birthMonth: value('birthday'), idCard: value('idCard'),
+      politicalStatus: value('political'), ethnicity: value('ethnicity'), highestEducation: value('education'),
+      carPlate: value('plateNumber'), mobile: value('phone'), email: value('email'),
+      emergencyName: value('emergencyName'), emergencyMobile: value('emergencyPhone'),
+      payeeName: value('payee'), bankCard: value('bankCard'), bankName: value('bank'),
+      education: value('studyExperience'), employment: value('workExperience'), awards: value('awards'),
+      remark: value('remark')
+    },
+    certificates: [],
+    contracts: []
+  };
+}
+
+// §3.2／§3.5：第二步与教师详情页共用的证书取值，含适用专业与文件来源两个维度。
+function teacherCertificateRecords(teacherId) {
+  const facts = resolveTeacherFacts(teacherId);
+  const seeded = (facts?.certificates || []).map((item) => ({ ...item, number: item.number || item.id, source: item.source || '学校录入' }));
+  const seededKeys = new Set(seeded.map((item) => certificateDedupKey(item)).filter(Boolean));
+  const entered = (readDemoState().teacherCertificates || [])
+    .filter((item) => item.teacherId === teacherId)
+    .map((item) => ({ ...item, source: item.source || '学校录入' }))
+    .filter((item) => !seededKeys.has(certificateDedupKey(item)));
+  return [...seeded, ...entered];
+}
+
+// 有效性按有效期截止日期独立计算，与审核状态分列，不合成一个结论。
+function certificateValidity(item) {
+  if (item.status !== '已通过') return '—';
+  if (!item.expiresAt) return '永久有效';
+  return item.expiresAt < CONTRACT_DEMO_TODAY ? '已过期' : '有效';
+}
+
+function certificateReadonlyRows(records) {
+  if (!records.length) return '<tr><td colspan="6">该教师暂无证书，可通过「录入证书」补充。</td></tr>';
+  return records.map((item) => `<tr data-certificate-record="${importEsc(item.id)}"><td>${importEsc(item.name)}</td><td>${importEsc(item.type)}</td><td>${importEsc((item.majors || []).join('、') || '—')}</td><td>${CERTIFICATE_STATUS_VALUES.has(item.status) ? statusTag(item.status) : '—'}</td><td>${importEsc(certificateValidity(item))}</td><td>${importEsc(item.source)}</td></tr>`).join('');
+}
+
+// §3.3：历史 create.html?tab=certificate 深链重定向到第二步；缺少有效 teacher_id 时回退教师列表。
+function wizardStepContext() {
+  const params = new URLSearchParams(location.search);
+  const step = params.get('mode') === 'wizard' ? (params.get('step') || 'profile') : 'profile';
+  const teacherId = params.get('teacher_id') || '';
+  if (params.get('tab') === 'certificate') {
+    const target = teacherId ? wizardCertificateLink(teacherId) : '/admin/pages/teachers/list.html';
+    window.location.replace(relativePath(target));
+    return { redirecting: true, step: 'profile', teacherId };
+  }
+  return { redirecting: false, step, teacherId };
+}
+
+// 第二步只认演示态里该教师的证书；不再有表单内既有行，因此按记录对象查重。
+const wizardCertificatesOf = (teacherId) => teacherCertificateRecords(teacherId);
+
+function wizardCertificateRows(records) {
+  return certificateReadonlyRows(records);
+}
+
+function persistWizardCertificate(record) {
+  return upsertDemoRecord('teacherCertificates', record);
+}
+
+function renderWizardCertificateStep(teacherId) {
+  const container = document.querySelector('#teacher-wizard-certificate');
+  const body = document.querySelector('[data-wizard-certificate-body]');
+  if (!container || !body) return;
+  // 第二步不重复展示主档必填字段，也不允许在第二步修改主档。
+  document.querySelector('#teacher-form')?.setAttribute('hidden', '');
+  document.querySelector('.teacher-tabbar')?.setAttribute('hidden', '');
+  const pageCopy = document.querySelector('#page-content .page-head p');
+  if (pageCopy) pageCopy.textContent = '第一步已建档完成；第二步只录入该教师的证书，可跳过或稍后再进入，本步不修改主档信息。';
+  container.hidden = false;
+  const teacherName = resolveTeacherFacts(teacherId)?.name || '本次新建档教师';
+  const teacherLabel = document.querySelector('[data-wizard-teacher]');
+  if (teacherLabel) teacherLabel.textContent = `${teacherName} · ${teacherId}`;
+  const majorOptions = CERTIFICATE_MAJOR_OPTIONS;
+  // §3.2.3：跳过与完成两者都进入该教师详情页，差别只在返回后的提示文案。
+  const leaveStep = (notice) => { window.location.href = relativePath(teacherProfileLink(teacherId, `&notice=${notice}`, '#certificate')); };
+  const draw = () => {
+    const records = wizardCertificatesOf(teacherId);
+    body.innerHTML = `<div class="form-section first-form-section"><div class="section-title-row"><div><h2>该教师已录入证书</h2></div><span class="tag gray">${records.length} 项</span></div><div class="table-wrap"><table><thead><tr><th>证书名称</th><th>证书类型</th><th>适用专业</th><th>审核状态</th><th>有效性</th><th>文件来源</th></tr></thead><tbody>${wizardCertificateRows(records)}</tbody></table></div></div><div class="form-section"><h2>录入证书</h2><form data-form="wizard-certificate" novalidate><div class="form-grid"><label class="form-field"><span>证书名称 *</span><input name="name" required placeholder="如：中国舞教师资格证" /></label><label class="form-field"><span>证书编号 *</span><input name="number" required placeholder="如：WD-2019-0028" /></label><label class="form-field"><span>证书类型 *</span><select name="type" required><option value="">请选择类型</option>${['学历证书', '教师资格证', '艺术等级证', '其他'].map((type) => `<option>${type}</option>`).join('')}</select></label><label class="form-field"><span>适用专业 *</span><select multiple size="3" class="certificate-major-select" name="majors" required>${majorOptions.map((major) => `<option>${major}</option>`).join('')}</select></label><label class="form-field"><span>发证机构 *</span><input name="issuer" required placeholder="如：中国舞蹈家协会" /></label><label class="form-field"><span>颁发日期</span><input name="issuedAt" type="date" /></label><label class="form-field"><span>有效期截止</span><input name="expiresAt" type="date" /></label><label class="form-field"><span>永久有效</span><span class="sales-switch-control"><input name="permanent" type="checkbox"></span></label><label class="form-field wide"><span>证书文件 *</span><input name="file" type="file" required accept=".jpg,.jpeg,.png,.pdf,.doc,.docx" /></label></div><p class="form-error" data-wizard-error role="alert" hidden></p><div class="teacher-form-actions"><button type="button" class="button" data-wizard-action="skip">跳过，稍后录入</button><button type="button" class="button primary" data-wizard-action="finish">完成</button><button type="submit" class="button primary">保存证书</button></div></form></div>`;
+  };
+  body.onclick = (event) => {
+    const action = event.target.closest('[data-wizard-action]')?.dataset.wizardAction;
+    if (!action) return;
+    leaveStep(action === 'skip' ? 'skip' : 'finish');
+  };
+  body.onsubmit = (event) => {
+    const formEl = event.target.closest('[data-form="wizard-certificate"]');
+    if (!formEl) return;
+    event.preventDefault();
+    const data = new FormData(formEl);
+    const error = formEl.querySelector('[data-wizard-error]');
+    const majors = data.getAll('majors');
+    if (!String(data.get('name') || '').trim() || !String(data.get('number') || '').trim() || !data.get('type') || !String(data.get('issuer') || '').trim() || !majors.length || !formEl.querySelector('[name="file"]').files.length) {
+      error.textContent = '请补齐证书名称、编号、类型、适用专业（至少 1 个）、发证机构与证书文件。';
+      error.hidden = false;
+      return;
+    }
+    // §3.2.2：查重范围是该教师已保存的全部证书（类型 + 编号），命中不产生第二条记录。
+    const duplicate = findDuplicateCertificate(wizardCertificatesOf(teacherId), { type: data.get('type'), number: String(data.get('number')).trim() });
+    if (duplicate) {
+      // §3.2.2：第二步没有表单内既有行，「查看既有记录」定位到教师详情页证书与账号页签。
+      openCertificateDuplicateDialog({ item: { type: data.get('type'), number: String(data.get('number')).trim() }, teacherName, onView: () => leaveStep('existing') });
+      return;
+    }
+    const record = { id: `cert-${Date.now()}`, teacherId, name: String(data.get('name')).trim(), number: String(data.get('number')).trim(), type: data.get('type'), majors, issuer: String(data.get('issuer')).trim(), issuedAt: data.get('issuedAt') || '', expiresAt: data.get('permanent') ? '' : (data.get('expiresAt') || ''), status: '已通过', source: '学校录入', operator: readAdminSession()?.name || '李教务', enteredAt: demoTime(), file: formEl.querySelector('[name="file"]').files[0].name };
+    persistWizardCertificate(record);
+    draw();
+    toast('证书已录入，状态为已通过、来源为学校录入。');
+  };
+  draw();
+}
+
+// 第二步入口：只在 step=certificate 时接管页面，返回 true 表示本页已由第二步渲染。
+function initTeacherWizard() {
+  const context = wizardStepContext();
+  if (context.redirecting) return true;
+  if (context.step !== 'certificate') return false;
+  // §3.3.3：teacher_id 缺失或无效时回退教师列表并提示，不进入空态页面。
+  if (!context.teacherId || !resolveTeacherFacts(context.teacherId)) {
+    toast('缺少有效的教师标识，已返回教师列表。', 'error');
+    window.setTimeout(() => { window.location.replace(relativePath('/admin/pages/teachers/list.html')); }, 800);
+    return true;
+  }
+  // §3.4.2：第二步录入证书要求 PERM-TEACHER-004；无权限时回教师详情页，不展示证书录入。
+  if (!canManageTeacherCertificate()) {
+    toast('当前账号没有证书录入权限，已返回教师详情页。', 'error');
+    window.setTimeout(() => { window.location.replace(relativePath(teacherProfileLink(context.teacherId, '&notice=no-permission', '#certificate'))); }, 900);
+    return true;
+  }
+  renderWizardCertificateStep(context.teacherId);
+  return true;
+}
 
 const teacherFieldEmpty = (field) => {
   if (field.type === 'checkbox') return !field.checked;
@@ -806,10 +974,19 @@ function initTeacherCreate() {
     if (!/^\d{11}$/.test(phone)) { toast('手机号必须为11位数字。', 'error'); return; }
     if (!/^\d{17}[\dXx]$/.test(idCard)) { toast('身份证号必须为18位有效格式。', 'error'); return; }
     // CR-2026-028 §2.2：后台录入保存前执行查重，命中不静默创建第二条记录。
-    if (!validateTeacherCertificateRows(form)) return;
+    // CR-2026-048：建档只校验主档，证书不再随第一步提交。
     const result = form.querySelector('[data-build-result]');
     if (result) result.hidden = false;
     toast('教师已建档；账号邀请发送失败，可重新发送。', 'error');
+    // CR-2026-048 §3.1：建档只写主档；新建教师写入演示态，第二步与详情页据此回读同一教师对象。
+    const created = teacherRecordFromForm(form, demoId('teacher'));
+    upsertDemoRecord('teacherRecords', created);
+    // §3.4：无证书录入权限的角色完成第一步后直接进入教师详情页，不展示第二步。
+    if (!canManageTeacherCertificate()) {
+      window.setTimeout(() => { window.location.href = relativePath(teacherProfileLink(created.id)); }, 700);
+      return;
+    }
+    window.setTimeout(() => { window.location.href = relativePath(wizardCertificateLink(created.id)); }, 900);
   });
   // §3.1.5／§3.2：保存草稿不校验必填，只刷新页签角标与完成度。
   form?.querySelector('[data-action="save-draft"]')?.addEventListener('click', () => { teacherTabs.refreshBadges(); toast('教师档案草稿已保存（未校验必填项）。'); });
@@ -833,28 +1010,6 @@ function initTeacherCreate() {
     if (copy) copy.textContent = '教师账号保持“未激活”，待教师验证建档手机号、设置本人密码并同意协议后变为“正常”。';
     result?.classList.add('success');
     toast('激活邀请已重新发送。');
-  });
-  form?.querySelector('[data-action="add-certificate"]')?.addEventListener('click', () => {
-    const body = form.querySelector('[data-certificate-list]');
-    if (!body) return;
-    const row = body.querySelector('tr')?.cloneNode(true);
-    if (!row) return;
-    // 证书行新增时清空全部控件，多选「适用专业」需清空选中项。
-    row.querySelectorAll('input, select').forEach((control) => {
-      if (control.type === 'checkbox') { control.checked = false; return; }
-      [...(control.options || [])].forEach((option) => { option.selected = false; });
-      control.value = '';
-    });
-    row.querySelector('[data-action="remove-certificate"]')?.removeAttribute('disabled');
-    body.append(row);
-    toast('已新增证书信息行。');
-  });
-  form?.addEventListener('click', (event) => {
-    if (event.target.closest('[data-action="remove-certificate"]')) {
-      const rows = form.querySelectorAll('[data-certificate-list] tr');
-      if (rows.length > 1) event.target.closest('tr')?.remove();
-      else toast('至少保留一行证书信息。', 'error');
-    }
   });
 }
 
@@ -1075,9 +1230,18 @@ function initSchedule() {
 
 function initProfile() {
   renderProfileCapacity();
-  const facts = teacherFactsById(new URLSearchParams(location.search).get('teacher_id') || 'teacher-wang');
+  const params = new URLSearchParams(location.search);
+  const facts = resolveTeacherFacts(params.get('teacher_id') || 'teacher-wang');
   if (facts) { renderTeacherProfileArchive(facts); renderTeacherSelfProfile(facts); }
+  // CR-2026-048 §3.2.3：第二步「跳过，稍后录入」与「完成」都进入本页，差别只在提示文案。
+  const notice = params.get('notice');
+  if (notice === 'skip') toast('已跳过证书录入；该教师证书为 0 项，可随时从本页「录入证书」补录。');
+  else if (notice === 'finish') toast('证书录入已完成，主档与证书分别保存。');
+  else if (notice === 'existing') toast('已定位到该教师的既有证书，请在原记录上重新上传，不要新增第二条。', 'error');
+  else if (notice === 'no-permission') toast('当前账号没有证书录入权限，请由具备该权限的角色录入证书。', 'error');
   const profileTabs = document.querySelector('.teacher-tabcard') ? initTeacherTabs(document.querySelector('.teacher-tabcard'), { mode: 'readonly' }) : null;
+  // 从第二步返回的 #certificate 深链直接停在「证书与账号」页签。
+  if (location.hash === '#certificate') document.querySelector('[data-teacher-tab="certificate"]')?.click();
   // §4.3：编辑入口携带当前页签，返回后停留原页签。
   const editLink = document.querySelector('#teacher-profile-edit-link');
   if (editLink && facts) {
@@ -1163,12 +1327,13 @@ function renderTeacherProfileArchive(facts) {
 
   const certificatePanel = document.querySelector('[data-teacher-panel="certificate"]');
   if (certificatePanel) {
-    const certificates = facts.certificates || [];
-    const rows = certificates.length
-      ? certificates.map((item) => `<tr><td>${importEsc(item.name)}</td><td>${importEsc(item.type)}</td><td>${importEsc((item.majors || []).join('、') || '—')}</td><td>${importEsc(item.expiresAt || '永久有效')}</td><td>${statusTag(item.status)}</td><td>${importEsc(item.id)}</td></tr>`).join('')
-      : '<tr><td colspan="6">该教师暂无证书记录。</td></tr>';
+    // CR-2026-048 §3.5：第 4 页签 = 账号只读信息 + 证书只读列表 + 录入证书入口；「查看证书明细」保留。
+    const certificates = teacherCertificateRecords(facts.id);
     const accountFields = [['邀请手机号', mobile], ['初始账号状态', facts.accountStatus === 'active' ? '正常' : '未激活'], ['备注', teacherArchiveValue(facts, 'remark').value || '—']];
-    certificatePanel.innerHTML = `<div class="form-section first-form-section"><div class="section-title-row"><div><h2>证书信息</h2></div><a class="button" href="${relativePath(`/admin/pages/teachers/certificates.html?teacher_id=${encodeURIComponent(facts.id)}`)}">查看证书明细</a></div><div class="table-wrap"><table><thead><tr><th>证书名称</th><th>证书类型</th><th>适用专业</th><th>有效期截止</th><th>审核状态</th><th>证书编号</th></tr></thead><tbody>${rows}</tbody></table></div></div><div class="form-section"><h2>账号</h2><div class="table-wrap"><table class="teacher-archive-table"><thead><tr><th>字段</th><th>当前值</th><th>来源</th><th>最近更新</th></tr></thead><tbody>${accountFields.map(([label, value]) => `<tr data-archive-field="${label}" data-empty="${value === '—'}"><th>${label}</th><td>${importEsc(value)}</td><td>后台建档</td><td>—</td></tr>`).join('')}</tbody></table></div></div>`;
+    const entry = canManageTeacherCertificate()
+      ? `<a class="button primary" href="${relativePath(wizardCertificateLink(facts.id))}">录入证书</a>`
+      : '';
+    certificatePanel.innerHTML = `<div class="form-section first-form-section"><div class="section-title-row"><div><h2>证书列表</h2></div><div class="toolbar-actions">${entry}<a class="button" href="${relativePath(`/admin/pages/teachers/certificates.html?teacher_id=${encodeURIComponent(facts.id)}`)}">查看证书明细</a></div></div><div class="table-wrap"><table><thead><tr><th>证书名称</th><th>证书类型</th><th>适用专业</th><th>审核状态</th><th>有效性</th><th>文件来源</th></tr></thead><tbody>${certificateReadonlyRows(certificates)}</tbody></table></div><p class="teacher-profile-readonly-note">审核仍在证书列表页执行；本页只读展示，材料变更走既有记录的重新上传。</p></div><div class="form-section"><h2>账号</h2><div class="table-wrap"><table class="teacher-archive-table"><thead><tr><th>字段</th><th>当前值</th><th>来源</th><th>最近更新</th></tr></thead><tbody>${accountFields.map(([label, value]) => `<tr data-archive-field="${label}" data-empty="${value === '—'}"><th>${label}</th><td>${importEsc(value)}</td><td>后台建档</td><td>—</td></tr>`).join('')}</tbody></table></div></div>`;
   }
 
   const recordsPanel = document.querySelector('[data-teacher-panel="records"]');
@@ -1209,7 +1374,7 @@ function renderTeacherSelfProfile(facts) {
 // 教师详情：按专业逐条给出资质结论，并列出申报层面的准入阻断。
 function renderProfileCapacity() {
   const container = document.querySelector('.teacher-capability-detail');
-  const facts = teacherFactsById(new URLSearchParams(location.search).get('teacher_id') || 'teacher-wang');
+  const facts = resolveTeacherFacts(new URLSearchParams(location.search).get('teacher_id') || 'teacher-wang');
   if (!container || !facts) return;
   const summary = summarizeTeacherCapacity(facts);
   const apply = explainTeacherCapacity(facts, { purpose: 'apply' });
@@ -1226,8 +1391,9 @@ function renderProfileCapacity() {
   const summaryResult = document.querySelector('.teacher-summary-result');
   if (summaryResult) {
     const today = new Date().toISOString().slice(0, 10);
-    const usable = (facts.certificates || []).filter((item) => item.status === '已通过' && (!item.expiresAt || item.expiresAt >= today)).length;
-    const pending = (facts.certificates || []).length - usable;
+    const certificates = teacherCertificateRecords(facts.id);
+    const usable = certificates.filter((item) => item.status === '已通过' && (!item.expiresAt || item.expiresAt >= today)).length;
+    const pending = certificates.length - usable;
     summaryResult.innerHTML = `<strong>可用 ${usable} 份 <span aria-hidden="true">|</span> 待处理 ${pending} 份</strong><p>${summary.majors.map((item) => `${item.major}：${item.qualified ? '资质满足' : '待补充专业资质'}`).join('；')}。</p>`;
   }
 }
@@ -1235,7 +1401,8 @@ function renderProfileCapacity() {
 document.addEventListener('click', (event) => { if (event.target.closest('[data-dialog-close]')) event.target.closest('dialog')?.close(); });
 
 if (teacherPage === 'list') initTeacherList();
-if (teacherPage === 'create') initTeacherCreate();
+// CR-2026-048 §3：新增教师页承载两步向导，step=certificate 时交第二步渲染，其余情况仍渲染建档表单。
+if (teacherPage === 'create' && !initTeacherWizard()) initTeacherCreate();
 if (teacherPage === 'contracts') initContracts();
 if (teacherPage === 'schedule') initSchedule();
 if (teacherPage === 'profile') initProfile();

@@ -146,3 +146,14 @@
 .teacher-archive-table th { width: 160px; font-weight: 600; color: var(--text-muted, #5b6478); }
 .certificate-major-select { min-width: 150px; }
 .teacher-profile-readonly-note { margin: 10px 0 0; font-size: 13px; color: var(--text-muted, #5b6478); }
+
+/* CR-2026-048：新增教师页两步向导的步骤指示与第二步容器。 */
+.teacher-wizard-step { padding: 16px; }
+.teacher-wizard-steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
+.teacher-wizard-steps li { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--line, #e3e6ee); border-radius: 999px; font-size: 13px; color: var(--text-muted, #5b6478); }
+.teacher-wizard-steps li em { font-style: normal; font-size: 12px; color: inherit; opacity: .85; }
+.teacher-wizard-steps li.is-done { border-color: #cfe9d8; background: #e6f6ec; color: #1f7a44; }
+.teacher-wizard-steps li.is-current { border-color: var(--brand, #2f6fed); background: rgba(47, 111, 237, .08); color: var(--brand, #2f6fed); font-weight: 600; }
+.teacher-wizard-step .teacher-form-actions { margin-top: 12px; }
+/* 第二步时第一步的页签条与表单整体隐藏；.teacher-tabbar 自身声明了 display，需要显式覆盖。 */
+.teacher-tabbar[hidden], .card[hidden], .teacher-wizard-step[hidden] { display: none; }

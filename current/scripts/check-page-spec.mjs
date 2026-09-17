@@ -104,13 +104,20 @@ const teacherFields = allSpecFields();
 const seenIds = new Map();
 // CR-2026-045：教师详情是新增教师页的只读投影，按变更单要求复用 FD-TEACHER-xxx 编号，
 // 不另起编号空间；编号唯一性校验对投影页放行，其余页面仍要求全局唯一。
-const MIRROR_SPEC_PAGES = new Set(['teachers/profile']);
+// CR-2026-048 §4.1：证书字段抽为 spec/fields 的 CERTIFICATE_FIELDS 公共定义，第二步（挂在 teachers/create）
+// 与 teachers/certificates 引用同一份定义，因此这两页也放行编号复用；其他页面仍要求全局唯一。
+const MIRROR_SPEC_PAGES = new Set(['teachers/profile', 'teachers/certificates', 'teachers/create']);
 for (const field of teacherFields) {
   const at = `${field.pageKey} / ${field.label}`;
   if (!ID_PATTERN.test(String(field.id || ''))) problems.push(`[编号] ${at}：字段编号格式应为 FD-模块-三位序号，实际 ${field.id}`);
-  if (MIRROR_SPEC_PAGES.has(field.pageKey)) { /* 投影页允许复用源页字段编号 */ }
-  else if (seenIds.has(field.id)) problems.push(`[编号] ${at}：字段编号 ${field.id} 与 ${seenIds.get(field.id)} 重复`);
-  else seenIds.set(field.id, at);
+  const previous = seenIds.get(field.id);
+  // 投影页与共享定义页之间允许复用编号（两个页面都在放行名单里）；其余重复仍然报错。
+  const sharedPair = previous && MIRROR_SPEC_PAGES.has(field.pageKey) && MIRROR_SPEC_PAGES.has(previous.pageKey);
+  if (previous && !sharedPair) {
+    problems.push(`[编号] ${at}：字段编号 ${field.id} 与 ${previous.at} 重复`);
+  } else if (!previous) {
+    seenIds.set(field.id, { at, pageKey: field.pageKey });
+  }
   for (const key of ['label', 'type', 'length', 'required', 'note']) {
     if (!String(field[key] ?? '').trim()) problems.push(`[字段] ${at}：缺少 ${key}`);
   }

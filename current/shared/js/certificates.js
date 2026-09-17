@@ -1,6 +1,7 @@
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
-import { sessionsFrom, teacherFactsByName } from './teacher-facts.js';
-import { certificateSourceLabel } from './certificate-source.js';
+import { sessionsFrom, teacherFactsById, teacherFactsByName } from './teacher-facts.js';
+import { certificateDedupKey, certificateSourceLabel } from './certificate-source.js';
+import { readDemoState } from './demo-store.js';
 
 const table = document.querySelector('#certificates-table');
 const filterForm = document.querySelector('#certificate-filter');
@@ -437,13 +438,67 @@ document.querySelector('#reupload-form')?.addEventListener('submit', (event) => 
   showToast('证书已重新上传，等待教研主管审核。');
 });
 
+// CR-2026-048 §3.5.4／§3.6：第二步（后台）录入的证书与后台列表页同源；
+// 按 teacher_id 进入时把该教师的证书记录补进列表，避免详情页有证书而明细页空白。
+function appendTeacherEnteredRows(teacherId, teacherName) {
+  const entered = (readDemoState().teacherCertificates || []).filter((item) => item.teacherId === teacherId);
+  if (!entered.length || !table || !rows.length) return;
+  const template = rows[0];
+  const today = new Date().toISOString().slice(0, 10);
+  const soon = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  entered.forEach((item) => {
+    const key = certificateDedupKey(item);
+    const sameTeacher = (row) => row.dataset.teacher === teacherName;
+    if (rows.filter(sameTeacher).some((row) => certificateDedupKey({ type: row.dataset.type, number: row.dataset.number }) === key)) return;
+    const row = template.cloneNode(true);
+    row.dataset.certificateId = item.id;
+    row.dataset.teacher = teacherName;
+    row.dataset.name = item.name;
+    row.dataset.number = item.number;
+    row.dataset.type = item.type;
+    row.dataset.issuer = item.issuer;
+    row.dataset.expiry = item.expiresAt || '';
+    row.dataset.status = item.status;
+    row.dataset.source = item.source;
+    row.dataset.enteredBy = item.operator || '—';
+    row.dataset.file = item.file || '';
+    row.dataset.uploadedAt = item.enteredAt || '';
+    row.dataset.reviewer = item.operator || '—';
+    row.dataset.reviewedAt = item.enteredAt || '';
+    row.dataset.reviewNote = '后台录入默认通过。';
+    row.dataset.referenced = '否';
+    row.dataset.validity = !item.expiresAt || item.expiresAt > soon ? '有效' : item.expiresAt < today ? '已过期' : '即将过期';
+    const cells = row.children;
+    cells[0].innerHTML = `<a class="link" href="profile.html?teacher_id=${encodeURIComponent(teacherId)}">${item.teacherName || teacherName}</a>`;
+    cells[1].textContent = item.name;
+    cells[2].textContent = (item.majors || []).join('、') || '—';
+    cells[3].textContent = item.number;
+    cells[4].innerHTML = `<span class="tag brand">${item.type}</span>`;
+    cells[5].textContent = item.issuer || '—';
+    cells[6].textContent = item.expiresAt || '永久有效';
+    cells[8].innerHTML = `<span class="tag ${validityClass(row.dataset.validity)}">${row.dataset.validity}</span>`;
+    cells[10].textContent = item.operator || '—';
+    cells[13].textContent = '—';
+    updateStatusCell(row);
+    table.tBodies[0].append(row);
+    rows.push(row);
+  });
+}
+
 const params = new URLSearchParams(window.location.search);
 const queryStatus = params.get('status');
 const queryValidity = params.get('validity');
 const queryTeacher = params.get('teacher');
+// CR-2026-048 §3.5.4：教师详情页「查看证书明细」按 teacher_id 进入，这里解析出教师姓名并套用同一套筛选。
+const queryTeacherId = params.get('teacher_id');
 if (queryStatus && statusTabs.some((tab) => tab.dataset.certificateStatus === queryStatus)) activeStatus = queryStatus;
 if (queryValidity) document.querySelector('#certificate-validity').value = queryValidity;
-if (queryTeacher) document.querySelector('#certificate-teacher').value = queryTeacher;
+const teacherNameOfQuery = queryTeacher
+  || (queryTeacherId ? (teacherFactsById(queryTeacherId)?.name
+    || (readDemoState().teacherRecords || []).find((item) => item.id === queryTeacherId)?.name || '') : '');
+if (teacherNameOfQuery) document.querySelector('#certificate-teacher').value = teacherNameOfQuery;
+// 第二步录入的证书归属演示态教师（静态列表里没有该行），按 teacher_id 进入时补行后再统一渲染。
+if (queryTeacherId) appendTeacherEnteredRows(queryTeacherId, teacherNameOfQuery || '本次建档教师');
 // 操作列由 updateActionCell 统一渲染，静态标记只作占位，避免静态与动态分叉成两套动作。
 rows.forEach(updateActionCell);
 syncCertificateSourceCells();

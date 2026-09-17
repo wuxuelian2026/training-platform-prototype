@@ -100,6 +100,26 @@ teacherState.contracts = Array.isArray(teacherState.contracts) ? teacherState.co
 // CR-2026-028 §3.2：教师端只展示文件来源文案（学校录入／本人上传／系统生成），
 // 内部枚举（后台录入／教师端上传）不外露，业务来源口径不下发到教师端。
 teacherState.certificates = teacherState.certificates.map(item => ({ ...item, source: certificateSourceLabel(item.source) }));
+// CR-2026-048 §3.6：后台第二步录入的证书与教师端「我的证书」同源——
+// 同一条证书记录在两端可见，来源显示为“学校录入”，不再各存一份。
+const adminEnteredCertificates = (() => {
+  try {
+    const currentTeacherId = sessionStorage.getItem('hbyx-teacher-id') || defaultTeacherId();
+    const shared = JSON.parse(localStorage.getItem('hbyx-iteration1-demo-v1') || '{}').teacherCertificates || [];
+    return shared
+      .filter(item => item.teacherId === currentTeacherId)
+      .map(item => ({
+        id: item.id, name: item.name, number: item.number, type: item.type, issuer: item.issuer,
+        issuedAt: item.issuedAt || '', expiresAt: item.expiresAt || '', status: item.status,
+        source: certificateSourceLabel(item.source), file: item.file || '证书文件',
+        fileVersion: 'v1', reviewedAt: item.enteredAt || '', reviewNote: '后台录入默认通过。'
+      }));
+  } catch { return []; }
+})();
+if (adminEnteredCertificates.length) {
+  const knownCertificateIds = new Set(teacherState.certificates.map(item => item.id));
+  teacherState.certificates = [...teacherState.certificates, ...adminEnteredCertificates.filter(item => !knownCertificateIds.has(item.id))];
+}
 teacherState.graduationRecords = Array.isArray(teacherState.graduationRecords) ? teacherState.graduationRecords : teacherGraduationDefaults.map(item => ({ ...item }));
 const storedTeacherMessages = Array.isArray(teacherState.messages) ? teacherState.messages : [];
 const knownTeacherMessages = teacherMessageDefaults.map(item => ({ ...item, read: storedTeacherMessages.find(row => row.id === item.id)?.read ?? item.read }));

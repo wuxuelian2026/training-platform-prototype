@@ -13,18 +13,18 @@
   <div data-admin-shell data-title="新增教师" data-active="teachers" data-teacher-page="create">
     <div id="page-content">
       <div class="page-head">
-        <div><h1>新增教师</h1><p>四个页签共用一套分组，页签可自由跳转；提交时跨页签全量校验，失败自动定位到第一个含错误的页签与字段。</p></div>
+        <div><h1>新增教师</h1><p>第一步建档只填主档，四个页签可自由跳转，提交时跨页签全量校验；保存成功后进入第二步证书录入，可跳过、可中断、可再次进入。</p></div>
         <div class="toolbar-actions"><a class="button" href="list.html">返回教师列表</a></div>
       </div>
 
-      <!-- CR-2026-045：新增教师与教师详情共用同一套四页签分组（基本信息／联系与财务／经历与展示／证书与账号）。 -->
+      <!-- CR-2026-048：第一步只建主档，四个页签为基本信息／联系与财务／经历与展示／账号，证书输入不在此表单。 -->
       <!-- novalidate：校验由脚本按页签统一执行，避免隐藏页签内的必填项触发浏览器原生校验而阻断提交。 -->
       <form class="card form-card teacher-form" id="teacher-form" novalidate>
         <div class="teacher-tabbar" role="tablist" aria-label="教师建档页签">
           <button type="button" role="tab" id="teacher-tab-basic" aria-controls="teacher-panel-basic" aria-selected="true" data-teacher-tab="basic">基本信息<span class="tab-badge" data-tab-badge="basic"></span></button>
           <button type="button" role="tab" id="teacher-tab-contact" aria-controls="teacher-panel-contact" aria-selected="false" data-teacher-tab="contact">联系与财务<span class="tab-badge" data-tab-badge="contact"></span></button>
           <button type="button" role="tab" id="teacher-tab-experience" aria-controls="teacher-panel-experience" aria-selected="false" data-teacher-tab="experience">经历与展示<span class="tab-badge" data-tab-badge="experience"></span></button>
-          <button type="button" role="tab" id="teacher-tab-certificate" aria-controls="teacher-panel-certificate" aria-selected="false" data-teacher-tab="certificate">证书与账号<span class="tab-badge" data-tab-badge="certificate"></span></button>
+          <button type="button" role="tab" id="teacher-tab-account" aria-controls="teacher-panel-account" aria-selected="false" data-teacher-tab="account">账号<span class="tab-badge" data-tab-badge="account"></span></button>
         </div>
 
         <section class="teacher-tabpanel" id="teacher-panel-basic" role="tabpanel" aria-labelledby="teacher-tab-basic" data-teacher-panel="basic">
@@ -71,9 +71,7 @@
           </div></div>
         </section>
 
-        <section class="teacher-tabpanel" id="teacher-panel-certificate" role="tabpanel" aria-labelledby="teacher-tab-certificate" data-teacher-panel="certificate" hidden>
-          <!-- CR-2026-045 §3.3：证书子表补「适用专业」列，多选、新增行时必填、至少 1 个（FD-TEACHER-064）。 -->
-          <div class="form-section first-form-section"><div class="section-title-row"><div><h2>证书信息</h2></div><button type="button" class="button" data-action="add-certificate">新增证书</button></div><div class="table-wrap subtable-wrap"><table class="subtable"><thead><tr><th>证书名称</th><th>证书编号</th><th>证书类型</th><th>适用专业</th><th>发证机构</th><th>颁发日期</th><th>有效期截止</th><th>永久有效</th><th>证书文件</th><th>审核状态</th><th>操作</th></tr></thead><tbody data-certificate-list><tr><td><input placeholder="证书名称" /></td><td><input placeholder="证书编号" data-certificate-number /></td><td><select data-certificate-type><option>选择类型</option><option>学历证书</option><option>教师资格证</option><option>艺术等级证</option><option>其他</option></select></td><td><select multiple size="2" class="certificate-major-select" data-certificate-majors aria-label="适用专业" required><option>中国舞</option><option>民族民间舞</option><option>芭蕾舞</option><option>声乐演唱</option><option>钢琴</option><option>古筝</option><option>中国画</option><option>少儿绘画</option><option>书法</option><option>戏剧表演</option><option>朗诵与主持</option></select></td><td><input placeholder="发证机构" /></td><td><input type="date" /></td><td><input type="date" /></td><td><input type="checkbox" aria-label="永久有效" /></td><td><label class="upload-control"><input type="file" />上传文件</label></td><td><span class="tag green">已通过</span></td><td><button type="button" class="text-button danger-link" data-action="remove-certificate">删除</button></td></tr></tbody></table></div></div>
+        <section class="teacher-tabpanel" id="teacher-panel-account" role="tabpanel" aria-labelledby="teacher-tab-account" data-teacher-panel="account" hidden>
 
           <div class="form-section"><h2>账号邀请</h2><div class="form-grid">
             <label class="form-field"><span>邀请手机号</span><input value="使用联系方式中的手机号" readonly class="readonly-field" /></label>
@@ -86,6 +84,15 @@
         <!-- 操作条固定在页签内容之外；提交按钮旁展示必填项完成度。 -->
         <div class="form-actions teacher-form-actions"><a class="button" href="list.html">取消</a><span class="teacher-required-hint" data-required-hint>必填项还差 0 项</span><button type="button" class="button" data-action="save-draft" data-api-action="save_draft">保存草稿</button><button type="submit" class="button primary" data-api-action="complete_and_invite">完成建档并发送邀请</button></div>
       </form>
+      <!-- CR-2026-048 §3.2：第二步证书录入与第一步共用同一路由，通过 ?mode=wizard&step=certificate&teacher_id=<id> 进入；可跳过、可中断、可再次进入。 -->
+      <section class="card teacher-wizard-step" id="teacher-wizard-certificate" data-wizard-step="certificate" hidden>
+        <ol class="teacher-wizard-steps">
+          <li class="is-done">第一步 建档<em>已完成</em></li>
+          <li class="is-current">第二步 证书录入<em>可跳过</em></li>
+        </ol>
+        <div class="section-title-row"><div><h2>第二步：证书录入</h2></div><span class="sub-cell" data-wizard-teacher>—</span></div>
+        <div data-wizard-certificate-body></div>
+      </section>
       <div class="toast" data-teacher-toast role="status" aria-live="polite" hidden></div>
     </div>
   </div>
