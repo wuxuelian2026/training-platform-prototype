@@ -65,22 +65,40 @@ export function classSalesProjection(record, now = DEMO_NOW) {
   };
 }
 
-export function deriveClassStatus(record, now = DEMO_NOW) {
-  if (!record) return '待排班';
-  if (record.status === '已取消') return '已取消';
-  if (!isSchedulePublished(record)) return record.scheduleStatus === '草稿' ? '排班草稿' : '待排班';
-  const capacity = Number(record.capacity || 0);
-  const enrolled = Number(record.enrolled || 0);
-  if (capacity > 0 && enrolled >= capacity) return '已满员';
+// CR-2026-047 §5.2：班级主状态收窄为 6 值单向链——待排课／待发布／招生中／进行中／已结束／已取消。
+// 容量与报名窗口不再参与主链（原先容量短路了教学周期，导致满员班的「进行中／已结束」不可达）；
+// 首次发布后主状态进入「招生中」且不回退，发布后的排班变更由「排班版本」列表达。
+export function classMainStatus(record, now = DEMO_NOW) {
+  if (!record) return '待排课';
+  if (record.status === '已取消' || record.canceledAt) return '已取消';
+  if (!isSchedulePublished(record)) return record.scheduleStatus === '草稿' ? '待发布' : '待排课';
   const sessions = Array.isArray(record.sessions) ? record.sessions : [];
   const first = asDate(sessions[0]?.date || record.firstLessonDate);
   const last = asDate(sessions.at(-1)?.date);
-  const enrollStart = asDate(record.enrollStart);
   if (last && now > new Date(last.getTime() + 24 * 60 * 60 * 1000)) return '已结束';
   if (first && now >= first) return '进行中';
-  if (enrollStart && now < enrollStart) return '报名未开始';
   return '招生中';
 }
+
+// CR-2026-047 §5.3：报名条件是仅在「招生中」阶段有效的派生标签，不落库、不进入主状态；
+// 主状态进入「进行中／已结束」后冻结为「已截止」。后台与学员端「已满员」必须来自同一次派生。
+export function classEnrollmentCondition(record, now = DEMO_NOW) {
+  const main = classMainStatus(record, now);
+  if (main === '待排课' || main === '待发布') return '未开始';
+  if (main === '已取消' || main === '已结束' || main === '进行中') return '已截止';
+  const capacity = Number(record?.capacity || 0);
+  const enrolled = Number(record?.enrolled || 0);
+  if (capacity > 0 && enrolled >= capacity) return '已满员';
+  if (record?.enrollmentClosed === true || record?.enrollmentStatus === '已关闭') return '已关闭';
+  const enrollStart = asDate(record?.enrollStart);
+  if (enrollStart && now < enrollStart) return '未开始';
+  const deadline = asDate(record?.deadline);
+  if (deadline && now > deadline) return '已截止';
+  return '报名中';
+}
+
+// 旧调用名兼容：取值随本单更名为「待排课／待发布」，行为规则不变。
+export const deriveClassStatus = classMainStatus;
 
 export function classEnrollment(record, now = DEMO_NOW) {
   const projection = classSalesProjection(record, now);
