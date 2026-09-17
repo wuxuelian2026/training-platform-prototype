@@ -7,44 +7,48 @@
   <link rel="stylesheet" href="../../../shared/css/tokens.css" />
   <link rel="stylesheet" href="../../../shared/css/shell.css" />
   <link rel="stylesheet" href="../../../shared/css/teacher-center.css" />
+  <link rel="stylesheet" href="../../../shared/css/rich-editor.css" />
 </head>
 <body>
   <div data-admin-shell data-title="教师详情" data-active="teachers" data-teacher-page="profile">
     <div id="page-content">
       <div class="page-head">
-        <div><h1>教师详情</h1></div>
-        <div class="toolbar-actions"><a class="button" href="list.html">返回教师列表</a><a class="button" href="create.html?mode=edit&amp;teacher_id=teacher-wang">编辑资料</a></div>
+        <div><h1>教师详情</h1><p>抬头区常驻；四个档案页签与新增教师页同名同序，「关联与记录」为详情页专属页签。</p></div>
+        <div class="toolbar-actions"><a class="button" href="list.html">返回教师列表</a><a class="button primary" id="teacher-profile-edit-link" href="create.html?mode=edit&amp;teacher_id=teacher-wang&amp;tab=basic">编辑资料</a></div>
       </div>
 
+      <!-- CR-2026-045 §4.1：抬头区不随页签切换，承载身份、三张状态卡、待处理事项与操作入口。 -->
       <section class="profile-banner card">
-        <div><div class="teacher-inline-tags"><span class="tag brand">可申报</span><span class="tag green">今日可排课</span></div><h2>王玥</h2><p>JS20260901 · 舞蹈表演 / 中国舞 · 138****2026</p></div>
+        <div><div class="teacher-inline-tags"><span class="tag brand" data-teacher-apply>可申报</span><span class="tag green" data-teacher-schedule>今日可排课</span></div><h2 id="teacher-profile-name">王玥</h2><p id="teacher-profile-identity">JS20260901 · 中国舞 / 民族民间舞 · 138****2026</p></div>
         <div class="profile-summary"><span>最近授课</span><strong>2026-09-14 14:00</strong><span class="profile-summary-note">中国舞身韵训练</span></div>
       </section>
 
-      <div class="profile-action-strip card"><div><strong>当前待处理事项</strong><span>中国舞教师资格证和当前适用合同即将到期；不影响当日可用结论，未来排课仍按专业与课次日期重检。</span></div><div class="toolbar-actions"><button class="button" data-profile-action="freeze">冻结账号</button><button class="button danger-button" data-profile-action="resign">办理离职</button></div></div>
+      <div class="profile-action-strip card"><div><strong>当前待处理事项</strong><span id="teacher-profile-todo">中国舞教师资格证和当前适用合同即将到期；不影响当日可用结论，未来排课仍按专业与课次日期重检。</span></div><div class="toolbar-actions"><button type="button" class="button" data-profile-action="freeze">冻结账号</button><button type="button" class="button" data-profile-action="resign">办理离职</button></div></div>
 
       <div class="teacher-state-grid">
-        <section class="card teacher-state-card"><span>资料状态</span><strong>已建档</strong><p>基础必填资料已完成。</p></section>
+        <section class="card teacher-state-card"><span>资料状态</span><strong data-teacher-profile-status>已建档</strong><p>基础必填资料已完成，缺失项在页签角标展示。</p></section>
         <section class="card teacher-state-card"><span>在职情况</span><strong id="teacher-departed-status">在职</strong><p id="teacher-departed-note">离职日期为空即在职。</p></section>
-        <section class="card teacher-state-card"><span>账号状态</span><strong>正常</strong><p>枚举值 active，可登录教师端。</p></section>
+        <section class="card teacher-state-card"><span>账号状态</span><strong data-teacher-account-status>正常</strong><p>枚举值 active，可登录教师端。</p></section>
       </div>
 
-      <div class="detail-grid">
-        <section class="card"><h2>基本信息</h2><dl class="info-grid">
-          <div><dt>工号</dt><dd>JS20260901</dd></div><div><dt>姓名</dt><dd>王玥</dd></div><div><dt>人员类型</dt><dd>签约</dd></div><div><dt>身份证号</dt><dd>4201**********2826</dd></div><div class="wide"><dt>授课专业</dt><dd>舞蹈表演 / 中国舞、民族民间舞</dd></div><div><dt>手机号</dt><dd id="teacher-profile-mobile">138****2026</dd></div>
-        </dl></section>
+      <!-- §4.1.2：当前能力与原因同时取决于专业、证书、合同三个维度，上移至抬头区。 -->
+      <section class="card" id="teacher-capability-card"><div class="section-title-row"><div><h2>当前能力与原因</h2></div><span class="tag gray">专业 × 证书 × 合同</span></div><div class="teacher-capability-detail" data-capacity-apply></div></section>
 
-        <section class="card"><h2>当前能力与原因</h2><div class="teacher-capability-detail"><div><span class="tag brand">可申报</span><p>资料已建档、人员在职、账号正常，且已配置授课专业。</p></div><div><span class="tag green">今日可排课</span><p>中国舞专业今日具备有效资质和生效合同；具体课次仍按日期、专业、教师与教室冲突重检。</p></div></div></section>
+      <div class="card teacher-tabcard">
+        <div class="teacher-tabbar" role="tablist" aria-label="教师档案页签">
+          <button type="button" role="tab" id="teacher-profile-tab-basic" aria-controls="teacher-panel-basic" aria-selected="true" data-teacher-tab="basic">基本信息<span class="tab-badge" data-tab-badge="basic"></span></button>
+          <button type="button" role="tab" id="teacher-profile-tab-contact" aria-controls="teacher-panel-contact" aria-selected="false" data-teacher-tab="contact">联系与财务<span class="tab-badge" data-tab-badge="contact"></span></button>
+          <button type="button" role="tab" id="teacher-profile-tab-experience" aria-controls="teacher-panel-experience" aria-selected="false" data-teacher-tab="experience">经历与展示<span class="tab-badge" data-tab-badge="experience"></span></button>
+          <button type="button" role="tab" id="teacher-profile-tab-certificate" aria-controls="teacher-panel-certificate" aria-selected="false" data-teacher-tab="certificate">证书与账号<span class="tab-badge" data-tab-badge="certificate"></span></button>
+          <button type="button" role="tab" id="teacher-profile-tab-records" aria-controls="teacher-panel-records" aria-selected="false" data-teacher-tab="records">关联与记录<span class="tab-badge" data-tab-badge="records"></span></button>
+        </div>
+        <p class="teacher-required-hint" data-required-hint>资料待完善 0 项</p>
 
-        <section class="card detail-grid-wide"><div class="section-title-row"><div><h2>本人维护字段</h2></div><span class="tag gray" id="teacher-self-profile-version">v1</span></div><div class="table-wrap"><table><thead><tr><th>字段</th><th>最新值</th><th>维护方</th><th>最近更新时间</th></tr></thead><tbody id="teacher-self-profile-rows"><tr><td colspan="4">教师尚未在教师端修改过档案，当前值以后台建档内容为准。</td></tr></tbody></table></div></section>
-
-        <section class="card detail-grid-wide" id="teacher-profile-audit-card"><div class="section-title-row"><div><h2>档案变更审计</h2></div><span class="tag gray" id="teacher-profile-audit-count">0 条</span></div><div class="table-wrap"><table><thead><tr><th>操作时间</th><th>操作人</th><th>字段</th><th>修改前</th><th>修改后</th></tr></thead><tbody id="teacher-profile-audit-rows"><tr><td colspan="5">暂无档案变更记录。</td></tr></tbody></table></div><p class="teacher-summary-note">审计由教师端本人维护产生，对教师不可见，供后台追溯；冻结与离职状态下教师端不可编辑。</p></section>
-
-        <section class="card"><div class="section-title-row"><div><h2>证书摘要</h2></div><a class="button" href="certificates.html?teacher_id=teacher-wang">查看证书明细</a></div><div class="teacher-summary-result"><strong>可用 2 份 <span aria-hidden="true">|</span> 待处理 1 份</strong><p>中国舞：资质满足；民族民间舞：待补充专业资质。</p><span class="teacher-summary-note">即将到期证书仍计入可用，同时计入待处理。</span></div></section>
-
-        <section class="card"><div class="section-title-row"><div><h2>合同摘要</h2></div><a class="button" href="contracts.html?teacher_id=teacher-wang">查看合同明细</a></div><div class="teacher-summary-result"><strong>生效中 <span aria-hidden="true">|</span> 至 2026-12-31</strong><p>CT2026010008 · 中国舞授课适用</p><span class="teacher-summary-note">每课次含税单价：¥180 / 每次课（含税）</span></div></section>
-
-        <section class="card detail-grid-wide"><div class="section-title-row"><div><h2>关联课程</h2></div><span class="tag brand">2门课程</span></div><div class="table-wrap"><table><thead><tr><th>课程名称</th><th>课程类型</th><th>所属专业</th><th>课程状态</th><th>最近授课</th></tr></thead><tbody><tr><td class="link">舞蹈基本功</td><td>面授课程</td><td>中国舞</td><td><span class="tag green">已发布</span></td><td>2026-09-08</td></tr><tr><td class="link">中国舞身韵训练</td><td>面授课程</td><td>中国舞</td><td><span class="tag green">已发布</span></td><td>2026-09-14</td></tr></tbody></table></div></section>
+        <section class="teacher-tabpanel" id="teacher-panel-basic" role="tabpanel" aria-labelledby="teacher-profile-tab-basic" data-teacher-panel="basic"></section>
+        <section class="teacher-tabpanel" id="teacher-panel-contact" role="tabpanel" aria-labelledby="teacher-profile-tab-contact" data-teacher-panel="contact" hidden></section>
+        <section class="teacher-tabpanel" id="teacher-panel-experience" role="tabpanel" aria-labelledby="teacher-profile-tab-experience" data-teacher-panel="experience" hidden></section>
+        <section class="teacher-tabpanel" id="teacher-panel-certificate" role="tabpanel" aria-labelledby="teacher-profile-tab-certificate" data-teacher-panel="certificate" hidden></section>
+        <section class="teacher-tabpanel" id="teacher-panel-records" role="tabpanel" aria-labelledby="teacher-profile-tab-records" data-teacher-panel="records" hidden></section>
       </div>
       <div class="toast" data-teacher-toast role="status" aria-live="polite" hidden></div>
     </div>

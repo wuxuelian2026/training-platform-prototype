@@ -177,7 +177,8 @@ const modal = (title, subtitle, content, options = {}) => {
   document.body.appendChild(dialog);
   dialog.querySelector('.course-modal-close').addEventListener('click', closeModal);
   dialog.addEventListener('click', event => { if (event.target === dialog) closeModal(); });
-  dialog.addEventListener('close', () => { dialog.remove(); state.modal = previousModal || null; });
+  // close 事件是异步派发的，只有仍是当前弹窗时才回写状态，避免先关闭旧弹窗再打开新弹窗时被旧事件覆盖。
+  dialog.addEventListener('close', () => { dialog.remove(); if (state.modal === dialog) state.modal = previousModal || null; });
   dialog.showModal();
   state.modal = dialog;
   return dialog;
@@ -492,6 +493,8 @@ function openLibraryVersionDetail(id, version) {
   syncLibraryVersion(item);
   const entry = (item.versions || []).find(row => row.version === version);
   if (!entry) { showToast('未找到该历史版本', 'error'); return; }
+  // UI 复核 CR-2026-025：先关闭历史版本列表再打开版本详情，避免两个弹窗叠加后仍看到列表标题。
+  closeModal();
   const snapshot = entry.snapshot || {};
   const currentVersion = courseVersionOf(item);
   const isCurrent = entry.version === currentVersion;

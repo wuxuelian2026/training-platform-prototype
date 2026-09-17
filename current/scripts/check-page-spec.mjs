@@ -102,10 +102,14 @@ const lengthBoundsOf = (text) => {
 
 const teacherFields = allSpecFields();
 const seenIds = new Map();
+// CR-2026-045：教师详情是新增教师页的只读投影，按变更单要求复用 FD-TEACHER-xxx 编号，
+// 不另起编号空间；编号唯一性校验对投影页放行，其余页面仍要求全局唯一。
+const MIRROR_SPEC_PAGES = new Set(['teachers/profile']);
 for (const field of teacherFields) {
   const at = `${field.pageKey} / ${field.label}`;
   if (!ID_PATTERN.test(String(field.id || ''))) problems.push(`[编号] ${at}：字段编号格式应为 FD-模块-三位序号，实际 ${field.id}`);
-  if (seenIds.has(field.id)) problems.push(`[编号] ${at}：字段编号 ${field.id} 与 ${seenIds.get(field.id)} 重复`);
+  if (MIRROR_SPEC_PAGES.has(field.pageKey)) { /* 投影页允许复用源页字段编号 */ }
+  else if (seenIds.has(field.id)) problems.push(`[编号] ${at}：字段编号 ${field.id} 与 ${seenIds.get(field.id)} 重复`);
   else seenIds.set(field.id, at);
   for (const key of ['label', 'type', 'length', 'required', 'note']) {
     if (!String(field[key] ?? '').trim()) problems.push(`[字段] ${at}：缺少 ${key}`);

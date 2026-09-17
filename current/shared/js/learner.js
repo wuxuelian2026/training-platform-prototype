@@ -410,7 +410,11 @@ function renderCourses() {
   };
   const updateFilterControls = () => {
     const isClass = activeCourseTab === 'class';
-    document.querySelectorAll('[data-course-class-filter]').forEach(item => { item.hidden = !isClass; });
+    const classFilterVisible = isClass || activeCourseTab === 'all';
+    // CR-2026-035 §5：全部页签展示全部筛选、面授页签保留校区与适合年龄、视频页签隐藏对面授才有意义的筛选项。
+    document.querySelectorAll('[data-course-class-filter]').forEach(item => { item.hidden = !classFilterVisible; });
+    const openOnlyToggle = document.querySelector('#course-open-only')?.closest('.mp-course-toggle');
+    if (openOnlyToggle) openOnlyToggle.hidden = activeCourseTab === 'video';
     levelTrigger.querySelector('span').textContent = level || '难度';
     ageTrigger.querySelector('span').textContent = age || '适合年龄';
     campusTrigger.querySelector('span').textContent = campus || '校区';
@@ -460,7 +464,7 @@ function renderCourses() {
       const searchable = `${item.name}${item.type === 'video' ? item.teacher : ''}${item.category}${item.discipline || ''}${item.field || ''}${item.professional || ''}`.toLowerCase();
       const categoryMatch = !categoryFilter || [item.discipline, item.field, item.professional, item.category].filter(Boolean).some(value => value.includes(categoryFilter));
       const campusMatch = !campus || (item.classOptions || []).some(option => option.campus === campus);
-      return (activeCourseTab === 'all' || item.type === activeCourseTab) && categoryMatch && (!discipline || item.discipline === discipline) && (!field || item.field === field) && (!professional || item.professional === professional) && (!level || item.level === level) && (activeCourseTab !== 'class' || !age || String(item.age).includes(age)) && (activeCourseTab !== 'class' || campusMatch) && (!openOnly || item.type !== 'class' || item.bookable) && searchable.includes(keyword);
+      return (activeCourseTab === 'all' || item.type === activeCourseTab) && categoryMatch && (!discipline || item.discipline === discipline) && (!field || item.field === field) && (!professional || item.professional === professional) && (!level || item.level === level) && (item.type !== 'class' || ((!age || String(item.age).includes(age)) && campusMatch)) && (!openOnly || item.type !== 'class' || item.bookable) && searchable.includes(keyword);
     });
     document.querySelector('#course-list').innerHTML = items.length ? items.map(item => courseCard(item)).join('') : `<div class="mp-empty">暂无符合条件的课程</div>`;
     document.querySelector('#course-result-count').textContent = `${items.length}门课程`;
@@ -516,7 +520,7 @@ function renderCourses() {
   moreTrigger.addEventListener('click', () => { openOnlyInput.checked = openOnly; moreDialog.showModal(); });
   document.querySelector('[data-more-close]').addEventListener('click', () => moreDialog.close());
   document.querySelector('#course-more-confirm').addEventListener('click', () => { openOnly = openOnlyInput.checked; moreDialog.close(); updateFilterControls(); draw(); });
-  document.querySelectorAll('[data-course-tab]').forEach(tab => tab.addEventListener('click', () => { activeCourseTab = tab.dataset.courseTab; if (activeCourseTab !== 'class') { age = ''; campus = ''; } document.querySelectorAll('[data-course-tab]').forEach(item => { const active = item === tab; item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active)); }); updateFilterControls(); draw(); }));
+  document.querySelectorAll('[data-course-tab]').forEach(tab => tab.addEventListener('click', () => { activeCourseTab = tab.dataset.courseTab; if (activeCourseTab === 'video') { age = ''; campus = ''; openOnly = false; } document.querySelectorAll('[data-course-tab]').forEach(item => { const active = item === tab; item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active)); }); updateFilterControls(); draw(); }));
   document.querySelector('#course-search-form').addEventListener('submit', event => { event.preventDefault(); draw(); });
   document.querySelector('#course-search').addEventListener('input', draw);
   document.querySelector('#course-filter-reset').addEventListener('click', () => { categoryFilter = ''; Object.assign(selectedMajor, { discipline: '', field: '', professional: '' }); level = ''; age = ''; campus = ''; openOnly = false; document.querySelector('#course-search').value = ''; updateProfessionValue(); moreDialog.close(); updateFilterControls(); draw(); });

@@ -13,61 +13,78 @@
   <div data-admin-shell data-title="新增教师" data-active="teachers" data-teacher-page="create">
     <div id="page-content">
       <div class="page-head">
-        <div><h1>新增教师</h1></div>
-        <a class="button" href="list.html">返回教师列表</a>
+        <div><h1>新增教师</h1><p>四个页签共用一套分组，页签可自由跳转；提交时跨页签全量校验，失败自动定位到第一个含错误的页签与字段。</p></div>
+        <div class="toolbar-actions"><a class="button" href="list.html">返回教师列表</a></div>
       </div>
 
-      <form class="card form-card teacher-form" id="teacher-form">
-        <div class="form-section first-form-section"><h2>基本信息</h2><div class="form-grid">
-          <label class="form-field"><span>工号</span><input value="JS20260909-003" readonly class="readonly-field" /></label>
-          <label class="form-field"><span>姓名 *</span><input required placeholder="请输入教师姓名" /></label>
-          <div class="form-field"><span>人员类型 *</span><div class="choice-group"><label class="choice"><input type="radio" name="person-type" required />在编</label><label class="choice"><input type="radio" name="person-type" />签约</label><label class="choice"><input type="radio" name="person-type" />外聘</label></div></div>
-          <div class="form-field"><span>性别</span><div class="choice-group"><label class="choice"><input type="radio" name="gender" />男</label><label class="choice"><input type="radio" name="gender" />女</label></div></div>
-          <label class="form-field"><span>出生年月</span><input type="date" /></label>
-          <label class="form-field"><span>身份证号 *</span><input name="idCard" required placeholder="18位身份证号，需唯一" /></label>
-          <label class="form-field"><span>政治面貌</span><select><option>请选择</option><option>中共党员</option><option>预备党员</option><option>共青团员</option><option>民主党派</option><option>群众</option></select></label>
-          <label class="form-field"><span>民族</span><select><option>请选择</option><option>汉族</option><option>回族</option><option>满族</option><option>其他</option></select></label>
-          <label class="form-field"><span>最高学历</span><select><option>请选择</option><option>博士</option><option>硕士</option><option>本科</option><option>大专</option><option>中专</option><option>高中及以下</option></select></label>
-          <div class="form-field wide"><span>授课专业 *</span><div class="cascade-controls" data-professional-picker><select name="professional-category" aria-label="授课门类" required><option value="">选择门类</option><option value="音乐类">音乐类</option><option value="舞蹈类">舞蹈类</option><option value="美术类">美术类</option><option value="戏剧类">戏剧类</option></select><select name="professional-group" aria-label="授课分类" required disabled><option value="">请先选择门类</option></select><select name="professional" aria-label="授课专业" disabled><option value="">请先选择分类</option></select><button type="button" class="button" data-action="add-professional">添加专业</button></div><div class="selected-professionals" data-selected-professionals hidden></div></div>
-          <label class="form-field"><span>从教年限</span><input type="number" min="0" placeholder="单位：年" /></label>
-          <label class="form-field"><span>职称</span><select><option>请选择</option><option>教授</option><option>副教授</option><option>讲师</option><option>助教</option><option>高级教师</option><option>一级教师</option><option>二级教师</option><option>无</option></select></label>
-          <label class="form-field"><span>车牌号</span><input placeholder="选填" /></label>
-        </div></div>
+      <!-- CR-2026-045：新增教师与教师详情共用同一套四页签分组（基本信息／联系与财务／经历与展示／证书与账号）。 -->
+      <!-- novalidate：校验由脚本按页签统一执行，避免隐藏页签内的必填项触发浏览器原生校验而阻断提交。 -->
+      <form class="card form-card teacher-form" id="teacher-form" novalidate>
+        <div class="teacher-tabbar" role="tablist" aria-label="教师建档页签">
+          <button type="button" role="tab" id="teacher-tab-basic" aria-controls="teacher-panel-basic" aria-selected="true" data-teacher-tab="basic">基本信息<span class="tab-badge" data-tab-badge="basic"></span></button>
+          <button type="button" role="tab" id="teacher-tab-contact" aria-controls="teacher-panel-contact" aria-selected="false" data-teacher-tab="contact">联系与财务<span class="tab-badge" data-tab-badge="contact"></span></button>
+          <button type="button" role="tab" id="teacher-tab-experience" aria-controls="teacher-panel-experience" aria-selected="false" data-teacher-tab="experience">经历与展示<span class="tab-badge" data-tab-badge="experience"></span></button>
+          <button type="button" role="tab" id="teacher-tab-certificate" aria-controls="teacher-panel-certificate" aria-selected="false" data-teacher-tab="certificate">证书与账号<span class="tab-badge" data-tab-badge="certificate"></span></button>
+        </div>
 
-        <div class="form-section"><h2>联系方式</h2><div class="form-grid">
-          <label class="form-field"><span>手机号 *</span><input name="phone" required pattern="[0-9]{11}" placeholder="11位手机号，需唯一" /></label>
-          <label class="form-field"><span>邮箱</span><input type="email" placeholder="请输入邮箱" /></label>
-          <label class="form-field"><span>紧急联系人姓名</span><input placeholder="请输入姓名" /></label>
-          <label class="form-field"><span>紧急联系人电话</span><input pattern="[0-9]{11}" placeholder="11位手机号" /></label>
-        </div></div>
+        <section class="teacher-tabpanel" id="teacher-panel-basic" role="tabpanel" aria-labelledby="teacher-tab-basic" data-teacher-panel="basic">
+          <div class="form-section first-form-section"><h2>基本信息</h2><div class="form-grid">
+            <label class="form-field"><span>工号</span><input value="JS20260909-003" readonly class="readonly-field" /></label>
+            <label class="form-field"><span>姓名 *</span><input name="name" required placeholder="请输入教师姓名" /></label>
+            <div class="form-field"><span>人员类型 *</span><div class="choice-group"><label class="choice"><input type="radio" name="person-type" value="在编" required />在编</label><label class="choice"><input type="radio" name="person-type" value="签约" />签约</label><label class="choice"><input type="radio" name="person-type" value="外聘" />外聘</label></div></div>
+            <div class="form-field"><span>性别</span><div class="choice-group"><label class="choice"><input type="radio" name="gender" value="男" />男</label><label class="choice"><input type="radio" name="gender" value="女" />女</label></div></div>
+            <label class="form-field"><span>出生年月</span><input name="birthday" type="month" /></label>
+            <label class="form-field"><span>身份证号 *</span><input name="idCard" required placeholder="18位身份证号，需唯一" /></label>
+            <label class="form-field"><span>政治面貌</span><select name="political"><option>请选择</option><option>中共党员</option><option>预备党员</option><option>共青团员</option><option>民主党派</option><option>群众</option></select></label>
+            <label class="form-field"><span>民族</span><select name="ethnicity"><option>请选择</option><option>汉族</option><option>回族</option><option>满族</option><option>其他</option></select></label>
+            <label class="form-field"><span>最高学历</span><select name="education"><option>请选择</option><option>博士</option><option>硕士</option><option>本科</option><option>大专</option><option>中专</option><option>高中及以下</option></select></label>
+            <div class="form-field wide"><span>授课专业 *</span><div class="cascade-controls" data-professional-picker><select name="professional-category" aria-label="授课门类" required><option value="">选择门类</option><option value="音乐类">音乐类</option><option value="舞蹈类">舞蹈类</option><option value="美术类">美术类</option><option value="戏剧类">戏剧类</option></select><select name="professional-group" aria-label="授课分类" required disabled><option value="">请先选择门类</option></select><select name="professional" aria-label="授课专业" disabled><option value="">请先选择分类</option></select><button type="button" class="button" data-action="add-professional">添加专业</button></div><div class="selected-professionals" data-selected-professionals hidden></div></div>
+            <label class="form-field"><span>从教年限</span><input name="teachingYears" type="number" min="0" placeholder="单位：年" /></label>
+            <label class="form-field"><span>职称</span><select name="title"><option>请选择</option><option>教授</option><option>副教授</option><option>讲师</option><option>助教</option><option>高级教师</option><option>一级教师</option><option>二级教师</option><option>无</option></select></label>
+            <label class="form-field"><span>车牌号</span><input name="plateNumber" placeholder="选填" /></label>
+          </div></div>
+        </section>
 
-        <div class="form-section"><h2>财务信息</h2><div class="form-grid">
-          <label class="form-field"><span>收款户名</span><input placeholder="请输入收款户名" /></label>
-          <label class="form-field"><span>银行卡号</span><input placeholder="请输入银行卡号" /></label>
-          <label class="form-field"><span>开户行</span><select><option>请选择开户行</option><option>中国工商银行</option><option>中国建设银行</option><option>中国银行</option><option>中国农业银行</option></select></label>
-        </div></div>
+        <section class="teacher-tabpanel" id="teacher-panel-contact" role="tabpanel" aria-labelledby="teacher-tab-contact" data-teacher-panel="contact" hidden>
+          <div class="form-section first-form-section"><h2>联系方式</h2><div class="form-grid">
+            <label class="form-field"><span>手机号 *</span><input name="phone" required pattern="[0-9]{11}" placeholder="11位手机号，需唯一" /></label>
+            <label class="form-field"><span>邮箱</span><input name="email" type="email" placeholder="请输入邮箱" /></label>
+            <label class="form-field"><span>紧急联系人姓名</span><input name="emergencyName" placeholder="请输入姓名" /></label>
+            <label class="form-field"><span>紧急联系人电话</span><input name="emergencyPhone" pattern="[0-9]{11}" placeholder="11位手机号" /></label>
+          </div></div>
+          <div class="form-section"><h2>财务信息</h2><div class="form-grid">
+            <label class="form-field"><span>收款户名</span><input name="payee" placeholder="请输入收款户名" /></label>
+            <label class="form-field"><span>银行卡号</span><input name="bankCard" placeholder="请输入银行卡号" /></label>
+            <label class="form-field"><span>开户行</span><select name="bank"><option>请选择开户行</option><option>中国工商银行</option><option>中国建设银行</option><option>中国银行</option><option>中国农业银行</option></select></label>
+          </div></div>
+        </section>
 
-        <div class="form-section"><h2>经历信息</h2><div class="form-grid">
-          <label class="form-field wide"><span>学习经历</span><textarea placeholder="填写毕业院校、专业和学习时间"></textarea></label>
-          <label class="form-field wide"><span>工作经历</span><textarea placeholder="填写任职单位、岗位和任职时间"></textarea></label>
-          <label class="form-field wide"><span>获奖情况</span><textarea placeholder="填写艺术或教学相关获奖经历"></textarea></label>
-        </div></div>
+        <section class="teacher-tabpanel" id="teacher-panel-experience" role="tabpanel" aria-labelledby="teacher-tab-experience" data-teacher-panel="experience" hidden>
+          <div class="form-section first-form-section"><h2>经历信息</h2><div class="form-grid">
+            <label class="form-field wide"><span>学习经历</span><textarea name="studyExperience" placeholder="填写毕业院校、专业和学习时间"></textarea></label>
+            <label class="form-field wide"><span>工作经历</span><textarea name="workExperience" placeholder="填写任职单位、岗位和任职时间"></textarea></label>
+            <label class="form-field wide"><span>获奖情况</span><textarea name="awards" placeholder="填写艺术或教学相关获奖经历"></textarea></label>
+          </div></div>
+          <div class="form-section"><h2>展示信息</h2><div class="form-grid">
+            <label class="form-field wide"><span>一句话简介</span><textarea name="tagline" maxlength="200" placeholder="用于教师详情、课程介绍和小程序展示，限200字"></textarea></label>
+            <div class="form-field wide"><span>简介</span><div data-rich-editor data-name="introduction" data-max-length="2000" data-aria-label="教师简介" data-placeholder="请输入教师艺术经历、教学特色和代表成果" data-min-height="200px"></div></div>
+          </div></div>
+        </section>
 
-        <div class="form-section"><h2>展示信息</h2><div class="form-grid">
-          <label class="form-field wide"><span>一句话简介</span><textarea maxlength="200" placeholder="用于教师详情、课程介绍和小程序展示，限200字"></textarea></label>
-          <div class="form-field wide"><span>简介</span><div data-rich-editor data-name="introduction" data-max-length="2000" data-aria-label="教师简介" data-placeholder="请输入教师艺术经历、教学特色和代表成果" data-min-height="200px"></div></div>
-        </div></div>
+        <section class="teacher-tabpanel" id="teacher-panel-certificate" role="tabpanel" aria-labelledby="teacher-tab-certificate" data-teacher-panel="certificate" hidden>
+          <!-- CR-2026-045 §3.3：证书子表补「适用专业」列，多选、新增行时必填、至少 1 个（FD-TEACHER-064）。 -->
+          <div class="form-section first-form-section"><div class="section-title-row"><div><h2>证书信息</h2></div><button type="button" class="button" data-action="add-certificate">新增证书</button></div><div class="table-wrap subtable-wrap"><table class="subtable"><thead><tr><th>证书名称</th><th>证书编号</th><th>证书类型</th><th>适用专业</th><th>发证机构</th><th>颁发日期</th><th>有效期截止</th><th>永久有效</th><th>证书文件</th><th>审核状态</th><th>操作</th></tr></thead><tbody data-certificate-list><tr><td><input placeholder="证书名称" /></td><td><input placeholder="证书编号" data-certificate-number /></td><td><select data-certificate-type><option>选择类型</option><option>学历证书</option><option>教师资格证</option><option>艺术等级证</option><option>其他</option></select></td><td><select multiple size="2" class="certificate-major-select" data-certificate-majors aria-label="适用专业" required><option>中国舞</option><option>民族民间舞</option><option>芭蕾舞</option><option>声乐演唱</option><option>钢琴</option><option>古筝</option><option>中国画</option><option>少儿绘画</option><option>书法</option><option>戏剧表演</option><option>朗诵与主持</option></select></td><td><input placeholder="发证机构" /></td><td><input type="date" /></td><td><input type="date" /></td><td><input type="checkbox" aria-label="永久有效" /></td><td><label class="upload-control"><input type="file" />上传文件</label></td><td><span class="tag green">已通过</span></td><td><button type="button" class="text-button danger-link" data-action="remove-certificate">删除</button></td></tr></tbody></table></div></div>
 
-        <div class="form-section"><div class="section-title-row"><div><h2>证书信息</h2></div><button type="button" class="button" data-action="add-certificate">新增证书</button></div><div class="table-wrap subtable-wrap"><table class="subtable"><thead><tr><th>证书名称</th><th>证书编号</th><th>证书类型</th><th>发证机构</th><th>颁发日期</th><th>有效期截止</th><th>永久有效</th><th>证书文件</th><th>审核状态</th><th>操作</th></tr></thead><tbody data-certificate-list><tr><td><input placeholder="证书名称" /></td><td><input placeholder="证书编号" /></td><td><select><option>选择类型</option><option>学历证书</option><option>教师资格证</option><option>艺术等级证</option><option>其他</option></select></td><td><input placeholder="发证机构" /></td><td><input type="date" /></td><td><input type="date" /></td><td><input type="checkbox" aria-label="永久有效" /></td><td><label class="upload-control"><input type="file" />上传文件</label></td><td><span class="tag green">已通过</span></td><td><button type="button" class="text-button danger-link" data-action="remove-certificate">删除</button></td></tr></tbody></table></div></div>
-
-        <div class="form-section"><h2>账号邀请</h2><div class="form-grid">
-          <label class="form-field"><span>邀请手机号</span><input value="使用联系方式中的手机号" readonly class="readonly-field" /></label>
-          <label class="form-field"><span>初始账号状态</span><input value="未激活" readonly class="readonly-field" /></label>
-          <label class="form-field wide"><span>备注</span><textarea placeholder="请输入内部备注"></textarea></label>
-        </div></div>
+          <div class="form-section"><h2>账号邀请</h2><div class="form-grid">
+            <label class="form-field"><span>邀请手机号</span><input value="使用联系方式中的手机号" readonly class="readonly-field" /></label>
+            <label class="form-field"><span>初始账号状态</span><input value="未激活" readonly class="readonly-field" /></label>
+            <label class="form-field wide"><span>备注</span><textarea name="remark" placeholder="请输入内部备注"></textarea></label>
+          </div></div>
+        </section>
 
         <div class="teacher-build-result" data-build-result hidden role="status"><div><strong>已建档，邀请发送失败</strong><p>教师资料已保存为“已建档”，账号保持“未激活”。请复用当前教师记录重新发送邀请。</p></div><button type="button" class="button" data-action="retry-invite" data-api="API-TEACHER-14">重新发送邀请</button></div>
-        <div class="form-actions"><a class="button" href="list.html">取消</a><button type="button" class="button" data-action="save-draft" data-api-action="save_draft">保存草稿</button><button type="submit" class="button primary" data-api-action="complete_and_invite">完成建档并发送邀请</button></div>
+        <!-- 操作条固定在页签内容之外；提交按钮旁展示必填项完成度。 -->
+        <div class="form-actions teacher-form-actions"><a class="button" href="list.html">取消</a><span class="teacher-required-hint" data-required-hint>必填项还差 0 项</span><button type="button" class="button" data-action="save-draft" data-api-action="save_draft">保存草稿</button><button type="submit" class="button primary" data-api-action="complete_and_invite">完成建档并发送邀请</button></div>
       </form>
       <div class="toast" data-teacher-toast role="status" aria-live="polite" hidden></div>
     </div>

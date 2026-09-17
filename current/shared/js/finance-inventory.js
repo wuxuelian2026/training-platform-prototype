@@ -127,7 +127,7 @@ function openOfflineRefundForm() {
     if (amount > pending) { error.textContent = `退款金额不得超过待退金额 ${money(pending)}。`; error.hidden = false; return; }
     const candidate = offlineRefundCandidates().find((item) => item.orderNo === orderNo) || {};
     if (candidate.status === '已取消') { error.textContent = '已取消订单不得登记退款。'; error.hidden = false; return; }
-    const record = { id: `refund-${Date.now()}`, no: `RF${Date.now()}`, orderNo, student: candidate.student || '—', phone: '—', course: candidate.course || '—', orderType: candidate.orderType || '面授课程', amount, reason: String(data.get('reason') || '').trim() || '线下退款登记', channel: String(data.get('channel') || '银行转账'), time: String(data.get('time') || '').replace('T', ' ') || '2026-09-17 16:00', status: '已退款', source: '线下', remark: String(data.get('remark') || '').trim() };
+    const record = { id: `refund-${Date.now()}`, no: `RF${Date.now()}`, orderNo, student: candidate.student || '—', phone: '—', course: candidate.course || '—', orderType: candidate.orderType || '面授课程', amount, reason: String(data.get('reason') || '').trim() || '线下退款登记', channel: String(data.get('channel') || '银行转账'), time: String(data.get('time') || '').replace('T', ' ') || '2026-09-17 16:00', status: '已退款', source: '线下', expectedAt: '登记即时完成（线下）', remark: String(data.get('remark') || '').trim() };
     refunds.unshift(record);
     upsertDemoRecord('refunds', record);
     syncOrderAfterOfflineRefund(orderNo, record.orderType);

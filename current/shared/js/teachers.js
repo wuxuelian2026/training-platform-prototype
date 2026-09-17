@@ -7,12 +7,14 @@ import { toLocalDateString } from './date-utils.js';
 import { teacherFactsById } from './teacher-facts.js';
 import { certificateDedupKey } from './certificate-source.js';
 import { permissionsOfRole } from './permissions.js';
-import { TEACHER_PROFILE_LABELS, teacherProfileMask } from './teacher-profile-fields.js';
+import { TEACHER_PROFILE_EDITABLE_FIELDS, TEACHER_PROFILE_LABELS, teacherProfileMask } from './teacher-profile-fields.js';
 import { explainTeacherCapacity, summarizeTeacherCapacity } from './teacher-capacity.js';
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 
 const teacherRoot = document.querySelector('[data-teacher-page]');
 const teacherPage = teacherRoot?.dataset.teacherPage;
+// CR-2026-046 §4：合同域期限派生使用固定演示基准日，与教师端课表 `2026-09-12` 一致，避免 Mock 随时间漂移。
+const CONTRACT_DEMO_TODAY = '2026-09-12';
 let activeTeacherRow = null;
 let activeContractRow = null;
 let toastTimer;
@@ -557,8 +559,9 @@ function certificateRowsOf(form) {
   return [...form.querySelectorAll('[data-certificate-list] tr')].map((row) => ({
     row,
     name: row.children[0]?.querySelector('input')?.value.trim() || '',
-    number: row.children[1]?.querySelector('input')?.value.trim() || '',
-    type: row.children[2]?.querySelector('select')?.value || ''
+    number: (row.querySelector('[data-certificate-number]') || row.children[1]?.querySelector('input'))?.value.trim() || '',
+    type: (row.querySelector('[data-certificate-type]') || row.children[2]?.querySelector('select'))?.value || '',
+    majors: [...(row.querySelector('[data-certificate-majors]')?.selectedOptions || [])].map((option) => option.textContent.trim())
   })).filter((item) => item.number && item.type && item.type !== '选择类型');
 }
 
@@ -584,8 +587,145 @@ function validateTeacherCertificateRows(form) {
   return true;
 }
 
+// CR-2026-045：新增教师与教师详情共用同一套四页签分组与顺序。
+const TEACHER_TABS = ['basic', 'contact', 'experience', 'certificate'];
+
+const teacherFieldEmpty = (field) => {
+  if (field.type === 'checkbox') return !field.checked;
+  if (field.tagName === 'SELECT') return !String(field.value || '').trim();
+  return !String(field.value || '').trim();
+};
+
+// 必填项按「控件 + 单选组 + 条件行」统计：一个单选组只计一项，证书行的适用专业属行内条件必填。
+function teacherRequiredFields(panel) {
+  const seen = new Set();
+  const items = [];
+  panel.querySelectorAll('input[required], select[required], textarea[required]').forEach((field) => {
+    if (field.disabled) return;
+    // 单选组按 name 归并；同名控件只计一项；无 name 的（证书行适用专业等）按序号去重。
+    const key = field.type === 'radio'
+      ? `radio:${field.name}`
+      : `${field.tagName}:${field.name || (field.dataset.certificateMajors !== undefined ? `certificate-majors-${items.length}` : `field-${items.length}`)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    items.push({ key, field, value: () => (field.type === 'radio' ? [...panel.querySelectorAll(`input[type="radio"][name="${field.name}"]`)].some((radio) => radio.checked) : !teacherFieldEmpty(field)) });
+  });
+  return items;
+}
+
+function teacherTabMissing(form, name) {
+  const panel = form.querySelector(`[data-teacher-panel="${name}"]`);
+  return panel ? teacherRequiredFields(panel).filter((item) => !item.value()).length : 0;
+}
+
+function refreshTeacherTabBadges(form, names = TEACHER_TABS, mode = 'form') {
+  if (mode === 'readonly') {
+    let pending = 0;
+    names.forEach((name) => {
+      const panel = form.querySelector(`[data-teacher-panel="${name}"]`);
+      const empty = panel ? [...panel.querySelectorAll('[data-archive-field][data-empty="true"]')].length : 0;
+      pending += empty;
+      const badge = form.querySelector(`[data-tab-badge="${name}"]`);
+      const tab = form.querySelector(`[data-teacher-tab="${name}"]`);
+      if (badge) { badge.textContent = empty ? String(empty) : '✓'; badge.dataset.tone = empty ? 'warn' : 'done'; badge.hidden = false; }
+      if (tab) tab.dataset.state = empty ? 'incomplete' : 'complete';
+    });
+    const hint = form.querySelector('[data-required-hint]');
+    if (hint) hint.textContent = pending ? `资料待完善 ${pending} 项` : '资料已完善';
+    return { missingTotal: pending };
+  }
+  let missingTotal = 0;
+  names.forEach((name) => {
+    const missing = teacherTabMissing(form, name);
+    missingTotal += missing;
+    const badge = form.querySelector(`[data-tab-badge="${name}"]`);
+    const tab = form.querySelector(`[data-teacher-tab="${name}"]`);
+    if (badge) {
+      badge.textContent = missing ? String(missing) : '✓';
+      badge.dataset.tone = missing ? 'warn' : 'done';
+      badge.hidden = false;
+    }
+    if (tab) tab.dataset.state = missing ? 'incomplete' : 'complete';
+  });
+  const hint = form.querySelector('[data-required-hint]');
+  if (hint) hint.textContent = missingTotal ? `必填项还差 ${missingTotal} 项` : '必填项已完成';
+  return { missingTotal };
+}
+
+function clearTeacherFieldErrors(form) {
+  form.querySelectorAll('[data-field-error]').forEach((element) => element.remove());
+  form.querySelectorAll('.teacher-field-invalid').forEach((field) => field.classList.remove('teacher-field-invalid'));
+}
+
+function markTeacherFieldError(field) {
+  const anchor = field.closest('.form-field') || field.closest('td') || field;
+  field.classList.add('teacher-field-invalid');
+  if (anchor.querySelector('[data-field-error]')) return;
+  anchor.insertAdjacentHTML('beforeend', '<p class="form-error" data-field-error role="alert">该必填项未填写或不合法。</p>');
+}
+
+// 跨页签全量校验：先临时展开全部页签找出第一个错误，再切回该页签并滚动高亮。
+function validateTeacherForm(form, tabs) {
+  const panels = [...form.querySelectorAll('[data-teacher-panel]')];
+  const hiddenState = panels.map((panel) => panel.hidden);
+  panels.forEach((panel) => { panel.hidden = false; });
+  clearTeacherFieldErrors(form);
+  let firstBad = null;
+  for (const name of TEACHER_TABS) {
+    const panel = form.querySelector(`[data-teacher-panel="${name}"]`);
+    const bad = panel && [...panel.querySelectorAll('input, select, textarea')].find((field) => !field.checkValidity());
+    if (bad) { firstBad = { name, field: bad }; break; }
+  }
+  panels.forEach((panel, index) => { panel.hidden = hiddenState[index]; });
+  if (!firstBad) { refreshTeacherTabBadges(form); return true; }
+  tabs.setTab(firstBad.name);
+  markTeacherFieldError(firstBad.field);
+  const badge = form.querySelector(`[data-tab-badge="${firstBad.name}"]`);
+  if (badge) badge.dataset.tone = 'error';
+  firstBad.field.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  if (typeof firstBad.field.focus === 'function') firstBad.field.focus({ preventScroll: true });
+  toast('请先补齐当前页签中标红的必填项。', 'error');
+  return false;
+}
+
+function initTeacherTabs(form, options = {}) {
+  const tabs = [...form.querySelectorAll('[data-teacher-tab]')];
+  const panels = [...form.querySelectorAll('[data-teacher-panel]')];
+  const names = tabs.map((tab) => tab.dataset.teacherTab);
+  const fallback = names[0] || 'basic';
+  const mode = options.mode || 'form';
+  const setTab = (name, options = {}) => {
+    const target = names.includes(name) ? name : fallback;
+    tabs.forEach((tab) => {
+      const active = tab.dataset.teacherTab === target;
+      tab.setAttribute('aria-selected', String(active));
+      tab.classList.toggle('active', active);
+      tab.tabIndex = active ? 0 : -1;
+      if (active && options.focus) tab.focus({ preventScroll: true });
+    });
+    // 切换页签只改可见性，不重建 DOM、不重置已填值。
+    panels.forEach((panel) => { panel.hidden = panel.dataset.teacherPanel !== target; });
+    const url = new URL(location.href);
+    url.searchParams.set('tab', target);
+    history.replaceState(null, '', url);
+  };
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => setTab(tab.dataset.teacherTab));
+    tab.addEventListener('keydown', (event) => {
+      const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      if (!delta) return;
+      event.preventDefault();
+      setTab(tabs[(index + delta + tabs.length) % tabs.length].dataset.teacherTab, { focus: true });
+    });
+  });
+  setTab(new URLSearchParams(location.search).get('tab') || fallback);
+  refreshTeacherTabBadges(form, names, mode);
+  return { setTab, refreshBadges: () => refreshTeacherTabBadges(form, names, mode) };
+}
+
 function initTeacherCreate() {
   const form = document.querySelector('#teacher-form');
+  const teacherTabs = form ? initTeacherTabs(form) : { setTab: () => {}, refreshBadges: () => ({ missingTotal: 0 }) };
   mountRichEditor(form?.querySelector('[data-rich-editor]'));
   form?.addEventListener('rich-editor:message', (event) => toast(event.detail.message, event.detail.kind));
   const professionalData = {
@@ -635,7 +775,8 @@ function initTeacherCreate() {
   });
   form?.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (!form.checkValidity()) { form.reportValidity(); return; }
+    // CR-2026-045 §3.1.2：跨页签全量校验，失败切到第一个含错误的页签并高亮该字段。
+    if (!validateTeacherForm(form, teacherTabs)) return;
     if (selected.length === 0) { toast('请至少添加一个授课专业。', 'error'); return; }
     const phone = form.querySelector('[name="phone"]')?.value || '';
     const idCard = form.querySelector('[name="idCard"]')?.value || '';
@@ -647,7 +788,18 @@ function initTeacherCreate() {
     if (result) result.hidden = false;
     toast('教师已建档；账号邀请发送失败，可重新发送。', 'error');
   });
-  form?.querySelector('[data-action="save-draft"]')?.addEventListener('click', () => toast('教师档案草稿已保存。'));
+  // §3.1.5／§3.2：保存草稿不校验必填，只刷新页签角标与完成度。
+  form?.querySelector('[data-action="save-draft"]')?.addEventListener('click', () => { teacherTabs.refreshBadges(); toast('教师档案草稿已保存（未校验必填项）。'); });
+  // 输入时刷新角标，且清除该字段的错误标记。
+  form?.addEventListener('input', (event) => {
+    const field = event.target;
+    if (!(field instanceof HTMLElement)) return;
+    field.classList.remove('teacher-field-invalid');
+    const anchor = field.closest('.form-field') || field.closest('td');
+    anchor?.querySelector('[data-field-error]')?.remove();
+    teacherTabs.refreshBadges();
+  });
+  form?.addEventListener('change', () => teacherTabs.refreshBadges());
   form?.querySelector('[data-action="retry-invite"]')?.addEventListener('click', (event) => {
     event.currentTarget.disabled = true;
     event.currentTarget.textContent = '邀请已发送';
@@ -664,7 +816,12 @@ function initTeacherCreate() {
     if (!body) return;
     const row = body.querySelector('tr')?.cloneNode(true);
     if (!row) return;
-    row.querySelectorAll('input, select').forEach((control) => { control.value = ''; if (control.type === 'checkbox') control.checked = false; });
+    // 证书行新增时清空全部控件，多选「适用专业」需清空选中项。
+    row.querySelectorAll('input, select').forEach((control) => {
+      if (control.type === 'checkbox') { control.checked = false; return; }
+      [...(control.options || [])].forEach((option) => { option.selected = false; });
+      control.value = '';
+    });
     row.querySelector('[data-action="remove-certificate"]')?.removeAttribute('disabled');
     body.append(row);
     toast('已新增证书信息行。');
@@ -721,11 +878,13 @@ function initContracts() {
   let activeContractStatus = new URLSearchParams(location.search).get('status') || '';
   if (!contractTabs.some((tab) => tab.value === activeContractStatus)) activeContractStatus = '';
 
-  // 合同期限状态是派生值：由合同起止日期按当天计算，不写入签署状态字段（05-状态字典 §4.2）。
-  const today = new Date().toISOString().slice(0, 10);
+  // 合同期限状态是派生值：由合同起止日期按固定演示基准日计算，不写入签署状态字段（05-状态字典 §4.2）。
+  // CR-2026-046 §4：基准日固定为 2026-09-12，与教师端课表口径一致，保证四种签署状态与三种期限状态长期可复现。
+  const today = CONTRACT_DEMO_TODAY;
   const termStatusOf = (row) => {
     const [startAt, endAt] = String(row.dataset.term || '').split('至').map((value) => value.trim());
-    if (!endAt) return '有效';
+    // 无固定期限（形如「2025-09-01 起（无固定期限）」）派生为有效，截止日期不参与校验。
+    if (!endAt || String(row.dataset.term || '').includes('无固定期限')) return '有效';
     if (endAt < today) return '已到期';
     if (startAt && startAt > today) return '有效';
     return Math.round((new Date(`${endAt}T00:00:00`) - new Date(`${today}T00:00:00`)) / 86400000) <= 30 ? '即将到期' : '有效';
@@ -780,7 +939,30 @@ function initContracts() {
     activeContractRow = row;
     if (action === 'view') {
       const data = row.dataset;
-      text('contract-detail-teacher', data.teacher); text('contract-detail-number', data.number); text('contract-detail-status', data.status); text('contract-detail-term', `${data.term}（${termStatusOf(row)}）`); text('contract-detail-rate', `¥${data.rate}  / 每次课（含税）`); text('contract-detail-note', data.note || '暂无备注。');
+      // CR-2026-046 §3：补齐课程、工作校区、合同模板、签署日期与脱敏身份证号；无固定期限显示「长期有效」；
+      // 文件来源按 FD-TEACHER-050 的 noUpload 口径显示「系统生成」，业务来源行按产品未确认口径暂不展示。
+      const noFixedTerm = String(data.term || '').includes('无固定期限');
+      text('contract-detail-teacher', data.teacher);
+      text('contract-detail-number', data.number);
+      text('contract-detail-status', data.status);
+      text('contract-detail-type', data.type);
+      text('contract-detail-template', data.template);
+      text('contract-detail-course', data.course);
+      text('contract-detail-campus', data.campus);
+      text('contract-detail-term', noFixedTerm ? '长期有效' : data.term);
+      text('contract-detail-term-status', termStatusOf(row));
+      text('contract-detail-rate', `¥${Number(data.rate || 0).toFixed(2)} / 每次课（含税）`);
+      text('contract-detail-sign-date', data.signDate || '待签署');
+      text('contract-detail-id-card', teacherArchiveIdCardMask(data.idCard || ''));
+      text('contract-detail-file-source', '系统生成');
+      text('contract-detail-file', `${data.template || '合同模板'} · ${data.number}.pdf`);
+      text('contract-detail-version', data.fileVersion || 'v1');
+      const terminateWrap = document.querySelector('#contract-detail-terminate-wrap');
+      if (terminateWrap) {
+        terminateWrap.hidden = data.status !== '已终止';
+        if (data.status === '已终止') text('contract-detail-terminate', `${data.terminateReason || '未填写'} · 生效日期 ${data.terminateAt || '—'}`);
+      }
+      text('contract-detail-note', data.note || '暂无备注。');
       const status = document.querySelector('#contract-detail-status'); if (status) status.className = `tag ${tagClass(data.status)}`;
       openDialog('contract-detail-dialog');
     }
@@ -871,11 +1053,110 @@ function initSchedule() {
 function initProfile() {
   renderProfileCapacity();
   const facts = teacherFactsById(new URLSearchParams(location.search).get('teacher_id') || 'teacher-wang');
-  if (facts) renderTeacherSelfProfile(facts);
+  if (facts) { renderTeacherProfileArchive(facts); renderTeacherSelfProfile(facts); }
+  const profileTabs = document.querySelector('.teacher-tabcard') ? initTeacherTabs(document.querySelector('.teacher-tabcard'), { mode: 'readonly' }) : null;
+  // §4.3：编辑入口携带当前页签，返回后停留原页签。
+  const editLink = document.querySelector('#teacher-profile-edit-link');
+  if (editLink && facts) {
+    const tab = profileTabs ? (new URLSearchParams(location.search).get('tab') || 'basic') : 'basic';
+    editLink.href = relativePath(`/admin/pages/teachers/create.html?mode=edit&teacher_id=${encodeURIComponent(facts.id)}&tab=${encodeURIComponent(tab)}`);
+  }
   document.querySelectorAll('[data-profile-action]').forEach((button) => button.addEventListener('click', () => {
     const action = button.dataset.profileAction;
     if (action === 'freeze' || action === 'resign') toast(action === 'freeze' ? '已打开冻结确认。' : '已打开离职确认。');
   }));
+}
+
+// CR-2026-045 §4：教师详情页四个档案页签的只读投影。
+// 每个字段标注来源（后台建档／教师端本人维护）与最近更新时间；空值显示「—」；身份证号与手机号按规则脱敏。
+const TEACHER_ARCHIVE_GROUPS = [
+  { name: 'basic', title: '基本信息', fields: [
+    ['employeeNo', '工号'], ['name', '姓名'], ['personnelType', '人员类型'], ['gender', '性别'], ['birthMonth', '出生年月'],
+    ['idCard', '身份证号'], ['politicalStatus', '政治面貌'], ['ethnicity', '民族'], ['highestEducation', '最高学历'],
+    ['majors', '授课专业'], ['teachingYears', '从教年限'], ['professionalTitle', '职称'], ['carPlate', '车牌号']
+  ] },
+  { name: 'contact', title: '联系与财务', fields: [
+    ['mobile', '手机号'], ['email', '邮箱'], ['emergencyName', '紧急联系人姓名'], ['emergencyMobile', '紧急联系人电话'],
+    ['payeeName', '收款户名'], ['bankCard', '银行卡号'], ['bankName', '开户行']
+  ] },
+  { name: 'experience', title: '经历与展示', fields: [
+    ['education', '学习经历'], ['employment', '工作经历'], ['awards', '获奖情况'], ['tagline', '一句话简介'], ['introduction', '简介']
+  ] }
+];
+
+const TEACHER_ARCHIVE_SELF_KEYS = new Set(TEACHER_PROFILE_EDITABLE_FIELDS.map((field) => field.key));
+
+function teacherArchiveIdCardMask(value) {
+  const text = String(value || '');
+  return text.length >= 10 ? `${text.slice(0, 4)}${'*'.repeat(text.length - 8)}${text.slice(-4)}` : text;
+}
+
+function teacherArchiveValue(facts, key) {
+  const state = readDemoState();
+  const self = (state.teacherProfiles || {})[facts.id] || {};
+  if (TEACHER_ARCHIVE_SELF_KEYS.has(key) && self[key] !== undefined && String(self[key]).trim() !== '') {
+    return { value: String(self[key]), source: '教师端本人维护', at: self.updatedAt || '—' };
+  }
+  const archive = facts.archive || {};
+  if (key === 'name') return { value: facts.name || '', source: '后台建档', at: archive.updatedAt || '2026-08-18 10:00' };
+  if (key === 'majors') return { value: (facts.majors || []).join('、'), source: '后台建档', at: archive.updatedAt || '2026-08-18 10:00' };
+  if (key === 'teachingYears') return { value: facts.teachingYears ? `${facts.teachingYears} 年` : '', source: '后台建档', at: archive.updatedAt || '2026-08-18 10:00' };
+  if (key === 'professionalTitle') return { value: facts.professionalTitle || '', source: '后台建档', at: archive.updatedAt || '2026-08-18 10:00' };
+  if (key === 'tagline') return { value: facts.tagline || '', source: '教师端本人维护', at: self.updatedAt || '—' };
+  if (key === 'introduction') return { value: facts.introduction || '', source: '教师端本人维护', at: self.updatedAt || '—' };
+  return { value: archive[key] !== undefined ? String(archive[key]) : '', source: '后台建档', at: archive.updatedAt || '2026-08-18 10:00' };
+}
+
+function teacherArchiveDisplay(facts, key) {
+  const { value, source, at } = teacherArchiveValue(facts, key);
+  const masked = key === 'idCard' ? teacherArchiveIdCardMask(value) : key === 'mobile' || key === 'emergencyMobile' ? teacherProfileMask(key, value) : value;
+  return { text: masked && masked.trim() ? masked : '—', empty: !(masked && masked.trim()), source, at };
+}
+
+function teacherArchiveRows(facts, fields) {
+  const rows = fields.map(([key, label]) => {
+    const field = teacherArchiveDisplay(facts, key);
+    return `<tr data-archive-field="${key}" data-empty="${field.empty}"><th>${label}</th><td>${importEsc(field.text)}</td><td>${importEsc(field.source)}</td><td>${importEsc(field.at)}</td></tr>`;
+  }).join('');
+  return `<div class="table-wrap"><table class="teacher-archive-table"><thead><tr><th>字段</th><th>当前值</th><th>来源</th><th>最近更新</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function renderTeacherProfileArchive(facts) {
+  const name = document.querySelector('#teacher-profile-name');
+  if (name) name.textContent = facts.name;
+  const identity = document.querySelector('#teacher-profile-identity');
+  const mobile = teacherArchiveDisplay(facts, 'mobile').text;
+  const employeeNo = teacherArchiveValue(facts, 'employeeNo').value || '—';
+  if (identity) identity.textContent = `${employeeNo} · ${(facts.majors || []).join(' / ') || '—'} · ${mobile}`;
+  const profileStatus = document.querySelector('[data-teacher-profile-status]');
+  if (profileStatus) profileStatus.textContent = facts.profileStatus || '—';
+  const accountStatus = document.querySelector('[data-teacher-account-status]');
+  if (accountStatus) accountStatus.textContent = facts.accountStatus === 'active' ? '正常' : facts.accountStatus === 'frozen' ? '冻结' : '未激活';
+
+  TEACHER_ARCHIVE_GROUPS.forEach((group) => {
+    const panel = document.querySelector(`[data-teacher-panel="${group.name}"]`);
+    if (panel) panel.innerHTML = `<div class="form-section first-form-section"><h2>${group.title}</h2>${teacherArchiveRows(facts, group.fields)}</div>`;
+  });
+
+  const certificatePanel = document.querySelector('[data-teacher-panel="certificate"]');
+  if (certificatePanel) {
+    const certificates = facts.certificates || [];
+    const rows = certificates.length
+      ? certificates.map((item) => `<tr><td>${importEsc(item.name)}</td><td>${importEsc(item.type)}</td><td>${importEsc((item.majors || []).join('、') || '—')}</td><td>${importEsc(item.expiresAt || '永久有效')}</td><td>${statusTag(item.status)}</td><td>${importEsc(item.id)}</td></tr>`).join('')
+      : '<tr><td colspan="6">该教师暂无证书记录。</td></tr>';
+    const accountFields = [['邀请手机号', mobile], ['初始账号状态', facts.accountStatus === 'active' ? '正常' : '未激活'], ['备注', teacherArchiveValue(facts, 'remark').value || '—']];
+    certificatePanel.innerHTML = `<div class="form-section first-form-section"><div class="section-title-row"><div><h2>证书信息</h2></div><a class="button" href="${relativePath(`/admin/pages/teachers/certificates.html?teacher_id=${encodeURIComponent(facts.id)}`)}">查看证书明细</a></div><div class="table-wrap"><table><thead><tr><th>证书名称</th><th>证书类型</th><th>适用专业</th><th>有效期截止</th><th>审核状态</th><th>证书编号</th></tr></thead><tbody>${rows}</tbody></table></div></div><div class="form-section"><h2>账号</h2><div class="table-wrap"><table class="teacher-archive-table"><thead><tr><th>字段</th><th>当前值</th><th>来源</th><th>最近更新</th></tr></thead><tbody>${accountFields.map(([label, value]) => `<tr data-archive-field="${label}" data-empty="${value === '—'}"><th>${label}</th><td>${importEsc(value)}</td><td>后台建档</td><td>—</td></tr>`).join('')}</tbody></table></div></div>`;
+  }
+
+  const recordsPanel = document.querySelector('[data-teacher-panel="records"]');
+  if (recordsPanel) {
+    const contracts = facts.contracts || [];
+    const contractRows = contracts.length
+      ? contracts.map((item) => `<tr><td>${importEsc(item.number)}</td><td>${statusTag(item.status)}</td><td>${importEsc(item.startAt || '—')} 至 ${importEsc(item.endAt || '长期有效')}</td><td>${importEsc((item.courses || []).join('、') || '—')}</td></tr>`).join('')
+      : '<tr><td colspan="4">该教师暂无合同记录。</td></tr>';
+    const courseRows = [...new Set(contracts.flatMap((item) => item.courses || []))].map((courseName) => `<tr><td>${importEsc(courseName)}</td><td>—</td><td>${importEsc((facts.majors || []).join('、'))}</td></tr>`).join('');
+    recordsPanel.innerHTML = `<div class="form-section first-form-section"><div class="section-title-row"><div><h2>合同摘要</h2></div><a class="button" href="${relativePath(`/admin/pages/teachers/contracts.html?teacher_id=${encodeURIComponent(facts.id)}`)}">查看合同明细</a></div><div class="table-wrap"><table><thead><tr><th>合同编号</th><th>签署状态</th><th>合同有效期</th><th>覆盖课程</th></tr></thead><tbody>${contractRows}</tbody></table></div><p class="teacher-profile-readonly-note">签署证据、版本与终止信息在合同明细中查看；计薪按合同单价与已发生课次计算。</p></div><div class="form-section"><div class="section-title-row"><div><h2>关联课程</h2></div><span class="tag brand">${courseRows ? `${courseRows.split('<tr>').length - 1}门课程` : '暂无'}</span></div><div class="table-wrap"><table><thead><tr><th>课程名称</th><th>课程类型</th><th>所属专业</th></tr></thead><tbody>${courseRows || '<tr><td colspan="3">该教师暂无关联课程。</td></tr>'}</tbody></table></div></div><div class="form-section"><div class="section-title-row"><div><h2>本人维护字段</h2></div><span class="tag gray" id="teacher-self-profile-version">v1</span></div><div class="table-wrap"><table><thead><tr><th>字段</th><th>最新值</th><th>维护人</th><th>更新时间</th></tr></thead><tbody id="teacher-self-profile-rows"><tr><td colspan="4">教师尚未在教师端修改过档案，当前值以后台建档内容为准。</td></tr></tbody></table></div></div><div class="form-section" id="teacher-profile-audit-card"><div class="section-title-row"><div><h2>档案变更审计</h2></div><span class="tag gray" id="teacher-profile-audit-count">0 条</span></div><div class="table-wrap"><table><thead><tr><th>时间</th><th>操作人</th><th>来源</th><th>字段</th><th>变更</th></tr></thead><tbody id="teacher-profile-audit-rows"><tr><td colspan="5">暂无档案变更记录。</td></tr></tbody></table></div></div>`;
+  }
 }
 
 // CR-2026-022：教师端“我的档案”由教师本人维护，后台教师详情页读取最新值并展示变更审计。

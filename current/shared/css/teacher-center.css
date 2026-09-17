@@ -127,3 +127,22 @@
 
 /* CR-2026-028 §2.2：证书录入命中重复时定位到的既有行高亮，便于运营直接核对。 */
 .certificate-duplicate-row { outline: 2px solid var(--danger, #d94b4b); outline-offset: -2px; background: rgba(217, 75, 75, 0.08); }
+
+/* CR-2026-045：师资中心四页签、必填角标与只读档案表。 */
+.teacher-tabbar { display: flex; gap: 2px; overflow-x: auto; padding: 0 16px; margin: -4px -16px 0; border-bottom: 1px solid var(--line, #e3e6ee); }
+.teacher-tabbar [role="tab"] { flex: 0 0 auto; border: 0; background: transparent; padding: 12px 14px; font-size: 14px; color: var(--text-muted, #5b6478); border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
+.teacher-tabbar [role="tab"][aria-selected="true"] { color: var(--brand, #2f6fed); border-bottom-color: var(--brand, #2f6fed); font-weight: 600; }
+.teacher-tabbar [role="tab"][data-state="incomplete"] { color: var(--text, #1f2532); }
+.tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; font-size: 11px; line-height: 1; }
+.tab-badge[data-tone="warn"] { background: #fff2e0; color: #b26a00; }
+.tab-badge[data-tone="error"] { background: #fde8e8; color: #c0392b; }
+.tab-badge[data-tone="done"] { background: #e6f6ec; color: #1f7a44; }
+.teacher-field-invalid { outline: 2px solid #d94b4b; outline-offset: 1px; }
+.teacher-tabpanel { padding-top: 4px; }
+.teacher-tabcard { padding: 16px; }
+.teacher-tabcard .teacher-required-hint { display: block; margin: 10px 0 0; }
+.teacher-form-actions { display: flex; align-items: center; gap: 12px; }
+.teacher-form-actions .teacher-required-hint { margin-left: auto; font-size: 13px; color: var(--text-muted, #5b6478); }
+.teacher-archive-table th { width: 160px; font-weight: 600; color: var(--text-muted, #5b6478); }
+.certificate-major-select { min-width: 150px; }
+.teacher-profile-readonly-note { margin: 10px 0 0; font-size: 13px; color: var(--text-muted, #5b6478); }
