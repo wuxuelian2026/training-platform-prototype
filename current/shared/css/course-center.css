@@ -104,6 +104,19 @@
 .course-review-actionbar { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 0; padding: 14px 0 0; border-top: 1px solid var(--line, #e3e6ee); background: var(--card, #fff); }
 .course-review-actionbar-copy { font-size: 13px; color: var(--text-muted, #5b6478); }
 .course-review-actionbar .toolbar-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* CR-2026-050 §5.2／§5.5：编排工作台面板内编辑——左右面板固定高度纵向滚动、底部操作条常驻，
+   删除与完成编排的阻断原因在行内标记并在面板顶部汇总。 */
+.course-workbench-pane { display: flex; flex-direction: column; max-height: 58vh; }
+.course-pane-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.course-pane-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--line, #e3e6ee); }
+.course-inline-form { display: grid; gap: 10px; margin-bottom: 14px; padding: 14px; border: 1px solid var(--brand, #2f6fed); border-radius: 6px; background: rgba(47, 111, 237, .04); }
+.course-inline-form .course-detail-grid { grid-template-columns: 1fr; }
+.course-inline-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.chapter-item.is-invalid, .lesson-item.is-invalid { outline: 2px solid #d94b4b; outline-offset: -2px; background: rgba(217, 75, 75, .06); }
+.course-blocker-panel { margin-bottom: 14px; padding: 12px 14px; border: 1px solid #f0c7c7; border-radius: 6px; background: #fdf3f3; }
+.course-blocker-panel strong { display: block; margin-bottom: 6px; font-size: 13px; color: #b03030; }
+.course-blocker-panel ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-muted, #5b6478); }
 .course-stepper { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
 .course-step { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: #fafafa; }
 .course-step span { display: grid; flex: 0 0 24px; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: #e9e6e2; font-size: 12px; }

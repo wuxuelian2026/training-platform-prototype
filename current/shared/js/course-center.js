@@ -518,46 +518,74 @@ function openCourseArchiveForm(id) {
   render();
 }
 
-// 历史版本列表：版本号、生成时间、操作人、变更摘要与当前版本标识；不提供差异对比与回退。
+// 历史版本链路：列表 → 版本详情 → 返回列表，全部在当前层内替换内容。
+// CR-2026-050 §5.6：不再「先关闭再打开」，返回是真实返回，并保留版本列表的滚动位置。
+let libraryVersionLayer = null;
 function openLibraryVersions(id) {
   const item = library.find(record => record.id === id);
   if (!item) return;
   const key = courseArchiveKey(item);
   syncLibraryVersion(item);
   ensureVersionTrack(item);
-  const currentVersion = courseVersionOf(item);
-  const rows = [...item.versions].reverse().map(entry => `<tr><td><span class="primary-cell">v${entry.version}</span>${entry.version === currentVersion ? '<span class="sub-cell">当前版本</span>' : ''}</td><td>${escapeHtml(entry.at || '—')}</td><td>${escapeHtml(entry.operator || '—')}</td><td>${escapeHtml((entry.changes || []).join('、') || '—')}</td><td><div class="course-actions">${button(entry.version === currentVersion ? '查看当前版本' : `查看 v${entry.version}`, 'library-version-detail', `data-id="${item.id}" data-version="${entry.version}"`)}</div></td></tr>`).join('');
-  modal('历史版本', `${key} · ${item.name}`, `<div class="course-version-summary"><div><span>当前版本</span><strong>v${currentVersion}</strong><small>历史版本整体快照只读</small></div><div><span>引用情况</span><strong>${escapeHtml(referenceLabel(courseReferences(item)))}</strong><small>历史版本可查可回溯</small></div></div><div class="course-table-wrap"><table><thead><tr><th>版本号</th><th>生成时间</th><th>操作人</th><th>变更摘要</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div><p class="course-hint">历史版本不提供字段级差异对比，也不提供版本回退；如需恢复历史内容，请按当前版本手工修改并生成新版本。</p><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div>`, { large: true });
+  const dialog = modal('历史版本', `${key} · ${item.name}`, '<div data-version-layer-root></div>', { large: true });
+  const holder = dialog.querySelector('[data-version-layer-root]');
+  const scroller = dialog.querySelector('.course-modal-body') || dialog;
+  const layer = { item, holder, scroller, listScrollTop: 0, activeTab: 'basic', activeVersion: null };
+  const setHeader = (title, subtitle) => {
+    const heading = dialog.querySelector('.course-modal-header h2');
+    if (heading) heading.textContent = title;
+    const copy = dialog.querySelector('.course-modal-header p');
+    if (copy) copy.textContent = subtitle;
+  };
+  const renderList = (restoreScroll = false) => {
+    const currentVersion = courseVersionOf(item);
+    const rows = [...item.versions].reverse().map(entry => `<tr><td><span class="primary-cell">v${entry.version}</span>${entry.version === currentVersion ? '<span class="sub-cell">当前版本</span>' : ''}</td><td>${escapeHtml(entry.at || '—')}</td><td>${escapeHtml(entry.operator || '—')}</td><td>${escapeHtml((entry.changes || []).join('、') || '—')}</td><td><div class="course-actions">${button(entry.version === currentVersion ? '查看当前版本' : `查看 v${entry.version}`, 'library-version-detail', `data-id="${item.id}" data-version="${entry.version}"`)}</div></td></tr>`).join('');
+    layer.activeVersion = null;
+    layer.activeTab = 'basic';
+    holder.innerHTML = `<div class="course-version-summary"><div><span>当前版本</span><strong>v${currentVersion}</strong><small>历史版本整体快照只读</small></div><div><span>引用情况</span><strong>${escapeHtml(referenceLabel(courseReferences(item)))}</strong><small>历史版本可查可回溯</small></div></div><div class="course-table-wrap"><table><thead><tr><th>版本号</th><th>生成时间</th><th>操作人</th><th>变更摘要</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div><p class="course-hint">历史版本不提供字段级差异对比，也不提供版本回退；如需恢复历史内容，请按当前版本手工修改并生成新版本。</p><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div>`;
+    setHeader('历史版本', `${key} · ${item.name}`);
+    scroller.scrollTop = restoreScroll ? layer.listScrollTop : 0;
+  };
+  const renderDetail = (version) => {
+    const entry = (item.versions || []).find(row => row.version === version);
+    if (!entry) { showToast('未找到该历史版本', 'error'); return; }
+    if (layer.activeVersion === null) layer.listScrollTop = scroller.scrollTop;
+    const snapshot = entry.snapshot || {};
+    const isCurrent = entry.version === courseVersionOf(item);
+    const chapters = Array.isArray(snapshot.outline) ? snapshot.outline : [];
+    const tabs = () => `<div class="course-tabs"><button type="button" class="course-tab${layer.activeTab === 'basic' ? ' active' : ''}" data-version-detail-tab="basic">基本信息</button><button type="button" class="course-tab${layer.activeTab === 'outline' ? ' active' : ''}" data-version-detail-tab="outline">课程大纲</button></div>`;
+    const basic = () => `<section class="course-detail-section wide"><h3>版本快照</h3><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(courseArchiveKey(item))}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(snapshot.name || '—')}</dd></div><div><dt>课程来源</dt><dd>${escapeHtml(snapshot.source || item.source || '—')}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(snapshot.type || '—')}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(snapshot.major || '—')}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(snapshot.teacher || '—')}</dd></div><div><dt>总课时</dt><dd>${escapeHtml(String(snapshot.hours ?? '—'))} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(snapshot.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml((snapshot.ages || []).join('、') || '未填写')}</dd></div><div class="wide"><dt>编排结构摘要</dt><dd>${escapeHtml(snapshot.structure || '—')}</dd></div><div class="wide"><dt>本版本变更字段</dt><dd>${escapeHtml((entry.changes || []).join('、') || '—')}</dd></div></dl></section>`;
+    const outline = () => chapters.length
+      ? courseOutlineView(chapters)
+      : `<div class="course-empty"><strong>暂无课程大纲</strong><span>该版本快照未留存大纲明细，仅保留编排结构摘要：${escapeHtml(snapshot.structure || '—')}</span></div>`;
+    layer.activeVersion = version;
+    holder.innerHTML = `<div class="course-version-summary"><div><span>版本号</span><strong>v${entry.version}</strong><small>${isCurrent ? '当前版本' : '历史版本，永久只读'}</small></div><div><span>生成时间 / 操作人</span><strong>${escapeHtml(entry.at || '—')}</strong><small>${escapeHtml(entry.operator || '—')}</small></div></div>${tabs()}${layer.activeTab === 'basic' ? basic() : outline()}<p class="course-hint">历史版本为整体快照，不提供与当前版本的字段级差异对比，也不提供回退入口。</p><div class="course-modal-actions"><button class="button" type="button" data-version-layer-back="list">返回版本列表</button><button class="button primary" type="button" data-action="close-modal">关闭</button></div>`;
+    setHeader(isCurrent ? '当前版本详情（只读）' : `历史版本详情 v${entry.version}（只读）`, `${courseArchiveKey(item)} · ${item.name}`);
+    scroller.scrollTop = 0;
+  };
+  dialog.addEventListener('click', event => {
+    const tab = event.target.closest('[data-version-detail-tab]')?.dataset.versionDetailTab;
+    if (tab && layer.activeVersion !== null) { layer.activeTab = tab; renderDetail(layer.activeVersion); return; }
+    if (event.target.closest('[data-version-layer-back]')) renderList(true);
+  });
+  layer.renderList = renderList;
+  layer.renderDetail = renderDetail;
+  libraryVersionLayer = layer;
+  dialog.addEventListener('close', () => { if (libraryVersionLayer === layer) libraryVersionLayer = null; });
+  renderList();
 }
 
-// 历史版本只读详情：整体快照，可返回版本列表或当前版本。
+// 历史版本只读详情：版本列表已在本层打开时同层替换，否则先打开列表层再替换（深链兜底）。
 function openLibraryVersionDetail(id, version) {
   const item = library.find(record => record.id === id);
   if (!item) return;
   syncLibraryVersion(item);
-  const entry = (item.versions || []).find(row => row.version === version);
-  if (!entry) { showToast('未找到该历史版本', 'error'); return; }
-  // UI 复核 CR-2026-025：先关闭历史版本列表再打开版本详情，避免两个弹窗叠加后仍看到列表标题。
-  closeModal();
-  const snapshot = entry.snapshot || {};
-  const currentVersion = courseVersionOf(item);
-  const isCurrent = entry.version === currentVersion;
-  const chapters = Array.isArray(snapshot.outline) ? snapshot.outline : [];
-  let activeTab = 'basic';
-  const tabs = () => `<div class="course-tabs"><button type="button" class="course-tab${activeTab === 'basic' ? ' active' : ''}" data-version-detail-tab="basic">基本信息</button><button type="button" class="course-tab${activeTab === 'outline' ? ' active' : ''}" data-version-detail-tab="outline">课程大纲</button></div>`;
-  const basic = () => `<section class="course-detail-section wide"><h3>版本快照</h3><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(courseArchiveKey(item))}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(snapshot.name || '—')}</dd></div><div><dt>课程来源</dt><dd>${escapeHtml(snapshot.source || item.source || '—')}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(snapshot.type || '—')}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(snapshot.major || '—')}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(snapshot.teacher || '—')}</dd></div><div><dt>总课时</dt><dd>${escapeHtml(String(snapshot.hours ?? '—'))} 课时</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(snapshot.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml((snapshot.ages || []).join('、') || '未填写')}</dd></div><div class="wide"><dt>编排结构摘要</dt><dd>${escapeHtml(snapshot.structure || '—')}</dd></div><div class="wide"><dt>本版本变更字段</dt><dd>${escapeHtml((entry.changes || []).join('、') || '—')}</dd></div></dl></section>`;
-  const outline = () => chapters.length
-    ? courseOutlineView(chapters)
-    : `<div class="course-empty"><strong>暂无课程大纲</strong><span>该版本快照未留存大纲明细，仅保留编排结构摘要：${escapeHtml(snapshot.structure || '—')}</span></div>`;
-  const dialog = modal(isCurrent ? '当前版本详情（只读）' : `历史版本详情 v${entry.version}（只读）`, `${courseArchiveKey(item)} · ${item.name}`, '<div data-version-detail-root></div>', { large: true });
-  const holder = dialog.querySelector('[data-version-detail-root]');
-  const render = () => { holder.innerHTML = `<div class="course-version-summary"><div><span>版本号</span><strong>v${entry.version}</strong><small>${isCurrent ? '当前版本' : '历史版本，永久只读'}</small></div><div><span>生成时间 / 操作人</span><strong>${escapeHtml(entry.at || '—')}</strong><small>${escapeHtml(entry.operator || '—')}</small></div></div>${tabs()}${activeTab === 'basic' ? basic() : outline()}<p class="course-hint">历史版本为整体快照，不提供与当前版本的字段级差异对比，也不提供回退入口。</p><div class="course-modal-actions"><button class="button" type="button" data-action="library-versions" data-id="${item.id}">返回版本列表</button><button class="button primary" type="button" data-action="close-modal">关闭</button></div>`; };
-  dialog.addEventListener('click', event => { const tab = event.target.closest('[data-version-detail-tab]')?.dataset.versionDetailTab; if (tab) { activeTab = tab; render(); } });
-  render();
+  if (!(item.versions || []).some(row => row.version === version)) { showToast('未找到该历史版本', 'error'); return; }
+  if (!(libraryVersionLayer && libraryVersionLayer.item.id === id)) openLibraryVersions(id);
+  libraryVersionLayer?.renderDetail(version);
 }
 
 // CR-2026-034 §2.2：专业引用统计由数据实时派生，不用种子里的静态值；
-// 展示与停用／删除守卫共用同一份结果，避免出现“显示 0 却被拦截”。
 function majorCourseRecords(majorName) {
   const seen = new Set();
   const records = [];
@@ -722,25 +750,119 @@ function openWorkbench(id) {
       dialog.querySelector('#workbench-content').innerHTML = `${basicInfo}${chapters}<div class="course-workbench-footer"><div><span class="tag green">编排已完成 · 只读</span></div><div class="toolbar-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div></div>`;
       return;
     }
-    dialog.querySelector('#workbench-content').innerHTML = `${teachingPanel()}<div class="course-workbench"><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>章节结构</h3><p>${item.chapters.length} 个章节 · ${lessonCount} 个课时</p></div><button class="button" type="button" data-workbench="add-chapter">添加章节</button></div><div class="chapter-list">${item.chapters.map((current, index) => `<div class="chapter-item${index === activeChapter ? ' active' : ''}" data-workbench="select-chapter" data-index="${index}"><div><strong>${escapeHtml(current.name)}</strong><small>${current.lessons.length} 个课时 · ${escapeHtml(current.desc || '暂无章节描述')}</small></div><div class="chapter-item-actions"><button type="button" data-workbench="edit-chapter" data-index="${index}" aria-label="编辑章节">编辑</button><button type="button" data-workbench="delete-chapter" data-index="${index}" aria-label="删除章节">删</button></div></div>`).join('') || '<div class="course-empty"><strong>还没有章节</strong><span>先添加章节，再添加课时。</span></div>'}</div></section><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>${chapter ? escapeHtml(chapter.name) : '选择章节'}</h3><p>${chapter ? escapeHtml(chapter.desc || '编辑章节下的课时内容') : '请选择左侧章节'}</p></div>${chapter ? '<button class="button" type="button" data-workbench="add-lesson">添加课时</button>' : ''}</div><div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target)}</p></div><div class="chapter-item-actions"><button type="button" data-workbench="edit-lesson" data-chapter="${activeChapter}" data-index="${index}">编辑</button><button type="button" data-workbench="delete-lesson" data-chapter="${activeChapter}" data-index="${index}">删</button></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span class="${item.type === '视频课程' && !lesson.resources.some(resourceId => resources.find(resource => resource.id === resourceId)?.type === '教学视频') ? 'missing' : ''}">${lesson.resources.length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).join('、') : item.type === '视频课程' ? '未关联视频资源' : '未关联资源（可选）'}</span><button class="button" type="button" data-workbench="resource" data-chapter="${activeChapter}" data-index="${index}">引用资源</button></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong><span>请添加至少一个课时并完成教学目标。</span></div>'}</div></section></div><div class="course-workbench-footer"><div>${item.type === '视频课程' && !videoReady ? '<span class="tag red">视频课程还缺少必填视频资源</span>' : '<span class="tag green">当前结构可保存</span>'}<div class="course-progress"><span style="width:${Math.min(100, item.hours ? Math.round(lessonCount / item.hours * 100) : 0)}%"></span></div></div><div class="toolbar-actions"><button class="button" type="button" data-workbench="save">保存草稿</button>${item.status !== '已完成' ? '<button class="button primary" type="button" data-workbench="complete">完成编排</button>' : ''}</div></div>`;
+    dialog.querySelector('#workbench-content').innerHTML = workbenchEditable();
+  };
+  // CR-2026-050 §5.2／§5.5：编排工作台内的表单改为面板内编辑（不再叠加弹层）；
+  // 「完成编排」的阻断原因在对应章节／课时行标记，并在底部常驻条汇总缺失项数量。
+  let paneView = 'list';          // list：课时列表；lesson：课时编辑；resources：资源引用
+  let chapterDraft = null;        // { index, name, sort, desc }
+  let lessonDraft = null;         // { index, name, order, target, duration, kind, description }
+  let resourceTarget = null;      // { chapterIndex, lessonIndex }
+  let paneError = '';
+  let blockersVisible = false;
+  let chapterMarks = new Set();
+  let lessonMarks = new Set();
+  const buildBlockers = () => {
+    const list = [];
+    if (!item.chapters.length) list.push({ chapterIndex: null, lessonIndex: null, text: '至少需要一个章节' });
+    item.chapters.forEach((current, chapterIndex) => {
+      if (!current.lessons.length) list.push({ chapterIndex, lessonIndex: null, text: `章节「${current.name}」还没有课时` });
+      current.lessons.forEach((lesson, lessonIndex) => {
+        if (!lesson.name || !lesson.target || !lesson.duration) list.push({ chapterIndex, lessonIndex, text: `第 ${lessonIndex + 1} 课时缺少必填信息` });
+        else if (item.type === '视频课程' && !lesson.resources.some((id) => resources.find((row) => row.id === id)?.type === '教学视频')) list.push({ chapterIndex, lessonIndex, text: `第 ${lessonIndex + 1} 课时未关联教学视频` });
+      });
+    });
+    if (item.type !== '视频课程') {
+      const lessons = item.chapters.flatMap((current) => current.lessons);
+      if (lessons.length !== Number(item.hours)) list.push({ chapterIndex: null, lessonIndex: null, text: `课时数需等于申报总课时 ${item.hours} 课时，当前 ${lessons.length} 课时` });
+    }
+    return list;
+  };
+  const refreshMarks = () => {
+    const blockers = blockersVisible ? buildBlockers() : [];
+    chapterMarks = new Set(blockers.filter((row) => row.chapterIndex !== null && row.lessonIndex === null).map((row) => row.chapterIndex));
+    lessonMarks = new Set(blockers.filter((row) => row.lessonIndex !== null).map((row) => `${row.chapterIndex}-${row.lessonIndex}`));
+    return blockers;
+  };
+  const errorLine = () => (paneError ? `<p class="course-error" data-inline-error>${escapeHtml(paneError)}</p>` : '');
+  const chapterFormMarkup = () => (chapterDraft ? `<form class="course-inline-form" data-course-inline="chapter"><div class="course-field"><label>章节名称 <span class="sub-cell">必填</span></label><input name="name" value="${escapeHtml(chapterDraft.name)}" placeholder="如：第一章：身韵元素训练" /></div><div class="course-field"><label>排序</label><input name="sort" type="number" min="1" value="${chapterDraft.sort}" /></div><div class="course-field"><label>章节描述</label><textarea name="desc" placeholder="填写章节的教学重点">${escapeHtml(chapterDraft.desc || '')}</textarea></div>${errorLine()}<div class="course-inline-actions"><button type="button" class="button" data-workbench="cancel-chapter">取消</button><button type="submit" class="button primary">保存章节</button></div></form>` : '');
+  const lessonFormMarkup = () => (lessonDraft ? `<form class="course-inline-form" data-course-inline="lesson"><div class="course-detail-grid"><div class="course-field"><label>课时名称 <span class="sub-cell">必填</span></label><input name="name" value="${escapeHtml(lessonDraft.name)}" placeholder="如：站姿与脚位" /></div><div class="course-field"><label>课时序号 <span class="sub-cell">必填</span></label><input name="order" type="number" min="1" value="${lessonDraft.order}" /></div><div class="course-field"><label>课时目标 <span class="sub-cell">必填</span></label><input name="target" value="${escapeHtml(lessonDraft.target)}" placeholder="填写本课时可达成的目标" /></div><div class="course-field"><label>课时时长（分钟） <span class="sub-cell">必填</span></label><input name="duration" type="number" min="1" value="${lessonDraft.duration}" /></div><div class="course-field"><label>课时类型 <span class="sub-cell">必填</span></label>${selectWithValues('kind', ['理论', '示范', '练习', '综合'], lessonDraft.kind, '')}</div><div class="course-field wide"><label>内容描述</label><textarea name="description" placeholder="填写教学内容和执行提示">${escapeHtml(lessonDraft.description || '')}</textarea></div></div>${errorLine()}</form>` : '');
+  const resourceMarkup = () => {
+    const lesson = resourceTarget ? item.chapters[resourceTarget.chapterIndex]?.lessons[resourceTarget.lessonIndex] : null;
+    if (!lesson) return '<div class="course-empty"><strong>请先选择课时</strong></div>';
+    return `<div class="course-list-select">${resources.map((row) => `<label class="course-list-select-item"><input type="checkbox" data-workbench="toggle-resource" value="${row.id}"${lesson.resources.includes(row.id) ? ' checked' : ''} /><span><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.type)} · ${escapeHtml(row.major)} · 已引用 ${row.references} 次</small></span></label>`).join('')}</div><p class="course-hint">勾选即保存，无需再次确认；视频课程的每个课时至少需要一个教学视频。</p>`;
+  };
+  const lessonListView = (chapter) => `<div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item${lessonMarks.has(`${activeChapter}-${index}`) ? ' is-invalid' : ''}"><div class="lesson-item-head"><div><h4>${escapeHtml(lesson.name || `第 ${index + 1} 课时`)}</h4><p>${escapeHtml(lesson.target || '未填写教学目标')}</p></div><div class="chapter-item-actions"><button type="button" data-workbench="edit-lesson" data-index="${index}">编辑</button><button type="button" data-workbench="delete-lesson" data-index="${index}">删</button></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span class="${item.type === '视频课程' && !lesson.resources.some((resourceId) => resources.find((row) => row.id === resourceId)?.type === '教学视频') ? 'missing' : ''}">${lesson.resources.length ? lesson.resources.map((resourceId) => resources.find((row) => row.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : item.type === '视频课程' ? '未关联视频资源' : '未关联资源（可选）'}</span><button class="button" type="button" data-workbench="resource" data-index="${index}">引用资源</button></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong><span>请添加至少一个课时并完成教学目标。</span></div>'}</div>`;
+  const saveChapterDraft = (form) => {
+    const data = new FormData(form);
+    const name = String(data.get('name') || '').trim();
+    if (!name) { paneError = '章节名称必填'; renderWorkbench(); return; }
+    paneError = '';
+    const chapter = { name, desc: String(data.get('desc') || '').trim(), lessons: chapterDraft.index === null ? [] : item.chapters[chapterDraft.index].lessons };
+    const fallback = chapterDraft.index === null ? item.chapters.length + 1 : chapterDraft.index + 1;
+    const order = Math.max(1, Math.min(item.chapters.length + (chapterDraft.index === null ? 1 : 0), Number(data.get('sort')) || fallback));
+    const editIndex = chapterDraft.index;
+    if (editIndex !== null) item.chapters.splice(editIndex, 1);
+    item.chapters.splice(order - 1, 0, chapter);
+    activeChapter = order - 1;
+    chapterDraft = null;
+    persistCourse(item);
+    renderWorkbench();
+    showToast('章节已保存');
+  };
+  const saveLessonDraft = (form) => {
+    const scope = form || dialog.querySelector('form[data-course-inline="lesson"]');
+    if (!scope) return;
+    const data = new FormData(scope);
+    const name = String(data.get('name') || '').trim();
+    const target = String(data.get('target') || '').trim();
+    const duration = Number(data.get('duration'));
+    if (!name || !target || !(duration > 0)) { paneError = '课时名称、课时目标与课时时长必填'; renderWorkbench(); return; }
+    paneError = '';
+    const lessons = item.chapters[activeChapter].lessons;
+    const current = lessonDraft.index === null ? { resources: [] } : lessons[lessonDraft.index];
+    const lesson = { name, target, duration, kind: data.get('kind'), description: String(data.get('description') || '').trim(), resources: [...(current.resources || [])] };
+    const fallback = lessonDraft.index === null ? lessons.length + 1 : lessonDraft.index + 1;
+    const order = Math.max(1, Math.min(lessons.length + (lessonDraft.index === null ? 1 : 0), Number(data.get('order')) || fallback));
+    if (lessonDraft.index !== null) lessons.splice(lessonDraft.index, 1);
+    lessons.splice(order - 1, 0, lesson);
+    paneView = 'list';
+    lessonDraft = null;
+    persistCourse(item);
+    renderWorkbench();
+    showToast('课时已保存');
+  };
+  const workbenchEditable = () => {
+    const chapter = item.chapters[activeChapter];
+    const lessonCount = item.chapters.reduce((sum, current) => sum + current.lessons.length, 0);
+    const blockers = refreshMarks();
+    const pane = paneView === 'lesson'
+      ? { title: lessonDraft?.index === null ? '添加课时' : '编辑课时', hint: '表单在本面板内编辑，取消将丢弃未保存输入', body: lessonFormMarkup(), actions: '<button type="button" class="button" data-workbench="cancel-lesson">取消</button><button type="button" class="button primary" data-workbench="save-lesson">保存课时</button>' }
+      : paneView === 'resources'
+        ? { title: '引用教学资源', hint: '勾选即保存到该课时', body: resourceMarkup(), actions: '<button type="button" class="button primary" data-workbench="back-to-list">完成</button>' }
+        : { title: chapter ? chapter.name : '选择章节', hint: chapter ? (chapter.desc || '编辑章节下的课时内容') : '请选择左侧章节', body: lessonListView(chapter), actions: '' };
+    return `${teachingPanel()}${blockers.length ? `<section class="course-blocker-panel"><strong>完成编排前还需处理 ${blockers.length} 项</strong><ul>${blockers.slice(0, 4).map((row) => `<li>${escapeHtml(row.text)}</li>`).join('')}${blockers.length > 4 ? `<li>等共 ${blockers.length} 项</li>` : ''}</ul></section>` : ''}<div class="course-workbench"><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>章节结构</h3><p>${item.chapters.length} 个章节 · ${lessonCount} 个课时</p></div>${chapterDraft ? '<span class="tag brand">编辑中</span>' : '<button class="button" type="button" data-workbench="add-chapter">添加章节</button>'}</div><div class="course-pane-body">${chapterFormMarkup()}<div class="chapter-list">${item.chapters.map((current, index) => `<div class="chapter-item${index === activeChapter ? ' active' : ''}${chapterMarks.has(index) ? ' is-invalid' : ''}" data-workbench="select-chapter" data-index="${index}"><div><strong>${escapeHtml(current.name)}</strong><small>${current.lessons.length} 个课时 · ${escapeHtml(current.desc || '暂无章节描述')}</small></div><div class="chapter-item-actions"><button type="button" data-workbench="edit-chapter" data-index="${index}" aria-label="编辑章节">编辑</button><button type="button" data-workbench="delete-chapter" data-index="${index}" aria-label="删除章节">删</button></div></div>`).join('') || '<div class="course-empty"><strong>还没有章节</strong><span>先添加章节，再添加课时。</span></div>'}</div></div></section><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>${escapeHtml(pane.title)}</h3><p>${escapeHtml(pane.hint)}</p></div>${paneView === 'list' && chapter ? '<button class="button" type="button" data-workbench="add-lesson">添加课时</button>' : ''}</div><div class="course-pane-body">${pane.body}</div>${pane.actions ? `<div class="course-pane-actions">${pane.actions}</div>` : ''}</section></div><div class="course-workbench-footer"><div>${blockers.length ? `<span class="tag red">还差 ${blockers.length} 项，已在对应行标出</span>` : item.type === '视频课程' && !videoReady ? '<span class="tag red">视频课程还缺少必填视频资源</span>' : '<span class="tag green">当前结构可保存</span>'}<div class="course-progress"><span style="width:${Math.min(100, item.hours ? Math.round(lessonCount / item.hours * 100) : 0)}%"></span></div></div><div class="toolbar-actions"><button class="button" type="button" data-workbench="save">保存草稿</button>${item.status !== '已完成' ? '<button class="button primary" type="button" data-workbench="complete">完成编排</button>' : ''}</div></div>`;
   };
   dialog.addEventListener('click', event => {
     const target = event.target.closest('[data-workbench]');
     if (!target) return;
     const action = target.dataset.workbench;
-    if (action === 'select-chapter') { activeChapter = Number(target.dataset.index); renderWorkbench(); }
-    if (action === 'add-chapter' || action === 'edit-chapter') openChapterForm(item, action === 'edit-chapter' ? Number(target.dataset.index) : null, () => { persistCourse(item); renderWorkbench(); });
+    if (action === 'select-chapter') { activeChapter = Number(target.dataset.index); paneView = 'list'; paneError = ''; renderWorkbench(); }
+    if (action === 'add-chapter') { chapterDraft = { index: null, name: '', sort: item.chapters.length + 1, desc: '' }; paneError = ''; renderWorkbench(); }
+    if (action === 'edit-chapter') { const chapterIndex = Number(target.dataset.index); const current = item.chapters[chapterIndex]; chapterDraft = { index: chapterIndex, name: current.name, sort: chapterIndex + 1, desc: current.desc || '' }; paneError = ''; renderWorkbench(); }
+    if (action === 'cancel-chapter') { chapterDraft = null; paneError = ''; renderWorkbench(); }
     if (action === 'delete-chapter') {
       const chapterIndex = Number(target.dataset.index);
       confirmAction({
         title: '删除章节', message: '删除章节会同时删除章节下的所有课时，确认继续？',
-        detail: '需先保存草稿才会写入课程档案；历史版本不受影响。',
-        confirmLabel: '确认删除',
+        detail: '需先保存草稿才会写入课程档案；历史版本不受影响。', confirmLabel: '确认删除',
         onConfirm: () => { item.chapters.splice(chapterIndex, 1); activeChapter = Math.max(0, Math.min(activeChapter, item.chapters.length - 1)); persistCourse(item); renderWorkbench(); showToast('章节已删除'); }
       });
     }
-    if (action === 'add-lesson') openLessonForm(item, activeChapter, null, () => { persistCourse(item); renderWorkbench(); });
-    if (action === 'edit-lesson') openLessonForm(item, Number(target.dataset.chapter), Number(target.dataset.index), () => { persistCourse(item); renderWorkbench(); });
+    if (action === 'add-lesson') { paneView = 'lesson'; paneError = ''; lessonDraft = { index: null, name: '', order: (item.chapters[activeChapter]?.lessons.length || 0) + 1, target: '', duration: 45, kind: '理论', description: '' }; renderWorkbench(); }
+    if (action === 'edit-lesson') { const lessonIndex = Number(target.dataset.index); const lesson = item.chapters[activeChapter].lessons[lessonIndex]; paneView = 'lesson'; paneError = ''; lessonDraft = { index: lessonIndex, name: lesson.name, order: lessonIndex + 1, target: lesson.target, duration: lesson.duration, kind: lesson.kind, description: lesson.description || '' }; renderWorkbench(); }
+    if (action === 'cancel-lesson') { paneView = 'list'; lessonDraft = null; paneError = ''; renderWorkbench(); }
+    if (action === 'save-lesson') saveLessonDraft();
     if (action === 'delete-lesson') {
       const chapterIndex = Number(target.dataset.chapter);
       const lessonIndex = Number(target.dataset.index);
@@ -749,20 +871,14 @@ function openWorkbench(id) {
         onConfirm: () => { item.chapters[chapterIndex].lessons.splice(lessonIndex, 1); persistCourse(item); renderWorkbench(); showToast('课时已删除'); }
       });
     }
-    if (action === 'resource') openResourcePicker(item, Number(target.dataset.chapter), Number(target.dataset.index), () => { persistCourse(item); renderWorkbench(); });
+    if (action === 'resource') { paneView = 'resources'; resourceTarget = { chapterIndex: activeChapter, lessonIndex: Number(target.dataset.index) }; renderWorkbench(); }
+    if (action === 'back-to-list') { paneView = 'list'; paneError = ''; renderWorkbench(); }
     if (action === 'save') { if (!saveTeaching()) return; item.status = '编排中'; item.updatedAt = demoTime(); persistCourse(item); const versionResult = commitWorkbenchVersion(); renderWorkbench(); showToast(versionResult && versionResult.bumped ? `编排草稿已保存；编排结构变更已生成 v${versionResult.version}，v${versionResult.previous} 保留` : '编排草稿已保存'); }
-    if (action === 'complete') { if (!saveTeaching()) return;
-      const lessons = item.chapters.flatMap(current => current.lessons);
-      if (!item.chapters.length || item.chapters.some(current => !current.lessons.length || current.lessons.some(lesson => !lesson.name || !lesson.target || !lesson.duration))) { showToast('请补齐章节和课时必填信息', 'error'); return; }
-      // I1-DEC-22: 面授课程校验课时数等于申报总课时；视频课程只校验每个课时都有教学视频。
-      if (item.type === '视频课程') {
-        const videoReady = item.chapters.every(current => current.lessons.every(lesson => lesson.resources.some(resourceId => resources.find(resource => resource.id === resourceId)?.type === '教学视频')));
-        if (!videoReady) { showToast('视频课程每个课时都必须关联至少一个教学视频', 'error'); return; }
-      } else if (lessons.length !== Number(item.hours)) {
-        const gap = Number(item.hours) - lessons.length;
-        showToast(gap > 0 ? `面授课程课时数需等于申报总课时 ${item.hours} 课时，当前 ${lessons.length} 课时，请再补齐 ${gap} 个课时` : `面授课程课时数需等于申报总课时 ${item.hours} 课时，当前 ${lessons.length} 课时，请删除 ${Math.abs(gap)} 个课时`, 'error');
-        return;
-      }
+    if (action === 'complete') {
+      if (!saveTeaching()) return;
+      const blockers = buildBlockers();
+      if (blockers.length) { blockersVisible = true; renderWorkbench(); showToast(`完成编排前还需处理 ${blockers.length} 项，已在面板内标出`, 'error'); return; }
+      blockersVisible = false;
       item.status = '已完成';
       item.updatedAt = demoTime();
       persistCourse(item);
@@ -772,6 +888,24 @@ function openWorkbench(id) {
       renderContent(root());
       showToast(versionResult && versionResult.bumped ? `课程编排已完成，编排结构变更已生成 v${versionResult.version}，v${versionResult.previous} 保留` : '课程编排已完成，可进入课程库');
     }
+  });
+  dialog.addEventListener('submit', event => {
+    const inlineForm = event.target.closest('[data-course-inline]');
+    if (!inlineForm) return;
+    event.preventDefault();
+    if (inlineForm.dataset.courseInline === 'chapter') saveChapterDraft(inlineForm); else saveLessonDraft(inlineForm);
+  });
+  dialog.addEventListener('change', event => {
+    const box = event.target.closest('[data-workbench="toggle-resource"]');
+    if (!box || !resourceTarget) return;
+    const lesson = item.chapters[resourceTarget.chapterIndex]?.lessons[resourceTarget.lessonIndex];
+    if (!lesson) return;
+    if (box.checked) { if (!lesson.resources.includes(box.value)) lesson.resources.push(box.value); }
+    else lesson.resources = lesson.resources.filter((id) => id !== box.value);
+    persistCourse(item);
+    if (blockersVisible && !buildBlockers().length) blockersVisible = false;
+    renderWorkbench();
+    showToast('资源引用已更新');
   });
   renderWorkbench();
 }
