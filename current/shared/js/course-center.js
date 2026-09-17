@@ -6,6 +6,8 @@ import { courseAgesText, courseArchiveFor, persistCourseTeaching } from './cours
 import { courseArchiveSeed } from './course-display.js';
 import { TEACHER_FACTS } from './teacher-facts.js';
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
+import { readAdminSession } from './admin-auth.js';
+import { permissionsOfRole } from './permissions.js';
 
 const courseRoot = document.querySelector('[data-course-page]');
 
@@ -206,11 +208,14 @@ function confirmAction({ title, message, confirmLabel = '确认', cancelLabel = 
   modal(title, '', `<section class="course-detail-section wide"><p class="course-hint">${escapeHtml(message)}</p>${detail ? `<p class="sub-cell">${escapeHtml(detail)}</p>` : ''}</section><div class="course-modal-actions"><button type="button" class="button" data-action="close-modal">${escapeHtml(cancelLabel)}</button><button type="button" class="button ${confirmTone}" data-confirm-action="run">${escapeHtml(confirmLabel)}</button></div>`);
 }
 const button = (label, action, attrs = '', className = '') => `<button type="button" class="text-button ${className}" data-action="${action}" ${attrs}>${escapeHtml(label)}</button>`;
-const pageShell = (title, description, actions = '') => {
+// CR-2026-049 §4.4：申报审批页抬头需要状态与「只读」标签，description/titleTag 允许传已转义的富文本。
+const pageShell = (title, description, actions = '', options = {}) => {
   const toolbar = title === '课程内容编排'
     ? `${actions}<button class="button primary" type="button" data-action="new-direct-course">新增面授课程</button>`
     : title === '课程库' ? '' : actions;
-  return `<div class="page-head"><div><h1>${escapeHtml(title)}</h1>${description ? `<p>${escapeHtml(description)}</p>` : ''}</div><div class="toolbar-actions">${toolbar}</div></div>`;
+  const titleMarkup = options.rawTitle ? title : escapeHtml(title);
+  const descriptionMarkup = description ? (options.rawDescription ? description : escapeHtml(description)) : '';
+  return `<div class="page-head"><div><h1>${titleMarkup}</h1>${descriptionMarkup ? `<p>${descriptionMarkup}</p>` : ''}</div><div class="toolbar-actions">${toolbar}</div></div>`;
 };
 const filterField = (label, input) => `<div class="course-field"><label>${escapeHtml(label)}</label>${input}</div>`;
 const select = (name, values, selected = '', allLabel = '全部') => `<select name="${name}">${allLabel ? option('', selected === '') .replace('</option>', `>${allLabel}</option>`) : ''}${values.map(value => option(value, selected === value)).join('')}</select>`;
@@ -259,7 +264,7 @@ function renderApplications(page) {
   const statusFilter = activeTab === ''
     ? filterField('申报状态', selectWithValues('status', tabs.filter(tab => tab.value).map(tab => tab.value), state.applicationFilters.status || '', '全部状态'))
     : '';
-  page.innerHTML = `<div class="course-page">${pageShell('课程申报', '', '<button class="button" type="button" data-action="export-applications">导出列表</button>')}<section class="course-surface"><div class="course-tabs">${tabs.map(tab => `<button type="button" class="course-tab${activeTab === tab.value ? ' active' : ''}" data-action="application-tab" data-value="${tab.value}">${tab.label} <small>(${applications.filter(item => !tab.value || item.status === tab.value).length})</small></button>`).join('')}</div><form class="course-filter" data-form="application-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('申报教师', `<input name="teacher" value="${escapeHtml(state.applicationFilters.teacher || '')}" placeholder="输入教师姓名" />`)}${filterField('所属专业', professionalFilter('major', state.applicationFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.applicationFilters.keyword || '')}" placeholder="课程名称或申报编号" />`)}${statusFilter}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>申报列表</strong><span> 当前显示 ${filtered.length} 条</span></div><div class="course-legend"><span class="course-legend-item">待教研审核</span><span class="course-legend-item success">可进入编排</span><span class="course-legend-item warning">需修改</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>申报编号</th><th>课程名称</th><th>课程类型</th><th>申报教师</th><th>所属专业</th><th>申报时间</th><th>申报状态</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td>${item.id}</td><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${escapeHtml(item.intro.slice(0, 28))}…</span></td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.submittedAt)}</td><td>${tag(item.status)}</td><td><div class="course-actions">${button('查看详情', 'application-detail', `data-id="${item.id}"`)}${item.status === '待审核' ? button('审批', 'application-review', `data-id="${item.id}"`) : ''}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无申报数据</strong><span>调整筛选条件后重试，或等待教师提交新的课程申报。</span></div>'}</div>${pagination(filtered.length)}</section></div>`;
+  page.innerHTML = `<div class="course-page">${pageShell('课程申报', '', '<button class="button" type="button" data-action="export-applications">导出列表</button>')}<section class="course-surface"><div class="course-tabs">${tabs.map(tab => `<button type="button" class="course-tab${activeTab === tab.value ? ' active' : ''}" data-action="application-tab" data-value="${tab.value}">${tab.label} <small>(${applications.filter(item => !tab.value || item.status === tab.value).length})</small></button>`).join('')}</div><form class="course-filter" data-form="application-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('申报教师', `<input name="teacher" value="${escapeHtml(state.applicationFilters.teacher || '')}" placeholder="输入教师姓名" />`)}${filterField('所属专业', professionalFilter('major', state.applicationFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.applicationFilters.keyword || '')}" placeholder="课程名称或申报编号" />`)}${statusFilter}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>申报列表</strong><span> 当前显示 ${filtered.length} 条</span></div><div class="course-legend"><span class="course-legend-item">待教研审核</span><span class="course-legend-item success">可进入编排</span><span class="course-legend-item warning">需修改</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>申报编号</th><th>课程名称</th><th>课程类型</th><th>申报教师</th><th>所属专业</th><th>申报时间</th><th>申报状态</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td>${item.id}</td><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${escapeHtml(item.intro.slice(0, 28))}…</span></td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.submittedAt)}</td><td>${tag(item.status)}</td><td><div class="course-actions">${applicationEntryButton(item)}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无申报数据</strong><span>调整筛选条件后重试，或等待教师提交新的课程申报。</span></div>'}</div>${pagination(filtered.length)}</section></div>`;
 }
 
 function renderContent(page) {
@@ -600,40 +605,62 @@ function applicationStatusTone(status) {
   if (status === '待审核') return 'brand';
   return 'gray';
 }
+// CR-2026-049 §4.1：列表操作列合并为单一入口，取值按申报状态与权限决定，两种文案指向同一地址。
+// 权限取值与系统管理「角色权限管理」一致：先看角色预置，再看本地保存的勾选，便于复现无权限的只读路径。
+function roleHasPoint(pointId) {
+  // 页面模块可能先于后台壳层渲染，不能依赖 window.hbyxPermissions 已挂载；取值顺序与「角色权限管理」一致。
+  const roleKey = window.hbyxPermissions?.roleKey || readAdminSession()?.role || 'academic_lead';
+  try {
+    const saved = JSON.parse(localStorage.getItem('hbyx-admin-role-permissions') || '[]');
+    const row = Array.isArray(saved) ? saved.find((item) => item.key === roleKey) : null;
+    if (row?.permissions?.length) return row.permissions.includes(pointId);
+  } catch { /* 本地勾选不可用时回落到角色预置 */ }
+  return permissionsOfRole(roleKey).includes(pointId);
+}
+const canReviewApplication = () => roleHasPoint('PERM-COURSE-002');
+
+function applicationEntryButton(item) {
+  const label = item.status === '待审核' && canReviewApplication() ? '审批' : '查看';
+  return button(label, 'application-review', `data-id="${item.id}"`);
+}
 function renderApplicationReview(page) {
   const reviewParams = new URLSearchParams(location.search);
   const applicationId = reviewParams.get('application_id') || reviewParams.get('id') || '';
   const returnUrl = reviewParams.get('return') || '/admin/pages/courses/applications.html';
   const item = applications.find((record) => record.id === applicationId);
   if (!item) {
-    page.innerHTML = `<div class="course-page">${pageShell('课程申报审批', '', `<a class="button" href="${escapeHtml(returnUrl)}">返回列表</a>`)}<section class="course-surface"><div class="course-empty"><strong>未找到该申报</strong><span>申报编号 ${escapeHtml(applicationId || '未提供')} 不存在或已被撤销，请返回列表重新选择。</span></div></section></div>`;
+    page.innerHTML = `<div class="course-page">${pageShell('课程申报详情', '', `<a class="button" href="${escapeHtml(returnUrl)}">返回列表</a>`)}<section class="course-surface"><div class="course-empty"><strong>未找到该申报</strong><span>申报编号 ${escapeHtml(applicationId || '未提供')} 不存在或已被撤销，请返回列表重新选择。</span></div></section></div>`;
     return;
   }
+  // CR-2026-049 §4.1：查看与审批合并为一个页面，页面模式由申报状态与权限决定，不由 URL 参数决定。
+  const pending = item.status === '待审核';
+  const canReview = pending && canReviewApplication();
+  const readOnly = !canReview;
+  const submittedAt = item.submittedAt || item.date || '—';
+  // §4.2.2：申报编号、课程名称、申报状态与提交时间上移抬头四段式并列，页内不再重复展示。
+  const headDescription = `${escapeHtml(item.id)} · ${escapeHtml(item.name)} · ${tag(item.status)} · 提交时间 ${escapeHtml(submittedAt)}`;
+  // §4.4：标题按模式动态取值，只读模式在抬头标注「只读」，避免被误判为页面异常。
+  const headTitle = `${escapeHtml(canReview ? '课程申报审批' : '课程申报详情')}${readOnly ? ' <span class="tag gray">只读</span>' : ''}`;
+  const head = (actions, description = headDescription) => pageShell(headTitle, description, actions, { rawTitle: true, rawDescription: true });
+  const backLink = `<a class="button" href="${escapeHtml(returnUrl)}">返回列表</a>`;
   // CR-2026-034 §3.1.1：审批通过后就地给出「查看该课程编排」入口，无需回列表再找课程。
   if (state.reviewResult?.id === item.id) {
     const courseId = state.reviewResult.courseId;
-    page.innerHTML = `<div class="course-page">${pageShell('课程申报审批', `${item.id} · ${item.name}`, `<a class="button" href="${escapeHtml(state.reviewResult.back)}">返回列表</a>`)}<section class="course-surface"><div class="course-detail-section wide"><h3>审批已通过</h3><p class="course-hint">申报已通过，课程「${escapeHtml(item.name)}」已进入课程编排，当前状态为待编排。</p><dl class="course-detail-list"><div><dt>申报编号</dt><dd>${escapeHtml(item.id)}</dd></div><div><dt>派生课程编号</dt><dd>${escapeHtml(courseId)}</dd></div><div><dt>编排状态</dt><dd>${tag('待编排')}</dd></div></dl><div class="course-modal-actions"><a class="button" href="${escapeHtml(state.reviewResult.back)}">返回列表</a><a class="button primary" href="${relativePath(`/admin/pages/courses/library.html?tab=arrange&courseId=${encodeURIComponent(courseId)}`)}">查看该课程编排</a></div></div></section></div>`;
+    page.innerHTML = `<div class="course-page">${head(`<a class="button" href="${escapeHtml(state.reviewResult.back)}">返回列表</a>`, `${escapeHtml(item.id)} · ${escapeHtml(item.name)} · ${tag('已通过')} · 提交时间 ${escapeHtml(submittedAt)}`)}<section class="course-surface"><div class="course-detail-section wide"><h3>审批已通过</h3><p class="course-hint">申报已通过，课程「${escapeHtml(item.name)}」已进入课程编排，当前状态为待编排。</p><dl class="course-detail-list"><div><dt>派生课程编号</dt><dd>${escapeHtml(courseId)}</dd></div><div><dt>编排状态</dt><dd>${tag('待编排')}</dd></div></dl><div class="course-modal-actions"><a class="button" href="${escapeHtml(state.reviewResult.back)}">返回列表</a><a class="button primary" href="${relativePath(`/admin/pages/courses/library.html?tab=arrange&courseId=${encodeURIComponent(courseId)}`)}">查看该课程编排</a></div></div></section></div>`;
     return;
   }
-  const canReview = window.hbyxPermissions ? window.hbyxPermissions.can('PERM-COURSE-002') : true;
-  const pending = item.status === '待审核';
   const reviewDisabledReason = !pending
     ? `当前状态为「${item.status}」，不可提交审批结论。`
-    : (!canReview ? '当前账号未获得审批权限点（PERM-COURSE-002），仅可查看申报内容。' : '');
-  const reviewForm = pending && canReview
-    ? `<form class="course-review-form" data-form="application-review-page" data-id="${escapeHtml(item.id)}"><div class="course-detail-section wide"><h3>审批结论</h3><div class="choice-group"><label class="choice"><input type="radio" name="result" value="approved" checked />通过</label><label class="choice"><input type="radio" name="result" value="rejected" />驳回</label></div><div class="course-field wide"><label for="review-opinion">审批意见 <span class="sub-cell">驳回时必填，≤500 字；将通过消息同步给申报人</span></label><textarea id="review-opinion" name="opinion" maxlength="500" placeholder="填写审批意见或驳回原因">${escapeHtml('')}</textarea></div><p class="course-error" data-error></p></div><div class="course-modal-actions"><button class="button" type="submit" class="button primary">提交审批</button><a class="button" href="${escapeHtml(returnUrl)}">返回列表</a></div></form>`
+    : (!canReviewApplication() ? '当前账号未获得审批权限点（PERM-COURSE-002），仅可查看申报内容。' : '');
+  // §4.3.1：审批结论区排在内容区之后，审批人先读完申报内容再决策；提交与返回收进页面底部常驻操作条。
+  const conclusion = canReview
+    ? `<form id="application-review-page-form" class="course-review-form" data-form="application-review-page" data-id="${escapeHtml(item.id)}"><section class="course-detail-section wide"><h3>审批结论</h3><div class="choice-group"><label class="choice"><input type="radio" name="result" value="approved" checked />通过</label><label class="choice"><input type="radio" name="result" value="rejected" />驳回</label></div><div class="course-field wide"><label for="review-opinion">审批意见 <span class="sub-cell">驳回时必填，≤500 字；将通过消息同步给申报人</span></label><textarea id="review-opinion" name="opinion" maxlength="500" placeholder="填写审批意见或驳回原因"></textarea></div><p class="course-error" data-error></p></section></form>`
     : `<section class="course-detail-section wide"><h3>审批结论</h3><p class="course-hint">${escapeHtml(reviewDisabledReason)}</p></section>`;
   const lastReview = item.review
     ? `<section class="course-detail-section wide"><h3>最近一次审核意见</h3><div class="course-review-box">${tag(item.status)}<p>${escapeHtml(item.review)}</p><small>审批人：${escapeHtml(item.reviewedBy || '—')} · 审批时间：${escapeHtml(item.reviewedAt || '—')}</small></div></section>`
     : '<section class="course-detail-section wide"><h3>最近一次审核意见</h3><p class="course-hint">暂无审核意见。仅展示最近一次，不提供历史意见时间线。</p></section>';
-  page.innerHTML = `<div class="course-page">${pageShell('课程申报审批', `${item.id} · ${item.name}`, `<a class="button" href="${escapeHtml(returnUrl)}">返回列表</a>`)}<section class="course-surface"><div class="course-detail-grid"><section class="course-detail-section wide"><h3>申报概览</h3><dl class="course-detail-list"><div><dt>申报编号</dt><dd>${escapeHtml(item.id)}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>申报状态</dt><dd>${tag(item.status)}</dd></div><div><dt>提交时间</dt><dd>${escapeHtml(item.submittedAt || item.date || '—')}</dd></div></dl></section><section class="course-detail-section wide"><h3>教师信息（只读）</h3><dl class="course-detail-list"><div><dt>姓名</dt><dd>${escapeHtml(item.teacher || '—')}</dd></div><div><dt>工号</dt><dd>${escapeHtml(item.teacherNo || '—')}</dd></div><div><dt>教学单位</dt><dd>${escapeHtml(item.teacherUnit || '—')}</dd></div><div><dt>专业方向</dt><dd>${escapeHtml(item.teacherProfessional || item.major || '—')}</dd></div><div><dt>职称</dt><dd>${escapeHtml(item.teacherTitle || '—')}</dd></div></dl></section><section class="course-detail-section wide"><h3>申报内容（只读）</h3><dl class="course-detail-list"><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>总课时</dt><dd>${item.hours ? `${item.hours} 课时` : '未填写'}</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(item.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(item) || '未填写')}</dd></div><div class="wide"><dt>课程简介</dt><dd>${escapeHtml(item.intro || '未填写')}</dd></div><div class="wide"><dt>附件</dt><dd>${item.attachment ? escapeHtml(item.attachment) : '未上传附件'}</dd></div></dl></section>${lastReview}${reviewForm}</div></section></div>`;
-}
-
-function openApplicationDetail(id, reviewMode = false) {
-  const item = applications.find(record => record.id === id);
-  if (!item) return;
-  const dialog = modal(reviewMode ? '审批课程申报' : '课程申报详情', `${item.id} · ${item.name}`, `<div class="course-detail-grid"><section class="course-detail-section wide"><h3>教师信息</h3><dl class="course-detail-list"><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>教师工号</dt><dd>${escapeHtml(item.teacherNo || '—')}</dd></div><div><dt>教学单位</dt><dd>${escapeHtml(item.teacherUnit || '—')}</dd></div><div><dt>职称</dt><dd>${escapeHtml(item.teacherTitle || '—')}</dd></div><div><dt>专业方向</dt><dd>${escapeHtml(item.teacherProfessional || item.major)}</dd></div></dl></section><section class="course-detail-section wide"><h3>课程信息</h3><dl class="course-detail-list"><div><dt>申报编号</dt><dd>${escapeHtml(item.id)}</dd></div><div><dt>派生课程编号</dt><dd>${escapeHtml(applicationCourseId(item))}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>总课时</dt><dd>${item.hours ? `${item.hours} 课时` : '未填写'}</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(item.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(item))}</dd></div><div class="wide"><dt>课程简介</dt><dd>${escapeHtml(item.intro)}</dd></div><div><dt>附件</dt><dd>${item.attachment ? escapeHtml(item.attachment) : '未上传附件'}</dd></div><div><dt>申报时间</dt><dd>${escapeHtml(item.submittedAt)}</dd></div></dl></section>${item.review ? `<section class="course-detail-section wide"><h3>审核记录</h3><div class="course-review-box">${tag(item.status)}<p>${escapeHtml(item.review)}</p>${item.reviewedBy ? `<small>审核人：${escapeHtml(item.reviewedBy)} · 审核时间：${escapeHtml(item.reviewedAt || '待记录')}</small>` : ''}</div></section>` : ''}${reviewMode ? `<form class="course-detail-section wide" data-form="application-review-form" data-id="${item.id}"><h3>审核决定</h3><div class="choice-group"><label class="choice"><input type="radio" name="result" value="approved" checked />通过</label><label class="choice"><input type="radio" name="result" value="rejected" />驳回</label></div><div class="course-field" style="margin-top:12px"><label for="review-opinion">审批意见 <span class="sub-cell">驳回时必填</span></label><textarea id="review-opinion" name="opinion" placeholder="填写审批意见或驳回原因">${escapeHtml(item.review || '')}</textarea><p class="course-error" data-error></p></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">提交审批</button></div></form>` : '<div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div>'}</div>`, { large: true });
-  if (reviewMode) dialog.querySelector('[name=result]').addEventListener('change', event => { const error = dialog.querySelector('[data-error]'); if (event.target.value === 'approved') error.textContent = ''; });
+  const actionBar = `<div class="course-review-actionbar"><div class="course-review-actionbar-copy">${canReview ? '审批结论提交后立即生效，并同步给申报人。' : escapeHtml(reviewDisabledReason || '当前为只读模式，不提供审批结论表单。')}</div><div class="toolbar-actions">${backLink}${canReview ? '<button class="button primary" type="submit" form="application-review-page-form">提交审批</button>' : ''}</div></div>`;
+  page.innerHTML = `<div class="course-page">${head(backLink)}<section class="course-surface"><div class="course-detail-grid"><section class="course-detail-section wide"><h3>教师信息（只读）</h3><dl class="course-detail-list"><div><dt>姓名</dt><dd>${escapeHtml(item.teacher || '—')}</dd></div><div><dt>工号</dt><dd>${escapeHtml(item.teacherNo || '—')}</dd></div><div><dt>教学单位</dt><dd>${escapeHtml(item.teacherUnit || '—')}</dd></div><div><dt>专业方向</dt><dd>${escapeHtml(item.teacherProfessional || item.major || '—')}</dd></div><div><dt>职称</dt><dd>${escapeHtml(item.teacherTitle || '—')}</dd></div></dl></section><section class="course-detail-section wide"><h3>申报内容（只读）</h3><dl class="course-detail-list"><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>总课时</dt><dd>${item.hours ? `${item.hours} 课时` : '未填写'}</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(item.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(item) || '未填写')}</dd></div><div class="wide"><dt>课程简介</dt><dd>${escapeHtml(item.intro || '未填写')}</dd></div><div class="wide"><dt>附件</dt><dd>${item.attachment ? escapeHtml(item.attachment) : '未上传附件'}</dd></div></dl></section>${lastReview}${conclusion}</div>${actionBar}</section></div>`;
 }
 
 function openWorkbench(id) {
@@ -863,7 +890,6 @@ function handleClick(event) {
     renderLibrary(root());
   }
   if (action === 'export-applications') showToast('列表导出任务已创建，数据将按当前权限脱敏');
-  if (action === 'application-detail') openApplicationDetail(target.dataset.id);
   if (action === 'application-review') {
     // CR-2026-033 §2.1：审批动作唯一入口是审批页；列表页不再弹窗审批。
     const back = new URL(location.href);
@@ -969,19 +995,6 @@ function handleSubmit(event) {
     renderLibrary(root());
     showToast(`课程「${item.name}」已停用；既有商品、班级、订单与学习权限不受影响`);
     return;
-  }
-  if (form.dataset.form === 'application-review-form') {
-    event.preventDefault();
-    const result = form.querySelector('[name=result]:checked')?.value;
-    const opinion = form.querySelector('[name=opinion]').value.trim();
-    const error = form.querySelector('[data-error]');
-    if (result === 'rejected' && !opinion) { error.textContent = '驳回时必须填写审批意见或原因'; return; }
-    const item = applications.find(record => record.id === form.dataset.id);
-    if (!item) return;
-    applyApplicationReview(item, result, opinion);
-    closeModal();
-    renderApplications(root());
-    showToast(result === 'approved' ? '申报已通过，课程进入编排列表' : '申报已驳回，教师可修改后重新提交');
   }
 }
 

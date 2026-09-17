@@ -98,6 +98,12 @@
 .lesson-resource .missing { color: var(--danger); }
 .course-workbench-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .course-workbench-footer .toolbar-actions { justify-content: flex-end; }
+
+/* CR-2026-049 §4.3：申报审批页的提交与返回收进页面底部常驻操作条，滚动时保持可见。
+   复用同一容器，不新增第二套定位上下文。 */
+.course-review-actionbar { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 0; padding: 14px 0 0; border-top: 1px solid var(--line, #e3e6ee); background: var(--card, #fff); }
+.course-review-actionbar-copy { font-size: 13px; color: var(--text-muted, #5b6478); }
+.course-review-actionbar .toolbar-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .course-stepper { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
 .course-step { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: #fafafa; }
 .course-step span { display: grid; flex: 0 0 24px; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: #e9e6e2; font-size: 12px; }
@@ -184,8 +190,8 @@
   .course-filter, .course-table-head, .course-tabs, .course-pagination { padding-right: 14px; padding-left: 14px; }
   .course-filter-grid, .course-detail-grid, .course-detail-list, .catalog-layout { grid-template-columns: 1fr; }
   .course-field.wide, .course-detail-grid .wide, .catalog-panel.wide, .catalog-detail-panel { grid-column: auto; }
-  .course-filter-head, .course-table-head, .course-pagination, .course-workbench-footer { align-items: flex-start; flex-direction: column; }
-  .course-filter-actions, .course-workbench-footer .toolbar-actions { justify-content: flex-start; }
+  .course-filter-head, .course-table-head, .course-pagination, .course-workbench-footer, .course-review-actionbar { align-items: flex-start; flex-direction: column; }
+  .course-filter-actions, .course-workbench-footer .toolbar-actions, .course-review-actionbar .toolbar-actions { justify-content: flex-start; }
   .course-modal-card { padding: 18px; }
   .catalog-panel { padding: 14px; }
   .catalog-level-panel { min-height: auto; }

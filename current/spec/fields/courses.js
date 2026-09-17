@@ -58,12 +58,19 @@ export const COURSE_FIELD_SPEC = {
     },
     'courses/application-review': {
       groups: [
+        // CR-2026-049 §4.2：申报编号、课程名称、申报状态与提交时间上移抬头四段式并列，页内不再重复展示。
+        { heading: '抬头与展示字段', fields: [
+          { id: 'FD-COURSE-067', label: '申报抬头', type: '只读', length: '四段式', required: '系统展示', note: '格式为「申报编号 · 课程名称 · 申报状态 · 提交时间」；原「申报概览」卡片已下线，同一字段在同一屏只出现一次', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-068', label: '教师信息', type: '只读子表', length: '5 项', required: '系统展示', note: '姓名、工号、教学单位、专业方向、职称；取教师档案，与 CR-2026-033 第 2.2 节一致', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-031', label: '申报内容', type: '只读子表', length: '8 项', required: '系统展示', note: '课程名称、所属专业、课程类型、总课时、难度等级、适合年龄、课程简介、附件；取申报记录，与 CR-2026-033 第 2.2 节一致', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-069', label: '只读标识', type: '只读', length: '只读', required: '系统展示', note: '不可审批时（状态非待审核或缺 PERM-COURSE-002）在抬头展示「只读」标签，标题同步为「课程申报详情」', constraints: { readOnly: true, system: true } }
+        ] },
         { heading: '审批字段', fields: [
-          { id: 'FD-COURSE-031', label: '申报内容', type: '只读', length: '—', required: '系统展示', note: '展示完整申报信息，含教师信息与课程信息', constraints: { readOnly: true, system: true } },
           { id: 'FD-COURSE-032', label: '审批结果', type: '单选', length: '通过 / 驳回', required: '是', note: '决定课程是否进入课程库', constraints: { options: ['通过', '驳回'] } },
           { id: 'FD-COURSE-006', label: '审批意见', type: '多行文本', length: '≤ 500 字', required: '驳回时必填', note: '填写后同步给申报人', constraints: { maxLength: 500 } },
           { id: 'FD-COURSE-051', label: '审批人', type: '只读', length: '—', required: '系统记录', note: '提交审批结论时写入当前操作人，展示在「最近一次审核意见」', constraints: { readOnly: true, system: true } },
-          { id: 'FD-COURSE-052', label: '审批时间', type: '只读', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '提交审批结论时写入，与审批人同源展示', constraints: { readOnly: true, system: true } }
+          { id: 'FD-COURSE-052', label: '审批时间', type: '只读', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '提交审批结论时写入，与审批人同源展示', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-070', label: '提交与返回操作条', type: '按钮组', length: '—', required: '是', note: '页面底部常驻操作条，滚动时保持可见；只读模式只保留「返回列表」，审批模式提供「提交审批」与「返回列表」', constraints: { action: true } }
         ] }
       ],
       notes: [
@@ -71,7 +78,10 @@ export const COURSE_FIELD_SPEC = {
         '审批记录保留审批人、审批时间与意见。',
         '审批不改变课程申报的量纲与编号规则。',
         '通过时可填写备注；驳回时必须填写原因。',
-        'CR-2026-034：通过后当场给出“查看该课程编排”入口，跳转课程库内容编排视图并定位到该课程，不必回列表再检索。'
+        'CR-2026-034：通过后当场给出“查看该课程编排”入口，跳转课程库内容编排视图并定位到该课程，不必回列表再检索。',
+        'CR-2026-049：查看与审批合并为本页唯一入口，列表「查看／审批」按钮取值由申报状态与权限决定，两者指向同一地址；原「课程申报详情」弹窗与列表内审批分支已下线。',
+        'CR-2026-049：页面模式由申报状态与权限决定，不由 URL 参数决定，不新增 mode 一类展示开关；深链参数 application_id、id、return 保持不变。',
+        'CR-2026-049：审批结论区排在内容区之后；只读模式说明不可审批原因。不提供历史审核意见时间线、批量审批与附件在线预览。'
       ]
     },
     'courses/resources': {
