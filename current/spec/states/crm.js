@@ -79,6 +79,116 @@ export const STATE_MACHINES = [
     ]
   },
   {
+    // CR-2026-038 §3.1：销售线索状态机（字典 §12.4），承载 crm/leads 与派生视图 crm/conversions。
+    "id": "SM-LEAD",
+    "object": "销售线索",
+    "diagram": false,
+    "pages": [
+      "crm/leads",
+      "crm/conversions"
+    ],
+    "states": [
+      [
+        "pending_assign",
+        "待分配",
+        false
+      ],
+      [
+        "following",
+        "跟进中",
+        false
+      ],
+      [
+        "converted",
+        "已转化",
+        true
+      ],
+      [
+        "lost",
+        "已流失",
+        true
+      ]
+    ],
+    "transitions": [
+      [
+        "待分配",
+        "指派负责人",
+        "跟进中",
+        "销售"
+      ],
+      [
+        "跟进中",
+        "生成面授订单",
+        "已转化",
+        "系统"
+      ],
+      [
+        "跟进中",
+        "填写流失原因",
+        "已流失",
+        "销售"
+      ],
+      [
+        "已流失",
+        "重新激活（填原因）",
+        "跟进中",
+        "销售"
+      ]
+    ]
+  },
+  {
+    // CR-2026-038 §3.1：试听预约状态机（字典 §12.5），承载 crm/trials 与派生视图 crm/conversions。
+    "id": "SM-TRIAL",
+    "object": "试听预约",
+    "diagram": false,
+    "pages": [
+      "crm/trials",
+      "crm/conversions"
+    ],
+    "states": [
+      [
+        "pending_confirm",
+        "待确认",
+        false
+      ],
+      [
+        "confirmed",
+        "已确认",
+        false
+      ],
+      [
+        "attended",
+        "已试听",
+        true
+      ],
+      [
+        "cancelled",
+        "已取消",
+        true
+      ]
+    ],
+    "transitions": [
+      [
+        "待确认",
+        "确认时间并发送通知",
+        "已确认",
+        "课程顾问"
+      ],
+      [
+        "已确认",
+        "完成试听",
+        "已试听",
+        "课程顾问"
+      ],
+      [
+        "待确认/已确认",
+        "填写原因取消",
+        "已取消",
+        "课程顾问"
+      ]
+    ]
+  },
+  {
     "id": "SM-CLASS-DISPLAY",
     "object": "班级前台展示",
     "diagram": true,

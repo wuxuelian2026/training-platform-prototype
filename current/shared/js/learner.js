@@ -1038,10 +1038,19 @@ function renderOrders() {
 }
 // 关联卡片：只保留名称 + 一行关键信息 + 跳转按钮，课程与班级细节回到各自详情页。
 function orderAssociation(order, item, isClass) {
-  const isPaid = order.status === '已支付';
-  if (isClass) return { title: item.className || item.name, line: `${item.teacher}老师 · ${item.schedule || '上课时间以班级详情为准'}`, label: '查看班级', href: courseLink(item) };
-  if (isPaid) return { title: item.name, line: `${item.teacher}老师 · 共${item.hours}课时`, label: '进入学习', href: '/learner/pages/learning.html' };
-  return { title: item.name, line: `${item.teacher}老师 · 共${item.hours}课时`, label: '查看课程', href: `/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}` };
+  // CR-2026-026 §6.1：关联卡片按订单状态分流；面授与视频都按状态取目标，不固定指向班级详情。
+  const status = order.status;
+  if (isClass) {
+    const title = item.className || item.name;
+    const line = `${item.teacher}老师 · ${item.schedule || '上课时间以班级详情为准'}`;
+    if (status === '已支付') return { title, line, label: '查看班级', href: `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.id)}` };
+    if (status === '待支付' || status === '已取消') return { title, line, label: '去快速报名', href: `/learner/pages/fast-registration-detail.html?classId=${encodeURIComponent(item.id)}` };
+    // 已退款与退款中：报名已释放或正在释放，不再提供班级报名入口，只回课程详情。
+    return { title: item.courseName || item.name, line: `${item.teacher}老师 · ${item.professional || item.category || '面授课程'}`, label: '查看课程', href: `/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.courseId || item.id)}` };
+  }
+  const videoLine = `${item.teacher}老师 · 共${item.hours}课时`;
+  if (status === '已支付') return { title: item.name, line: videoLine, label: '进入学习', href: '/learner/pages/learning.html' };
+  return { title: item.name, line: videoLine, label: '查看课程', href: `/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}` };
 }
 // 状态 + 下一步指引（CR-2026-026 §3.4）
 function orderStatusGuidance(order, isClass) {

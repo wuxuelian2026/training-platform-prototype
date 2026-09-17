@@ -178,7 +178,7 @@ export const TEACHER_FIELD_SPEC = {
           { id: 'FD-TEACHER-068', label: '文件来源', type: '只读', length: '学校录入 / 本人上传 / 系统生成', required: '系统记录', note: '由 file_source_type 映射，只在文件层回答“这份文件是谁放进系统的”；教师端“我的证书”与后台来源列共用同一套文案，不与审核结果混用', constraints: { readOnly: true, system: true } },
           { id: 'FD-TEACHER-069', label: '文件来源筛选', type: '下拉', length: '全部 / 学校录入 / 本人上传 / 系统生成', required: '否', note: '后台证书列表按文件来源过滤，默认全部', constraints: { options: ['全部', '学校录入', '本人上传', '系统生成'] } },
           { id: 'FD-TEACHER-070', label: '证书编号', type: '文本', length: '≤ 40 字', required: '是', note: '同一教师下“证书类型 + 证书编号”唯一；两个录入入口保存前查重，命中不得静默创建第二条记录', constraints: { maxLength: 40, unique: '同一教师下 证书类型 + 证书编号' } },
-          { id: 'FD-TEACHER-071', label: '查看既有记录', type: '按钮', length: '—', required: '查重命中时展示', note: '查重提示内提供入口，直接定位到既有证书记录；教师端命中提示“该证书已存在”并引导到既有记录或对原记录重新上传', constraints: { action: true } }
+          { id: 'FD-TEACHER-071', label: '查看既有记录', type: '按钮', length: '—', required: '查重命中时展示', note: '查重比对范围是该教师已保存的全部证书记录；后台命中后定位到教师详情页「证书与账号」页签并高亮该条记录，教师端命中提示“该证书已存在”并引导到既有记录或对原记录重新上传', constraints: { action: true } },
         ] }
       ],
       notes: [
