@@ -10,9 +10,9 @@ export const bannerSeed = [
     name: '秋季艺术课程招生',
     position: '学员端首页',
     jumpType: '课程详情',
-    jumpTarget: '/learner/pages/courses.html',
-    startAt: '2026-09-01',
-    endAt: '2026-10-31',
+    targetId: 'COURSE-CR-2026-0001',
+    targetName: '舞蹈基本功',
+    jumpTarget: '/learner/pages/course-detail.html?courseId=COURSE-CR-2026-0001',
     sort: 1,
     status: '已启用',
     copy: { kicker: '秋季招生', title: '面授班级正在招生', text: '查看教师、校区、课时和剩余名额，选择合适的班级。', mark: '课' }
@@ -22,9 +22,9 @@ export const bannerSeed = [
     name: '声乐演唱技巧推荐',
     position: '学员端首页',
     jumpType: '商品详情',
-    jumpTarget: '/learner/pages/course-detail.html?course=声乐演唱技巧',
-    startAt: '',
-    endAt: '',
+    targetId: 'product-1',
+    targetName: '声乐演唱技巧',
+    jumpTarget: '/learner/pages/course-detail.html?courseId=COURSE-CR-2026-0002',
     sort: 2,
     status: '草稿',
     copy: { kicker: '本周精选', title: '让练习成为看得见的成长', text: '精选声乐、舞蹈和器乐课程，找到适合自己的学习节奏。', mark: '艺' }
@@ -33,10 +33,8 @@ export const bannerSeed = [
     id: 'banner-003',
     name: '视频课程随时学',
     position: '学员端首页',
-    jumpType: '课程库',
+    jumpType: '课程列表',
     jumpTarget: '/learner/pages/courses.html?type=video',
-    startAt: '',
-    endAt: '',
     sort: 3,
     status: '已启用',
     copy: { kicker: '视频课程', title: '随时打开一节好课', text: '支持断点续播，利用碎片时间完成你的艺术训练。', mark: '学' }
@@ -47,8 +45,6 @@ export const bannerSeed = [
     position: '学员端首页',
     jumpType: '名师列表',
     jumpTarget: '/learner/pages/teachers.html',
-    startAt: '',
-    endAt: '',
     sort: 4,
     status: '已启用',
     copy: { kicker: '名师推荐', title: '跟着好老师稳步进阶', text: '查看教师专业方向、教龄与已发布课程，按需选择。', mark: '师' }
@@ -72,6 +68,6 @@ export function resolveHomeBanners(shared) {
   return mergeBanners(shared)
     .filter((item) => item.status === '已启用')
     .sort((left, right) => Number(left.sort || 0) - Number(right.sort || 0))
-    .map((item) => item.copy)
+    .map((item) => ({ ...item.copy, jumpTarget: item.jumpTarget || '' }))
     .filter(Boolean);
 }

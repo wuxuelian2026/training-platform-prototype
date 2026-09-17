@@ -13,19 +13,17 @@ export const MALL_FIELD_SPEC = {
         { heading: '新增轮播图字段', fields: [
           { id: 'FD-MALL-012', label: '轮播图标题', type: '文本', length: '≤ 50 字', required: '否', note: '内部备注用标题，不在学员端展示', constraints: { maxLength: 50 } },
           { id: 'FD-MALL-013', label: '图片', type: '图片上传', length: '单个图片', required: '是', note: '建议尺寸 1242×414px', constraints: { maxFiles: 1, image: true } },
-          { id: 'FD-MALL-014', label: '跳转链接类型', type: '下拉', length: '无跳转 / 课程详情 / 教师详情', required: '否', note: '决定点击轮播图的跳转目标', constraints: { options: ['无跳转', '课程详情', '教师详情'] } },
-          { id: 'FD-MALL-015', label: '跳转参数', type: '文本', length: '≤ 100 字', required: '条件必填', note: '选择课程详情或教师详情时必填，如 courseId=123', constraints: { maxLength: 100, requiredWhen: 'FD-MALL-014!=无跳转' } },
+          { id: 'FD-MALL-014', label: '跳转链接类型', type: '下拉', length: '无跳转 / 课程详情 / 商品详情 / 课程列表 / 名师列表 / 教师详情', required: '否', note: '决定点击轮播图的跳转目标', constraints: { options: ['无跳转', '课程详情', '商品详情', '课程列表', '名师列表', '教师详情'] } },
+          { id: 'FD-MALL-015', label: '跳转对象', type: '对象选择器', length: '单个课程 / 商品 / 名师', required: '条件必填', note: '选择课程详情、商品详情或教师详情时，从对应对象中选择一项，目标地址由系统生成', constraints: { requiredWhen: 'FD-MALL-014=课程详情|商品详情|教师详情' } },
           { id: 'FD-MALL-016', label: '排序序号', type: '数字', length: '≥ 1 的整数', required: '否', note: '数字越小越靠前；上移下移后自动重算序号', constraints: { min: 1, integer: true } },
-          { id: 'FD-MALL-017', label: '有效期开始', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '否', note: '留空表示立即生效', constraints: { format: 'YYYY-MM-DD HH:mm' } },
-          { id: 'FD-MALL-018', label: '有效期结束', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '否', note: '留空表示长期有效；需晚于有效期开始', constraints: { format: 'YYYY-MM-DD HH:mm' } },
           { id: 'FD-MALL-019', label: '启用状态', type: '开关', length: '是 / 否', required: '是', note: '关闭后为草稿，学员端不展示' }
         ] }
       ],
       notes: [
-        '轮播图配置用于学员端首页展示，可设置跳转目标和展示时间。',
+        '轮播图配置用于学员端首页展示，可设置跳转目标、排序与启用状态。',
         '轮播图按排序序号升序展示，序号越小越靠前。',
-        '超出有效期的轮播图自动停止展示，不删除配置。',
-        '跳转链接类型为无跳转时，点击轮播图不产生跳转。'
+        '轮播图不设置有效期，是否展示只由启用状态决定。',
+        '跳转链接类型为无跳转时，点击轮播图不产生跳转；详情类型必须选择具体课程、商品或名师。'
       ]
     },
     // 试看与上下架口径以 CR-2026-004 为准：试看由商品配置决定，开启后只能播放第一课时；
