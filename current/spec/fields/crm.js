@@ -52,17 +52,20 @@ export const CRM_FIELD_SPEC = {
           { id: 'FD-CRM-016', label: '联系人', type: '文本', length: '2–30 字', required: '是', note: '线索联系人姓名', constraints: { minLength: 2, maxLength: 30 } },
           { id: 'FD-CRM-017', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '用于跟进与转化', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
           { id: 'FD-CRM-018', label: '意向课程', type: '文本', length: '≤ 50 字', required: '否', note: '记录意向方向，便于分配课程顾问', constraints: { maxLength: 50 } },
-          { id: 'FD-CRM-019', label: '来源类型', type: '下拉', length: '预置来源', required: '否', note: '记录线索来源渠道' }
+          { id: 'FD-CRM-019', label: '来源类型', type: '下拉', length: '线上咨询 / 后台登记 / 转介绍 / 活动', required: '否', note: '记录线索来源渠道；与试听登记使用同一套预置来源，不再出现“咨询／后台登记试听”两套写法', constraints: { options: ['线上咨询', '后台登记', '转介绍', '活动'] } }
         ] }
       ],
       notes: [
         '线索可继续流转为试听或直接报名，流转过程保留历史记录。',
-        '填写跟进后记录跟进时间、跟进人和跟进内容。'
+        '填写跟进后记录跟进时间、跟进人和跟进内容。',
+        'CR-2026-038：线索状态与试听状态由状态源统一登记，线索状态“已转化”与转化列表中该线索的“已报名”必须一致。',
+        'CR-2026-038：线索详情展示该线索名下的试听记录与报名结果，形成完整链条。'
       ]
     },
     'crm/trials': {
       groups: [
         { heading: '登记试听字段', fields: [
+          { id: 'FD-CRM-072', label: '来源线索编号', type: '下拉', length: '线索编号', required: '是', note: '试听记录必须关联来源线索；由线索发起试听登记时自动带入，直接登记试听时需选择来源线索', constraints: { dictionary: '线索' } },
           { id: 'FD-CRM-020', label: '学员姓名', type: '文本', length: '2–30 字', required: '是', note: '试听学员姓名', constraints: { minLength: 2, maxLength: 30 } },
           { id: 'FD-CRM-021', label: '家长手机号', type: '文本', length: '11 位数字', required: '是', note: '用于联系与后续转化', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
           { id: 'FD-CRM-022', label: '目标课程', type: '文本', length: '≤ 50 字', required: '否', note: '试听意向课程', constraints: { maxLength: 50 } },
@@ -71,12 +74,17 @@ export const CRM_FIELD_SPEC = {
           { id: 'FD-CRM-025', label: '试听教师', type: '下拉', length: '可选教师', required: '否', note: '需满足该专业可排课条件' },
           { id: 'FD-CRM-026', label: '学员年龄', type: '文本', length: '≤ 20 字', required: '否', note: '登记试听学员年龄，用于匹配合适班级', constraints: { maxLength: 20 } },
           { id: 'FD-CRM-027', label: '备注', type: '多行文本', length: '≤ 200 字', required: '否', note: '选填，记录试听安排或特殊说明', constraints: { maxLength: 200 } }
+        ] },
+        { heading: '试听来源字段', fields: [
+          { id: 'FD-CRM-073', label: '来源', type: '下拉', length: '线上咨询 / 后台登记 / 转介绍 / 活动', required: '否', note: '与线索来源类型共用同一套预置取值', constraints: { options: ['线上咨询', '后台登记', '转介绍', '活动'] } }
         ] }
       ],
       notes: [
         '试听登记后可确认试听并转为报名，流转过程保留记录。',
         '试听由课程顾问根据咨询线索登记，学员端不提供自主预约入口。',
-        '试听教师需满足该专业可排课条件；资质或合同不满足时不可安排。'
+        '试听教师需满足该专业可排课条件；资质或合同不满足时不可安排。',
+        'CR-2026-038：试听状态取值以状态源 `SM-TRIAL` 为准；同一试听记录在试听列表与报名转化列表的取值来自同一字段。',
+        'CR-2026-038：报名转化页是按线索派生的只读视图，不维护独立数据；其线索状态与试听状态引用 `SM-LEAD`／`SM-TRIAL`，不新增独立状态机。'
       ]
     }
   }
