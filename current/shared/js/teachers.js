@@ -689,7 +689,9 @@ function wizardStepContext() {
   const params = new URLSearchParams(location.search);
   const step = params.get('mode') === 'wizard' ? (params.get('step') || 'profile') : 'profile';
   const teacherId = params.get('teacher_id') || '';
-  if (params.get('tab') === 'certificate') {
+  // R49 后续修复：仅当未带 mode 参数时才把 tab=certificate 当作历史深链；
+  // 编辑态（mode=edit）带入的 tab=certificate 应归一为第 4 页签「账号」，不能被重定向到第二步。
+  if (!params.get('mode') && params.get('tab') === 'certificate') {
     const target = teacherId ? wizardCertificateLink(teacherId) : '/admin/pages/teachers/list.html';
     window.location.replace(relativePath(target));
     return { redirecting: true, step: 'profile', teacherId };
@@ -715,6 +717,9 @@ function renderWizardCertificateStep(teacherId) {
   // 第二步不重复展示主档必填字段，也不允许在第二步修改主档。
   document.querySelector('#teacher-form')?.setAttribute('hidden', '');
   document.querySelector('.teacher-tabbar')?.setAttribute('hidden', '');
+  const stepHeading = document.querySelector('#page-content .page-head h1');
+  if (stepHeading) stepHeading.textContent = '教师证书录入';
+  document.title = '师资中心 · 教师证书录入';
   const pageCopy = document.querySelector('#page-content .page-head p');
   if (pageCopy) pageCopy.textContent = '第一步已建档完成；第二步只录入该教师的证书，可跳过或稍后再进入，本步不修改主档信息。';
   container.hidden = false;
@@ -914,7 +919,23 @@ function initTeacherTabs(form, options = {}) {
   return { setTab, refreshBadges: () => refreshTeacherTabBadges(form, names, mode) };
 }
 
+// 编辑态上下文：页标题按 mode 取值；新增页第 4 页签已更名「账号」，
+// 详情页带入的 tab=certificate 需归一为 account，避免落回第一个页签或被当成历史深链。
+function applyCreateContextCopy() {
+  const params = new URLSearchParams(location.search);
+  const isEdit = params.get('mode') === 'edit';
+  if (isEdit && params.get('tab') === 'certificate') {
+    const url = new URL(location.href);
+    url.searchParams.set('tab', 'account');
+    history.replaceState(null, '', url);
+  }
+  const heading = document.querySelector('#page-content .page-head h1');
+  if (heading) heading.textContent = isEdit ? '编辑教师' : '新增教师';
+  document.title = isEdit ? '师资中心 · 编辑教师' : '师资中心 · 新增教师';
+}
+
 function initTeacherCreate() {
+  applyCreateContextCopy();
   const form = document.querySelector('#teacher-form');
   const teacherTabs = form ? initTeacherTabs(form) : { setTab: () => {}, refreshBadges: () => ({ missingTotal: 0 }) };
   mountRichEditor(form?.querySelector('[data-rich-editor]'));
@@ -1246,7 +1267,9 @@ function initProfile() {
   const editLink = document.querySelector('#teacher-profile-edit-link');
   if (editLink && facts) {
     const tab = profileTabs ? (new URLSearchParams(location.search).get('tab') || 'basic') : 'basic';
-    editLink.href = relativePath(`/admin/pages/teachers/create.html?mode=edit&teacher_id=${encodeURIComponent(facts.id)}&tab=${encodeURIComponent(tab)}`);
+    // 新增页第 4 页签为「账号」，证书页签进入编辑态时按「账号」带入，避免落到证书向导。
+    const editTab = tab === 'certificate' ? 'account' : tab;
+    editLink.href = relativePath(`/admin/pages/teachers/create.html?mode=edit&teacher_id=${encodeURIComponent(facts.id)}&tab=${encodeURIComponent(editTab)}`);
   }
   document.querySelectorAll('[data-profile-action]').forEach((button) => button.addEventListener('click', () => {
     const action = button.dataset.profileAction;
