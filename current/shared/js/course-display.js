@@ -147,6 +147,16 @@ export function courseArchiveFor(course) {
   return null;
 }
 
+// 商品、班级和订单按自身保存的版本读取课程属性；未传版本时才读取当前版本。
+export function courseArchiveVersionFor(course, version) {
+  const current = courseArchiveFor(course);
+  const requested = Number(version);
+  if (!current || !Number.isInteger(requested) || requested < 1) return current;
+  const entry = (current.versions || []).find((item) => Number(item.version) === requested);
+  if (!entry?.snapshot) return current;
+  return { ...current, ...entry.snapshot, version: requested, sourceCourseId: current.sourceCourseId, versions: current.versions };
+}
+
 // 运营四项是否已配置：售卖单元的课程封面配置后，二次发布默认只读带入。
 export function courseDisplayConfigured(unit) {
   return Boolean(unit && unit.cover && unit.cover !== COURSE_DISPLAY_UNSET);

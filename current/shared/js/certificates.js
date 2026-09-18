@@ -2,6 +2,7 @@ import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 import { sessionsFrom, teacherFactsById, teacherFactsByName } from './teacher-facts.js';
 import { certificateDedupKey, certificateSourceLabel } from './certificate-source.js';
 import { readDemoState } from './demo-store.js';
+import { DEMO_TODAY, demoDateTime } from './demo-clock.js';
 
 const table = document.querySelector('#certificates-table');
 const filterForm = document.querySelector('#certificate-filter');
@@ -63,7 +64,7 @@ rows.slice().sort((a, b) => a.dataset.expiry.localeCompare(b.dataset.expiry)).fo
 // 事实层视图：证书只在“适用专业”范围内参与资质校验；受影响课次 =
 // 证书到期之后、教师仍要上的、属于该适用专业的课次，用来提前发现换人或续证需求。
 function renderCertificateFactCells() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = DEMO_TODAY;
   rows.forEach((row) => {
     const facts = teacherFactsByName(row.dataset.teacher);
     const certificate = (facts?.certificates || []).find((item) => item.name === row.dataset.name);
@@ -444,8 +445,10 @@ function appendTeacherEnteredRows(teacherId, teacherName) {
   const entered = (readDemoState().teacherCertificates || []).filter((item) => item.teacherId === teacherId);
   if (!entered.length || !table || !rows.length) return;
   const template = rows[0];
-  const today = new Date().toISOString().slice(0, 10);
-  const soon = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const today = DEMO_TODAY;
+  const soonDate = demoDateTime(DEMO_TODAY);
+  soonDate.setDate(soonDate.getDate() + 30);
+  const soon = soonDate.toISOString().slice(0, 10);
   entered.forEach((item) => {
     const key = certificateDedupKey(item);
     const sameTeacher = (row) => row.dataset.teacher === teacherName;

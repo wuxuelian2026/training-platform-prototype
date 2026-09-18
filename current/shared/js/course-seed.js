@@ -138,6 +138,7 @@ function mockCourse(teacher, teacherIndex, itemIndex) {
   const sequence = 1001 + teacherIndex * 10 + itemIndex;
   const applicationId = `CR-2026-${String(sequence).padStart(4, '0')}`;
   const fromApprovedApplication = applicationStatuses[itemIndex] === '已通过';
+  const plannedHours = 8 + (itemIndex % 5) * 2;
   const status = courseArrangeStatuses[itemIndex];
   const course = {
     id: fromApprovedApplication ? courseIdForApplication(applicationId) : `COURSE-MOCK-${String(sequence).padStart(4, '0')}`,
@@ -148,14 +149,15 @@ function mockCourse(teacher, teacherIndex, itemIndex) {
     major: teacher.major,
     teacherId: teacher.id,
     teacher: teacher.name,
-    hours: 8 + (itemIndex % 5) * 2,
+    hours: status === '已完成' ? plannedHours : 0,
+    plannedHours,
     status,
     updatedAt: `${applicationDates[itemIndex]} ${String(10 + teacherIndex).padStart(2, '0')}:${String(12 + itemIndex * 3).padStart(2, '0')}`,
     difficulty: applicationDifficulties[itemIndex % applicationDifficulties.length],
     ages: [...applicationAges[itemIndex % applicationAges.length]],
     chapters: []
   };
-  course.chapters = mockCourseChapters(course, itemIndex);
+  course.chapters = mockCourseChapters({ ...course, hours: plannedHours }, itemIndex);
   return course;
 }
 

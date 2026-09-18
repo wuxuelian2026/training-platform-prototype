@@ -3,6 +3,8 @@
 // 输入是事实（teacher-facts.js）与请求上下文（专业／课程／课次日期／用途），
 // 输出是结论与可解释的原因。硬阻断用 blocks，提醒用 warnings。
 // 调用方只负责展示，不再自行复算规则。
+import { DEMO_TODAY } from './demo-clock.js';
+
 const DAY = 24 * 60 * 60 * 1000;
 const toTime = (iso) => (iso ? new Date(`${iso}T00:00:00`).getTime() : Number.POSITIVE_INFINITY);
 
@@ -69,7 +71,7 @@ export function explainTeacherCapacity(facts, request = {}) {
 
 // 视图层汇总：可授课专业数量、各专业资质结论、档案与账号问题。
 // 注意这里刻意不产出教师级“可排课”结论，排课结论只在具体（专业 × 日期）下成立。
-export function summarizeTeacherCapacity(facts, today = new Date().toISOString().slice(0, 10)) {
+export function summarizeTeacherCapacity(facts, today = DEMO_TODAY) {
   const majors = (facts?.majors || []).map((major) => {
     const certificate = validCertificateFor(facts, major, today);
     return {

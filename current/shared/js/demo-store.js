@@ -1,4 +1,5 @@
 import { toCanonicalCourseId } from './course-seed.js';
+import { DEMO_NOW } from './demo-clock.js';
 
 const STORAGE_KEY = 'hbyx-iteration1-demo-v1';
 // v2 (CR-2026-003 / I1-DEC-19): retire the legacy parallel course numbering; demo data restarts from seed.
@@ -176,9 +177,7 @@ export function demoId(prefix) {
 }
 
 export function demoTime() {
-  const now = new Date();
-  const pad = value => String(value).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  return DEMO_NOW;
 }
 
 export function upsertDemoRecord(collection, record) {

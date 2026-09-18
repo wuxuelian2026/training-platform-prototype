@@ -1,4 +1,5 @@
 import { readDemoState, upsertDemoRecord, videoRefundSettings } from './demo-store.js';
+import { DEMO_TODAY, demoDateTime } from './demo-clock.js';
 import { readAdminSession } from './admin-auth.js';
 
 const opsRoot = document.querySelector('[data-finance-page], [data-inventory-page]');
@@ -73,7 +74,7 @@ function videoRefundRuleFor(orderNo) {
   const watched = new Set([...(Array.isArray(progress.chapterDone) ? progress.chapterDone : []), ...Object.entries(progress.positions || {}).filter(([, seconds]) => Number(seconds) > 0).map(([id]) => id)]);
   const paidAt = order.paidAt || order.createdAt;
   const paidTime = paidAt ? new Date(String(paidAt).replace(' ', 'T')).getTime() : NaN;
-  const ageDays = Number.isFinite(paidTime) ? Math.max(0, (Date.now() - paidTime) / 86400000) : Infinity;
+  const ageDays = Number.isFinite(paidTime) ? Math.max(0, (demoDateTime(DEMO_TODAY).getTime() - paidTime) / 86400000) : Infinity;
   const watchedLessons = watched.filter(id => /^chapter-\d+$/.test(id)).length;
   return { eligible: Number.isFinite(paidTime) && ageDays <= config.windowDays && watchedLessons <= config.maxLessons, watchedLessons, ageDays, config, reason: !Number.isFinite(paidTime) || ageDays > config.windowDays ? `超过${config.windowDays}日退款期限` : watchedLessons > config.maxLessons ? `已观看${watchedLessons}课时，超过${config.maxLessons}课时上限` : '满足视频课程退款条件' };
 }

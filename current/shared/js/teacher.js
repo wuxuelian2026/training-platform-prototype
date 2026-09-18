@@ -5,6 +5,7 @@ import { toLocalDateString } from './date-utils.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
 import { demoId, demoTime, getCurrentAccountId, readDemoState, upsertDemoRecord, writeDemoState } from './demo-store.js';
+import { DEMO_TODAY } from './demo-clock.js';
 import { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } from './course-seed.js';
 import { courseAgesText } from './course-display.js';
 import { teacherFactsById } from './teacher-facts.js';
@@ -24,12 +25,12 @@ const teacherProfileDefaults = {
   highestEducation: '本科',
   teachingYears: '8',
   professionalTitle: '副教授',
-  mobile: '13800138026',
+  mobile: '138****2026',
   email: 'wangyue@hbyx.edu.cn',
   emergencyName: '王明远',
-  emergencyMobile: '13900139018',
+  emergencyMobile: '139****9018',
   payeeName: '王玥',
-  bankCard: '6217003810022866',
+  bankCard: '6217 **** **** 2866',
   bankName: '中国建设银行武汉光谷支行',
   carPlate: '鄂A·9X2R6',
   education: '2010.09-2014.06，湖北艺术学院舞蹈表演专业，本科。',
@@ -148,7 +149,7 @@ const scheduleDays = [
   ] },
   { key: '09-13', weekday: '日', date: '13', label: '9月13日 周日', lessons: [] }
 ];
-const calendarToday = '2026-09-12';
+const calendarToday = DEMO_TODAY;
 let selectedScheduleDay = calendarToday;
 let calendarYear = 2026;
 let calendarMonth = 8;
@@ -850,7 +851,7 @@ function certificateValidityTone(validity) {
 }
 function calculateCertificateValidity(expiresAt) {
   if (!expiresAt) return '有效';
-  const remainingDays = Math.ceil((new Date(`${expiresAt}T00:00:00`) - new Date('2026-09-10T00:00:00')) / 86400000);
+  const remainingDays = Math.ceil((new Date(`${expiresAt}T00:00:00`) - new Date(`${DEMO_TODAY}T00:00:00`)) / 86400000);
   if (remainingDays < 0) return '已过期';
   return remainingDays <= 60 ? '即将过期' : '有效';
 }
@@ -970,7 +971,7 @@ function contractStatusTone(status) {
 }
 
 // 合同期限状态按字典 §4.2 由起止日期派生（有效／即将到期／已到期），不写进签署状态字段。
-function contractTermStatusOf(contract, today = new Date().toISOString().slice(0, 10)) {
+function contractTermStatusOf(contract, today = DEMO_TODAY) {
   if (!contract?.endAt) return '有效';
   if (contract.endAt < today) return '已到期';
   if (contract.startAt && contract.startAt > today) return '有效';

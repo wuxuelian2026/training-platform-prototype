@@ -13,10 +13,10 @@ export const TEACHER_FACTS = [
     // CR-2026-045：后台建档档案字段（详情页 28 项非子表字段的取值来源）。
     archive: {
       employeeNo: 'JS20260901', personnelType: '签约', gender: '女', birthMonth: '1988-06',
-      idCard: '420106198806152826', politicalStatus: '中共党员', ethnicity: '汉族', highestEducation: '本科',
-      carPlate: '鄂A·8K209', mobile: '13800002026', email: 'wangyue@hbyx.edu.cn',
-      emergencyName: '王建国', emergencyMobile: '13900008812',
-      payeeName: '王玥', bankCard: '6222020200112233445', bankName: '中国工商银行',
+      idCard: '4201********2826', politicalStatus: '中共党员', ethnicity: '汉族', highestEducation: '本科',
+      carPlate: '鄂A·8K209', mobile: '138****2026', email: 'wangyue@hbyx.edu.cn',
+      emergencyName: '王建国', emergencyMobile: '139****8812',
+      payeeName: '王玥', bankCard: '6222 **** **** 3445', bankName: '中国工商银行',
       education: '2006-2010 湖北艺术职业学院 舞蹈表演 本科', employment: '2010-2016 湖北省歌舞剧院 演员；2016 至今 湖北艺术职业学院 舞蹈教师',
       awards: '2024年湖北省职业院校技能大赛优秀指导教师。',
       remark: '2026 秋季学期承担少儿中国舞基础班教学。'
@@ -39,10 +39,10 @@ export const TEACHER_FACTS = [
     teachingYears: 5, professionalTitle: '讲师',
     archive: {
       employeeNo: 'JS20260902', personnelType: '外聘', gender: '男', birthMonth: '1992-03',
-      idCard: '420106199203074519', politicalStatus: '群众', ethnicity: '汉族', highestEducation: '硕士研究生',
-      carPlate: '', mobile: '13800002027', email: 'chenchen@hbyx.edu.cn',
-      emergencyName: '陈立', emergencyMobile: '13900008813',
-      payeeName: '陈晨', bankCard: '6222020200112233450', bankName: '中国建设银行',
+      idCard: '4201********4519', politicalStatus: '群众', ethnicity: '汉族', highestEducation: '硕士研究生',
+      carPlate: '', mobile: '138****2027', email: 'chenchen@hbyx.edu.cn',
+      emergencyName: '陈立', emergencyMobile: '139****8813',
+      payeeName: '陈晨', bankCard: '6222 **** **** 3450', bankName: '中国建设银行',
       education: '2011-2015 武汉音乐学院 声乐表演 本科；2015-2018 武汉音乐学院 声乐教学 硕士研究生',
       employment: '2018 至今 湖北艺术职业学院 声乐教师',
       awards: '', remark: '外聘教师，按课次结算。'

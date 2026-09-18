@@ -5,16 +5,18 @@ import { demoId, demoTime, readDemoState, upsertDemoRecord, writeDemoState } fro
 import { readXlsxSheetRows } from './xlsx-lite.js';
 import { toLocalDateString } from './date-utils.js';
 import { teacherFactsById } from './teacher-facts.js';
+import { classSeed } from './class-seed.js';
 import { certificateDedupKey, findDuplicateCertificate } from './certificate-source.js';
 import { permissionsOfRole } from './permissions.js';
 import { TEACHER_PROFILE_EDITABLE_FIELDS, TEACHER_PROFILE_LABELS, teacherProfileMask } from './teacher-profile-fields.js';
 import { explainTeacherCapacity, summarizeTeacherCapacity } from './teacher-capacity.js';
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
+import { DEMO_TODAY } from './demo-clock.js';
 
 const teacherRoot = document.querySelector('[data-teacher-page]');
 const teacherPage = teacherRoot?.dataset.teacherPage;
 // CR-2026-046 §4：合同域期限派生使用固定演示基准日，与教师端课表 `2026-09-12` 一致，避免 Mock 随时间漂移。
-const CONTRACT_DEMO_TODAY = '2026-09-12';
+const CONTRACT_DEMO_TODAY = DEMO_TODAY;
 let activeTeacherRow = null;
 let activeContractRow = null;
 let toastTimer;
@@ -72,7 +74,7 @@ function confirmTeacherAction(row, action) {
     const needDate = action === 'resign';
     dateField.hidden = !needDate;
     dateInput.required = needDate;
-    if (needDate) dateInput.value = new Date().toISOString().slice(0, 10);
+    if (needDate) dateInput.value = DEMO_TODAY;
   }
   openDialog('teacher-action-dialog');
 }
@@ -86,7 +88,7 @@ function updateTeacherRow(row, action) {
     row.dataset.accountStatus = 'active';
   }
   if (action === 'resign') {
-    row.dataset.departedAt = String(document.querySelector('#teacher-action-date')?.value || '').trim() || new Date().toISOString().slice(0, 10);
+    row.dataset.departedAt = String(document.querySelector('#teacher-action-date')?.value || '').trim() || DEMO_TODAY;
   }
   renderTeacherCapability(row);
   renderTeacherActions(row, actionCell);
@@ -1444,18 +1446,23 @@ function renderProfileCapacity() {
   const summary = summarizeTeacherCapacity(facts);
   const apply = explainTeacherCapacity(facts, { purpose: 'apply' });
   const withoutCertificate = summary.majors.filter((item) => !item.qualified).map((item) => item.major);
+  const arrangeRows = summary.majors.map((item) => {
+    const sample = classSeed.find((row) => row.teacher === facts.name && row.professional === item.major) || classSeed.find((row) => row.professional === item.major);
+    const result = explainTeacherCapacity(facts, { purpose: 'arrange', major: item.major, course: sample?.courseName || sample?.course || '', date: sample?.firstLessonDate || DEMO_TODAY });
+    return `${item.major}（${sample?.courseName || sample?.course || '示例课程'} · ${sample?.firstLessonDate || DEMO_TODAY}）：${result.status === 'available' ? '可排课' : `不可排课，${result.reasons.join('；')}`}`;
+  }).join('；');
   const reasonRows = [
     ...apply.blocks.map((block) => `<div><span class="tag red">阻断</span><p>${block.text}</p></div>`),
     ...(withoutCertificate.length ? [`<div><span class="tag amber">排课提醒</span><p>${withoutCertificate.join('、')} 暂无有效资质，不影响申报，但发布与排课会按专业和课次日期校验。</p></div>`] : [])
   ].join('');
-  container.innerHTML = `<div><span class="tag ${apply.status === 'available' ? 'brand' : 'gray'}">${apply.status === 'available' ? '可申报' : '暂不可申报'}</span><p>${apply.status === 'available' ? '资料已建档、离职日期为空（在职）、账号正常，且已配置授课专业。' : apply.reasons.join('；')}</p></div>${reasonRows}<div><span class="tag brand">授课专业 ${summary.majorCount} 个</span><p>${summary.majors.map((item) => `${item.major}：${item.qualified ? '有有效资质' : '缺有效资质'}`).join('；')}。</p></div>`;
+  container.innerHTML = `<div><span class="tag ${apply.status === 'available' ? 'brand' : 'gray'}">${apply.status === 'available' ? '可申报' : '暂不可申报'}</span><p>${apply.status === 'available' ? '资料已建档、离职日期为空（在职）、账号正常，且已配置授课专业。' : apply.reasons.join('；')}</p></div>${reasonRows}<div><span class="tag brand">授课专业 ${summary.majorCount} 个</span><p>${summary.majors.map((item) => `${item.major}：${item.qualified ? '有有效资质' : '缺有效资质'}`).join('；')}。</p></div><div><span class="tag ${arrangeRows.includes('不可排课') ? 'amber' : 'green'}">排课判定</span><p>${arrangeRows || '暂无授课专业，无法计算排课判定。'}</p><small>按具体专业、课程和课次日期重算；可申报与可排课不是同一结论。</small></div>`;
   const departedStatus = document.querySelector('#teacher-departed-status');
   const departedNote = document.querySelector('#teacher-departed-note');
   if (departedStatus) departedStatus.textContent = facts.departedAt ? `离职 · ${facts.departedAt}` : '在职';
   if (departedNote) departedNote.textContent = facts.departedAt ? '离职后禁止登录与新增未来排课，历史记录保留。' : '离职日期为空即在职。';
   const summaryResult = document.querySelector('.teacher-summary-result');
   if (summaryResult) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = DEMO_TODAY;
     const certificates = teacherCertificateRecords(facts.id);
     const usable = certificates.filter((item) => item.status === '已通过' && (!item.expiresAt || item.expiresAt >= today)).length;
     const pending = certificates.length - usable;
