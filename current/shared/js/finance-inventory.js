@@ -1,4 +1,4 @@
-import { readDemoState, upsertDemoRecord, videoRefundSettings } from './demo-store.js';
+import { readDemoState, transitionVideoEntitlement, upsertDemoRecord, videoRefundSettings } from './demo-store.js';
 import { DEMO_TODAY, demoDateTime } from './demo-clock.js';
 import { readAdminSession } from './admin-auth.js';
 
@@ -100,6 +100,8 @@ function syncOrderAfterOfflineRefund(orderNo, orderType) {
   if (orderType === '视频课程') {
     order.fulfillment = '学习权限：已回收';
     order.fulfillmentDetail = { ...(order.fulfillmentDetail || {}), 退款处理: '线上收款已线下退回，学习权限已回收，学习记录保留' };
+    // 字典 SM-VIDEO-ENTITLEMENT：线下登记退款直接完成，学习授权置已失效并留痕，记录保留可追溯。
+    transitionVideoEntitlement(order.accountId, order.courseId, '已失效', { reason: '线下登记退款完成，学习授权已失效', operator: readAdminSession()?.name || '系统', orderId: order.id });
   } else {
     order.fulfillment = '已取消（退款释放名额）';
     order.fulfillmentDetail = { ...(order.fulfillmentDetail || {}), 报名结果: '已取消报名并释放名额' };

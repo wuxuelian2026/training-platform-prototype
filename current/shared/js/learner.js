@@ -4,7 +4,7 @@ import { mountPageHelp } from './page-help.js';
 import { toLocalDateTimeString, toLocalMonthString } from './date-utils.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
-import { accountStudents, demoId, demoTime, getCurrentAccountId, readDemoState, subscribeDemoState, upsertDemoRecord, updateDemoRecord, videoRefundSettings, writeDemoState } from './demo-store.js';
+import { accountStudents, demoId, demoTime, getCurrentAccountId, readDemoState, subscribeDemoState, transitionVideoEntitlement, upsertDemoRecord, updateDemoRecord, videoRefundSettings, writeDemoState } from './demo-store.js';
 import { DEMO_TODAY, demoDateTime } from './demo-clock.js';
 import { classSeed } from './class-seed.js';
 import { resolveHomeBanners } from './banner-seed.js';
@@ -900,6 +900,36 @@ function videoRefundEligibility(order, item) {
   if (watchedLessons > config.maxLessons) return { eligible: false, watchedLessons, ageDays, config, reason: `已观看${watchedLessons}课时，超过最多${config.maxLessons}课时的退款条件。` };
   return { eligible: true, watchedLessons, ageDays, config, reason: `购课${Math.floor(ageDays)}日，已观看${watchedLessons}课时，可申请全额退款。` };
 }
+// 视频退款的状态迁移同时驱动学习授权（字典 SM-VIDEO-ENTITLEMENT）：
+// 申请退款即冻结，失败或超时解冻，退款完成置已失效。
+function syncVideoEntitlementForRefund(order, item, nextStatus, reason) {
+  if (!order || item?.type !== 'video') return false;
+  return transitionVideoEntitlement(order.accountId || state.accountId, order.courseId || item.id, nextStatus, {
+    reason,
+    orderId: order.id,
+    refundKey: order.refundBusinessKey || `video_refund:${order.paymentRecordId || order.id}`
+  });
+}
+// 学员端申请退款：列表与详情共用同一入口；视频订单在进入「退款中」的同时冻结学习授权。
+function applyRefundApplication(orderId) {
+  const order = state.orders.find(row => row.id === orderId);
+  const item = order ? orderCourse(order) : null;
+  const eligibility = item && item.type === 'video' ? videoRefundEligibility(order, item) : { eligible: Boolean(order?.status === '已支付') };
+  if (!order || !eligibility.eligible) { toast(eligibility.reason || '当前订单不满足退款条件', 'error'); return false; }
+  order.status = '退款中';
+  order.refundAt = order.refundAt || demoTime();
+  order.refundStatus = order.refundStatus || '待审核';
+  order.refundNo = order.refundNo || `RF-${order.id}`;
+  order.refundAmount = Number(order.amount || 0);
+  order.refundMethod = order.refundMethod || '微信支付原路退回';
+  order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日';
+  order.refundReason = order.refundReason || (item.type === 'video' ? `视频课程退款：购课${Math.floor(eligibility.ageDays || 0)}日，已观看${eligibility.watchedLessons}课时` : '用户申请退款');
+  order.refundBusinessKey = order.refundBusinessKey || `${item.type === 'video' ? 'video' : 'class'}_refund:${order.paymentRecordId || order.id}`;
+  syncVideoEntitlementForRefund(order, item, '冻结', '视频退款审核期间学习授权冻结');
+  upsertDemoRecord('orders', order);
+  saveState();
+  return true;
+}
 function isPaymentResumable(order) { return !order || ['待支付', '已取消'].includes(order.status); }
 function studentEnrolledCount(shared, classId) {
   return (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.classId === classId && item.status === '已分班').length;
@@ -986,7 +1016,10 @@ function renderPayment() {
           const baseline = sharedRow ? Number(sharedRow.enrolled || 0) : Math.max(0, Number(item.seats?.split('/')[1] || 0) - Number(item.seats?.split('/')[0] || 0));
           upsertDemoRecord('classes', { ...sourceClass, courseId: sourceClass.courseId || item.id, course: sourceClass.course || item.courseName || item.name, batch: sourceClass.batch || item.season, status: sourceClass.status || item.classStatus || '招生中', display: sourceClass.display || '已展示', fast: sourceClass.fast || '否', archive: sourceClass.archive || '轻量课程档案', professional: item.professional || sourceClass.professional, age: item.age || sourceClass.age, capacity, enrolled: Math.min(capacity, baseline + 1) });
         }
-      } else upsertDemoRecord('videoEntitlements', { id: `${state.accountId}-${item.id}`, accountId: state.accountId, courseId: item.id, courseVersion: patch.snapshot.courseVersion, snapshot: patch.snapshot, status: '生效', grantedAt: now });
+      } else {
+        // 重新购买按新授权起算：显式清空上一次冻结或失效的留痕，避免旧记录污染本次授权。
+        upsertDemoRecord('videoEntitlements', { id: `${state.accountId}-${item.id}`, accountId: state.accountId, courseId: item.id, courseVersion: patch.snapshot.courseVersion, snapshot: patch.snapshot, status: '生效', grantedAt: now, updatedAt: now, frozenAt: '', frozenReason: '', freezeRefundKey: '', restoredAt: '', restoreReason: '', invalidatedAt: '', invalidReason: '', invalidatedBy: '', invalidOrderId: '' });
+      }
     } else {
       patch.status = '已取消'; patch.paidAt = ''; patch.paymentReason = outcome === 'timeout' ? '支付超时，订单已关闭' : '用户主动取消支付'; patch.cancelType = outcome === 'timeout' ? 'timeout' : 'cancel'; upsertDemoRecord('orders', patch);
     }
@@ -1100,7 +1133,7 @@ function renderOrders() {
       }).join('');
     }
     list.querySelectorAll('[data-order-action="pay"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); go(`/learner/pages/payment.html?${order?.classId ? `classId=${encodeURIComponent(order.classId)}` : `courseId=${encodeURIComponent(node.dataset.courseId)}`}&orderId=${encodeURIComponent(node.dataset.orderId)}`); }));
-    list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); const item = order ? orderCourse(order) : null; const eligibility = item && item.type === 'video' ? videoRefundEligibility(order, item) : { eligible: Boolean(order?.status === '已支付') }; if (!order || !eligibility.eligible) { toast(eligibility.reason || '当前订单不满足退款条件', 'error'); return; } order.status = '退款中'; order.refundAt = order.refundAt || demoTime(); order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.amount || 0); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || (item.type === 'video' ? `视频课程退款：购课${Math.floor(eligibility.ageDays || 0)}日，已观看${eligibility.watchedLessons}课时` : '用户申请退款'); order.refundBusinessKey = order.refundBusinessKey || `${item.type === 'video' ? 'video' : 'class'}_refund:${order.paymentRecordId || order.id}`; upsertDemoRecord('orders', order); saveState(); draw(); toast('退款申请已提交，等待后台审核'); }));
+    list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => { if (applyRefundApplication(node.dataset.orderId)) { draw(); toast('退款申请已提交，等待后台审核'); } }));
   };
   document.querySelectorAll('[data-order-tab]').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('[data-order-tab]').forEach(item => item.classList.remove('active')); tab.classList.add('active'); draw(); }));
   draw();
@@ -1471,15 +1504,14 @@ document.addEventListener('click', event => {
   order.status = success ? '已退款' : '退款中';
   order.refundedAt = success ? demoTime() : '';
   order.paymentReason = success
-    ? `${item.type === 'video' ? '视频课程退款' : '退款渠道'}成功回调，退款已完成；${item.type === 'video' ? '学习权限已回收，学习记录与订单凭证保留。' : '未生成报名和分班，未增加人数。'}`
-    : '退款渠道失败或超时，订单保持退款中，已按同一业务键重试；学习权限与历史记录保持当前状态。';
+    ? `${item.type === 'video' ? '视频课程退款' : '退款渠道'}成功回调，退款已完成；${item.type === 'video' ? '学习授权已置为已失效并留痕，学习记录与订单凭证保留。' : '未生成报名和分班，未增加人数。'}`
+    : '退款渠道失败或超时，订单保持退款中，已按同一业务键重试；学习授权已解冻恢复生效。';
   upsertDemoRecord('orders', order);
-  if (success && item.type === 'video') {
-    writeDemoState(next => { next.videoEntitlements = (next.videoEntitlements || []).filter(entitlement => !(entitlement.accountId === state.accountId && entitlement.courseId === order.courseId)); return next; });
-  }
+  // 字典 SM-VIDEO-ENTITLEMENT：成功置已失效并留痕，失败或超时解冻恢复生效；两种路径都保留授权记录。
+  syncVideoEntitlementForRefund(order, item, success ? '已失效' : '生效', success ? '视频退款完成，学习授权已失效' : '退款失败或超时，学习授权解冻恢复生效');
   saveState();
   renderOrderDetail();
-  toast(success ? '退款成功回调已确认，学习权限已回收' : '退款失败或超时，订单保持退款中，可按原业务键重试');
+  toast(success ? '退款成功回调已确认，学习授权已失效' : '退款失败或超时，订单保持退款中，学习授权已解冻，可按原业务键重试');
 });
 document.addEventListener('click', event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
@@ -1508,12 +1540,8 @@ document.addEventListener('click', event => {
   if (action === 'switch-student') switchStudent();
   if (action === 'copy-order-no') { const orderNo = event.target.closest('[data-order-no]')?.dataset.orderNo || ''; if (orderNo) copyOrderNo(orderNo); }
   if (action === 'refund') {
-    const orderId = event.target.closest('[data-order-id]')?.dataset.orderId;
-    const order = state.orders.find(row => row.id === orderId);
-    const item = order ? orderCourse(order) : null;
-    const eligibility = item && item.type === 'video' ? videoRefundEligibility(order, item) : { eligible: Boolean(order?.status === '已支付') };
-    if (!order || !eligibility.eligible) { toast(eligibility.reason || '当前订单不满足退款条件', 'error'); return; }
-    order.status = '退款中'; order.refundAt = order.refundAt || demoTime(); order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.amount || 0); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || (item.type === 'video' ? `视频课程退款：购课${Math.floor(eligibility.ageDays || 0)}日，已观看${eligibility.watchedLessons}课时` : '用户申请退款'); order.refundBusinessKey = order.refundBusinessKey || `${item.type === 'video' ? 'video' : 'class'}_refund:${order.paymentRecordId || order.id}`; upsertDemoRecord('orders', order); saveState(); renderOrderDetail();
+    if (!applyRefundApplication(event.target.closest('[data-order-id]')?.dataset.orderId)) return;
+    renderOrderDetail();
     toast('退款申请已提交，等待后台审核');
   }
 });

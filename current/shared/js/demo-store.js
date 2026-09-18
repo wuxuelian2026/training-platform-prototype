@@ -208,6 +208,45 @@ export function removeDemoRecord(collection, id) {
   });
 }
 
+// 视频学习授权状态迁移，对应字典 SM-VIDEO-ENTITLEMENT：
+// 退款审核期间「冻结」，退款失败或超时「解冻」（回到生效），退款完成置「已失效」。
+// 记录一律保留并写入时间、原因与来源单号，用于按订单凭证追溯；不删除历史授权。
+export function transitionVideoEntitlement(accountId, courseId, nextStatus, meta = {}) {
+  if (!accountId || !courseId || !nextStatus) return false;
+  let hit = false;
+  writeDemoState(next => {
+    const rows = Array.isArray(next.videoEntitlements) ? next.videoEntitlements : [];
+    const target = rows.find(item => item.accountId === accountId && item.courseId === courseId);
+    if (!target) return next;
+    hit = true;
+    const at = meta.at || demoTime();
+    target.status = nextStatus;
+    target.updatedAt = at;
+    if (nextStatus === '冻结') {
+      target.frozenAt = at;
+      target.frozenReason = meta.reason || '';
+      target.freezeRefundKey = meta.refundKey || '';
+    } else if (nextStatus === '生效') {
+      target.restoredAt = at;
+      target.restoreReason = meta.reason || '';
+      target.frozenAt = '';
+      target.frozenReason = '';
+      target.freezeRefundKey = '';
+    } else if (nextStatus === '已失效') {
+      target.invalidatedAt = at;
+      target.invalidReason = meta.reason || '';
+      target.invalidatedBy = meta.operator || '系统';
+      target.invalidOrderId = meta.orderId || '';
+      target.frozenAt = '';
+      target.frozenReason = '';
+      target.freezeRefundKey = '';
+    }
+    next.videoEntitlements = rows;
+    return next;
+  });
+  return hit;
+}
+
 export function resetDemoData() {
   // I1-DEF-008: 学员端 keeps its own per-tab demo cache, so "恢复初始数据" has to clear it as well or a
   // reset browser would still merge stale course and order copies back in.
