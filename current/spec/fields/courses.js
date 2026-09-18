@@ -70,6 +70,8 @@ export const COURSE_FIELD_SPEC = {
           { id: 'FD-COURSE-006', label: '审批意见', type: '多行文本', length: '≤ 500 字', required: '驳回时必填', note: '填写后同步给申报人', constraints: { maxLength: 500 } },
           { id: 'FD-COURSE-051', label: '审批人', type: '只读', length: '—', required: '系统记录', note: '提交审批结论时写入当前操作人，展示在「最近一次审核意见」', constraints: { readOnly: true, system: true } },
           { id: 'FD-COURSE-052', label: '审批时间', type: '只读', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '提交审批结论时写入，与审批人同源展示', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-071', label: '上一轮审核意见', type: '只读', length: '≤ 500 字', required: '重提且存在上一轮意见时展示', note: '展示最近一轮审批意见、审批人与审批时间；重提后仍保留，不提供历史意见时间线', constraints: { readOnly: true, maxLength: 500 } },
+          { id: 'FD-COURSE-072', label: '附件预览', type: '按钮', length: '—', required: '存在附件时展示', note: '展示文件名并打开原型预览说明；原型阶段不上传真实文件', constraints: { action: true } },
           { id: 'FD-COURSE-070', label: '提交与返回操作条', type: '按钮组', length: '—', required: '是', note: '页面底部常驻操作条，滚动时保持可见；只读模式只保留「返回列表」，审批模式提供「提交审批」与「返回列表」', constraints: { action: true } }
         ] }
       ],
@@ -81,7 +83,8 @@ export const COURSE_FIELD_SPEC = {
         'CR-2026-034：通过后当场给出“查看该课程编排”入口，跳转课程库内容编排视图并定位到该课程，不必回列表再检索。',
         'CR-2026-049：查看与审批合并为本页唯一入口，列表「查看／审批」按钮取值由申报状态与权限决定，两者指向同一地址；原「课程申报详情」弹窗与列表内审批分支已下线。',
         'CR-2026-049：页面模式由申报状态与权限决定，不由 URL 参数决定，不新增 mode 一类展示开关；深链参数 application_id、id、return 保持不变。',
-        'CR-2026-049：审批结论区排在内容区之后；只读模式说明不可审批原因。不提供历史审核意见时间线、批量审批与附件在线预览。'
+        'CR-2026-049：审批结论区排在内容区之后；只读模式说明不可审批原因。不提供历史审核意见时间线与批量审批。',
+        'CR-2026-051：重提后存在上一轮意见时显示「上一轮审核意见」；附件存在时提供预览说明，原型仅记录文件名。'
       ]
     },
     'courses/resources': {

@@ -432,7 +432,7 @@ function renderApplicationCreate() {
   const teacherProfile = currentTeacher();
   const source = requestedId ? currentApplication() : { id: '', name: '', professional: teacherProfile.professional, type: '面授课程', hours: 16, intro: '', file: '' };
   const editing = Boolean(requestedId);
-  tLayout(tStack(`<section class="teacher-application-detail-head"><div>${tPill(editing ? '编辑中' : '新申报')}<h2>${editing ? '编辑课程申报' : '发起课程申报'}</h2><p>教师资料由系统自动带入，课程信息请完整填写。</p></div></section>`, `<section class="teacher-application-form"><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>系统带入</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(teacherProfile.name)}</strong></div><div><span>教师工号</span><strong>${tEsc(teacherProfile.no)}</strong></div><div><span>教学单位</span><strong>${tEsc(teacherProfile.unit)}</strong></div><div><span>专业方向</span><strong>${tEsc(teacherProfile.professional)}</strong></div><div><span>职称</span><strong>${tEsc(teacherProfile.title)}</strong></div></div></div><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>申报内容</h3><span>带 * 为必填</span></div><div class="mp-form"><div class="mp-field"><label for="application-name">课程名称 <b>*</b></label><input id="application-name" value="${tEsc(source.name)}" maxlength="100" placeholder="请输入课程名称"></div><div class="mp-field"><label>所属专业 <b>*</b><small>按门类、分类、专业逐级选择</small></label><div class="teacher-professional-cascade"><select id="application-discipline" aria-label="专业门类"><option>艺术学</option><option>教育学</option></select><select id="application-category" aria-label="专业分类"><option>舞蹈类</option><option>音乐类</option></select><select id="application-professional" aria-label="专业">${[...new Set([teacherProfile.professional, '舞蹈表演', '音乐表演', '音乐学'])].map(name => `<option ${source.professional === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div></div><div class="mp-field"><label>课程类型 <b>*</b></label><div class="teacher-radio-row"><label><input type="radio" name="application-type" value="面授课程" ${source.type === '面授课程' ? 'checked' : ''}>面授课程</label><label><input type="radio" name="application-type" value="视频课程" ${source.type === '视频课程' ? 'checked' : ''}>视频课程</label></div></div><div class="mp-field" id="application-hours-field"><label for="application-hours">总课时 <b>*</b><small>面授课程用于生成课次和工资统计</small></label><input id="application-hours" type="number" min="1" value="${tEsc(source.hours || 16)}" placeholder="请输入总课时"></div><div class="mp-field"><label for="application-difficulty">难度等级 <b>*</b><small>学员端卡片与筛选按此展示</small></label><select id="application-difficulty"><option value="">请选择难度等级</option>${['启蒙', '初级', '中级', '高级', '考级冲刺'].map(value => `<option ${source.difficulty === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div><div class="mp-field"><label>适合年龄 <b>*</b><small>可多选</small></label><div class="teacher-radio-row">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label><input type="checkbox" name="application-age" value="${value}" ${(source.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div><div class="mp-field"><label for="application-intro">课程简介</label><textarea id="application-intro" placeholder="补充课程目标、教学内容和适合人群">${tEsc(source.intro)}</textarea></div><div class="mp-field"><label for="application-file">附加材料</label><button type="button" class="teacher-upload-placeholder" id="application-file">＋ ${source.file ? tEsc(source.file) : '上传教学计划'} <span>可选</span></button></div></div></div><div class="teacher-application-form-actions"><a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">取消</a>${tButton('提交审核', 'data-application-form-action="submit"')}</div></section>`));
+  tLayout(tStack(`<section class="teacher-application-detail-head"><div>${tPill(editing ? '编辑中' : '新申报')}<h2>${editing ? '编辑课程申报' : '发起课程申报'}</h2><p>教师资料由系统自动带入，课程信息请完整填写。</p></div></section>`, `<section class="teacher-application-form"><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>系统带入</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(teacherProfile.name)}</strong></div><div><span>教师工号</span><strong>${tEsc(teacherProfile.no)}</strong></div><div><span>教学单位</span><strong>${tEsc(teacherProfile.unit)}</strong></div><div><span>专业方向</span><strong>${tEsc(teacherProfile.professional)}</strong></div><div><span>职称</span><strong>${tEsc(teacherProfile.title)}</strong></div></div></div><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>申报内容</h3><span>带 * 为必填</span></div><div class="mp-form"><div class="mp-field"><label for="application-name">课程名称 <b>*</b></label><input id="application-name" value="${tEsc(source.name)}" maxlength="100" placeholder="请输入课程名称"></div><div class="mp-field"><label>所属专业 <b>*</b><small>按门类、分类、专业逐级选择</small></label><div class="teacher-professional-cascade"><select id="application-discipline" aria-label="专业门类"><option>艺术学</option><option>教育学</option></select><select id="application-category" aria-label="专业分类"><option>舞蹈类</option><option>音乐类</option></select><select id="application-professional" aria-label="专业">${[...new Set([teacherProfile.professional, '舞蹈表演', '音乐表演', '音乐学'])].map(name => `<option ${source.professional === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div></div><div class="mp-field"><label>课程类型 <b>*</b></label><div class="teacher-radio-row"><label><input type="radio" name="application-type" value="面授课程" ${source.type === '面授课程' ? 'checked' : ''}>面授课程</label><label><input type="radio" name="application-type" value="视频课程" ${source.type === '视频课程' ? 'checked' : ''}>视频课程</label></div></div><div class="mp-field" id="application-hours-field"><label for="application-hours">总课时 <b>*</b><small>面授课程用于生成课次和工资统计</small></label><input id="application-hours" type="number" min="1" value="${tEsc(source.hours || 16)}" placeholder="请输入总课时"></div><div class="mp-field"><label for="application-difficulty">难度等级 <b>*</b><small>学员端卡片与筛选按此展示</small></label><select id="application-difficulty"><option value="">请选择难度等级</option>${['启蒙', '初级', '中级', '高级', '考级冲刺'].map(value => `<option ${source.difficulty === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div><div class="mp-field"><label>适合年龄 <b>*</b><small>可多选</small></label><div class="teacher-radio-row">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label><input type="checkbox" name="application-age" value="${value}" ${(source.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div><div class="mp-field"><label for="application-intro">课程简介</label><textarea id="application-intro" placeholder="补充课程目标、教学内容和适合人群">${tEsc(source.intro)}</textarea></div><div class="mp-field"><label for="application-file">附加材料</label><input type="file" id="application-file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.png"><small class="mp-muted" id="application-file-name">${source.file ? `已选择：${tEsc(source.file)}` : '尚未选择文件'}</small></div></div></div><div class="teacher-application-form-actions"><a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">取消</a>${tButton('提交审核', 'data-application-form-action="submit"')}</div></section>`));
 }
 function applicationReviewCopy(item) {
   if (item.status === '待审核') return ['等待教研审核', '申报已提交，审核期间课程内容不可修改。'];
@@ -496,6 +496,7 @@ function initApplicationForm() {
   radios.forEach(radio => radio.addEventListener('change', syncHours));
   const submitApplication = () => {
     if (!validateApplication()) return;
+    const pickedFile = document.querySelector('#application-file')?.files?.[0]?.name || '';
     const id = new URLSearchParams(location.search).get('application');
     const existing = id ? currentApplication() : null;
     const teacherProfile = currentTeacher();
@@ -512,10 +513,11 @@ function initApplicationForm() {
       date: toLocalDateString(),
       submittedAt: demoTime(),
       status: '待审核',
-      hours: type === '面授课程' ? Number(document.querySelector('#application-hours')?.value || existing?.hours || 1) : Number(existing?.hours || 0),
+      // CR-2026-051 §4.1：视频课程总课时由编排结果派生，重提时也不得沿用旧的面授课时。
+      hours: type === '面授课程' ? Number(document.querySelector('#application-hours')?.value || existing?.hours || 1) : 0,
       intro: document.querySelector('#application-intro')?.value.trim() || '', difficulty: document.querySelector('#application-difficulty')?.value || existing?.difficulty || '', ages: [...document.querySelectorAll('[name="application-age"]:checked')].map(input => input.value),
-      file: existing?.file || '',
-      attachment: existing?.attachment || existing?.file || '',
+      file: pickedFile || existing?.file || '',
+      attachment: pickedFile || existing?.attachment || existing?.file || '',
       // I1-DEC-23: identity comes from the signed-in teacher profile, never a hardcoded name.
       teacherId: existing?.teacherId || teacherProfile.id,
       teacher: existing?.teacher || teacherProfile.name,
@@ -525,10 +527,9 @@ function initApplicationForm() {
       teacherProfessional: existing?.teacherProfessional || teacherProfile.professional,
       teacherInfo: `${teacherProfile.name} · ${teacherProfile.title} · ${teacherProfile.professional} · ${teacherProfile.unit}`,
       courseId: existing?.courseId || courseIdForApplication(applicationId),
-      accountId: getCurrentAccountId(),
-      review: '',
-      reviewedBy: '',
-      reviewedAt: ''
+      review: existing?.review || '',
+      reviewedBy: existing?.reviewedBy || '',
+      reviewedAt: existing?.reviewedAt || ''
     };
     upsertDemoRecord('applications', record);
     teacherState.applicationUpdates[record.id] = '待审核';
@@ -538,6 +539,13 @@ function initApplicationForm() {
   };
   document.querySelector('[data-application-form-action="submit"]')?.addEventListener('click', submitApplication);
   syncHours();
+  // CR-2026-051 §4.2：附加材料为真实文件选择控件，选中后回显文件名；原型只记录文件名，不上传真实文件。
+  const fileInput = document.querySelector('#application-file');
+  const fileNameNode = document.querySelector('#application-file-name');
+  fileInput?.addEventListener('change', event => {
+    const picked = event.target.files && event.target.files[0];
+    if (fileNameNode) fileNameNode.textContent = picked ? `已选择：${picked.name}` : '尚未选择文件';
+  });
 }
 function initApplicationDetail() {
   document.querySelector('[data-application-detail-action="edit"]')?.addEventListener('click', () => {

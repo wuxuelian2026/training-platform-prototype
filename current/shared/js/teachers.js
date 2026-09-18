@@ -1385,15 +1385,20 @@ function renderTeacherProfileArchive(facts) {
     if (panel) panel.innerHTML = `<div class="form-section first-form-section"><h2>${group.title}</h2>${teacherArchiveRows(facts, group.fields)}</div>`;
   });
 
+  // CR-2026-051 §4.6：证书与账号拆为两个独立页签——证书页签承载只读证书列表与录入入口，账号页签只承载账号只读信息。
+  const certificates = teacherCertificateRecords(facts.id);
   const certificatePanel = document.querySelector('[data-teacher-panel="certificate"]');
   if (certificatePanel) {
-    // CR-2026-048 §3.5：第 4 页签 = 账号只读信息 + 证书只读列表 + 录入证书入口；「查看证书明细」保留。
-    const certificates = teacherCertificateRecords(facts.id);
-    const accountFields = [['邀请手机号', mobile], ['初始账号状态', facts.accountStatus === 'active' ? '正常' : '未激活'], ['备注', teacherArchiveValue(facts, 'remark').value || '—']];
     const entry = canManageTeacherCertificate()
       ? `<a class="button primary" href="${relativePath(wizardCertificateLink(facts.id))}">录入证书</a>`
       : '';
-    certificatePanel.innerHTML = `<div class="form-section first-form-section"><div class="section-title-row"><div><h2>证书列表</h2></div><div class="toolbar-actions">${entry}<a class="button" href="${relativePath(`/admin/pages/teachers/certificates.html?teacher_id=${encodeURIComponent(facts.id)}`)}">查看证书明细</a></div></div><div class="table-wrap"><table><thead><tr><th>证书名称</th><th>证书类型</th><th>适用专业</th><th>审核状态</th><th>有效性</th><th>文件来源</th></tr></thead><tbody>${certificateReadonlyRows(certificates)}</tbody></table></div><p class="teacher-profile-readonly-note">审核仍在证书列表页执行；本页只读展示，材料变更走既有记录的重新上传。</p></div><div class="form-section"><h2>账号</h2><div class="table-wrap"><table class="teacher-archive-table"><thead><tr><th>字段</th><th>当前值</th><th>来源</th><th>最近更新</th></tr></thead><tbody>${accountFields.map(([label, value]) => `<tr data-archive-field="${label}" data-empty="${value === '—'}"><th>${label}</th><td>${importEsc(value)}</td><td>后台建档</td><td>—</td></tr>`).join('')}</tbody></table></div></div>`;
+    certificatePanel.innerHTML = `<div class="form-section first-form-section"><div class="section-title-row"><div><h2>证书列表</h2></div><div class="toolbar-actions">${entry}<a class="button" href="${relativePath(`/admin/pages/teachers/certificates.html?teacher_id=${encodeURIComponent(facts.id)}`)}">查看证书明细</a></div></div><div class="table-wrap"><table><thead><tr><th>证书名称</th><th>证书类型</th><th>适用专业</th><th>审核状态</th><th>有效性</th><th>文件来源</th></tr></thead><tbody>${certificateReadonlyRows(certificates)}</tbody></table></div><p class="teacher-profile-readonly-note">审核仍在证书列表页执行；本页只读展示，材料变更走既有记录的重新上传。</p></div>`;
+  }
+
+  const accountPanel = document.querySelector('[data-teacher-panel="account"]');
+  if (accountPanel) {
+    const accountFields = [['邀请手机号', mobile], ['初始账号状态', facts.accountStatus === 'active' ? '正常' : '未激活'], ['备注', teacherArchiveValue(facts, 'remark').value || '—']];
+    accountPanel.innerHTML = `<div class="form-section first-form-section"><h2>账号</h2><div class="table-wrap"><table class="teacher-archive-table"><thead><tr><th>字段</th><th>当前值</th><th>来源</th><th>最近更新</th></tr></thead><tbody>${accountFields.map(([label, value]) => `<tr data-archive-field="${label}" data-empty="${value === '—'}"><th>${label}</th><td>${importEsc(value)}</td><td>后台建档</td><td>—</td></tr>`).join('')}</tbody></table></div></div>`;
   }
 
   const recordsPanel = document.querySelector('[data-teacher-panel="records"]');
