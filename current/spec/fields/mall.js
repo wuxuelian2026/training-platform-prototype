@@ -62,7 +62,7 @@ export const MALL_FIELD_SPEC = {
         { heading: '订单详情分区字段', fields: [
           { id: 'FD-MALL-046', label: '订单基础信息', type: '只读', length: '—', required: '系统展示', note: '订单号、类型、课程、购买账号或报名学员、下单时间、金额、状态与关联状态', constraints: { readOnly: true, system: true } },
           { id: 'FD-MALL-047', label: '支付记录', type: '只读', length: '—', required: '有支付记录时展示', note: '支付渠道、金额、状态与时间；未支付订单不渲染该分区', constraints: { readOnly: true, system: true } },
-          { id: 'FD-MALL-048', label: '退款记录', type: '只读', length: '—', required: '退款中或已退款时展示', note: '退款单号、渠道、金额、状态、到账时间与原因；视频订单不渲染该分区', constraints: { readOnly: true, system: true } },
+          { id: 'FD-MALL-048', label: '退款记录', type: '只读', length: '—', required: '退款中或已退款时展示', note: '退款单号、渠道、金额、状态、到账时间与原因；视频订单满足退款规则时同样渲染该分区', constraints: { readOnly: true, system: true } },
           { id: 'FD-MALL-049', label: '履约结果', type: '只读', length: '—', required: '系统展示', note: '视频订单展示学习权限与有效期；面授订单展示班级、校区、分班与名额占用结果', constraints: { readOnly: true, system: true } },
           { id: 'FD-MALL-050', label: '操作日志', type: '只读', length: '—', required: '有状态变更时展示', note: '状态变更时间、操作人角色、变更前后状态与原因', constraints: { readOnly: true, system: true } }
         ] }
@@ -76,7 +76,8 @@ export const MALL_FIELD_SPEC = {
       groups: [
         { heading: '发布商品字段', fields: [
           { id: 'FD-MALL-001', label: '关联课程', type: '下拉', length: '必选 1 门', required: '是', note: '只能选择课程库中已完成编排的视频课程' },
-          { id: 'FD-MALL-051', label: '引用课程版本', type: '只读', length: 'v1 起单调递增', required: '系统记录', note: '发布时锁定版本；课程升版后商品不自动跟随', constraints: { readOnly: true, system: true } },
+          { id: 'FD-MALL-051', label: '引用课程版本', type: '只读', length: 'v1 起单调递增', required: '系统记录', note: '发布时锁定版本；课程升版后商品不自动跟随，列表显示可同步提示并由运营显式同步', constraints: { readOnly: true, system: true } },
+          { id: 'FD-MALL-057', label: '课程停用提示', type: '只读提示', length: '—', required: '关联课程停用时展示', note: '提示关联课程已停用，请恢复课程或下架商品；不自动修改商品状态', constraints: { readOnly: true, derived: true } },
           { id: 'FD-MALL-052', label: '课程基本信息', type: '只读信息组', length: '8 项', required: '系统继承', note: '课程编号、名称、类型、专业、申报教师、总课时、难度、适合年龄', constraints: { readOnly: true, derived: true } },
           { id: 'FD-MALL-053', label: '课程大纲', type: '只读结构', length: '章节 + 课时', required: '系统继承', note: '展示关联版本的章节和课时，商品页不可修改', constraints: { readOnly: true, derived: true } },
           { id: 'FD-MALL-008', label: '课程名称', type: '文本（只读）', length: '—', required: '系统继承', note: '由所选课程自动带入，禁止商城维护独立课程目录副本', constraints: { readOnly: true, derived: true } },

@@ -4,7 +4,7 @@ import { mountPageHelp } from './page-help.js';
 import { toLocalDateTimeString, toLocalMonthString } from './date-utils.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
-import { accountStudents, demoId, demoTime, getCurrentAccountId, readDemoState, subscribeDemoState, upsertDemoRecord, updateDemoRecord, writeDemoState } from './demo-store.js';
+import { accountStudents, demoId, demoTime, getCurrentAccountId, readDemoState, subscribeDemoState, upsertDemoRecord, updateDemoRecord, videoRefundSettings, writeDemoState } from './demo-store.js';
 import { classSeed } from './class-seed.js';
 import { resolveHomeBanners } from './banner-seed.js';
 import { isLearnerPublicPage, isMiniLoggedIn, miniPageName, redirectMiniLogin } from './mobile-guard.js';
@@ -234,7 +234,8 @@ function readState() {
       if (item.type !== 'video') return;
       const product = liveProducts.find(row => row.courseId === item.id);
       item.product = product || null;
-      item.sellable = Boolean(product && product.status === '已上架');
+      item.courseDisabled = Boolean(item.disabledAt || courseArchiveFor(item.id)?.disabledAt);
+      item.sellable = Boolean(product && product.status === '已上架' && !item.courseDisabled);
       if (product) {
         item.price = Number(product.price || item.price || 0);
         item.preview = product.preview;
@@ -845,9 +846,26 @@ function submitHomework(event, draft) { event?.preventDefault(); const text = do
 function reportState() { return state.reportStatus || '已发布'; }
 function renderResultsPage() { const status = reportState(); const reportBody = status === '已发布' ? '<p>本报告记录当前学员在课堂参与、作品练习和阶段展示中的学习成果。</p>' : status === '已撤回' ? '<div class="mp-notice">报告暂不可查看，教务正在更新。已结业、结业评语和证书不受影响。</div>' : '<div class="mp-notice">学习报告正在生成中，完成后会通过消息通知学员。</div>'; layout(stack(card(`<div class="mp-pills">${pill('已结业', 'green')}${pill(currentStudent().name, 'gray')}</div><h2 style="margin-top:12px">少儿中国舞基础班 · 我的成果</h2><p>班级结束不代表结业，当前页面仅展示当前学员成果。</p>`), card(`<h3>结业评语</h3><p>综合评语：课堂参与积极，基本功和组合衔接持续进步。</p><p>成长建议：保持每周练习，关注动作细节和节奏稳定性。</p>`), card(`<div class="mp-section-head"><h3>学习报告</h3>${pill(status, status === '已发布' ? 'green' : status === '已撤回' ? 'gray' : 'amber')}</div><div style="margin-top:10px">${reportBody}</div><div class="mp-field" style="margin-top:14px"><label for="report-status">演示报告状态</label><select id="report-status"><option ${status === '已发布' ? 'selected' : ''}>已发布</option><option ${status === '已撤回' ? 'selected' : ''}>已撤回</option><option ${status === '生成中' ? 'selected' : ''}>生成中</option></select></div>`), card(`<div class="mp-section-head"><h3>结业证书</h3>${pill('已生成', 'green')}</div><p>证书编号：CERT-2026-0908-001 · 可在线查看。</p>`))); document.querySelector('#report-status').addEventListener('change', event => { state.reportStatus = event.target.value; saveState(); renderResultsPage(); }); }
 function paymentStatusLabel(order) { return order?.status === '已取消' && order.cancelType === 'timeout' ? '已取消（超时）' : order?.status || '待支付'; }
+function videoWatchedLessonCount(order, item) {
+  const progress = readDemoState().progress?.[`${state.accountId}-${item.id}`] || {};
+  const ids = new Set([...(Array.isArray(progress.chapterDone) ? progress.chapterDone : []), ...Object.entries(progress.positions || {}).filter(([, seconds]) => Number(seconds) > 0).map(([id]) => id)]);
+  const total = Array.isArray(item.outline) && item.outline.length ? item.outline.length : Number(item.lessons || item.hours || 0);
+  return [...ids].filter(id => /^chapter-\d+$/.test(id) && (!total || Number(id.slice(8)) <= total)).length;
+}
+function videoRefundEligibility(order, item) {
+  const config = videoRefundSettings();
+  if (!order || order.status !== '已支付' || !item || item.type !== 'video') return { eligible: false, watchedLessons: 0, config, reason: '仅已支付视频订单可申请退款。' };
+  const paidAt = order.paidAt || order.createdAt;
+  const paidTime = paidAt ? new Date(String(paidAt).replace(' ', 'T')).getTime() : NaN;
+  const ageDays = Number.isFinite(paidTime) ? Math.max(0, (Date.now() - paidTime) / 86400000) : Infinity;
+  const watchedLessons = videoWatchedLessonCount(order, item);
+  if (!Number.isFinite(paidTime) || ageDays > config.windowDays) return { eligible: false, watchedLessons, ageDays, config, reason: `已超过购课${config.windowDays}日退款期限。` };
+  if (watchedLessons > config.maxLessons) return { eligible: false, watchedLessons, ageDays, config, reason: `已观看${watchedLessons}课时，超过最多${config.maxLessons}课时的退款条件。` };
+  return { eligible: true, watchedLessons, ageDays, config, reason: `购课${Math.floor(ageDays)}日，已观看${watchedLessons}课时，可申请全额退款。` };
+}
 function isPaymentResumable(order) { return !order || ['待支付', '已取消'].includes(order.status); }
 function studentEnrolledCount(shared, classId) {
-  return (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.classId === classId && item.status === '已报名').length;
+  return (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.classId === classId && item.status === '已分班').length;
 }
 function renderPayment() {
   if (!isLoggedIn()) { const redirect = `${location.pathname}${location.search}`; go(`/login.html?role=learner&redirect=${encodeURIComponent(redirect)}`); return; }
@@ -918,9 +936,9 @@ function renderPayment() {
       if (isClass) {
         // P0-1: keep the class name (not the batch class name) so the admin record is not rewritten.
         const sourceClass = classRecord || { ...item, id: item.id, name: item.name || item.className, className: item.className || item.name, course: item.courseName || item.name, display: '已展示', enrolled: 0, capacity: Number(item.seats?.split('/')[1] || 1), status: '招生中' };
-        const alreadyEnrolled = (shared.enrollments || []).some(row => row.accountId === state.accountId && row.studentId === state.currentStudentId && row.classId === item.id && row.status === '已报名');
+        const alreadyEnrolled = (shared.enrollments || []).some(row => row.accountId === state.accountId && row.studentId === state.currentStudentId && row.classId === item.id && row.status === '已分班');
         if (!alreadyEnrolled) {
-          upsertDemoRecord('enrollments', { id: `${state.accountId}-${state.currentStudentId}-${item.id}`, accountId: state.accountId, studentId: state.currentStudentId, classId: item.id, status: '已报名', enrolledAt: now });
+          upsertDemoRecord('enrollments', { id: `${state.accountId}-${state.currentStudentId}-${item.id}`, accountId: state.accountId, studentId: state.currentStudentId, classId: item.id, status: '已分班', enrolledAt: now });
           const sharedRow = (readDemoState().classes || []).find(row => row && typeof row === 'object' && row.id === sourceClass.id);
           const capacity = Number(sharedRow?.capacity || sourceClass.capacity || item.seats?.split('/')[1] || 1);
           const baseline = sharedRow ? Number(sharedRow.enrolled || 0) : Math.max(0, Number(item.seats?.split('/')[1] || 0) - Number(item.seats?.split('/')[0] || 0));
@@ -1005,10 +1023,13 @@ function orderCard(order) {
   // I1-DEC-25 / RM-U-01: video orders are keyed by the purchasing account, class orders by account + student.
   const subjectFact = isClass ? `<div><span>当前学员</span><strong>${esc(student.name)}</strong></div>` : `<div><span>购买账号</span><strong>${esc(purchaseAccount().name)}</strong></div>`;
   const detailLink = `/learner/pages/order-detail.html?orderId=${encodeURIComponent(order.id)}`;
+  const videoRefund = !isClass ? videoRefundEligibility(order, item) : { eligible: false };
   const primary = isPaymentResumable(order)
     ? `<button class="mp-button mp-order-action" type="button" data-order-action="pay" data-course-id="${item.id}" data-order-id="${order.id}">${order.status === '待支付' ? '去支付' : '继续支付'}</button>`
     : order.status === '已支付' && isClass
       ? `<button class="mp-button secondary mp-order-action" type="button" data-order-action="refund" data-order-id="${order.id}">申请退款</button>`
+      : videoRefund.eligible
+        ? `<button class="mp-button secondary mp-order-action" type="button" data-order-action="refund" data-order-id="${order.id}">申请全额退款</button>`
       : '';
   const hint = orderPendingHint(order);
   return `<article class="mp-order-card"><div class="mp-order-card-head"><div><strong>${esc(item.name)}</strong><small>${isClass ? '面授课程' : '视频课程'} · ${esc(order.id)}</small></div>${pill(paymentStatusLabel(order), orderTone(order.status))}</div>${hint ? `<p class="mp-order-card-hint">${esc(hint)}</p>` : ''}<div class="mp-order-card-facts">${subjectFact}<div><span>${isClass ? '班级' : '课程类型'}</span><strong>${esc(isClass ? item.className : '视频课程')}</strong></div>${isClass ? `<div><span>上课安排</span><strong>${esc(item.campus)} · ${esc(item.schedule)}</strong></div>` : `<div><span>下单时间</span><strong>${esc(times.createdAt)}</strong></div>`}<div><span>${times.paidAt ? '支付时间' : '订单时间'}</span><strong>${esc(times.paidAt || times.createdAt)}</strong></div>${order.paymentReason ? `<div><span>支付说明</span><strong>${esc(order.paymentReason)}</strong></div>` : ''}</div><div class="mp-order-card-footer"><span>实付 <b>${money2(order.amount || item.price)}</b></span><div class="mp-actions">${primary}<a class="mp-button secondary mp-order-action" href="${detailLink}">${order.status === '退款中' ? '查看退款进度' : '查看详情'}</a></div></div></article>`;
@@ -1037,7 +1058,7 @@ function renderOrders() {
       }).join('');
     }
     list.querySelectorAll('[data-order-action="pay"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); go(`/learner/pages/payment.html?${order?.classId ? `classId=${encodeURIComponent(order.classId)}` : `courseId=${encodeURIComponent(node.dataset.courseId)}`}&orderId=${encodeURIComponent(node.dataset.orderId)}`); }));
-    list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); if (!order) return; order.status = '退款中'; order.refundAt = order.refundAt || '刚刚'; order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.refundAmount ?? order.amount); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || '用户申请退款'; saveState(); draw(); toast('退款申请已提交，等待后台审核'); }));
+    list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); const item = order ? course(order.courseId) : null; const eligibility = item && item.type === 'video' ? videoRefundEligibility(order, item) : { eligible: Boolean(order?.status === '已支付') }; if (!order || !eligibility.eligible) { toast(eligibility.reason || '当前订单不满足退款条件', 'error'); return; } order.status = '退款中'; order.refundAt = order.refundAt || demoTime(); order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.amount || 0); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || (item.type === 'video' ? `视频课程退款：购课${Math.floor(eligibility.ageDays || 0)}日，已观看${eligibility.watchedLessons}课时` : '用户申请退款'); upsertDemoRecord('orders', order); saveState(); draw(); toast('退款申请已提交，等待后台审核'); }));
   };
   document.querySelectorAll('[data-order-tab]').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('[data-order-tab]').forEach(item => item.classList.remove('active')); tab.classList.add('active'); draw(); }));
   draw();
@@ -1082,7 +1103,9 @@ function renderOrderDetail() {
   const isClass = item.type === 'class';
   if (isClass && order.cancelType === 'seat-allocation-failed') { renderSeatFailureOrder(order, item, student); return; }
   const isPaid = order.status === '已支付';
+  const videoRefund = !isClass ? videoRefundEligibility(order, item) : { eligible: false };
   const canRefund = isClass && isPaid;
+  const canVideoRefund = !isClass && videoRefund.eligible;
   const displayStatus = paymentStatusLabel(order);
   const association = orderAssociation(order, item, isClass);
   const refundable = order.status === '退款中' || order.status === '已退款';
@@ -1093,13 +1116,13 @@ function renderOrderDetail() {
       : isPaid
         ? `<button class="mp-button full" type="button" data-action="learning">进入学习</button>`
         : '';
-  const secondaryAction = canRefund ? button('申请退款', `data-action="refund" data-order-id="${order.id}"`, 'secondary') : '';
+  const secondaryAction = canRefund ? button('申请退款', `data-action="refund" data-order-id="${order.id}"`, 'secondary') : canVideoRefund ? button('申请全额退款', `data-action="refund" data-order-id="${order.id}"`, 'secondary') : '';
   layout(stack(
     card(`<div class="mp-order-detail-status">${pill(displayStatus, orderTone(order.status))}<span class="mp-muted">${isClass ? '面授课程订单' : '视频课程订单'}</span></div><div class="mp-order-status-copy">${esc(orderStatusGuidance(order, isClass))}</div>`),
     card(`<div class="mp-section-head"><h3>关联课程</h3><span class="mp-muted">${isClass ? '面授班级' : '视频课程'}</span></div><div class="mp-order-association"><div><strong>${esc(association.title)}</strong><span>${esc(association.line)}</span></div><a class="mp-button secondary" href="${association.href}">${association.label}</a></div><p class="mp-order-association-note">教师、上课时间、教室与学习进度在班级详情与学习页维护，订单详情不重复展开。</p>`),
     card(`<div class="mp-section-head"><h3>金额与支付</h3><span class="mp-muted">交易凭证</span></div><dl class="mp-order-detail-facts"><div><dt>实付金额</dt><dd><strong class="mp-price">${money2(order.amount || item.price)}</strong></dd></div><div><dt>支付方式</dt><dd>${esc(credentials.payMethod)}</dd></div><div><dt>支付流水号</dt><dd>${esc(credentials.paymentNo || '未产生支付流水')}</dd></div><div><dt>支付时间</dt><dd>${esc(credentials.paidAt || '未完成支付')}</dd></div></dl>`),
     refundable ? card(`<div class="mp-section-head"><h3>退款信息</h3>${pill(credentials.refundStatus || '处理中', order.status === '已退款' ? 'green' : 'amber')}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(credentials.refundNo || '—')}</dd></div><div><dt>退款金额</dt><dd>${money2(credentials.refundAmount)}</dd></div><div><dt>退款方式</dt><dd>${esc(credentials.refundMethod)}</dd></div><div><dt>退款状态</dt><dd>${esc(credentials.refundStatus || '处理中')}</dd></div><div><dt>${order.status === '已退款' ? '实际到账时间' : '预计到账时间'}</dt><dd>${esc(credentials.refundExpectedAt || '以渠道回执为准')}</dd></div><div class="wide"><dt>退款原因</dt><dd>${esc(credentials.refundReason)}</dd></div></dl>`) : '',
-    card(`<div class="mp-section-head"><h3>订单信息</h3><span class="mp-muted">交易记录</span></div><dl class="mp-order-detail-facts"><div><dt>订单号</dt><dd class="mp-order-no"><span>${esc(order.id)}</span><button class="mp-button secondary" type="button" data-action="copy-order-no" data-order-no="${esc(order.id)}">复制</button></dd></div><div><dt>下单时间</dt><dd>${esc(times.createdAt)}</dd></div>${isClass ? `<div><dt>报名学员</dt><dd>${esc(student.name)}</dd></div>` : `<div><dt>购买账号</dt><dd>${esc(purchaseAccount().name)}${purchaseAccount().phone ? `（${esc(purchaseAccount().phone)}）` : ''}</dd></div>`}<div><dt>订单类型</dt><dd>${isClass ? '面授课程' : '视频课程'}</dd></div>${order.paymentReason ? `<div class="wide"><dt>状态说明</dt><dd>${esc(order.paymentReason)}</dd></div>` : ''}</dl>`),
+    card(`<div class="mp-section-head"><h3>订单信息</h3><span class="mp-muted">交易记录</span></div><dl class="mp-order-detail-facts"><div><dt>订单号</dt><dd class="mp-order-no"><span>${esc(order.id)}</span><button class="mp-button secondary" type="button" data-action="copy-order-no" data-order-no="${esc(order.id)}">复制</button></dd></div><div><dt>下单时间</dt><dd>${esc(times.createdAt)}</dd></div>${isClass ? `<div><dt>报名学员</dt><dd>${esc(student.name)}</dd></div>` : `<div><dt>购买账号</dt><dd>${esc(purchaseAccount().name)}${purchaseAccount().phone ? `（${esc(purchaseAccount().phone)}）` : ''}</dd></div>`}<div><dt>订单类型</dt><dd>${isClass ? '面授课程' : '视频课程'}</dd></div>${!isClass && isPaid ? `<div class="wide"><dt>退款资格</dt><dd>${esc(videoRefund.reason)}${videoRefund.eligible ? ' 申请后将按实付金额全额退款。' : ''}</dd></div>` : ''}${order.paymentReason ? `<div class="wide"><dt>状态说明</dt><dd>${esc(order.paymentReason)}</dd></div>` : ''}</dl>`),
     primaryAction || secondaryAction ? `<div class="mp-order-detail-actions">${primaryAction}${secondaryAction ? `<div class="mp-actions">${secondaryAction}</div>` : ''}</div>` : '',
     `<a class="mp-button secondary full" href="/learner/pages/orders.html">返回我的订单</a>`
   ));
@@ -1129,7 +1152,7 @@ function learningRecords() {
   ];
   const shared = readDemoState();
   const sharedVideo = (shared.videoEntitlements || []).filter(item => item.accountId === state.accountId && item.status === '生效').map(entitlement => { const progress = shared.progress?.[`${state.accountId}-${entitlement.courseId}`] || {}; return { courseId: entitlement.courseId, studentIds: state.students.map(student => student.id), type: 'video', status: 'ongoing', progress: Number(progress.percent || 0), lastPosition: progress.lastPosition || '尚未开始学习' }; });
-  const sharedClasses = (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.status === '已报名').map(enrollment => { const source = state.courses.find(courseItem => courseItem.id === enrollment.classId) || {}; return { ...source, courseId: enrollment.classId, studentIds: [state.currentStudentId], type: 'class', status: 'upcoming', progress: 0, className: source.className || source.name, teacher: source.teacher, classroom: `${source.campus || ''} · ${source.classroom || ''}`, nextLesson: source.schedule || '待排课' }; });
+  const sharedClasses = (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.status === '已分班').map(enrollment => { const source = state.courses.find(courseItem => courseItem.id === enrollment.classId) || {}; return { ...source, courseId: enrollment.classId, studentIds: [state.currentStudentId], type: 'class', status: 'upcoming', progress: 0, className: source.className || source.name, teacher: source.teacher, classroom: `${source.campus || ''} · ${source.classroom || ''}`, nextLesson: source.schedule || '待排课' }; });
   return [...records, ...sharedVideo, ...sharedClasses].filter(item => item.studentIds.includes(state.currentStudentId)).map(item => {
     const source = item.courseId ? course(item.courseId) : {};
     return { ...source, ...item, name: item.name || source.name, href: item.href || (item.type === 'video' ? `/learner/pages/video.html?courseId=${source.id}` : courseLink(source)) };
@@ -1436,7 +1459,10 @@ document.addEventListener('click', event => {
   if (action === 'refund') {
     const orderId = event.target.closest('[data-order-id]')?.dataset.orderId;
     const order = state.orders.find(row => row.id === orderId);
-    if (order) { order.status = '退款中'; order.refundAt = order.refundAt || '刚刚'; order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.refundAmount ?? order.amount); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || '用户申请退款'; saveState(); renderOrderDetail(); }
+    const item = order ? course(order.courseId) : null;
+    const eligibility = item && item.type === 'video' ? videoRefundEligibility(order, item) : { eligible: Boolean(order?.status === '已支付') };
+    if (!order || !eligibility.eligible) { toast(eligibility.reason || '当前订单不满足退款条件', 'error'); return; }
+    order.status = '退款中'; order.refundAt = order.refundAt || demoTime(); order.refundStatus = order.refundStatus || '待审核'; order.refundNo = order.refundNo || `RF-${order.id}`; order.refundAmount = Number(order.amount || 0); order.refundMethod = order.refundMethod || '微信支付原路退回'; order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日'; order.refundReason = order.refundReason || (item.type === 'video' ? `视频课程退款：购课${Math.floor(eligibility.ageDays || 0)}日，已观看${eligibility.watchedLessons}课时` : '用户申请退款'); upsertDemoRecord('orders', order); saveState(); renderOrderDetail();
     toast('退款申请已提交，等待后台审核');
   }
 });

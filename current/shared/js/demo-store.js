@@ -96,10 +96,12 @@ const defaultState = () => ({
   orders: [],
   // P0-1: one demo enrollment record so the admin class roster has a real detail row to show.
   enrollments: [
-    { id: 'account-002-student-101-class-001', accountId: 'account-002', studentId: 'student-101', classId: 'class-001', status: '已报名', enrolledAt: '2026-08-22 10:05' }
+    { id: 'account-002-student-101-class-001', accountId: 'account-002', studentId: 'student-101', classId: 'class-001', status: '已分班', enrolledAt: '2026-08-22 10:05' }
   ],
   videoEntitlements: [],
-  progress: {}
+  progress: {},
+  // CR-2026-052：视频退款规则由后台参数配置，客户端与财务端读取同一份演示状态。
+  videoRefundSettings: { windowDays: 7, maxLessons: 3 }
 });
 
 function readStored() {
@@ -138,6 +140,15 @@ function save(next) {
 export function readDemoState() {
   state = readStored();
   return state;
+}
+
+export function videoRefundSettings() {
+  const settings = readStored().videoRefundSettings || {};
+  return {
+    // CR-2026-052：退款时间窗口是固定业务规则，只有观看课时上限允许后台配置。
+    windowDays: 7,
+    maxLessons: Math.max(0, Number(settings.maxLessons ?? 3))
+  };
 }
 
 export function writeDemoState(mutator) {

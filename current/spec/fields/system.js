@@ -13,7 +13,8 @@ export const SYSTEM_FIELD_SPEC = {
           { id: 'FD-SYSTEM-003', label: '默认课时时长（分钟）', type: '数字', length: '30–240', required: '否', note: '新建课次时的默认时长，单个课次仍可单独调整', constraints: { min: 30, max: 240 } },
           { id: 'FD-SYSTEM-004', label: '作业默认截止时间（小时）', type: '数字', length: '1–720', required: '否', note: '布置作业时的默认截止时间', constraints: { min: 1, max: 720 } },
           { id: 'FD-SYSTEM-005', label: '最低出勤率（%）', type: '数字', length: '0–100', required: '否', note: '结业判定使用', constraints: { min: 0, max: 100 } },
-          { id: 'FD-SYSTEM-006', label: '最低作业提交率（%）', type: '数字', length: '0–100', required: '否', note: '结业判定使用', constraints: { min: 0, max: 100 } }
+          { id: 'FD-SYSTEM-006', label: '最低作业提交率（%）', type: '数字', length: '0–100', required: '否', note: '结业判定使用', constraints: { min: 0, max: 100 } },
+          { id: 'FD-SYSTEM-033', label: '视频退款最多观看课时数', type: '数字', length: '0–999', required: '否', note: '视频订单退款资格的观看课时上限，默认 3 课时；按账号与课程去重计数', constraints: { min: 0, max: 999 } }
         ] },
         { heading: '业务开关', fields: [
           { id: 'FD-SYSTEM-007', label: '启用教师端课程申报', type: '开关', length: '开 / 关', required: '否', note: '关闭后教师端不展示课程申报入口' },
@@ -23,7 +24,7 @@ export const SYSTEM_FIELD_SPEC = {
         ] }
       ],
       notes: [
-        '保存前校验数值范围：默认课时 30–240 分钟、作业截止 1–720 小时、出勤率与作业提交率 0–100%。',
+        '保存前校验数值范围：默认课时 30–240 分钟、作业截止 1–720 小时、出勤率与作业提交率 0–100%、最多观看课时 0–999；视频退款期限固定为购课 7 日。',
         '任一参数超出范围时整体不保存，并提示需要修正的取值区间。',
         '保存成功后记录审计日志，参数的变更时间与操作人可追溯。',
         '结业判定使用最低出勤率和最低作业提交率；待补录考勤不参与计算。'

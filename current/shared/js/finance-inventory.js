@@ -1,4 +1,4 @@
-import { readDemoState, upsertDemoRecord } from './demo-store.js';
+import { readDemoState, upsertDemoRecord, videoRefundSettings } from './demo-store.js';
 import { readAdminSession } from './admin-auth.js';
 
 const opsRoot = document.querySelector('[data-finance-page], [data-inventory-page]');
@@ -64,6 +64,20 @@ function refundOrderStatus(orderNo) {
   return received > 0 ? '已支付' : '待支付';
 }
 
+function videoRefundRuleFor(orderNo) {
+  const shared = readDemoState();
+  const order = (shared.orders || []).find(item => item.id === orderNo || item.number === orderNo);
+  if (!order || order.status !== '已支付' || !order.courseId) return null;
+  const config = videoRefundSettings();
+  const progress = shared.progress?.[`${order.accountId}-${order.courseId}`] || {};
+  const watched = new Set([...(Array.isArray(progress.chapterDone) ? progress.chapterDone : []), ...Object.entries(progress.positions || {}).filter(([, seconds]) => Number(seconds) > 0).map(([id]) => id)]);
+  const paidAt = order.paidAt || order.createdAt;
+  const paidTime = paidAt ? new Date(String(paidAt).replace(' ', 'T')).getTime() : NaN;
+  const ageDays = Number.isFinite(paidTime) ? Math.max(0, (Date.now() - paidTime) / 86400000) : Infinity;
+  const watchedLessons = watched.filter(id => /^chapter-\d+$/.test(id)).length;
+  return { eligible: Number.isFinite(paidTime) && ageDays <= config.windowDays && watchedLessons <= config.maxLessons, watchedLessons, ageDays, config, reason: !Number.isFinite(paidTime) || ageDays > config.windowDays ? `超过${config.windowDays}日退款期限` : watchedLessons > config.maxLessons ? `已观看${watchedLessons}课时，超过${config.maxLessons}课时上限` : '满足视频课程退款条件' };
+}
+
 // 可登记线下退款的订单：已存在收款记录且待退金额大于 0；已取消订单不出现。
 function offlineRefundCandidates() {
   const seen = new Map();
@@ -71,7 +85,7 @@ function offlineRefundCandidates() {
     if (seen.has(item.orderNo)) return;
     const pending = orderPendingRefund(item.orderNo);
     if (pending <= 0) return;
-    seen.set(item.orderNo, { orderNo: item.orderNo, student: item.student, course: item.course, orderType: item.source, receipt: orderReceiptTotal(item.orderNo), refunded: orderRefundedTotal(item.orderNo), pending, status: refundOrderStatus(item.orderNo) });
+    seen.set(item.orderNo, { orderNo: item.orderNo, student: item.student, course: item.course, orderType: item.source, receipt: orderReceiptTotal(item.orderNo), refunded: orderRefundedTotal(item.orderNo), pending, status: refundOrderStatus(item.orderNo), refundRule: item.source === '视频课程' ? videoRefundRuleFor(item.orderNo) : null });
   });
   return [...seen.values()];
 }
@@ -130,6 +144,7 @@ function openOfflineRefundForm() {
     if (amount > pending) { error.textContent = `退款金额不得超过待退金额 ${money(pending)}。`; error.hidden = false; return; }
     const candidate = offlineRefundCandidates().find((item) => item.orderNo === orderNo) || {};
     if (candidate.status === '已取消') { error.textContent = '已取消订单不得登记退款。'; error.hidden = false; return; }
+    if (candidate.orderType === '视频课程' && candidate.refundRule && !candidate.refundRule.eligible) { error.textContent = `视频课程不满足退款条件：${candidate.refundRule.reason}。`; error.hidden = false; return; }
     const voucherName = form.querySelector('[name="voucher"]')?.files?.[0]?.name || '';
     const record = { id: `refund-${Date.now()}`, no: `RF${Date.now()}`, orderNo, student: candidate.student || '—', phone: '—', course: candidate.course || '—', orderType: candidate.orderType || '面授课程', amount, reason: String(data.get('reason') || '').trim() || '线下退款登记', channel: String(data.get('channel') || '银行转账'), time: String(data.get('time') || '').replace('T', ' ') || '2026-09-17 16:00', status: '已退款', source: '线下', expectedAt: '登记即时完成（线下）', operator, voucher: voucherName, remark: String(data.get('remark') || '').trim() };
     refunds.unshift(record);
@@ -193,7 +208,7 @@ function renderPayments() {
 function renderRefunds() {
   opsData = refunds;
   // CR-2026-036 §2：退款记录页新增线下退款登记入口，与收款记录页的登记收款对称。
-  pageFrame('退款记录', '', '<button class="button" data-ops-action="refund-export">导出退款记录</button><button class="button primary" data-ops-action="refund-offline-create">登记线下退款</button>', metrics([['待审批', refunds.filter((r) => r.status === '待审批').length, '等待教务主管审批'], ['退款中', refunds.filter((r) => r.status === '退款中').length, '已发起渠道退款'], ['已退款', refunds.filter((r) => r.status === '已退款').length, '线上与线下退款合计'], ['已拒绝', refunds.filter((r) => r.status === '已拒绝').length, '保留拒绝原因']]) + filterPanel('refund-filter', select('退款状态', 'status', ['待审批', '退款中', '已退款', '已拒绝']) + select('退款方式', 'source', ['线上', '线下']) + select('退款渠道', 'channel', ['微信支付', '支付宝', '银行转账', '现金']) + field('订单号 / 学员', 'keyword', 'text', '模糊搜索', true)) + '<p class="ops-note warning">退款资格：面授课程线上退款走审批；视频课程与面授课程的已发生线下退款走「登记线下退款」，登记即视为退款完成。</p>' + table('<thead><tr><th>退款单号</th><th>关联订单</th><th>学员</th><th>课程</th><th>申请金额</th><th>退款原因</th><th>退款方式 / 渠道</th><th>申请时间</th><th>状态</th><th>操作</th></tr></thead>'));
+  pageFrame('退款记录', '', '<button class="button" data-ops-action="refund-export">导出退款记录</button><button class="button primary" data-ops-action="refund-offline-create">登记线下退款</button>', metrics([['待审批', refunds.filter((r) => r.status === '待审批').length, '等待教务主管审批'], ['退款中', refunds.filter((r) => r.status === '退款中').length, '已发起渠道退款'], ['已退款', refunds.filter((r) => r.status === '已退款').length, '线上与线下退款合计'], ['已拒绝', refunds.filter((r) => r.status === '已拒绝').length, '保留拒绝原因']]) + filterPanel('refund-filter', select('退款状态', 'status', ['待审批', '退款中', '已退款', '已拒绝']) + select('退款方式', 'source', ['线上', '线下']) + select('退款渠道', 'channel', ['微信支付', '支付宝', '银行转账', '现金']) + field('订单号 / 学员', 'keyword', 'text', '模糊搜索', true)) + '<p class="ops-note warning">退款资格：面授课程线上退款走审批；视频订单在购课期限内且观看课时不超过后台参数上限时可申请全额退款；线下登记按同一资格复核。</p>' + table('<thead><tr><th>退款单号</th><th>关联订单</th><th>学员</th><th>课程</th><th>申请金额</th><th>退款原因</th><th>退款方式 / 渠道</th><th>申请时间</th><th>状态</th><th>操作</th></tr></thead>'));
   const row = (item) => `<td>${item.no}</td><td>${item.orderNo}</td><td>${item.student}<br><span class="muted">${item.phone}</span></td><td>${item.course}<br><span class="muted">${item.orderType}</span></td><td class="ops-amount">${money(item.amount)}</td><td>${item.reason}</td><td>${item.source || '线上'} / ${item.channel}</td><td>${item.time}</td><td>${tag(item.status)}</td><td class="action-cell">${item.status === '待审批' ? '<button class="text-button" data-ops-action="refund-review">审批</button>' : ''}${item.status === '退款中' ? '<button class="text-button" data-ops-action="refund-complete">标记退款完成</button>' : ''}<button class="text-button" data-ops-action="refund-view">查看详情</button></td>`;
   renderRows(opsData, row);
   bindFilter('refund-filter', opsData, (form) => { const { status, source, channel, keyword } = form; return (item) => (!status.value || item.status === status.value) && (!source.value || (item.source || '线上') === source.value) && (!channel.value || item.channel === channel.value) && (!keyword.value.trim() || `${item.orderNo}${item.student}`.includes(keyword.value.trim())); }, row);
