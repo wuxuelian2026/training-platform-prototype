@@ -54,6 +54,12 @@ export const STATE_MACHINES = [
       ],
       [
         "已支付",
+        "视频退款资格校验通过",
+        "退款中",
+        "购买账号"
+      ],
+      [
+        "已支付",
         "面授退款审批通过",
         "退款中",
         "教务主管/财务"
@@ -69,6 +75,12 @@ export const STATE_MACHINES = [
         "渠道退款完成",
         "已退款",
         "系统"
+      ],
+      [
+        "已支付",
+        "线下登记退款",
+        "已退款",
+        "具备退款登记权限的后台角色"
       ]
     ]
   },
@@ -120,7 +132,7 @@ export const STATE_MACHINES = [
   },
   {
     "id": "SM-REFUND-OFFLINE",
-    "object": "面授退款申请",
+    "object": "退款申请",
     "diagram": true,
     "pages": [
       "finance/refunds",
