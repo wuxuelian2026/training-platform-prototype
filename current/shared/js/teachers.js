@@ -101,8 +101,38 @@ function renderTeacherCredential(row, summary) {
   if (!cell) return;
   const tone = summary.qualifiedCount === summary.majorCount ? 'green' : summary.qualifiedCount ? 'amber' : 'red';
   cell.className = `teacher-credential is-${tone}`;
-  cell.textContent = `有效资质 ${summary.qualifiedCount}/${summary.majorCount}`;
+  // P2：结论标签开放「判定依据」，避免只有结论没有口径。
+  cell.innerHTML = `有效资质 ${summary.qualifiedCount}/${summary.majorCount}<button type="button" class="text-button" data-capacity-evidence aria-label="查看有效资质判定依据">依据</button>`;
 }
+// P2：把「有效资质 x/y」与「当前能力」两个结论开放为可解释的判定依据
+//（每个专业缺什么资质、命中哪份证书、合同是否覆盖、申报告知），调用方只展示校验器的输出。
+function openTeacherCapacityEvidence(facts) {
+  const summary = summarizeTeacherCapacity(facts);
+  const today = toLocalDateString();
+  const majorRows = summary.majors.map((item) => {
+    const schedule = explainTeacherCapacity(facts, { purpose: 'schedule', major: item.major, date: today });
+    const detail = schedule.status === 'available'
+      ? '<span class="tag brand">可排课</span>'
+      : `<span class="tag amber">暂不可排课</span><span class="sub-cell">${importEsc(schedule.reasons.join('；') || '—')}</span>`;
+    return `<tr><td>${importEsc(item.major)}</td><td>${item.qualified ? '<span class="tag green">有有效资质</span>' : '<span class="tag red">缺有效资质</span>'}</td><td>${importEsc(item.certificate || '—')}</td><td>${detail}</td></tr>`;
+  }).join('');
+  const contracts = facts.contracts || [];
+  const contractRows = contracts.length
+    ? contracts.map((contract) => `<tr><td>${importEsc(contract.number)}</td><td>${statusTag(contract.status)}</td><td>${importEsc(`${contract.startAt || '—'} 至 ${contract.endAt || '长期有效'}`)}</td><td>${importEsc((contract.courses || []).join('、') || '—')}</td><td>${importEsc((contract.majors || []).join('、') || '—')}</td></tr>`).join('')
+    : '<tr><td colspan="5">该教师暂无合同记录</td></tr>';
+  const applyResult = explainTeacherCapacity(facts, { purpose: 'apply' });
+  const dialog = document.createElement('dialog');
+  dialog.className = 'modal-dialog';
+  dialog.dataset.capacityEvidence = 'true';
+  dialog.innerHTML = `<div class="modal-card"><div class="modal-header"><div><h2>当前能力判定依据</h2><p>${importEsc(facts.name)} · ${importEsc(facts.id)}</p></div><button type="button" class="icon-button modal-close" data-dialog-close title="关闭" aria-label="关闭">×</button></div><section class="form-section first-form-section"><h3>专业资质（基准日 ${today}）</h3><div class="table-wrap"><table><thead><tr><th>授课专业</th><th>资质结论</th><th>命中的有效证书</th><th>今日能否排课</th></tr></thead><tbody>${majorRows || '<tr><td colspan="4">未配置授课专业</td></tr>'}</tbody></table></div><p class="sub-cell">判定口径：证书需为「已通过」并覆盖该专业、且在课次日期仍有效；合同需为「已签署」并覆盖该专业／课程与日期。申报不校验证书与合同。</p></section><section class="form-section"><h3>合同覆盖</h3><div class="table-wrap"><table><thead><tr><th>合同编号</th><th>签署状态</th><th>合同有效期</th><th>覆盖课程</th><th>覆盖专业</th></tr></thead><tbody>${contractRows}</tbody></table></div><p class="sub-cell">${importEsc(applyResult.status === 'available' ? '当前资料与账号状态允许申报课程。' : `申报告知：${applyResult.reasons.join('；')}`)}</p></section><div class="modal-actions"><button type="button" class="button primary" data-dialog-close>关闭</button></div></div>`;
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  dialog.addEventListener('click', (event) => {
+    if (event.target.closest('[data-dialog-close]') || event.target === dialog) dialog.close();
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+}
+
 function renderTeacherCapability(row) {
   const cell = row.querySelector('[data-cell="capability"]');
   if (!cell) return;
@@ -122,7 +152,7 @@ function renderTeacherCapability(row) {
     tags.push(`<span class="tag ${applyResult.status === 'available' ? 'brand' : 'amber'}">${applyResult.status === 'available' ? '可申报' : '暂不可申报'}</span>`);
     tags.push(`<span class="tag ${schedulable ? 'green' : 'gray'}">${schedulable ? '可排课' : '暂不可排课'}</span>`);
   }
-  cell.innerHTML = tags.join('');
+  cell.innerHTML = `${tags.join('')}<button type="button" class="text-button" data-capacity-evidence aria-label="查看当前能力判定依据">依据</button>`;
   row.dataset.capabilities = summary.blocked ? '暂停使用' : (applyResult.status === 'available' ? '可申报' : '暂不可申报');
   if (schedulable) row.dataset.capabilities += ',可排课';
 }
@@ -516,6 +546,13 @@ function initTeacherList() {
   document.querySelector('[data-action="teacher-import-open"]')?.addEventListener('click', (event) => { if (!roleCan('PERM-TEACHER-003')) { event.preventDefault(); event.stopImmediatePropagation(); } }, true);
   applyHashFilters();
   window.addEventListener('hashchange', () => { applyHashFilters(); applyTeacherFilters(); });
+  document.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-capacity-evidence]');
+    if (!trigger) return;
+    const row = trigger.closest('tr[data-teacher-id]');
+    const facts = row ? teacherFactsById(row.dataset.teacherId) : null;
+    if (facts) openTeacherCapacityEvidence(facts);
+  });
   document.querySelectorAll('tr[data-teacher-id]').forEach((row) => {
     renderTeacherActions(row, row.querySelector('[data-cell="actions"]'));
     renderFeaturedSwitch(row, canManageFeatured);

@@ -18,7 +18,7 @@ const teacherProfileRows = (rows) => rows.map(([id, label, length, note]) => ({
 // 编号沿用既有 FD-TEACHER-051/053/064/068/070/071，不再各写一套，避免字段与查重口径分叉。
 const CERTIFICATE_FILE_SOURCE_FIELD = { id: 'FD-TEACHER-068', label: '文件来源', type: '只读', length: '学校录入 / 本人上传 / 系统生成', required: '系统记录', note: '由 file_source_type 映射，只在文件层回答“这份文件是谁放进系统的”；教师端“我的证书”与后台来源列共用同一套文案，不与审核结果混用', constraints: { readOnly: true, system: true } };
 const CERTIFICATE_NUMBER_UNIQUE_FIELD = { id: 'FD-TEACHER-070', label: '证书编号', type: '文本', length: '≤ 40 字', required: '是', note: '同一教师下“证书类型 + 证书编号”唯一；两个录入入口保存前查重，命中不得静默创建第二条记录', constraints: { maxLength: 40, unique: '同一教师下 证书类型 + 证书编号' } };
-const CERTIFICATE_DUPLICATE_VIEW_FIELD = { id: 'FD-TEACHER-071', label: '查看既有记录', type: '按钮', length: '—', required: '查重命中时展示', note: '查重比对范围是该教师已保存的全部证书记录；后台命中后定位到教师详情页「证书与账号」页签并高亮该条记录，教师端命中提示“该证书已存在”并引导到既有记录或对原记录重新上传', constraints: { action: true } };
+const CERTIFICATE_DUPLICATE_VIEW_FIELD = { id: 'FD-TEACHER-071', label: '查看既有记录', type: '按钮', length: '—', required: '查重命中时展示', note: '查重比对范围是该教师已保存的全部证书记录；后台命中后定位到教师详情页「账号」页签并高亮该条记录，教师端命中提示“该证书已存在”并引导到既有记录或对原记录重新上传', constraints: { action: true } };
 const CERTIFICATE_SOURCE_FILTER_FIELD = { id: 'FD-TEACHER-069', label: '文件来源筛选', type: '下拉', length: '全部 / 学校录入 / 本人上传 / 系统生成', required: '否', note: '后台证书列表按文件来源过滤，默认全部', constraints: { options: ['全部', '学校录入', '本人上传', '系统生成'] } };
 
 export const CERTIFICATE_FIELDS = {
@@ -146,7 +146,7 @@ export const TEACHER_FIELD_SPEC = {
           ['FD-TEACHER-025', '简介', '≤ 2000 字（富文本）', '只读渲染清洗后的富文本']
         ]) },
         // CR-2026-048 §3.5：本页签 = 账号只读信息 + 证书只读列表 + 录入证书入口；「查看证书明细」保留。
-        { heading: '证书与账号（只读）', fields: [
+        { heading: '账号（只读）', fields: [
           { id: 'FD-TEACHER-026', label: '证书列表', type: '只读子表', length: '按有效期为序', required: '系统展示', note: '展示证书名称、证书类型、适用专业、审核状态、有效性与文件来源；本页不提供审核与重传入口' },
           { id: 'FD-TEACHER-077', label: '录入证书', type: '按钮', length: '—', required: '具备证书录入权限时展示', note: '按第二步深链重新进入 create.html?mode=wizard&step=certificate&teacher_id=<id>；无 PERM-TEACHER-004 时不展示该入口' },
           teacherProfileRows([['FD-TEACHER-071', '查看证书明细', '—', '跳转后台证书列表页并按该教师过滤']])[0],
