@@ -3,7 +3,6 @@ import { readAdminSession } from './admin-auth.js';
 import { mountRichEditor } from './rich-editor.js';
 import { demoId, demoTime, readDemoState, upsertDemoRecord, writeDemoState } from './demo-store.js';
 import { readXlsxSheetRows } from './xlsx-lite.js';
-import { toLocalDateString } from './date-utils.js';
 import { teacherFactsById } from './teacher-facts.js';
 import { classSeed } from './class-seed.js';
 import { certificateDedupKey, findDuplicateCertificate } from './certificate-source.js';
@@ -110,7 +109,8 @@ function renderTeacherCredential(row, summary) {
 //（每个专业缺什么资质、命中哪份证书、合同是否覆盖、申报告知），调用方只展示校验器的输出。
 function openTeacherCapacityEvidence(facts) {
   const summary = summarizeTeacherCapacity(facts);
-  const today = toLocalDateString();
+  // R55-UI-01：能力判定统一走演示基准日，不随运行机器的真实日期漂移。
+  const today = DEMO_TODAY;
   const majorRows = summary.majors.map((item) => {
     const schedule = explainTeacherCapacity(facts, { purpose: 'schedule', major: item.major, date: today });
     const detail = schedule.status === 'available'
@@ -143,7 +143,8 @@ function renderTeacherCapability(row) {
   const summary = summarizeTeacherCapacity(facts);
   renderTeacherCredential(row, summary);
   const applyResult = explainTeacherCapacity(facts, { purpose: 'apply' });
-  const today = toLocalDateString();
+  // R55-UI-01：可排课结论与「依据」弹窗共用同一演示基准日。
+  const today = DEMO_TODAY;
   // 任一已配置专业在今天就绪即视为可排课；离职、冻结、资料未完善等阻断项统一显示暂停使用。
   const schedulable = !summary.blocked && summary.majors.some((item) => explainTeacherCapacity(facts, { purpose: 'schedule', major: item.major, date: today }).status === 'available');
   const tags = [];

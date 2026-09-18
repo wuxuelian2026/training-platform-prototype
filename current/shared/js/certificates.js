@@ -3,6 +3,7 @@ import { sessionsFrom, teacherFactsById, teacherFactsByName } from './teacher-fa
 import { certificateDedupKey, certificateSourceLabel } from './certificate-source.js';
 import { readDemoState } from './demo-store.js';
 import { DEMO_TODAY, demoDateTime } from './demo-clock.js';
+import { toLocalDateString } from './date-utils.js';
 
 const table = document.querySelector('#certificates-table');
 const filterForm = document.querySelector('#certificate-filter');
@@ -448,7 +449,7 @@ function appendTeacherEnteredRows(teacherId, teacherName) {
   const today = DEMO_TODAY;
   const soonDate = demoDateTime(DEMO_TODAY);
   soonDate.setDate(soonDate.getDate() + 30);
-  const soon = soonDate.toISOString().slice(0, 10);
+  const soon = toLocalDateString(soonDate);
   entered.forEach((item) => {
     const key = certificateDedupKey(item);
     const sameTeacher = (row) => row.dataset.teacher === teacherName;

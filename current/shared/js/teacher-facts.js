@@ -4,6 +4,7 @@
 // 的 explainTeacherCapacity() 按（教师 × 专业 × 课程 × 日期）计算，
 // 供教师列表、教师详情、排课工作台、证书页共用，避免各页面各写一套判断。
 import { classSeed } from './class-seed.js';
+import { toLocalDateString } from './date-utils.js';
 
 export const TEACHER_FACTS = [
   {
@@ -266,7 +267,8 @@ export const teacherPublicProfileById = (id) => {
 const addDays = (iso, days) => {
   const date = new Date(`${iso}T00:00:00`);
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  // 按本地日历格式化；toISOString() 在东八区会把日期整体前移一天。
+  return toLocalDateString(date);
 };
 
 // 已开班次：由班级种子派生的课时日期（未发布或已停课的班级不计入）。
