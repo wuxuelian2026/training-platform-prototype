@@ -1583,3 +1583,17 @@ body { background: #f7f7f5; }
 .teacher-lesson-dialog .editor-toolbar { flex-wrap: wrap; }
 .teacher-lesson-dialog .editor-select { min-width: 88px; }
 .teacher-lesson-dialog .rich-editor { min-height: 140px; font-size: 13px; }
+
+/* P1（2026-09-18）：教师端证书「审核状态」与「有效期」分维度——需要处理事项独立提醒区。 */
+.teacher-certificate-actions { margin: 0 0 12px; padding: 12px 14px; border: 1px solid #f0d7c7; border-radius: 10px; background: #fdf7f2; }
+.teacher-certificate-actions-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.teacher-certificate-actions-head strong { font-size: 14px; color: #b25f22; }
+.teacher-certificate-actions-head span { font-size: 12px; color: var(--text-muted, #6b7385); }
+.teacher-certificate-actions ul { margin: 0; padding-left: 16px; display: grid; gap: 4px; }
+.teacher-certificate-actions li { font-size: 12px; color: var(--text-muted, #6b7385); }
+.teacher-certificate-actions li button { border: 0; background: transparent; padding: 0; margin-right: 6px; color: var(--brand, #2f6fed); font-size: 12px; text-decoration: underline; }
+.teacher-certificate-card.is-focus { outline: 2px solid var(--brand, #2f6fed); outline-offset: 2px; }
+.teacher-contract-card-note { margin: 8px 0 0; font-size: 12px; color: #b25f22; }
+
+/* P1（2026-09-18）：本人可维护资料的分组说明（只读态常驻）。 */
+.teacher-archive-group-notes { margin: 10px 0 0; font-size: 12px; color: var(--text-muted, #6b7385); }

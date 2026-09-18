@@ -725,7 +725,9 @@ function renderTeacherProfileDetail() {
   }
   const isSelf = teacherProfileIsSelf();
   const rowsOnly = teacherArchiveRows(teacherProfileEditableFields.map(field => [field.label, teacherProfileMask(field.key, profile[field.key]), field.control === 'textarea' ? 'wide long' : '']));
-  const selfSections = isSelf ? [teacherProfileSection('本人可维护资料', rowsOnly, '教师本人维护')] : [];
+  // P1：分组说明在只读态同样常驻（如「经历与介绍」由本人填写、学校认定以证书与合同为准）。
+  const groupNotes = teacherProfileGroups.map(group => (teacherProfileGroupNote[group] ? `${group}：${teacherProfileGroupNote[group]}` : '')).filter(Boolean);
+  const selfSections = isSelf ? [teacherProfileSection('本人可维护资料', `${rowsOnly}${groupNotes.length ? `<p class="teacher-archive-group-notes">${groupNotes.map(tEsc).join('；')}</p>` : ''}`, '教师本人维护')] : [];
   const note = !isSelf
     ? `<p class="teacher-profile-readonly-note">当前登录的教师账号与所查看档案不一致，仅展示身份与任职信息；本人档案只能在教师本人登录后查看和维护。</p>`
     : teacherProfileEditBlocked()
@@ -845,16 +847,29 @@ function calculateCertificateValidity(expiresAt) {
   return remainingDays <= 60 ? '即将过期' : '有效';
 }
 function certificateNeedsAction(item) { return item.status === '已驳回' || item.validity === '即将过期' || item.validity === '已过期'; }
+// P1：审核状态与有效期是两个维度——页签只按审核状态分；需要处理的事项（驳回／撤销／到期）单列提醒区。
+function certificateActionReason(item) {
+  if (item.status === '已驳回') return '审核已驳回，请按审核意见重新上传';
+  if (item.status === '已撤销') return '已撤销，如需恢复请重新上传';
+  if (item.validity === '已过期') return '已过期，请上传有效期内的新证书';
+  if (item.validity === '即将过期') return `即将到期，有效期至 ${item.expiresAt || '—'}`;
+  return '';
+}
+const CERTIFICATE_STATUS_TABS = ['全部', '待审核', '已通过', '已驳回', '已撤销'];
 function teacherCertificateCard(item) {
   const canReupload = item.status === '已驳回' || item.validity === '已过期';
   return `<article class="teacher-certificate-card ${certificateNeedsAction(item) ? 'needs-action' : ''}"><div class="teacher-certificate-card-head"><div><span>${tEsc(item.type)}</span><h3>${tEsc(item.name)}</h3></div>${tPill(item.status, certificateStatusTone(item.status))}</div><dl class="teacher-certificate-facts"><div><dt>证书编号</dt><dd>${tEsc(item.number)}</dd></div><div><dt>发证机构</dt><dd>${tEsc(item.issuer)}</dd></div><div><dt>来源</dt><dd>${tEsc(item.source || '—')}</dd></div><div><dt>文件版本</dt><dd>${tEsc(item.fileVersion || 'v1')}</dd></div><div><dt>有效期</dt><dd>${item.expiresAt ? `至 ${tEsc(item.expiresAt)}` : '永久有效'}</dd></div><div><dt>有效性</dt><dd>${tPill(item.validity, certificateValidityTone(item.validity))}</dd></div></dl>${item.status === '已驳回' ? `<p class="teacher-certificate-review-note">审核意见：${tEsc(item.reviewNote)}</p>` : ''}<div class="teacher-certificate-card-foot"><span class="teacher-certificate-file"><b aria-hidden="true">${item.file.toLowerCase().endsWith('.pdf') ? 'PDF' : '图'}</b><span>${tEsc(item.file)}</span></span><div><button type="button" data-certificate-view="${tEsc(item.id)}">查看</button>${canReupload ? `<button type="button" class="primary" data-certificate-reupload="${tEsc(item.id)}">重新上传</button>` : ''}</div></div></article>`;
 }
 function renderTeacherCertificates() {
   const certificates = [...teacherState.certificates].map(item => ({ ...item, validity: calculateCertificateValidity(item.expiresAt) })).sort((a, b) => (a.expiresAt || '9999-12-31').localeCompare(b.expiresAt || '9999-12-31'));
-  const visible = certificates.filter(item => teacherCertificateFilter === '全部' || (teacherCertificateFilter === '待审核' ? item.status === '待审核' : certificateNeedsAction(item)));
-  const filters = [['全部', certificates.length], ['待审核', certificates.filter(item => item.status === '待审核').length], ['需处理', certificates.filter(certificateNeedsAction).length]];
+  // 历史态兼容：旧筛选值（需处理）不再作为页签，回落「全部」。
+  if (!CERTIFICATE_STATUS_TABS.includes(teacherCertificateFilter)) teacherCertificateFilter = '全部';
+  const visible = certificates.filter(item => teacherCertificateFilter === '全部' || item.status === teacherCertificateFilter);
+  const filters = CERTIFICATE_STATUS_TABS.map(label => [label, label === '全部' ? certificates.length : certificates.filter(item => item.status === label).length]).filter(([label, count]) => label === '全部' || count > 0);
+  const actionItems = certificates.map(item => ({ item, reason: certificateActionReason(item) })).filter(entry => entry.reason);
   const content = visible.length ? visible.map(teacherCertificateCard).join('') : `<section class="teacher-certificate-empty"><strong>暂无${tEsc(teacherCertificateFilter)}证书</strong><p>可切换其他状态或新增证书。</p></section>`;
-  tLayout(tStack(`<section class="teacher-certificate-toolbar"><div><strong>${certificates.length}</strong><span>项证书资料</span></div><button type="button" class="mp-button" data-certificate-add>新增证书</button></section>`, `<nav class="teacher-certificate-filters" role="tablist" aria-label="证书状态筛选">${filters.map(([label, count]) => `<button type="button" role="tab" aria-selected="${teacherCertificateFilter === label}" class="${teacherCertificateFilter === label ? 'active' : ''}" data-certificate-filter="${label}">${label}<span>${count}</span></button>`).join('')}</nav>`, `<section class="teacher-certificate-list" aria-live="polite"><div class="teacher-certificate-list-head"><h2>${tEsc(teacherCertificateFilter)}证书</h2><span>${visible.length} 项</span></div>${content}</section>`));
+  const actionPanel = actionItems.length ? `<section class="teacher-certificate-actions"><div class="teacher-certificate-actions-head"><strong>需要处理 ${actionItems.length} 项</strong><span>审核状态与有效期分开处理</span></div><ul>${actionItems.map(({ item, reason }) => `<li><button type="button" data-certificate-focus="${tEsc(item.id)}" data-certificate-focus-status="${tEsc(item.status)}">${tEsc(item.name)}</button><span>${tEsc(reason)}</span></li>`).join('')}</ul></section>` : '';
+  tLayout(tStack(`<section class="teacher-certificate-toolbar"><div><strong>${certificates.length}</strong><span>项证书资料</span></div><button type="button" class="mp-button" data-certificate-add>新增证书</button></section>`, `<nav class="teacher-certificate-filters" role="tablist" aria-label="证书状态筛选">${filters.map(([label, count]) => `<button type="button" role="tab" aria-selected="${teacherCertificateFilter === label}" class="${teacherCertificateFilter === label ? 'active' : ''}" data-certificate-filter="${label}">${label}<span>${count}</span></button>`).join('')}</nav>`, actionPanel, `<section class="teacher-certificate-list" aria-live="polite"><div class="teacher-certificate-list-head"><h2>${tEsc(teacherCertificateFilter)}证书</h2><span>${visible.length} 项</span></div>${content}</section>`));
 }
 function openTeacherCertificateDetail(item) {
   const dialog = document.createElement('dialog');
@@ -924,6 +939,15 @@ function openTeacherCertificateForm(item = null) {
 function bindTeacherCertificateEvents() {
   document.querySelector('[data-certificate-add]')?.addEventListener('click', () => openTeacherCertificateForm());
   document.querySelectorAll('[data-certificate-filter]').forEach(button => button.addEventListener('click', () => { teacherCertificateFilter = button.dataset.certificateFilter; renderTeacherCertificates(); bindTeacherCertificateEvents(); }));
+  // P1：待处理区点击后定位到对应证书卡（必要时先切回「全部」），便于教师直接处理。
+  document.querySelectorAll('[data-certificate-focus]').forEach(button => button.addEventListener('click', () => {
+    if (teacherCertificateFilter !== '全部') { teacherCertificateFilter = '全部'; renderTeacherCertificates(); bindTeacherCertificateEvents(); }
+    const card = document.querySelector(`[data-certificate-view="${button.dataset.certificateFocus}"]`)?.closest('.teacher-certificate-card');
+    if (!card) return;
+    card.classList.add('is-focus');
+    card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    window.setTimeout(() => card.classList.remove('is-focus'), 1800);
+  }));
   document.querySelectorAll('[data-certificate-view]').forEach(button => button.addEventListener('click', () => { const item = teacherState.certificates.find(record => record.id === button.dataset.certificateView); if (item) openTeacherCertificateDetail(item); }));
   document.querySelectorAll('[data-certificate-reupload]').forEach(button => button.addEventListener('click', () => { const item = teacherState.certificates.find(record => record.id === button.dataset.certificateReupload); if (item) openTeacherCertificateForm(item); }));
 }
@@ -952,18 +976,23 @@ function teacherContractCard(contract) {
   const signingStatus = contract.status;
   const termStatus = contractTermStatusOf(contract);
   const statusLabel = signingStatus === '已签署' && termStatus === '已到期' ? '已签署 · 已到期' : signingStatus;
+  // 期限状态独立展示：即将到期在卡片头部单独成标签，不并入签署状态页签。
+  const termPill = signingStatus !== '已终止' && termStatus === '即将到期' ? tPill(termStatus, contractStatusTone(termStatus)) : '';
   // I1-DEF-014：已终止是签署终态，需可见终止生效日期与终止原因。
   const terminated = contract.status === '已终止';
   const terminateFacts = terminated
     ? `<div><dt>终止生效日期</dt><dd>${tEsc(contract.terminatedAt || '—')}</dd></div><div><dt>终止原因</dt><dd>${tEsc(contract.terminateReason || contract.note || '—')}</dd></div>`
     : '';
-  return `<a class="teacher-contract-card ${contract.status === '待教师签署' ? 'pending' : ''}" href="${relativePath(`/teacher/pages/contract-detail.html?contract=${contract.id}`)}"><div class="teacher-contract-card-head"><div><span>${tEsc(contract.type)} · ${tEsc(contract.version)}</span><h3>${tEsc(contract.name)}</h3></div>${tPill(statusLabel, contractStatusTone(signingStatus))}</div><dl class="teacher-contract-card-facts"><div><dt>合同编号</dt><dd>${tEsc(contract.number)}</dd></div><div><dt>合同期限</dt><dd>${tEsc(contract.startAt)} 至 ${tEsc(contract.endAt)}</dd></div><div><dt>工作校区</dt><dd>${tEsc(contract.campus)}</dd></div><div><dt>每课次含税单价</dt><dd>¥${Number(contract.rate).toFixed(2)} / 每次课（含税）</dd></div>${terminateFacts}</dl><div class="teacher-contract-card-foot"><span>${contract.signedAt ? `${tEsc(contract.signedAt)} 签署` : `${tEsc(contract.pushedAt)} 推送`}</span><strong>${action}<i aria-hidden="true">›</i></strong></div></a>`;
+  return `<a class="teacher-contract-card ${contract.status === '待教师签署' ? 'pending' : ''}" href="${relativePath(`/teacher/pages/contract-detail.html?contract=${contract.id}`)}"><div class="teacher-contract-card-head"><div><span>${tEsc(contract.type)} · ${tEsc(contract.version)}</span><h3>${tEsc(contract.name)}</h3></div>${tPill(statusLabel, contractStatusTone(signingStatus))}${termPill}</div><dl class="teacher-contract-card-facts"><div><dt>合同编号</dt><dd>${tEsc(contract.number)}</dd></div><div><dt>合同期限</dt><dd>${tEsc(contract.startAt)} 至 ${tEsc(contract.endAt)}</dd></div><div><dt>工作校区</dt><dd>${tEsc(contract.campus)}</dd></div><div><dt>每课次含税单价</dt><dd>¥${Number(contract.rate).toFixed(2)} / 每次课（含税）</dd></div>${terminateFacts}</dl>${contract.status === '待教师签署' && contract.note ? `<p class="teacher-contract-card-note">${tEsc(contract.note)}</p>` : ''}<div class="teacher-contract-card-foot"><span>${contract.signedAt ? `${tEsc(contract.signedAt)} 签署` : `${tEsc(contract.pushedAt)} 推送`}</span><strong>${action}<i aria-hidden="true">›</i></strong></div></a>`;
 }
 function renderTeacherContracts() {
   const contracts = [...teacherState.contracts].sort((a, b) => b.startAt.localeCompare(a.startAt));
   const pendingCount = contracts.filter(item => item.status === '待教师签署').length;
-  const visible = contracts.filter(item => teacherContractFilter === '全部' || (teacherContractFilter === '待教师签署' ? item.status === '待教师签署' : item.status !== '待教师签署'));
-  const filters = [['全部', contracts.length], ['待教师签署', pendingCount], ['历史合同', contracts.length - pendingCount]];
+  // P1：筛选维度与后台对齐——按签署状态四分桶；期限状态（有效／即将到期／已到期）作为独立标签，不参与筛选。
+  const CONTRACT_STATUS_TABS = ['全部', '待教师签署', '待学校签署', '已签署', '已终止'];
+  if (!CONTRACT_STATUS_TABS.includes(teacherContractFilter)) teacherContractFilter = '全部';
+  const visible = contracts.filter(item => teacherContractFilter === '全部' || item.status === teacherContractFilter);
+  const filters = CONTRACT_STATUS_TABS.map(label => [label, label === '全部' ? contracts.length : contracts.filter(item => item.status === label).length]).filter(([label, count]) => label === '全部' || count > 0);
   tLayout(tStack(`<section class="teacher-contract-overview"><div><strong>${pendingCount}</strong><span>份合同待教师签署</span></div><p>${pendingCount ? '请在截止日期前阅读并完成签署' : '当前没有待教师签署合同'}</p></section>`, `<nav class="teacher-contract-filters" role="tablist" aria-label="合同状态筛选">${filters.map(([label, count]) => `<button type="button" role="tab" aria-selected="${teacherContractFilter === label}" class="${teacherContractFilter === label ? 'active' : ''}" data-contract-filter="${label}">${label}<span>${count}</span></button>`).join('')}</nav>`, `<section class="teacher-contract-list" aria-live="polite"><div class="teacher-contract-list-head"><h2>${tEsc(teacherContractFilter)}</h2><span>${visible.length} 份</span></div>${visible.length ? visible.map(teacherContractCard).join('') : `<div class="teacher-contract-empty">暂无${tEsc(teacherContractFilter)}合同</div>`}</section>`));
 }
 function contractDocument(contract) {

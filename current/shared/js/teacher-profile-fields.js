@@ -40,7 +40,7 @@ export const TEACHER_PROFILE_EDITABLE_FIELDS = [
 
 export const TEACHER_PROFILE_GROUPS = ['基础信息', '联系方式', '收付款信息', '经历与介绍'];
 
-export const TEACHER_PROFILE_GROUP_NOTE = { 收付款信息: '仅用于工资发放', 经历与介绍: '内部管理与教师端展示' };
+export const TEACHER_PROFILE_GROUP_NOTE = { 收付款信息: '仅用于工资发放', 经历与介绍: '本人填写，仅内部管理与教师端展示；学校认定以证书与合同为准' };
 
 /** 展示与审计中需要脱敏的字段。 */
 export const TEACHER_PROFILE_MASK_KEYS = ['mobile', 'emergencyMobile', 'bankCard'];
