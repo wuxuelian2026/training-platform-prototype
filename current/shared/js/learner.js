@@ -1360,23 +1360,29 @@ function renderSeatFailureOrder(order, item, student) {
 }
 function learningRecords() {
   const videoProgress = state.chapterDone.includes('chapter-003') ? 100 : course('COURSE-CR-2026-0002').progress;
+  // 学习中心的班级卡片只来自已分班的真实班级（classSeed + 分班记录），不再引用已退役的 class-001～004，
+  // 避免「进入班级」落到课程详情或空态；这里只登记学习状态，班级名称、教师、校区与教室一律取自班级档案。
+  const demoLearningState = {
+    'class-mock-ended-teaching-01': { lessonStatus: '上课中', lessonNote: '今日 10:00-11:30', nextLesson: '正在上课', homeworkStatus: '待提交' },
+    'class-mock-ended-teaching-02': { lessonStatus: '待上课', lessonNote: '09-16 09:00-10:30', nextLesson: '09-16 09:00' },
+    'class-mock-ended-teaching-03': { lessonStatus: '已完成', lessonNote: '09-13 10:00-11:30', nextLesson: '09-15 14:00', homeworkStatus: '待教师点评' },
+    // 已结课班级的学员结业状态（学员端文案：已结业／补课中／审核中），用于「已获证书」指标与成果入口。
+    'class-mock-ended-finished-01': { completionStatus: '已结业' },
+    'class-mock-ended-finished-02': { completionStatus: '补课中' },
+    'class-mock-ended-finished-03': { completionStatus: '审核中' },
+  };
   const records = [
-    { id: 'learning-class-001', demoScenario: true, courseId: 'class-001', studentIds: ['student-001', 'student-002'], type: 'class', status: 'ongoing', progress: 50, completedLessons: 8, className: '2026秋季中国舞启蒙一班', teacher: '王玥', classroom: '龙泉校区 · 综合楼302', nextLesson: '09-16 09:00', lessonNo: 9, lessonStatus: '待上课', lessonNote: '09-16 09:00-10:30' },
-    { id: 'learning-class-002-ongoing', demoScenario: true, courseId: 'class-001', studentIds: ['student-001', 'student-002'], type: 'class', status: 'ongoing', progress: 38, completedLessons: 6, name: '少儿中国舞提高班', className: '2026秋季中国舞提高二班', teacher: '王玥', classroom: '南湖校区 · 艺术楼201', nextLesson: '正在上课', lessonNo: 7, lessonStatus: '上课中', lessonNote: '今日 10:00-11:30' },
-    { id: 'learning-class-003-ongoing', demoScenario: true, courseId: 'class-001', studentIds: ['student-001', 'student-002'], type: 'class', status: 'ongoing', progress: 38, completedLessons: 6, name: '少儿中国舞基础班', className: '2026秋季中国舞基础三班', teacher: '王玥', classroom: '南湖校区 · 艺术楼201', nextLesson: '09-20 10:00', lessonNo: 6, lessonStatus: '已完成', lessonNote: '09-13 10:00-11:30', homeworkStatus: '待提交' },
-    { id: 'learning-class-006-ongoing', demoScenario: true, courseId: 'class-004', studentIds: ['student-001', 'student-002'], type: 'class', status: 'ongoing', progress: 63, completedLessons: 7, name: '国画入门工作坊', className: '2026秋季国画入门工作坊', teacher: '李青', classroom: '南湖校区 · 艺术楼103', nextLesson: '09-22 14:00', lessonNo: 7, lessonStatus: '已完成', lessonNote: '09-15 14:00-15:30', homeworkStatus: '待教师点评' },
-    { id: 'learning-class-004-ongoing', courseId: 'class-003', studentIds: ['student-002'], type: 'class', status: 'ongoing', progress: 19, completedLessons: 3, name: '少儿中国舞提高班', className: '2026秋季中国舞提高二班', teacher: '王玥', classroom: '南湖校区 · 艺术楼201', nextLesson: '09-20 10:00', lessonNo: 4, lessonStatus: '待上课', lessonNote: '09-20 10:00-11:30' },
-    { id: 'learning-class-005-ongoing', courseId: 'class-003', studentIds: ['student-002'], type: 'class', status: 'ongoing', progress: 25, completedLessons: 4, name: '少儿中国舞提高班', className: '2026秋季中国舞提高排练班', teacher: '王玥', classroom: '南湖校区 · 艺术楼201', nextLesson: '09-21 10:00', lessonNo: 5, lessonStatus: '待上课', lessonNote: '09-21 10:00-11:30' },
-    { id: 'learning-video-001', courseId: 'COURSE-CR-2026-0002', studentIds: ['student-001', 'student-002'], type: 'video', status: 'ongoing', progress: videoProgress, lastPosition: '第3章 · 作品演唱 18:36' },
-    { id: 'learning-class-002', courseId: 'class-002', studentIds: ['student-001', 'student-002'], type: 'class', status: 'upcoming', progress: 0, className: '2026秋季少儿美术兴趣班', teacher: '李青', classroom: '南湖校区 · 艺术楼103', nextLesson: '09-13 14:00' },
-    { id: 'learning-class-ended', studentIds: ['student-001'], type: 'class', status: 'ended', progress: 100, name: '少儿中国舞基础', className: '2026春季中国舞基础班', teacher: '王玥', classroom: '龙泉校区 · 综合楼302', completionStatus: '已结业', href: '/learner/pages/results.html?courseId=class-001' }
+    { id: 'learning-video-001', courseId: 'COURSE-CR-2026-0002', studentIds: ['student-001', 'student-002'], type: 'video', status: 'ongoing', progress: videoProgress, lastPosition: '第3章 · 作品演唱 18:36' }
   ];
   const shared = readDemoState();
   const videoHasAccess = state.orders.some(order => !order.classId && order.courseId === 'COURSE-CR-2026-0002' && order.status === '已支付') || (shared.videoEntitlements || []).some(item => item.accountId === state.accountId && item.courseId === 'COURSE-CR-2026-0002' && item.status === '生效');
   const sharedVideo = (shared.videoEntitlements || []).filter(item => item.accountId === state.accountId && item.status === '生效').map(entitlement => { const progress = shared.progress?.[`${state.accountId}-${entitlement.courseId}`] || {}; return { ...(entitlement.snapshot?.course || {}), courseId: entitlement.courseId, courseVersion: entitlement.courseVersion, studentIds: state.students.map(student => student.id), type: 'video', status: 'ongoing', progress: Number(progress.percent || 0), lastPosition: progress.lastPosition || '尚未开始学习' }; });
   const sharedClassRecords = classSeed.map(seed => ({ ...seed, ...(shared.classes || []).find(row => row.id === seed.id) })).concat((shared.classes || []).filter(row => !classSeed.some(seed => seed.id === row.id)));
   const sharedClassById = new Map(sharedClassRecords.map(record => [record.id, record]));
-  const sharedClasses = (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.status === '已分班').map(enrollment => {
+  const classEnrollments = (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.status === '已分班');
+  // 无分班记录的学员（如林知远）沿用同一组演示班级，保证学习中心不空且链接指向真实班级档案。
+  if (!classEnrollments.length) Object.keys(demoLearningState).forEach(classId => classEnrollments.push({ classId, studentId: state.currentStudentId }));
+  const sharedClasses = classEnrollments.map(enrollment => {
     const record = sharedClassById.get(enrollment.classId) || {};
     const teachingStatus = classTeachingStatus(record);
     const progress = classLessonProgress(record);
@@ -1400,14 +1406,15 @@ function learningRecords() {
       nextLesson: nextSession ? `${nextSession.date} ${nextSession.startTime || nextSession.start || ''}`.trim() : (learningStatus === 'ended' ? '课程已结束' : '待定'),
       lessonNo: Math.min(completedLessons + 1, totalLessons || 1),
       lessonStatus: learningStatus === 'ended' ? '已完成' : learningStatus === 'ongoing' ? '待上课' : '',
-      lessonNote: nextSession ? `${nextSession.date} ${nextSession.startTime || nextSession.start || ''}-${nextSession.endTime || nextSession.end || ''}` : ''
+      lessonNote: nextSession ? `${nextSession.date} ${nextSession.startTime || nextSession.start || ''}-${nextSession.endTime || nextSession.end || ''}` : '',
+      ...(demoLearningState[enrollment.classId] || {}),
     };
   });
   return [...records.filter(item => !isLegacyClassRecord(item)), ...sharedVideo, ...sharedClasses].filter(item => item.studentIds.includes(state.currentStudentId)).map(item => {
-    const source = item.courseId ? course(item.courseId) : {};
+    const source = item.type === 'class' ? (sharedClassById.get(item.courseId) || {}) : item.courseId ? course(item.courseId) : {};
     const activeOrderSnapshot = item.type === 'video' ? state.orders.find(order => !order.classId && order.courseId === item.courseId && order.status === '已支付')?.snapshot?.course : null;
     const accessRevoked = item.type === 'video' && !videoHasAccess;
-    return { ...source, ...(activeOrderSnapshot || {}), ...item, status: accessRevoked ? 'ended' : item.status, completionStatus: accessRevoked ? '已退款，学习记录保留' : item.completionStatus, name: item.name || source.name, href: accessRevoked ? '/learner/pages/orders.html' : (item.href || (item.type === 'video' ? `/learner/pages/video.html?courseId=${source.id}` : courseLink(source))), accessRevoked };
+    return { ...source, ...(activeOrderSnapshot || {}), ...item, status: accessRevoked ? 'ended' : item.status, completionStatus: accessRevoked ? '已退款，学习记录保留' : item.completionStatus, name: item.name || item.className || source.name, href: accessRevoked ? '/learner/pages/orders.html' : (item.href || (item.type === 'video' ? `/learner/pages/video.html?courseId=${encodeURIComponent(source.id)}` : item.type === 'class' ? `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.classId || item.courseId)}` : courseLink(item))), accessRevoked };
   });
 }
 function learningTasks() {
