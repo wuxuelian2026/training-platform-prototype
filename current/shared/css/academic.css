@@ -288,6 +288,8 @@ html.is-matrix-dragging, html.is-matrix-dragging * { user-select: none; }
 .academic-class-sheet > header strong { display: block; font-size: 14px; }
 .academic-class-sheet > header span { color: var(--muted); font-size: 12px; }
 .academic-class-sheet-actions { display: flex; align-items: center; gap: 8px; }
+/* R60-UI-01：班级课表卡内的课次表在窄屏宽于卡片，包一层横向滚动容器，保证右侧列可达。 */
+.academic-class-sheet-scroll { max-width: 100%; overflow-x: auto; }
 .academic-class-sheet table { width: 100%; border-collapse: collapse; }
 .academic-class-sheet th, .academic-class-sheet td { padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12px; text-align: left; }
 .academic-class-sheet thead th { background: #fdfdfe; color: var(--muted); font-weight: 500; }

@@ -5,6 +5,8 @@ current/.vite/
 current/legacy/
 # 本地一次性排查脚本（如乱码扫描/修复）不入版本，避免临时工具混进交付物
 current/.codex-tmpfix/
+# 全量页面巡检工具的本地输出（scripts/sweep-pages.mjs 生成）不入版本
+current/_sweep-pages.json
 .env
 .env.*
 !.env.example

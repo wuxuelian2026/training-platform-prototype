@@ -40,6 +40,11 @@ if (tableStart >= 0) {
       configurable: /^可配置/.test(cells[3]),
       entry: cells[4],
       keywords: [...new Set(cells[0].split(/[／/、，,]/).map((part) => part.trim()).filter((part) => part.length >= 2))],
+      // 数值复述的判定针：默认值文案本身（如「7 个自然日」「10MB」「45／60／90／120／150」）。
+      // 只提参数名不算复述数值，避免把「难度等级是课程级教学属性」这类正常引用计成重复。
+      valueNeedles: (cells[2].match(/\d[\d.／/–\-]*\s*(?:分钟|个自然日|天|课时|次|小时|MB|GB|%|格)?/g) || [])
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2),
       numeric: (cells[2].match(/\d+(\.\d+)?/) || [])[0] || ''
     });
   });
@@ -82,7 +87,9 @@ for (const { name, file } of markdownFiles) {
         }
       });
       if (!hit) return;
-      spread.get(row.key).add(name);
+      // 只有「参数名 + 默认值」出现在同一行，才算复述数值；单纯引用参数名不计入复述面。
+      const restatesValue = row.valueNeedles.some((needle) => line.includes(needle));
+      if (restatesValue) spread.get(row.key).add(name);
       if (conflict) {
         problems.push(`${name}:${index + 1} 参数「${row.name}」登记为可配置，但邻近写法像固定规则：…${conflict.slice(0, 46)}…`);
       }
@@ -90,13 +97,20 @@ for (const { name, file } of markdownFiles) {
   });
 }
 
+// 实现类文档（接口契约、数据库模型、测试基线、状态字典、系统管理页说明）按性质必须带具体数值，
+// 单列出来，避免把「实现需要」误读成「重复维护」；业务模块文档才提示改为引用参数表。
+const IMPLEMENTATION_DOCS = /^(09-接口契约|10-数据库模型与约束|12-测试与验收实施基线|05-状态字典|10-后台管理端-系统管理|07-异常处理实施要求|08-需求与验收追踪矩阵|13-迭代1原型评审基线与整改清单)\.md$/;
 const crowded = [...spread.entries()].filter(([, files]) => files.size > 4);
+
 
 process.stdout.write(`全局参数一致性检查（登记 ${rows.length} 个参数，扫描 ${markdownFiles.length} 个文档）\n`);
 if (crowded.length) {
   process.stdout.write('\n复述面偏大的参数（建议改为引用 12 §2.6.1，不阻断）：\n');
   crowded.sort((a, b) => b[1].size - a[1].size).forEach(([key, files]) => {
-    process.stdout.write(`  - ${key}：出现在 ${files.size} 个文件\n`);
+    const business = [...files].filter((name) => !IMPLEMENTATION_DOCS.test(name));
+    const implementation = files.size - business.length;
+    process.stdout.write(`  - ${key}：出现在 ${files.size} 个文件（业务模块 ${business.length}、实现类 ${implementation}）\n`);
+    if (business.length) process.stdout.write(`      业务模块待改引用：${business.join('、')}\n`);
   });
 }
 if (problems.length) {

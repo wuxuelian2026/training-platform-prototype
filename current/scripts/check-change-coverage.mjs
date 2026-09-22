@@ -32,6 +32,44 @@ const changeOrders = readdirSync(changesDir)
   .filter((name) => name.endsWith('.md') && !name.includes('模板'))
   .sort();
 
+// 编号唯一性与「文件名 ↔ 正文编号」一致性检查（2026-09-22，客户裁定：发现重复编号即非零退出）。
+// 背景：曾出现 CR-2026-104／099／103／073／011／018 等同号两单，导致引用无法定位。
+// 规则：
+//   1. 同一编号（含 A／B 后缀整体）被两个及以上文件使用 → 判冲突并退出码 1，阻断 check:spec；
+//   2. 母单加拆分件（如 CR-2026-109 与 CR-2026-109A／109B）属正常约定，不判冲突；
+//   3. 文件名的编号与正文「变更单号／变更编号」不一致 → 提示不拦截（多为改号后漏改正文）。
+const changeIdOf = (name) => {
+  const match = name.match(/^(CR-\d{4}-\d+[A-Z]?)/);
+  return match ? match[1] : null;
+};
+const filesById = new Map();
+for (const name of changeOrders) {
+  const id = changeIdOf(name);
+  if (!id) continue;
+  if (!filesById.has(id)) filesById.set(id, []);
+  filesById.get(id).push(name);
+}
+const idConflicts = [...filesById.entries()].filter(([, files]) => files.length > 1);
+const idMismatches = [];
+for (const name of changeOrders) {
+  const id = changeIdOf(name);
+  if (!id) continue;
+  const declared = readFileSync(path.join(changesDir, name), 'utf8')
+    .match(/-\s*(?:变更单号|变更编号)[：:]\s*(CR-\d{4}-\d+[A-Z]?)/);
+  if (declared && declared[1] !== id) {
+    idMismatches.push(`${name}：正文写 ${declared[1]}，文件名是 ${id}（改号后请同步正文）`);
+  }
+}
+if (idConflicts.length) {
+  process.stdout.write(`变更单编号冲突 ${idConflicts.length} 处（阻断）：\n`);
+  idConflicts.forEach(([id, files]) => {
+    process.stdout.write(`  - ${id} 被 ${files.length} 个文件同时使用：\n`);
+    files.forEach((file) => process.stdout.write(`      · ${file}\n`));
+  });
+  process.stdout.write('处理方式：为其中一张改号（取当前未占用的最小号），并同步文件名、正文「变更单号」与跨文档引用。\n');
+  process.exit(1);
+}
+
 const legacy = existsSync(legacyFile)
   ? new Set(readFileSync(legacyFile, 'utf8').split('\n').map((line) => line.trim()).filter(Boolean))
   : null;
@@ -61,6 +99,11 @@ for (const name of changeOrders) {
 }
 
 process.stdout.write(`变更单覆盖检查（存量 ${changeOrders.filter((n) => legacy.has(n)).length} 张豁免，本次校验 ${changeOrders.length - changeOrders.filter((n) => legacy.has(n)).length} 张）\n`);
+process.stdout.write(`变更单编号唯一性检查通过（共 ${filesById.size} 个编号，无同号多单）。\n`);
+if (idMismatches.length) {
+  process.stdout.write(`\n编号与文件名不一致 ${idMismatches.length} 处（提示，不拦截）：\n`);
+  idMismatches.forEach((problem) => process.stdout.write(`  - ${problem}\n`));
+}
 if (problems.length) {
   // CR-2026-113：并发新建变更单缺编号时只提示，不再阻断 check:spec 与构建（退出码保持 0）。
   process.stdout.write(`\n待补登记 ${problems.length} 处（提示，不拦截）：\n`);
