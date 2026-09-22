@@ -340,17 +340,30 @@ function currentStudent() { return state.students.find(item => item.id === state
 // show the account instead of a student selector. Class orders keep the current-student display.
 function purchaseAccount() { const shared = readDemoState(); return (shared.accounts || []).find(item => item.id === state.accountId) || { name: '当前购买账号', phone: '' }; }
 function course(id = params.get('courseId')) { return state.courses.find(item => item.id === id) || (state.classOptions || []).find(item => item.id === id) || (state.allCourses || []).find(item => item.id === id) || state.courses[0]; }
-// 深链课程解析：严格匹配课程库、班级与课程档案，匹配不到返回 undefined。
-// 详情页入口一律走它，避免 `course()` 的兜底把失效 courseId 静默渲染成第一门课程（R59-UI-01／R59-UI-03）。
-function resolveCourse(id) {
-  if (!id) return undefined;
-  return state.courses.find(item => item.id === id)
-    || (state.classOptions || []).find(item => item.id === id)
-    || (state.allCourses || []).find(item => item.id === id);
+// ZK-B-18／ZK-B-21 深链口径：参数缺失或格式非法直接跳回列表；参数可解析但对象不存在、已删除、
+// 已隐藏或关联课程已停用／已下架时渲染统一空态卡片，保留当前 URL 不自动跳转。
+const DEEP_LINK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+function isDeepLinkIdUsable(id) { return Boolean(id) && DEEP_LINK_ID_PATTERN.test(String(id)); }
+// 深链目标解析：只认学员端可售课程、班级与面授课程档案；视频课程的商品已下架（不在可售集合）
+// 不再回落到课程档案，交由页面渲染空态，避免失效深链静默显示成另一门课程。
+function resolveDeepLinkTarget(id) {
+  if (!isDeepLinkIdUsable(id)) return null;
+  const sellable = state.courses.find(item => item.id === id);
+  if (sellable) return sellable;
+  const classItem = (state.classOptions || []).find(item => item.id === id);
+  if (classItem) return classItem;
+  const archive = (state.allCourses || []).find(item => item.id === id);
+  return archive && archive.type !== 'video' ? archive : null;
 }
-// 深链参数缺失或指向已下架／已删除对象时的统一空态：说明原因并给出返回入口。
-function renderMissingDeepLink(kind = '课程', href = '/learner/pages/courses.html', label = '返回课程库') {
-  layout(stack(card(`<div class="mp-empty"><strong>${esc(kind)}不存在或已失效</strong><p>该${esc(kind)}可能已下架、被删除或链接有误，请返回后重新选择。</p></div>`), `<a class="mp-button secondary full" href="${href}">${esc(label)}</a>`));
+// 班级深链可展示性：不存在、对象类型不符、展示状态为隐藏，或关联课程已停用／已下架时按空态处理。
+function classDeepLinkUnavailable(item) {
+  if (!item || item.objectType !== 'class') return true;
+  if (item.visible === false) return true;
+  return Boolean(courseArchiveFor(item.courseId)?.disabledAt);
+}
+// 统一空态卡片：与页面说明口径一致，保留 URL 不自动跳转。
+function renderDeepLinkEmpty(href = '/learner/pages/courses.html', label = '返回课程列表') {
+  layout(stack(card('<div class="mp-empty"><strong>课程不存在或已下架</strong><p>该课程或班级可能已删除、已隐藏，或关联课程已停用、关联商品已下架；请返回列表重新选择。</p></div>'), `<a class="mp-button secondary full" href="${href}">${esc(label)}</a>`));
 }
 // 教室文案：校区或教室缺失时不再输出 undefined，两者都缺时显示「教室待定」。
 function roomText(item, fallback = '教室待定') { return [item?.campus, item?.classroom].filter(Boolean).join(' · ') || fallback; }
@@ -691,7 +704,7 @@ function renderOfflineCourseDetail(item) {
   document.querySelectorAll('[data-course-detail-tab]').forEach(tab => tab.addEventListener('click', () => go(`/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}&tab=${tab.dataset.courseDetailTab}`)));
 }
 function renderCourseDetail(item) {
-  if (!item) { renderMissingDeepLink('课程'); return; }
+  if (!item) { renderDeepLinkEmpty('/learner/pages/courses.html', '返回课程列表'); return; }
   if (item.type === 'class' && item.objectType === 'course') { renderOfflineCourseDetail(item); return; }
   const isClass = item.type === 'class';
   const status = isClass ? item.classStatus || '招生中' : (item.sellable === false ? (item.product?.status || '未上架') : item.status || '可购买');
@@ -903,7 +916,7 @@ function renderFastRegistration() {
   draw();
 }
 function renderFastRegistrationDetail(item) {
-  if (!item || item.objectType !== 'class') { layout('<div class="mp-empty">未找到该班级</div>'); return; }
+  if (classDeepLinkUnavailable(item)) { renderDeepLinkEmpty('/learner/pages/fast-registration.html', '返回班级列表'); return; }
   const available = item.bookable === true;
   const status = item.learnerStatus;
   const statusTone = available ? 'green' : 'gray';
@@ -974,7 +987,8 @@ function classTimetableSessions(classId) {
 }
 function classTimetableView(item) {
   const sessions = classTimetableSessions(item.id);
-  const statusTone = (value) => (value === '已完成' || value === '已上课' ? 'gray' : value === '已停课' || value === '已取消' ? 'amber' : 'green');
+  // CR-2026-099：课次不设「已取消」，学员端班级课表只按 4 态着色（ZK-B-14 残留清理）。
+  const statusTone = (value) => (value === '已完成' || value === '已上课' ? 'gray' : value === '已停课' ? 'amber' : 'green');
   const list = sessions.length
     ? `<ol class="mp-class-timetable">${sessions.map((session, index) => `<li><div><strong>第 ${index + 1} 次 · ${esc(session.date)} ${esc(session.weekday || '')}</strong><small>${esc(session.startTime || session.start || '—')}–${esc(session.endTime || session.end || '—')} · ${esc(item.classroom || '教室待定')}</small></div>${pill(session.status || '待上课', statusTone(session.status))}</li>`).join('')}</ol>`
     : '<p class="mp-muted">课表尚未发布，发布后会在这里显示每次课的日期、时间与教室。</p>';
@@ -987,7 +1001,7 @@ function shareClassTimetable(item) {
   toast('已生成班级课表分享链接，可发送给家长');
 }
 function renderClassDetail(item, tab = params.get('tab') || 'overview') {
-  if (!item || item.objectType !== 'class') { renderMissingDeepLink('班级', '/learner/pages/fast-registration.html', '返回班级列表'); return; }
+  if (classDeepLinkUnavailable(item)) { renderDeepLinkEmpty('/learner/pages/fast-registration.html', '返回班级列表'); return; }
   const record = classLearningRecord(item);
   const activeTab = ['overview', 'timetable', 'attendance', 'result'].includes(tab) ? tab : 'overview';
   const content = activeTab === 'timetable' ? classTimetableView(item) : activeTab === 'attendance' ? classAttendanceHomeworkView(item) : activeTab === 'result' ? resultView(item, record) : classInfoView(item, record);
@@ -1418,7 +1432,7 @@ function learningCourseCard(item) {
   const statusLabels = { ongoing: '进行中', upcoming: '待开课', ended: '已结束' };
   const statusTones = { ongoing: 'green', upcoming: 'amber', ended: 'gray' };
   const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
-  const lessonTone = item.lessonStatus === '上课中' ? 'amber' : item.lessonStatus === '已完成' ? 'green' : ['已取消', '已停课'].includes(item.lessonStatus) ? 'gray' : '';
+  const lessonTone = item.lessonStatus === '上课中' ? 'amber' : item.lessonStatus === '已完成' ? 'green' : item.lessonStatus === '已停课' ? 'gray' : '';
   const totalLessons = item.lessons || item.totalLessons || 0;
   const completedLessons = item.completedLessons ?? Math.round((item.progress || 0) * totalLessons / 100);
   const courseStatus = item.status === 'ongoing' ? '' : pill(statusLabels[item.status], statusTones[item.status]);
@@ -1742,11 +1756,22 @@ if (!isLearnerPublicPage(miniPageName(path)) && !isMiniLoggedIn()) {
   redirectMiniLogin('learner');
 } else if (path.endsWith('/index.html') || path.endsWith('/learner/')) renderHome();
 else if (path.endsWith('/courses.html')) renderCourses();
-// 详情页深链一律严格解析：失效或缺失 courseId 走空态，不再兜底成第一门课程（R59-UI-01／R59-UI-03）。
-else if (path.endsWith('/course-detail.html')) renderCourseDetail(resolveCourse(params.get('courseId')));
+// 详情页深链：缺参或参数格式非法直接跳回列表；可解析但对象失效走空态，不再兜底成第一门课程（ZK-B-18／ZK-B-21）。
+else if (path.endsWith('/course-detail.html')) {
+  if (!isDeepLinkIdUsable(params.get('courseId'))) go('/learner/pages/courses.html');
+  else renderCourseDetail(resolveDeepLinkTarget(params.get('courseId')));
+}
 else if (path.endsWith('/fast-registration.html')) renderFastRegistration();
-else if (path.endsWith('/fast-registration-detail.html')) renderFastRegistrationDetail(resolveCourse(params.get('classId') || params.get('courseId')));
-else if (path.endsWith('/class-detail.html')) renderClassDetail(resolveCourse(params.get('courseId')));
+else if (path.endsWith('/fast-registration-detail.html')) {
+  const classDeepLinkId = params.get('classId') || params.get('courseId');
+  if (!isDeepLinkIdUsable(classDeepLinkId)) go('/learner/pages/fast-registration.html');
+  else renderFastRegistrationDetail(resolveDeepLinkTarget(classDeepLinkId));
+}
+else if (path.endsWith('/class-detail.html')) {
+  const classDeepLinkId = params.get('courseId') || params.get('classId');
+  if (!isDeepLinkIdUsable(classDeepLinkId)) go('/learner/pages/fast-registration.html');
+  else renderClassDetail(resolveDeepLinkTarget(classDeepLinkId));
+}
 else if (path.endsWith('/payment.html')) renderPayment();
 else if (path.endsWith('/orders.html')) renderOrders();
 else if (path.endsWith('/order-detail.html')) renderOrderDetail();

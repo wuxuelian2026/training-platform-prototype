@@ -59,7 +59,7 @@ export function classLessonProgress(record, now = DEMO_NOW) {
   const total = Number(record?.lessons || sessions.length || 0);
   const completed = sessions.filter(session => {
     if (['已完成', '已上课', 'completed'].includes(session?.status)) return true;
-    if (['已取消', 'cancelled'].includes(session?.status)) return false;
+    // ZK-B-14：课次不设「已取消」状态（4 态口径，见 CR-2026-099），不再保留该状态的防御分支。
     const endAt = asDate(`${session?.date || ''} ${session?.endTime || session?.end || '23:59'}`);
     return endAt ? now >= endAt : false;
   }).length;
