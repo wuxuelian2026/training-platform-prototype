@@ -227,7 +227,7 @@ body { background: #f7f7f5; }
 .mp-order-card-facts div { min-width: 0; }
 .mp-order-card-facts span, .mp-order-card-facts strong { display: block; }
 .mp-order-card-facts span { color: var(--muted); font-size: 11px; }
-.mp-order-card-facts strong { margin-top: 3px; overflow: hidden; color: #4d433e; font-size: 12px; font-weight: 600; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.mp-order-card-facts strong { margin-top: 3px; color: #4d433e; font-size: 12px; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
 .mp-order-card-footer { align-items: center; padding-top: 12px; }
 .mp-order-card-footer > span { color: var(--muted); font-size: 12px; }
 .mp-order-card-footer b { color: var(--brand); font-size: 15px; }
@@ -1160,7 +1160,7 @@ body { background: #f7f7f5; }
 .teacher-contract-card-facts > div:nth-child(odd) { padding-right: 9px; }
 .teacher-contract-card-facts > div:nth-child(even) { padding-left: 9px; border-left: 1px solid #f0ece8; }
 .teacher-contract-card-facts dt { color: var(--muted); font-size: 9px; }
-.teacher-contract-card-facts dd { margin: 3px 0 0; overflow: hidden; color: #514943; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.teacher-contract-card-facts dd { margin: 3px 0 0; color: #514943; font-size: 10px; overflow-wrap: anywhere; }
 .teacher-contract-card-foot { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid #f0ece8; }
 .teacher-contract-card-foot > span { color: var(--muted); font-size: 9px; }
 .teacher-contract-card-foot strong { display: flex; align-items: center; gap: 4px; color: var(--brand); font-size: 10px; }
@@ -1178,7 +1178,7 @@ body { background: #f7f7f5; }
 .teacher-contract-info-head span { color: var(--muted); font-size: 9px; }
 .teacher-contract-file { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 13px; padding: 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
 .teacher-contract-file-page { display: grid; min-height: 148px; align-content: center; justify-items: center; padding: 10px 7px; border: 1px solid #d9cec6; background: #fffdfb; color: #62564f; text-align: center; }
-.teacher-contract-file-page span { width: 100%; overflow: hidden; color: #978b83; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.teacher-contract-file-page span { width: 100%; color: #978b83; font-size: 7px; overflow-wrap: anywhere; }
 .teacher-contract-file-page strong { margin-top: 22px; font-size: 11px; }
 .teacher-contract-file-page p { margin: 5px 0 0; color: #746962; font-size: 8px; }
 .teacher-contract-file-page small { margin-top: 22px; color: var(--muted); font-size: 8px; }
@@ -1359,7 +1359,7 @@ body { background: #f7f7f5; }
 .mp-learning-lesson-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 6px; margin-top: 8px; color: #403a35; font-size: 12px; font-weight: 700; }
 .mp-learning-lesson-row .mp-pill { min-height: 20px; padding: 0 6px; font-size: 10px; font-weight: 400; }
 .mp-learning-schedule,
-.mp-learning-resume { margin: 5px 0 0; overflow: hidden; color: #655d58; font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.mp-learning-resume { margin: 5px 0 0; color: #655d58; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
 .mp-learning-resume { margin-top: 9px; }
 .mp-learning-progress { margin-top: 13px; }
 .mp-learning-progress > div:first-child { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: var(--muted); font-size: 11px; }

@@ -2,7 +2,11 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="refresh" content="0; url=learner/index.html" />
+  <!-- ZK-D-50 D50-2：跳转目标用绝对路径，避免被 SPA 回退到本页时按当前深路径无限追加 learner/；file:// 下退回相对路径。 -->
+  <meta http-equiv="refresh" content="0; url=/learner/index.html" />
+  <script>
+    if (location.protocol === 'file:') location.replace('learner/index.html');
+  </script>
   <title>继续教育小程序原型入口</title>
 </head>
 <body>

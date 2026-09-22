@@ -12,12 +12,13 @@
 //      BASE=http://127.0.0.1:4180 node scripts/sweep-pages.mjs
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// SWEEP_ROOT 允许指向任意检出（QA 用 `git archive` 归档复跑时不必把脚本复制进检出）。
+const root = process.env.SWEEP_ROOT ? resolve(process.env.SWEEP_ROOT) : resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = process.env.BASE || 'http://127.0.0.1:4174';
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = Number(process.env.CDP_PORT || 9723);
@@ -25,13 +26,33 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const { PAGE_TYPES } = await import(pathToFileURL(join(root, 'spec/pages/page-types.js')).href);
 
+// ZK-D-50 D50-1：小程序只有端根目录的 index（学员端另有 /login.html），其余页面都在 <端>/pages/ 下。
+// 旧映射把 /teacher/applications 之类不存在的路径交给 SPA 回退，回退页的相对 meta refresh 会无限追加 learner/。
 const urlOf = (key) => {
   if (key === 'admin/index' || key === 'admin/login') return `/${key}.html`;
-  if (key.startsWith('learner/')) return key === 'learner/login' ? '/login.html' : `/${key}.html`;
-  if (key.startsWith('teacher/')) return `/${key}.html`;
+  if (key === 'learner/index') return '/learner/index.html';
+  if (key === 'learner/login') return '/login.html';
+  if (key.startsWith('learner/')) return `/learner/pages/${key.split('/')[1]}.html`;
+  if (key === 'teacher/index') return '/teacher/index.html';
+  if (key.startsWith('teacher/')) return `/teacher/pages/${key.split('/')[1]}.html`;
   return `/admin/pages/${key}.html`;
 };
 const viewportOf = (key) => (key.startsWith('learner/') || key.startsWith('teacher/') ? [390, 844] : [1280, 900]);
+// 参数依赖页：缺参会渲染空态或跳回列表（ZK-B-18／ZK-B-21），巡检按演示基��注入有效参数，
+// 否则「正文过短」会被误判成页面缺陷（如 teacher/class-overview 需要 ?class=）。
+const PARAMS_OF = {
+  'learner/course-detail': '?courseId=COURSE-CR-2026-0002',
+  'learner/class-detail': '?courseId=class-mock-enrolling-01',
+  'learner/fast-registration-detail': '?classId=class-mock-enrolling-01'
+};
+// 预期空态页（CR-2026-054 已移除教师端旧班级演示数据，新班级由后台建班后进入）。
+// 这类页面正文短是设计使然，但必须真的渲染出空态文案，否则仍按「正文过短」判失败。
+const EXPECTED_EMPTY = {
+  'teacher/class-detail': '暂无班级',
+  'teacher/class-overview': '暂无班级'
+};
+// 根 landing 的特征：标题固定，且带相对 meta refresh（一旦命中说明地址写错、被 SPA 回退了）。
+const LANDING_TITLE = '继续教育小程序原型入口';
 const keyFilter = (process.env.PAGES || '').split(',').map((item) => item.trim()).filter(Boolean);
 // 页面说明弹窗检查可用 HELP_CHECK=0 关闭：个别页面在弹窗交互后会出现客户端重定向链，
 // 让后续页面导航等待超时；版面与可达性断言不依赖弹窗交互，聚焦巡检时可关掉。
@@ -43,7 +64,58 @@ process.on('unhandledRejection', (error) => {
 });
 const pages = [...new Set(Object.keys(PAGE_TYPES))].sort()
   .filter((key) => !keyFilter.length || keyFilter.some((item) => key.includes(item)))
-  .map((key) => ({ key, url: urlOf(key), viewport: viewportOf(key) }));
+  .map((key) => ({ key, url: `${urlOf(key)}${PARAMS_OF[key] || ''}`, viewport: viewportOf(key), file: join(root, urlOf(key).split('?')[0]) }));
+
+// D50-1 预检 1：期望 URL ↔ 磁盘文件存在性。映射写错时先报错，不把错误混进断言结果。
+const missingFiles = [];
+for (const page of pages) {
+  if (!existsSync(page.file)) missingFiles.push(`${page.key} → ${page.url}`);
+  // 端与路径前缀一致性：防止把 teacher/x 映射到 learner 目录等同号不同端的错误。
+  const expectedPrefix = page.key.startsWith('teacher/') ? '/teacher/' : page.key.startsWith('learner/') ? '/learner/' : '/admin/';
+  const allowed = page.key === 'learner/login' ? page.url.startsWith('/login.html') : page.url.startsWith(expectedPrefix);
+  if (!allowed) missingFiles.push(`${page.key} → ${page.url}（端与路径前缀不一致，期望 ${expectedPrefix}）`);
+}
+if (missingFiles.length) {
+  process.stderr.write(`[sweep] 路由映射预检失败，以下页面在磁盘上不存在：\n  ${missingFiles.join('\n  ')}\n`);
+  process.exit(2);
+}
+// D50-1 预检 2：从磁盘 HTML 取期望标题；缺 title 视为登记错误。
+const titleOf = (file) => (readFileSync(file, 'utf8').match(/<title>([^<]*)<\/title>/)?.[1] || '').trim();
+const titleProblems = [];
+for (const page of pages) {
+  // 端壳标记按磁盘 HTML 实测推导：登录页等无壳页面不强行要求壳标记（避免误报）。
+  const html = readFileSync(page.file, 'utf8');
+  page.shell = html.includes('data-mobile-shell') ? 'data-mobile-shell' : html.includes('data-admin-shell') ? 'data-admin-shell' : '';
+  page.expectedTitle = titleOf(page.file);
+  if (!page.expectedTitle) titleProblems.push(`${page.key} → ${page.url}`);
+}
+if (titleProblems.length) {
+  process.stderr.write(`[sweep] 预检失败，以下页面缺少 <title>：\n  ${titleProblems.join('\n  ')}\n`);
+  process.exit(2);
+}
+// D50-1 预检 3：HTTP 响应自检 —— 200、含端壳标记、标题与磁盘一致、且不是根 landing / 相对跳转页。
+const preflight = [];
+for (const page of pages) {
+  let problem = '';
+  try {
+    const response = await fetch(`${BASE}${page.url}`);
+    const html = await response.text();
+    const served = (html.match(/<title>([^<]*)<\/title>/)?.[1] || '').trim();
+    const hasShellSource = page.shell ? html.includes(page.shell) : html.includes('type="module"');
+    if (response.status !== 200) problem = `HTTP ${response.status}`;
+    else if (served === LANDING_TITLE) problem = `命中根 landing（实际 URL ${page.url}）`;
+    else if (/http-equiv="refresh"/i.test(html)) problem = '命中带 meta refresh 的回退页';
+    else if (served !== page.expectedTitle) problem = `标题不一致：响应「${served}」≠ 磁盘「${page.expectedTitle}」`;
+    else if (!hasShellSource) problem = '响应 HTML 不含端壳或模块脚本标记';
+  } catch (error) {
+    problem = `请求失败：${String(error?.message || error).slice(0, 80)}`;
+  }
+  preflight.push({ key: page.key, url: page.url, expectedTitle: page.expectedTitle, problem });
+}
+const preflightFailures = preflight.filter((item) => item.problem);
+if (preflightFailures.length) {
+  process.stderr.write(`[sweep] 响应自检失败 ${preflightFailures.length} 页（防止地址写错也返回 200 造成假通过）：\n${preflightFailures.map((item) => `  - ${item.key} ${item.url}：${item.problem}`).join('\n')}\n`);
+}
 
 const child = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'sweep-'))}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', 'about:blank'], { stdio: 'ignore' });
 let up = false;
@@ -167,8 +239,34 @@ for (const page of pages) {
       const trigger = document.querySelector('[data-page-help-trigger], .page-help-trigger, [data-help-trigger]');
       const body = (document.querySelector('main, .mobile-main, #page-content, body')?.innerText || '').trim();
       const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
-      return { hasTrigger: Boolean(trigger), bodyLength: body.length, overflow, title: document.title, href: location.href };
+      // D50-1 浏览器侧自检：落点路径、标题与端壳标记都必须与登记一致，命中根 landing 直接判失败。
+      const shells = ['data-mobile-shell', 'data-admin-shell'];
+      return {
+        hasTrigger: Boolean(trigger),
+        bodyLength: body.length,
+        bodyText: body.slice(0, 200),
+        overflow,
+        title: document.title,
+        href: location.href,
+        pathname: location.pathname,
+        shellFound: shells.some((name) => Boolean(document.querySelector(`[${name}]`))),
+        hasRefreshMeta: Boolean(document.querySelector('meta[http-equiv="refresh" i]'))
+      };
     });
+    const expectedPath = page.url.split('?')[0];
+    const landingHit = probe.title === LANDING_TITLE || probe.hasRefreshMeta;
+    const shellMismatch = Boolean(page.shell) && !probe.shellFound;
+    const titleMismatch = probe.title !== page.expectedTitle;
+    const pathMismatch = probe.pathname !== expectedPath;
+    const routeProblem = landingHit
+      ? `命中根 landing／回退页（实际 ${probe.href}）`
+      : pathMismatch
+        ? `落点不符：实际 ${probe.pathname} ≠ 期望 ${expectedPath}`
+        : shellMismatch
+          ? '页面缺少端壳标记'
+          : titleMismatch
+            ? `标题不符：实际「${probe.title}」≠ 期望「${page.expectedTitle}」`
+            : '';
     const clipping = await evaluate(clippingProbe);
     let helpOpen = false;
     let headings = [];
@@ -190,7 +288,18 @@ for (const page of pages) {
       });
     }
     process.stderr.write(`[sweep] ${page.key} done ${Date.now() - startedAt}ms\n`);
-    rows.push({ ...page, ...probe, ...clipping, helpOpen, headings: headings.length, consoleErrors: events.filter((e) => e.type === 'console').length, exceptions: events.filter((e) => e.type === 'exception').length, samples: events.slice(0, 2).map((e) => `${e.type}: ${String(e.text).slice(0, 120)}`) });
+    rows.push({
+      ...page,
+      ...probe,
+      ...clipping,
+      routeProblem,
+      helpOpen,
+      headings: headings.length,
+      headingTexts: headings,
+      consoleErrors: events.filter((e) => e.type === 'console').length,
+      exceptions: events.filter((e) => e.type === 'exception').length,
+      samples: events.slice(0, 2).map((e) => `${e.type}: ${String(e.text).slice(0, 120)}`)
+    });
   } catch (error) {
     rows.push({ ...page, error: String(error).slice(0, 200) });
   }
@@ -223,8 +332,14 @@ child.kill();
 
 const summary = {
   pages: rows.length,
+  preflightFailures: preflightFailures.map((item) => `${item.key} ${item.url}：${item.problem}`),
+  routeProblems: rows.filter((r) => r.routeProblem).map((r) => `${r.key}：${r.routeProblem}`),
   failed: rows.filter((r) => r.error).map((r) => r.key),
-  emptyBody: rows.filter((r) => !r.error && r.bodyLength < 40).map((r) => r.key),
+  emptyBody: rows.filter((r) => !r.error && r.bodyLength < 40 && !EXPECTED_EMPTY[r.key]).map((r) => r.key),
+  // 登记为预期空态的页面：只要渲染出约定空态文案就不算缺陷，否则仍计入失败。
+  emptyStateMismatch: rows
+    .filter((r) => !r.error && EXPECTED_EMPTY[r.key] && !String(r.bodyText || '').includes(EXPECTED_EMPTY[r.key]))
+    .map((r) => `${r.key}（期望空态文案「${EXPECTED_EMPTY[r.key]}」）`),
   missingTrigger: rows.filter((r) => !r.error && !r.hasTrigger).map((r) => r.key),
   helpNotOpen: rows.filter((r) => !r.error && r.hasTrigger && !r.helpOpen).map((r) => r.key),
   noHeadings: rows.filter((r) => !r.error && r.helpOpen && !r.headings).map((r) => r.key),
@@ -238,6 +353,6 @@ const summary = {
 writeFileSync(join(root, '_sweep-pages.json'), JSON.stringify({ summary, rows }, null, 2));
 console.log(JSON.stringify(summary, null, 2));
 const viewProblems = Object.entries(timetableViews).filter(([, value]) => value.overflow > 2 || value.clippedCount > 0 || value.unreachableCount > 0 || value.consoleErrors > 0 || value.exceptions > 0).map(([key, value]) => `${key} 溢出${value.overflow}/被裁${value.clippedCount}/不可达${value.unreachableCount}/错误${value.consoleErrors + value.exceptions}`);
-const bad = summary.failed.length + summary.emptyBody.length + summary.missingTrigger.length + summary.helpNotOpen.length + summary.noHeadings.length + summary.overflow.length + summary.consoleErrorPages.length + summary.exceptionPages.length + summary.clippedContent.length + summary.unreachableScrollers.length + viewProblems.length;
-console.log(bad ? `巡检未通过：${bad} 项${viewProblems.length ? `（课表视图：${viewProblems.join('、')}）` : ''}` : '巡检通过：全部页面可加载、说明入口与小节齐备、无溢出、无被裁不可达内容、无控制台错误（含课表四视图 390／1280 专项）');
+const bad = summary.failed.length + summary.emptyBody.length + summary.emptyStateMismatch.length + summary.missingTrigger.length + summary.helpNotOpen.length + summary.noHeadings.length + summary.overflow.length + summary.consoleErrorPages.length + summary.exceptionPages.length + summary.clippedContent.length + summary.unreachableScrollers.length + viewProblems.length + summary.preflightFailures.length + summary.routeProblems.length;
+console.log(bad ? `巡检未通过：${bad} 项${viewProblems.length ? `（课表视图：${viewProblems.join('、')}）` : ''}` : '巡检通过：全部页面可加载且落点与标题正确、说明入口与小节齐备、无溢出、无被裁不可达内容、无控制台错误（含课表四视图 390／1280 专项）');
 process.exit(bad ? 1 : 0);

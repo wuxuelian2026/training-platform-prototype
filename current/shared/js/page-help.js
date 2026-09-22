@@ -56,24 +56,29 @@ const buildContent = (pageKey) => {
     `${machine.object}（${machine.id}）状态取值：${stateLabelsOf(machine).join(' / ')}。`,
     ...(machine.transitions || []).map(([from, event, to, role]) => `${machine.object}流转：${from} —${event}→ ${to}（${role}）。`)
   ]);
-  const sections = [template
+  // ZK-D-50 D50-5：先收集小节，再把字段表分组按标题合并进同名小节，避免出现两个同名 <h3>
+  //（此前 teacher/applications 的「业务规则」、teacher/application-create 的「提交与校验说明」都会重复一次）。
+  const blocks = template
     .filter((heading) => heading !== statusHeading || statusItems.length)
     .map((heading) => {
       const items = heading === statusHeading ? statusItems : (authored?.[heading]?.length ? authored[heading] : (derived[heading] || []));
-      return listSection(heading, items);
-    }).join('')];
+      return { heading, items };
+    });
   // 看板 / 配置 / 表单模板没有状态小节：命中状态机时在末尾补出状态段，未命中则不出现。
   if (statusItems.length && !template.includes(statusHeading)) {
-    sections.push(listSection(statusHeading, statusItems));
+    blocks.push({ heading: statusHeading, items: statusItems });
   }
   // 字段表与模板小节并存时，规格里的补充说明若已写在模板小节里就不再重复展示。
   const authoredTexts = new Set([...(authored ? Object.values(authored).flat() : []), ...Object.values(derived).flat()].map(clean));
-  if (spec) sections.push(spec.groups.map((group) => {
-    if (group.rows) return tableSection(group.heading, group.rows);
+  if (spec) spec.groups.forEach((group) => {
+    if (group.rows) { blocks.push({ heading: group.heading, rows: group.rows }); return; }
     const items = (group.items || []).filter((item) => !authoredTexts.has(clean(item)));
-    return items.length ? listSection(group.heading, items) : '';
-  }).join(''));
-  return sections.join('');
+    if (!items.length) return;
+    const sameHeading = blocks.find((block) => block.heading === group.heading && !block.rows);
+    if (sameHeading) { sameHeading.items = [...new Set([...sameHeading.items, ...items])]; return; }
+    blocks.push({ heading: group.heading, items });
+  });
+  return blocks.map((block) => (block.rows ? tableSection(block.heading, block.rows) : listSection(block.heading, block.items))).join('');
 };
 
 export const mountPageHelp = ({ pageKey, title, root = document.body }) => {
