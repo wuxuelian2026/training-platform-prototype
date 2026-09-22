@@ -87,6 +87,19 @@
 .contract-document h3 { margin: 16px 0 8px; text-align: center; font-size: 18px; }
 .contract-document p { margin: 8px 0; color: #595959; line-height: 1.8; }
 .contract-document .document-seal { width: 44px; height: 44px; display: grid; place-items: center; margin: 0 auto; border: 2px solid var(--brand); border-radius: 50%; color: var(--brand); font-weight: 700; }
+/* CR-2026-083：后台合同详情复用教师端条文模板（shared/js/contract-document.js），这里给出桌面端排版。 */
+.contract-document .teacher-contract-document { padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--ink); }
+.contract-document .teacher-contract-document-brand { color: var(--muted); font-size: 11px; text-align: center; }
+.contract-document .teacher-contract-document > h2 { margin: 10px 0 0; font-size: 18px; text-align: center; }
+.contract-document .teacher-contract-document-number,
+.contract-document .teacher-contract-parties { margin: 6px 0; color: var(--muted); font-size: 12px; text-align: center; }
+.contract-document .teacher-contract-parties p { margin: 2px 0; font-size: 12px; }
+.contract-document .teacher-contract-document section { margin-top: 14px; }
+.contract-document .teacher-contract-document section h3 { margin: 0 0 4px; font-size: 13px; text-align: left; }
+.contract-document .teacher-contract-document section p { margin: 0; font-size: 12px; line-height: 1.8; text-align: left; }
+.contract-document .teacher-contract-document-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; padding-top: 14px; border-top: 1px solid #e6e1dc; }
+.contract-document .teacher-contract-document-signatures span { display: block; color: var(--muted); font-size: 12px; }
+.contract-document .teacher-contract-document-signatures strong { display: block; margin-top: 10px; font-size: 12px; }
 .contract-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
 .contract-form-grid .wide { grid-column: 1 / -1; }
 .schedule-toolbar { align-items: flex-end; }

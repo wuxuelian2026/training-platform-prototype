@@ -50,7 +50,7 @@ if (agreementRoot) {
     bindEditor();
   }
 
-  // 协��正文是富文本字段：改用与图文详情、教师简介同源的富文本编辑器组件。
+  // 协议正文是富文本字段：改用与图文详情、教师简介同源的富文本编辑器组件。
   function mountAgreementEditor() {
     const field = agreementRoot.querySelector('[data-rich-editor]');
     const editor = mountRichEditor(field);

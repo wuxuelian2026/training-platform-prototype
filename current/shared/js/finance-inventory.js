@@ -75,7 +75,7 @@ function videoRefundRuleFor(orderNo) {
   const paidAt = order.paidAt || order.createdAt;
   const paidTime = paidAt ? new Date(String(paidAt).replace(' ', 'T')).getTime() : NaN;
   const ageDays = Number.isFinite(paidTime) ? Math.max(0, (demoDateTime(DEMO_TODAY).getTime() - paidTime) / 86400000) : Infinity;
-  const watchedLessons = watched.filter(id => /^chapter-\d+$/.test(id)).length;
+  const watchedLessons = [...watched].filter(id => /^chapter-\d+$/.test(id)).length;
   return { eligible: Number.isFinite(paidTime) && ageDays <= config.windowDays && watchedLessons <= config.maxLessons, watchedLessons, ageDays, config, reason: !Number.isFinite(paidTime) || ageDays > config.windowDays ? `超过${config.windowDays}日退款期限` : watchedLessons > config.maxLessons ? `已观看${watchedLessons}课时，超过${config.maxLessons}课时上限` : '满足视频课程退款条件' };
 }
 

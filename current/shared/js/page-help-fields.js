@@ -13,7 +13,7 @@ import { PAGE_FIELD_SPECS, toPageSpec } from '../../spec/fields/index.js';
 export const FIELD_PAGE_COLUMNS = ['参数名', '类型', '长度', '是否必填', '说明'];
 
 const STRUCTURED_PAGE_TABLES = Object.fromEntries(
-  Object.entries(PAGE_FIELD_SPECS).map(([pageKey, page]) => [pageKey, toPageSpec(page)])
+  Object.entries(PAGE_FIELD_SPECS).map(([pageKey, page]) => [pageKey, toPageSpec(page, pageKey)])
 );
 
 // 过渡态容器：所有页面都已迁移到 spec/fields/，这里保持空对象。

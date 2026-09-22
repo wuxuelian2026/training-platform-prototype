@@ -1,7 +1,9 @@
 import { relativePath } from './paths.js';
 import { readAdminSession } from './admin-auth.js';
 import { mountRichEditor } from './rich-editor.js';
-import { demoId, demoTime, readDemoState, upsertDemoRecord, writeDemoState } from './demo-store.js';
+import { contractSettings, demoId, demoTime, fileSpecSettings, readDemoState, upsertDemoRecord, writeDemoState } from './demo-store.js';
+import { contractDocumentHtml } from './contract-document.js';
+import { contractSignDeadline } from './contract-terms.js';
 import { readXlsxSheetRows } from './xlsx-lite.js';
 import { teacherFactsById } from './teacher-facts.js';
 import { classSeed } from './class-seed.js';
@@ -47,7 +49,7 @@ const tagClass = (value) => ({
   待完善: 'gray', 已建档: 'green', 在职: 'green', 离职: 'gray', 可申报: 'brand', 可排课: 'green', 暂停使用: 'gray',
   已签署: 'green', 待签署: 'amber', 待教师签署: 'amber', 待学校签署: 'brand', 签署中: 'brand',
   有效: 'green', 即将到期: 'amber', 已到期: 'red', 已终止: 'gray', 无合同: 'gray', 已驳回: 'red', 已撤销: 'gray',
-  未激活: 'gray', 正常: 'green', 冻结: 'gray', 草稿: 'gray'
+  正常: 'green', 冻结: 'gray', 草稿: 'gray'
 }[value] || 'gray');
 
 function statusTag(value) { return `<span class="tag ${tagClass(value)}">${value}</span>`; }
@@ -167,7 +169,6 @@ function renderTeacherActions(row, cell) {
   const account = row.dataset.accountStatus;
   const id = encodeURIComponent(row.dataset.teacherId);
   const actions = [`<a class="link" href="/admin/pages/teachers/profile.html?teacher_id=${id}">查看</a>`, `<a class="link" href="/admin/pages/teachers/create.html?mode=edit&teacher_id=${id}">编辑</a>`];
-  if (profile === '已建档' && account === 'inactive') actions.push('<button type="button" class="text-button" data-action="resend-invite">重新发送邀请</button>');
   if (account === 'frozen') actions.push('<button type="button" class="text-button" data-action="unfreeze">解冻</button>');
   else if (account === 'active' && !departedAt) actions.push('<button type="button" class="text-button danger-link" data-action="freeze">冻结</button>');
   if (!departedAt) actions.push('<button type="button" class="text-button danger-link" data-action="resign">办理离职</button>');
@@ -246,7 +247,7 @@ function resetTeacherImport() {
   const validateButton = document.querySelector('[data-action="teacher-import-validate"]');
   const commitButton = document.querySelector('[data-action="teacher-import-commit"]');
   if (validateButton) { validateButton.disabled = false; validateButton.textContent = '开始校验'; }
-  if (commitButton) { commitButton.disabled = false; commitButton.textContent = '确认导入并发送邀请'; }
+  if (commitButton) { commitButton.disabled = false; commitButton.textContent = '确认导入'; }
 }
 
 function showTeacherImportStatus(kind, title, copy) {
@@ -428,7 +429,7 @@ function appendImportedTeachers(rows, results) {
     const inviteFailed = Boolean(results?.[index]?.inviteFailed);
     const no = `JS2026${String(915 + index).padStart(4, '0')}`;
     const phone = importMaskPhone(item.phone);
-    // CR-2026-030：待办标签列已下线，导入行只保留资料/账号状态；邀请发送结果通过提示与审计表达。
+    // CR-2026-030：待办标签列已下线，导入行只保留资料/账号状态；账号状态结果通过提示与结果区表达。
 
     const row = document.createElement('tr');
     row.dataset.importBatch = 'CR-2026-009-demo';
@@ -439,11 +440,11 @@ function appendImportedTeachers(rows, results) {
     row.dataset.category = importCategory(item.major);
     row.dataset.profileStatus = '已建档';
     row.dataset.departedAt = '';
-    row.dataset.accountStatus = 'inactive';
+    row.dataset.accountStatus = 'active';
     row.dataset.capabilities = '暂停使用';
-    // CR-2026-030：导入行按新列集合输出，能力列独立、不再有代办列；邀请结果由提示与审计表达。
+    // CR-2026-030：导入行按新列集合输出，能力列独立、不再有代办列；账号状态结果由提示与结果区表达。
     row.innerHTML = `<td><a class="link teacher-name" href="profile.html?teacher_id=${encodeURIComponent(row.dataset.teacherId)}">${importEsc(item.name)}</a><span class="teacher-cell-sub">${no} · ${phone}</span></td><td data-cell="major">${importEsc(item.major)}<br /><span class="teacher-cell-sub">${importEsc(item.personnel)}</span><br /><span class="teacher-credential" data-cell="credential"></span></td><td data-cell="capability"><span class="tag gray">暂停使用</span></td><td data-cell="featured"></td><td>暂无授课</td><td class="action-cell" data-cell="actions"></td>`;
-    if (inviteFailed) toast(`${item.name} 邀请发送失败，可在操作列重新发送。`, 'error');
+    if (inviteFailed) toast(`${item.name} 已建档，但账号状态未完成，请联系管理员处理。`, 'error');
     renderTeacherActions(row, row.querySelector('[data-cell="actions"]'));
     renderFeaturedSwitch(row, true);
     empty?.before(row);
@@ -455,7 +456,7 @@ async function commitTeacherImport() {
   // CR009-QA-02：处理中重复确认给出反馈（不静默返回），已完成重复确认回显首次结果。
   if (teacherImportBusy) { toast('本次导入正在处理，请勿重复提交。'); return; }
   if (!teacherImportRequest?.importJobId || !teacherImportRequest?.validationVersion) return;
-  // CR009-QA-02：重复确认返回首次结果，不重复建档、不重复发送邀请。
+  // CR009-QA-02：重复确认返回首次结果，不重复建档。
   if (teacherImportCommitted) {
     document.querySelector('[data-import-status]')?.setAttribute('hidden', '');
     document.querySelector('[data-import-result]')?.removeAttribute('hidden');
@@ -467,10 +468,9 @@ async function commitTeacherImport() {
   teacherImportBusy = true;
   const commitButton = document.querySelector('[data-action="teacher-import-commit"]');
   if (commitButton) { commitButton.disabled = true; commitButton.textContent = '导入中'; }
-  showTeacherImportStatus('loading', '正在导入并发送邀请', '请勿重复提交，系统正在处理本次导入。');
+  showTeacherImportStatus('loading', '正在导入教师档案', '请勿重复提交，系统正在处理本次导入。');
   await new Promise((resolve) => window.setTimeout(resolve, 750));
-  // 原型演示口径：最后一个可导入行模拟邀请发送失败，其余邀请成功；失败不回滚已建档数据。
-  const results = importable.map((item, index) => ({ ...item, inviteFailed: importable.length > 1 && index === importable.length - 1 }));
+  const results = importable.map((item) => ({ ...item, inviteFailed: false }));
   teacherImportCommitted = true;
   teacherImportBusy = false;
   appendImportedTeachers(importable, results);
@@ -491,13 +491,13 @@ async function commitTeacherImport() {
   text('teacher-import-result-invite-fail', String(inviteFailed));
   text('teacher-import-result-skipped', String(skipped));
   const resultCopy = document.querySelector('#teacher-import-result-copy');
-  if (resultCopy) resultCopy.textContent = `已建档 ${created} 人，其中 ${inviteFailed} 人邀请发送失败`;
+  if (resultCopy) resultCopy.textContent = `已建档 ${created} 人，${inviteFailed ? `${inviteFailed} 人账号状态异常` : 账号状态均为正常}`;
   const resultNote = document.querySelector('#teacher-import-result-note');
   if (resultNote) {
     const failedName = results.find((item) => item.inviteFailed)?.name;
-    resultNote.textContent = `失败行未导入；邀请失败不回滚已建档数据。${failedName ? `请在教师列表对${failedName}执行“重新发送邀请”。` : ''}`;
+    resultNote.textContent = `失败行未导入；账号异常不回滚已建档数据。${failedName ? `请联系管理员处理${failedName}的账号状态。` : ''}`;
   }
-  teacherImportResultText = `已建档 ${created} 人；${inviteOk} 人邀请成功${inviteFailed ? `，${inviteFailed} 人请在列表中重新发送邀请` : ''}。`;
+  teacherImportResultText = `已建档 ${created} 人；${inviteFailed ? `${inviteFailed} 人账号需管理员处理` : '账号状态已设为正常'}。`;
   applyTeacherFilters();
   toast(`导入完成：${teacherImportResultText}`);
 }
@@ -557,6 +557,7 @@ function initTeacherList() {
     if (facts) openTeacherCapacityEvidence(facts);
   });
   document.querySelectorAll('tr[data-teacher-id]').forEach((row) => {
+    if (row.dataset.accountStatus === 'inactive') row.dataset.accountStatus = 'active';
     renderTeacherActions(row, row.querySelector('[data-cell="actions"]'));
     renderFeaturedSwitch(row, canManageFeatured);
     renderTeacherCapability(row);
@@ -571,7 +572,6 @@ function initTeacherList() {
     const row = event.target.closest('tr[data-teacher-id]');
     if (!action || !row) return;
     if (['freeze', 'unfreeze', 'resign'].includes(action)) confirmTeacherAction(row, action);
-    if (action === 'resend-invite') toast(`已向${row.dataset.teacher}的建档手机号重新发送激活邀请。`);
   });
   document.querySelector('#teacher-action-confirm')?.addEventListener('click', (event) => {
     if (!activeTeacherRow) return;
@@ -678,7 +678,7 @@ function teacherRecordFromForm(form, id) {
     id,
     name: value('name'),
     profileStatus: '已建档',
-    accountStatus: 'inactive',
+    accountStatus: 'active',
     departedAt: '',
     majors: [...form.querySelectorAll('input[name="professionals[]"]')].map((input) => input.value),
     teachingYears: Number(value('teachingYears')) || 0,
@@ -1038,7 +1038,7 @@ function initTeacherCreate() {
     // CR-2026-048：建档只校验主档，证书不再随第一步提交。
     const result = form.querySelector('[data-build-result]');
     if (result) result.hidden = false;
-    toast('教师已建档；账号邀请发送失败，可重新发送。', 'error');
+    toast('教师已建档，账号状态为正常。');
     // CR-2026-048 §3.1：建档只写主档；新建教师写入演示态，第二步与详情页据此回读同一教师对象。
     const created = teacherRecordFromForm(form, demoId('teacher'));
     upsertDemoRecord('teacherRecords', created);
@@ -1061,17 +1061,6 @@ function initTeacherCreate() {
     teacherTabs.refreshBadges();
   });
   form?.addEventListener('change', () => teacherTabs.refreshBadges());
-  form?.querySelector('[data-action="retry-invite"]')?.addEventListener('click', (event) => {
-    event.currentTarget.disabled = true;
-    event.currentTarget.textContent = '邀请已发送';
-    const result = form.querySelector('[data-build-result]');
-    const title = result?.querySelector('strong');
-    const copy = result?.querySelector('p');
-    if (title) title.textContent = '已建档，邀请发送成功';
-    if (copy) copy.textContent = '教师账号保持“未激活”，待教师验证建档手机号、设置本人密码并同意协议后变为“正常”。';
-    result?.classList.add('success');
-    toast('激活邀请已重新发送。');
-  });
 }
 
 let renewSourceRow = null;
@@ -1079,11 +1068,13 @@ let renewSourceRow = null;
 // 已签署合同终止的二次确认用同一步骤计数，不再使用 window.confirm。
 let terminateConfirmStep = 0;
 
-function contractActionFieldsVisible(visible) {
-  ['#contract-action-note', '#contract-action-date'].forEach((selector) => {
-    const label = document.querySelector(selector)?.closest('label');
-    if (label) label.hidden = !visible;
-  });
+function contractActionFieldsVisible(action) {
+  const noteWrap = document.querySelector('#contract-action-note-wrap');
+  const dateWrap = document.querySelector('#contract-action-date-wrap');
+  const fileWrap = document.querySelector('#contract-action-file-wrap');
+  if (noteWrap) noteWrap.hidden = action !== 'terminate';
+  if (dateWrap) dateWrap.hidden = action !== 'terminate';
+  if (fileWrap) fileWrap.hidden = action !== 'school-upload';
 }
 
 function prepareContractAction(action, config) {
@@ -1091,7 +1082,9 @@ function prepareContractAction(action, config) {
   text('contract-action-title', config.title);
   text('contract-action-copy', config.copy);
   contractActionConfirm().dataset.action = action;
-  contractActionFieldsVisible(action === 'terminate');
+  contractActionFieldsVisible(action);
+  const fileInput = document.querySelector('#contract-action-file');
+  if (fileInput) fileInput.value = '';
   return contractActionConfirm();
 }
 
@@ -1101,6 +1094,45 @@ function contractActionConfirm() {
 function initContracts() {
   const form = document.querySelector('#contract-filter');
   const rows = [...document.querySelectorAll('tr[data-contract-id]')];
+  // CR-2026-083：演示数据的推送日期与续签来源在此补齐（正式实现由后端合同字段驱动）。
+  const demoPushDates = { CT2026090017: '2026-09-13', CT2026090018: '2026-09-13', CT2027010008: '2026-09-13' };
+  const demoRenewalSource = { CT2027010008: 'CT2026010008' };
+  rows.forEach((row) => {
+    if (demoPushDates[row.dataset.number]) row.dataset.pushedAt = demoPushDates[row.dataset.number];
+    if (demoRenewalSource[row.dataset.number]) row.dataset.renewedFrom = demoRenewalSource[row.dataset.number];
+  });
+  // CR-2026-083：详情补充行与发起合同的签署截止日期字段由脚本注入，与状态页签同为运行期生成。
+  const detailGrid = document.querySelector('#contract-detail-dialog .info-grid');
+  if (detailGrid && !detailGrid.querySelector('#contract-detail-deadline-wrap')) {
+    const deadlineWrap = document.createElement('div');
+    deadlineWrap.id = 'contract-detail-deadline-wrap';
+    deadlineWrap.hidden = true;
+    deadlineWrap.innerHTML = '<dt>签署截止日期</dt><dd id="contract-detail-deadline">—</dd>';
+    const renewalWrap = document.createElement('div');
+    renewalWrap.id = 'contract-detail-renewal-wrap';
+    renewalWrap.className = 'wide';
+    renewalWrap.hidden = true;
+    renewalWrap.innerHTML = '<dt>续签来源</dt><dd id="contract-detail-renewal">—</dd>';
+    const terminateWrap = detailGrid.querySelector('#contract-detail-terminate-wrap');
+    detailGrid.insertBefore(deadlineWrap, terminateWrap || null);
+    detailGrid.insertBefore(renewalWrap, terminateWrap || null);
+  }
+  const contractFormGrid = document.querySelector('#contract-form .contract-form-grid');
+  if (contractFormGrid && !contractFormGrid.querySelector('#contract-sign-deadline')) {
+    const deadlineField = document.createElement('label');
+    deadlineField.className = 'form-field';
+    deadlineField.innerHTML = '<span>签署截止日期</span><input id="contract-sign-deadline" readonly class="readonly-field" />';
+    const statusField = [...contractFormGrid.querySelectorAll('label.form-field')].find((node) => node.querySelector('span')?.textContent.trim() === '合同状态');
+    contractFormGrid.insertBefore(deadlineField, statusField || null);
+  }
+  // CR-2026-083：发起与续签都按后台参数配置的签署截止期限展示截止日期。
+  const prepareContractForm = () => {
+    const days = contractSettings().signDeadlineDays;
+    const field = document.querySelector('#contract-sign-deadline');
+    if (field) field.value = contractSignDeadline({ pushedAt: CONTRACT_DEMO_TODAY });
+    const label = field?.closest('label')?.querySelector('span');
+    if (label) label.textContent = `签署截止日期（推送后 ${days} 天）`;
+  };
   // 签署状态页签：取值只读 spec/states 的 SM-TEACHER-CONTRACT，「全部」是不加状态过滤的默认项。
   const contractStateMachine = machinesForPage('teachers/contracts').find((machine) => machine.id === 'SM-TEACHER-CONTRACT');
   const contractTabs = [
@@ -1134,15 +1166,62 @@ function initContracts() {
     const value = termStatusOf(row);
     cell.innerHTML = `<span class="tag ${tagClass(value)} contract-term-status">${value}</span>`;
   });
+  // CR-2026-083：签署状态单元格与编号单元格统一渲染——待教师签署附带签署截止日期，续签件标注原合同编号。
+  rows.forEach((row) => {
+    row.children[1]?.setAttribute('data-cell', 'number');
+    row.children[6]?.setAttribute('data-cell', 'sign-date');
+  });
+  const renderStatusCell = (row) => {
+    const cell = row.querySelector('[data-cell="status"]');
+    if (!cell) return;
+    const deadline = row.dataset.status === '待教师签署' ? contractSignDeadline({ pushedAt: row.dataset.pushedAt }) : '';
+    cell.innerHTML = `${statusTag(row.dataset.status)}${deadline ? `<span class="sub-cell">签署截止 ${deadline}</span>` : ''}`;
+  };
+  const renderNumberCell = (row) => {
+    const cell = row.querySelector('[data-cell="number"]');
+    if (!cell) return;
+    cell.innerHTML = `${row.dataset.number}${row.dataset.renewedFrom ? `<span class="sub-cell">续签件 · 原合同 ${row.dataset.renewedFrom}</span>` : ''}`;
+  };
+  // CR-2026-083：续签生成的新合同继承原合同主档，但清空签署证据并按「待教师签署」重算状态、编号、期限与操作列。
+  const applyContractRenewal = (source, clone) => {
+    clone.dataset.pushedAt = CONTRACT_DEMO_TODAY;
+    clone.dataset.renewedFrom = source.dataset.number;
+    clone.dataset.signDate = '';
+    ['teacherFile', 'schoolFile', 'teacherSignedAt', 'schoolSignedAt', 'terminateReason', 'terminateAt'].forEach((key) => delete clone.dataset[key]);
+    renderStatusCell(clone);
+    renderNumberCell(clone);
+    const signDateCell = clone.querySelector('[data-cell="sign-date"]');
+    if (signDateCell) signDateCell.textContent = '—';
+    const termCell = clone.querySelector('[data-cell="term"]');
+    if (termCell) {
+      const value = termStatusOf(clone);
+      termCell.innerHTML = `<span class="tag ${tagClass(value)} contract-term-status">${value}</span>`;
+    }
+    const actionCell = clone.querySelector('.action-cell');
+    if (actionCell) actionCell.innerHTML = '<button type="button" class="text-button" data-contract-action="view">查看</button><button type="button" class="text-button" data-contract-action="download">下载</button><button type="button" class="text-button" data-contract-action="remind">催签</button>';
+  };
+  rows.forEach((row) => { renderStatusCell(row); renderNumberCell(row); });
+  // CR-2026-083：默认按处理优先级排序——待学校签署 → 待教师签署 → 即将到期 → 其他按签署日期倒序。
+  const contractRowPriority = (row) => (row.dataset.status === '待学校签署' ? 0 : row.dataset.status === '待教师签署' ? 1 : termStatusOf(row) === '即将到期' ? 2 : 3);
+  rows
+    .slice()
+    .sort((a, b) => contractRowPriority(a) - contractRowPriority(b) || String(b.dataset.signDate || '').localeCompare(String(a.dataset.signDate || '')))
+    .forEach((row) => row.parentElement.append(row));
   const apply = () => {
     const status = activeContractStatus;
     const termStatus = form?.querySelector('[name="termStatus"]')?.value || '';
     const teacher = (form?.querySelector('[name="teacher"]')?.value || '').trim();
+    // CR-2026-083：签署日期区间为合同核对维度，未填写签署日期的记录在应用该条件时不计入。
+    const signStart = form?.querySelector('input[aria-label="签署开始日期"]')?.value || '';
+    const signEnd = form?.querySelector('input[aria-label="签署结束日期"]')?.value || '';
+    const matchesSignDate = (row) => (!signStart && !signEnd)
+      || (Boolean(row.dataset.signDate) && (!signStart || row.dataset.signDate >= signStart) && (!signEnd || row.dataset.signDate <= signEnd));
     let visible = 0;
     rows.forEach((row) => {
       const matches = (!status || row.dataset.status === status)
         && (!termStatus || termStatusOf(row) === termStatus)
-        && (!teacher || row.dataset.teacher.includes(teacher));
+        && (!teacher || row.dataset.teacher.includes(teacher))
+        && matchesSignDate(row);
       row.hidden = !matches;
       if (matches) visible += 1;
     });
@@ -1171,13 +1250,12 @@ function initContracts() {
     const row = event.target.closest('tr[data-contract-id]');
     if (!actionElement) return;
     const action = actionElement.dataset.contractAction;
-    if (action === 'start') { activeContractRow = null; openDialog('contract-form-dialog'); return; }
+    if (action === 'start') { activeContractRow = null; renewSourceRow = null; openDialog('contract-form-dialog'); prepareContractForm(); return; }
     if (!row) return;
     activeContractRow = row;
     if (action === 'view') {
       const data = row.dataset;
-      // CR-2026-046 §3：补齐课程、工作校区、合同模板、签署日期与脱敏身份证号；无固定期限显示「长期有效」；
-      // 文件来源按 FD-TEACHER-050 的 noUpload 口径显示「系统生成」，业务来源行按产品未确认口径暂不展示。
+      // CR-2026-046／CR-2026-082：合同资料、双方签署时间和签署 PDF 均由行数据驱动；双方文件齐全才是已签署。
       const noFixedTerm = String(data.term || '').includes('无固定期限');
       text('contract-detail-teacher', data.teacher);
       text('contract-detail-number', data.number);
@@ -1189,17 +1267,48 @@ function initContracts() {
       text('contract-detail-term', noFixedTerm ? '长期有效' : data.term);
       text('contract-detail-term-status', termStatusOf(row));
       text('contract-detail-rate', `¥${Number(data.rate || 0).toFixed(2)} / 每次课（含税）`);
-      text('contract-detail-sign-date', data.signDate || '待签署');
+      const teacherFile = data.teacherFile || (['已签署', '已终止', '待学校签署'].includes(data.status) ? `${data.number}-教师签署件.pdf` : '');
+      const schoolFile = data.schoolFile || (['已签署', '已终止'].includes(data.status) ? `${data.number}-学校签署件.pdf` : '');
+      text('contract-detail-teacher-signed-at', data.teacherSignedAt || (teacherFile ? '已归档' : '待教师上传签署件'));
+      text('contract-detail-school-signed-at', data.schoolSignedAt || (schoolFile ? '已归档' : '待学校上传签署件'));
       text('contract-detail-id-card', teacherArchiveIdCardMask(data.idCard || ''));
-      text('contract-detail-file-source', '系统生成');
-      text('contract-detail-file', `${data.template || '合同模板'} · ${data.number}.pdf`);
-      text('contract-detail-version', data.fileVersion || 'v1');
+      // CR-2026-082：合同文件组固定三类标识，待签署 PDF 由系统生成，始终存在且不随签署进度消失。
+      const pendingFile = `${data.number}-待签署合同.pdf`;
+      text('contract-detail-pending-file', pendingFile);
+      text('contract-detail-teacher-file', teacherFile || '尚未上传');
+      text('contract-detail-school-file', schoolFile || '尚未上传');
+      text('contract-detail-file', schoolFile || teacherFile || pendingFile);
       const terminateWrap = document.querySelector('#contract-detail-terminate-wrap');
       if (terminateWrap) {
         terminateWrap.hidden = data.status !== '已终止';
         if (data.status === '已终止') text('contract-detail-terminate', `${data.terminateReason || '未填写'} · 生效日期 ${data.terminateAt || '—'}`);
       }
       text('contract-detail-note', data.note || '暂无备注。');
+      // CR-2026-083：后台详情复用教师端合同条文模板，并补齐签署截止日期与续签来源。
+      const [termStart, termEnd] = String(data.term || '').split('至').map((value) => value.trim());
+      const documentHost = document.querySelector('#contract-detail-dialog .contract-document');
+      if (documentHost) documentHost.innerHTML = contractDocumentHtml({
+        type: data.type,
+        number: data.number,
+        course: data.course,
+        campus: data.campus,
+        startAt: noFixedTerm ? '' : termStart,
+        endAt: noFixedTerm ? '长期有效' : termEnd,
+        rate: data.rate,
+        teacherFile,
+        schoolFile
+      });
+      const deadline = data.status === '待教师签署' ? contractSignDeadline({ pushedAt: data.pushedAt }) : '';
+      const deadlineWrap = document.querySelector('#contract-detail-deadline-wrap');
+      if (deadlineWrap) {
+        deadlineWrap.hidden = !deadline;
+        if (deadline) text('contract-detail-deadline', deadline);
+      }
+      const renewalWrap = document.querySelector('#contract-detail-renewal-wrap');
+      if (renewalWrap) {
+        renewalWrap.hidden = !data.renewedFrom;
+        if (data.renewedFrom) text('contract-detail-renewal', `原合同 ${data.renewedFrom}`);
+      }
       const status = document.querySelector('#contract-detail-status'); if (status) status.className = `tag ${tagClass(data.status)}`;
       openDialog('contract-detail-dialog');
     }
@@ -1208,31 +1317,34 @@ function initContracts() {
       const confirm = prepareContractAction('remind', { title: '发送催签提醒', copy: `确认向${row.dataset.teacher}发送合同催签提醒？` });
       if (confirm) { confirm.dataset.confirmAction = 'contract-remind'; confirm.textContent = '确认发送'; }
     }
-    // 9.2：学校签署使用标准 dialog（data-confirm-action="contract-school-sign"），不再用 window.confirm。
-    if (action === 'school-sign') {
+    if (action === 'school-upload') {
       terminateConfirmStep = 0;
-      const confirm = prepareContractAction('school-sign', { title: '学校签署确认', copy: '确认学校签署完成？签署证据齐全后合同转为已签署。' });
-      if (confirm) { confirm.dataset.confirmAction = 'contract-school-sign'; confirm.textContent = '确认学校签署完成'; }
+      const confirm = prepareContractAction('school-upload', { title: '上传学校签署件', copy: '请上传学校完成签署或盖章后的 PDF。上传成功后合同才会转为“已签署”。' });
+      if (confirm) { confirm.dataset.confirmAction = 'contract-school-upload'; confirm.textContent = '上传并完成签署'; }
     }
     if (action === 'terminate') {
       terminateConfirmStep = 0;
       const confirm = prepareContractAction('terminate', { title: '终止合同', copy: '确认终止该合同？终止前必须填写原因与终止生效日期。' });
       if (confirm) { confirm.dataset.confirmAction = 'contract-terminate'; confirm.textContent = '确认终止'; }
     }
-    if (action === 'renew') { renewSourceRow = row; openDialog('contract-form-dialog'); text('contract-form-title', '续签合同'); const teacher = document.querySelector('#contract-teacher'); if (teacher) teacher.value = row.dataset.teacher; }
-    if (action === 'start') openDialog('contract-form-dialog');
+    if (action === 'renew') { renewSourceRow = row; openDialog('contract-form-dialog'); prepareContractForm(); text('contract-form-title', '续签合同'); const teacher = document.querySelector('#contract-teacher'); if (teacher) teacher.value = row.dataset.teacher; }
   });
   document.querySelector('#contract-action-confirm')?.addEventListener('click', (event) => {
     if (!activeContractRow) return;
-    // 9.2：学校签署提交效果可由测试直接命中（data-confirm-action="contract-school-sign"）。
-    if (event.currentTarget.dataset.action === 'school-sign') {
+    if (event.currentTarget.dataset.action === 'school-upload') {
+      if (!activeContractRow.dataset.teacherFile) { toast('教师签署件尚未上传，不能上传学校签署件。', 'error'); return; }
+      const fileInput = document.querySelector('#contract-action-file');
+      const file = fileInput?.files?.[0];
+      if (!file) { toast('请先选择学校签署件 PDF。', 'error'); return; }
+      if (file.type !== 'application/pdf' && !String(file.name).toLowerCase().endsWith('.pdf')) { toast('仅支持上传 PDF 文件。', 'error'); return; }
+      if (file.size > fileSpecSettings().documentMb * 1024 * 1024) { toast(`PDF 文件不能超过 ${fileSpecSettings().documentMb}MB。`, 'error'); return; }
+      activeContractRow.dataset.schoolFile = file.name;
+      activeContractRow.dataset.schoolSignedAt = CONTRACT_DEMO_TODAY;
       activeContractRow.dataset.status = '已签署';
-      activeContractRow.dataset.schoolSignedAt = '2026-09-16';
-      const signedCell = activeContractRow.querySelector('[data-cell="status"]');
-      if (signedCell) signedCell.innerHTML = statusTag('已签署');
+      renderStatusCell(activeContractRow);
       closeDialog('contract-action-dialog');
       apply();
-      toast('学校签署完成，合同已签署。');
+      toast('学校签署件已上传，合同已签署。');
       return;
     }
     if (event.currentTarget.dataset.action === 'terminate' && !document.querySelector('#contract-action-note')?.value.trim()) {
@@ -1254,7 +1366,7 @@ function initContracts() {
     }
     if (event.currentTarget.dataset.action === 'terminate') {
       activeContractRow.dataset.status = '已终止';
-      const statusCell = activeContractRow.querySelector('[data-cell="status"]'); if (statusCell) statusCell.innerHTML = statusTag('已终止');
+      renderStatusCell(activeContractRow);
       activeContractRow.querySelector('[data-contract-action="terminate"]')?.remove();
       terminateConfirmStep = 0;
       closeDialog('contract-action-dialog'); apply(); toast('合同已终止，终止原因与生效日期已记录。');
@@ -1262,7 +1374,8 @@ function initContracts() {
       closeDialog('contract-action-dialog'); toast('已发送催签提醒。');
     }
   });
-  document.querySelector('#contract-form')?.addEventListener('submit', (event) => { event.preventDefault(); closeDialog('contract-form-dialog'); if (renewSourceRow) { const source = renewSourceRow; const nextNo = String(source.dataset.number || 'CT0000000000').replace(/^CT(\d{4})/, (m, y) => `CT${Number(y) + 1}`); const clone = source.cloneNode(true); clone.dataset.contractId = `${source.dataset.contractId}-renew`; clone.dataset.number = nextNo; clone.dataset.status = '待教师签署'; clone.dataset.version = 'v2'; source.dataset.version = source.dataset.version || 'v1'; const cell = clone.querySelector('[data-contract-cell="number"]'); if (cell) cell.textContent = nextNo; const statusCell = clone.lastElementChild; if (statusCell) statusCell.innerHTML = statusTag('待教师签署'); source.parentElement.insertBefore(clone, source); renewSourceRow = null; apply(); toast(`续签合同已生成（新编号 ${nextNo} · 版本 v2），原合同保留。`); return; } toast('合同已推送给教师签署。'); });
+  document.querySelector('#contract-form')?.addEventListener('submit', (event) => { event.preventDefault(); closeDialog('contract-form-dialog'); if (renewSourceRow) { const source = renewSourceRow; const nextNo = String(source.dataset.number || 'CT0000000000').replace(/^CT(\d{4})/, (m, y) => `CT${Number(y) + 1}`); const clone = source.cloneNode(true); clone.dataset.contractId = `${source.dataset.contractId}-renew`; clone.dataset.number = nextNo; clone.dataset.status = '待教师签署'; applyContractRenewal(source, clone); source.parentElement.insertBefore(clone, source); renewSourceRow = null; apply(); toast(`续签合同已生成（新编号 ${nextNo}），原合同保留。`); return; } toast('合同已推送给教师签署。'); });
+  document.querySelector('[data-contract-detail-download]')?.addEventListener('click', () => { if (activeContractRow) { toast(`已准备下载合同 PDF：${activeContractRow.dataset.schoolFile || activeContractRow.dataset.teacherFile || `${activeContractRow.dataset.number}-待签署合同.pdf`}`); } });
   apply();
 }
 
@@ -1379,7 +1492,7 @@ function renderTeacherProfileArchive(facts) {
   const profileStatus = document.querySelector('[data-teacher-profile-status]');
   if (profileStatus) profileStatus.textContent = facts.profileStatus || '—';
   const accountStatus = document.querySelector('[data-teacher-account-status]');
-  if (accountStatus) accountStatus.textContent = facts.accountStatus === 'active' ? '正常' : facts.accountStatus === 'frozen' ? '冻结' : '未激活';
+  if (accountStatus) accountStatus.textContent = facts.accountStatus === 'frozen' ? '冻结' : '正常';
 
   TEACHER_ARCHIVE_GROUPS.forEach((group) => {
     const panel = document.querySelector(`[data-teacher-panel="${group.name}"]`);
@@ -1398,7 +1511,7 @@ function renderTeacherProfileArchive(facts) {
 
   const accountPanel = document.querySelector('[data-teacher-panel="account"]');
   if (accountPanel) {
-    const accountFields = [['邀请手机号', mobile], ['初始账号状态', facts.accountStatus === 'active' ? '正常' : '未激活'], ['备注', teacherArchiveValue(facts, 'remark').value || '—']];
+    const accountFields = [['登录手机号', mobile], ['账号状态', facts.accountStatus === 'frozen' ? '冻结' : '正常'], ['备注', teacherArchiveValue(facts, 'remark').value || '—']];
     accountPanel.innerHTML = `<div class="form-section first-form-section"><h2>账号</h2><div class="table-wrap"><table class="teacher-archive-table"><thead><tr><th>字段</th><th>当前值</th><th>来源</th><th>最近更新</th></tr></thead><tbody>${accountFields.map(([label, value]) => `<tr data-archive-field="${label}" data-empty="${value === '—'}"><th>${label}</th><td>${importEsc(value)}</td><td>后台建档</td><td>—</td></tr>`).join('')}</tbody></table></div></div>`;
   }
 

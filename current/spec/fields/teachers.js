@@ -70,7 +70,7 @@ export const TEACHER_FIELD_SPEC = {
           { id: 'FD-TEACHER-013', label: '车牌号', type: '文本', length: '7–8 位', required: '否', note: '选填，教师端不可维护', constraints: { minLength: 7, maxLength: 8 } },
         ] },
         { heading: '联系与财务', fields: [
-          { id: 'FD-TEACHER-014', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '需唯一；作为教师账号激活和登录身份', constraints: { pattern: '^1[3-9]\\d{9}$', maxLength: 11, unique: true } },
+          { id: 'FD-TEACHER-014', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '需唯一；作为教师账号登录身份', constraints: { pattern: '^1[3-9]\\d{9}$', maxLength: 11, unique: true } },
           { id: 'FD-TEACHER-015', label: '邮箱', type: '文本', length: '≤ 64 字符', required: '否', note: '选填，需符合邮箱格式', constraints: { format: 'email', maxLength: 64 } },
           { id: 'FD-TEACHER-016', label: '紧急联系人姓名', type: '文本', length: '2–30 字', required: '否', note: '选填', constraints: { minLength: 2, maxLength: 30 } },
           { id: 'FD-TEACHER-017', label: '紧急联系人电话', type: '文本', length: '11 位数字', required: '否', note: '选填，填写时需符合手机号格式', constraints: { pattern: '^1[3-9]\\d{9}$', maxLength: 11 } },
@@ -87,8 +87,7 @@ export const TEACHER_FIELD_SPEC = {
         ] },
         // CR-2026-048 §3.1：第 4 页签只保留账号，本页签内不得出现任何证书输入控件。
         { heading: '账号', fields: [
-          { id: 'FD-TEACHER-035', label: '邀请手机号', type: '只读', length: '11 位数字', required: '系统取值', note: '取联系方式中的手机号，作为教师激活和登录身份', constraints: { readOnly: true, sourceField: 'FD-TEACHER-014' } },
-          { id: 'FD-TEACHER-036', label: '初始账号状态', type: '只读', length: '未激活', required: '系统取值', note: '待完善资料不创建账号；完成建档后为未激活，教师激活后为正常', constraints: { readOnly: true, system: true } },
+          { id: 'FD-TEACHER-036', label: '初始账号状态', type: '只读', length: '正常', required: '系统取值', note: '待完善资料不创建账号；完成建档后账号状态直接为正常，不设未激活与邀请激活流程', constraints: { readOnly: true, system: true } },
           { id: 'FD-TEACHER-037', label: '备注', type: '多行文本', length: '≤ 200 字', required: '否', note: '内部备注，不影响建档结果', constraints: { maxLength: 200 } }
         ] },
         // CR-2026-048 §3.2：第一步保存后进入第二步，字段、校验与查重规则与后台证书列表页同源（CERTIFICATE_FIELDS）。
@@ -99,11 +98,11 @@ export const TEACHER_FIELD_SPEC = {
         ] }
       ],
       notes: [
-        '保存草稿：资料状态为“待完善”，不创建账号、不发送邀请。',
+        '保存草稿：资料状态为“待完善”，不创建账号。',
         '完成建档：校验姓名、人员类型、身份证号、手机号和至少一个授课专业。',
-        '校验通过后资料状态为“已建档”，离职日期为空（即在职），账号状态为“未激活”。',
-        '邀请失败不回退建档结果，可复用同一教师记录重新发送邀请。',
-        '教师验证建档手机号、设置本人密码并同意协议后，账号状态转为“正常”，后台不设置初始密码。',
+        '校验通过后资料状态为“已建档”，离职日期为空（即在职），账号状态直接为“正常”。',
+        '建档成功后账号状态即“正常”，不设未激活与邀请激活流程，后台不设置初始密码。',
+        '冻结与解冻只变更账号状态；离职只写入离职日期，历史授课、考勤与结算记录均保留。',
         'CR-2026-048：建档只建主档，证书不再随第一步提交；第一步保存成功后自动进入第二步证书录入，第二步可跳过、可中断、可再次进入。',
         'CR-2026-048：第二步允许 0 行，「跳过，稍后录入」与「完成」都进入该教师详情页；证书缺失不影响课程申报，但会在课程发布、班级发布或排课时按目标专业进入资质校验。',
         'CR-2026-048：第二步保存的证书审核状态为“已通过”、文件来源为“学校录入”，并记录录入人与时间；无证书录入权限的角色完成第一步后直接进入教师详情页。'
@@ -130,7 +129,7 @@ export const TEACHER_FIELD_SPEC = {
           ['FD-TEACHER-013', '车牌号', '7–8 位', '选填，教师端不可维护']
         ]) },
         { heading: '联系与财务（只读）', fields: teacherProfileRows([
-          ['FD-TEACHER-014', '手机号', '11 位数字（脱敏展示）', '账号激活与登录身份，详情页脱敏展示'],
+          ['FD-TEACHER-014', '手机号', '11 位数字（脱敏展示）', '账号登录身份，详情页脱敏展示'],
           ['FD-TEACHER-015', '邮箱', '≤ 64 字符', '选填'],
           ['FD-TEACHER-016', '紧急联系人姓名', '2–30 字', '选填'],
           ['FD-TEACHER-017', '紧急联系人电话', '11 位数字（脱敏展示）', '选填，详情页脱敏展示'],
@@ -153,8 +152,7 @@ export const TEACHER_FIELD_SPEC = {
         ] },
         { heading: '账号（只读）', fields: [
           ...teacherProfileRows([
-            ['FD-TEACHER-035', '邀请手机号', '11 位数字（脱敏展示）', '取联系方式中的手机号'],
-            ['FD-TEACHER-036', '初始账号状态', '未激活 / 正常 / 冻结', '与账号状态同源'],
+            ['FD-TEACHER-036', '初始账号状态', '正常 / 冻结', '与账号状态同源'],
             ['FD-TEACHER-037', '备注', '≤ 200 字', '内部备注']
           ])
         ] },
@@ -172,7 +170,7 @@ export const TEACHER_FIELD_SPEC = {
         'CR-2026-045：四个档案页签与新增教师页同名同序，内容只读；「关联与记录」为详情页专属页签，不进新增页。',
         'CR-2026-045：只读字段（工号、资料状态、在职情况、账号状态、证书审核状态）不提供编辑入口；空值显示「—」，不得留白。',
         'CR-2026-045：页签角标语义为「资料待完善 N 项」，无校验失败态；新增页角标为必填缺失计数。',
-        'CR-2026-051：证书页签承载证书只读列表与「录入证书」入口；账号页签只承载邀请手机号、初始账号状态与备注，审核与重传仍留在证书列表页。'
+        'CR-2026-051：证书页签承载证书只读列表与「录入证书」入口；账号页签只承载账号状态与备注，审核与重传仍留在证书列表页。'
       ]
     },
     'teachers/contracts': {
@@ -189,9 +187,11 @@ export const TEACHER_FIELD_SPEC = {
           { id: 'FD-TEACHER-043', label: '合同截止日期', type: '日期', length: 'YYYY-MM-DD', required: '是', note: '需晚于起始日期', constraints: { format: 'YYYY-MM-DD', afterField: 'FD-TEACHER-042' } },
           { id: 'FD-TEACHER-044', label: '课时费标准', type: '金额', length: '大于 0', required: '是', note: '每课次含税单价，用于工资核算', constraints: { exclusiveMin: 0, decimals: 2 } },
           { id: 'FD-TEACHER-045', label: '无固定期限', type: '开关', length: '是 / 否', required: '否', note: '开启后合同截止日期不作为必填', constraints: { boolean: true, whenOn: 'FD-TEACHER-043' } },
-          { id: 'FD-TEACHER-049', label: '签署状态', type: '只读', length: '4 个状态值', required: '系统计算', note: '推送成功后为待教师签署；教师签名后进入待学校签署；学校签署后为已签署；终止后为已终止（终态）', constraints: { system: true, readOnly: true, options: ['待教师签署 pending_teacher', '待学校签署 pending_school', '已签署 signed', '已终止 terminated'] } },
+          { id: 'FD-TEACHER-049', label: '签署状态', type: '只读', length: '4 个状态值', required: '系统计算', note: '推送成功后为待教师签署；教师上传本人签署 PDF 后进入待学校签署；后台上传学校签署 PDF 后为已签署；终止后为已终止（终态）', constraints: { system: true, readOnly: true, options: ['待教师签署 pending_teacher', '待学校签署 pending_school', '已签署 signed', '已终止 terminated'] } },
           { id: 'FD-TEACHER-065', label: '期限状态', type: '只读', length: '3 个派生值', required: '系统计算', note: '按合同起止日期派生：有效 active／即将到期 expiring／已到期 expired；不设「未生效」，未到起始日期按有效计算', constraints: { system: true, readOnly: true, derived: true, options: ['有效 active', '即将到期 expiring', '已到期 expired'] } },
-          { id: 'FD-TEACHER-050', label: '合同文件', type: '预览区域', length: '按模板生成', required: '系统生成', note: '按合同模板和填写内容自动生成 PDF，不需要后台上传；推送后随合同版本留存并可预览', constraints: { system: true, readOnly: true, generated: true, templateDriven: true, noUpload: true } },
+          { id: 'FD-TEACHER-078', label: '签署截止日期', type: '只读', length: 'YYYY-MM-DD', required: '系统计算', note: '按推送日期加后台「参数配置」的签署截止期限派生，默认推送后 7 天；仅待教师签署阶段展示，不作为签署状态取值', constraints: { system: true, readOnly: true, derived: true } },
+          { id: 'FD-TEACHER-079', label: '续签来源', type: '只读', length: '原合同编号', required: '续签件展示', note: '续签生成的新合同保留原合同编号引用，用于与历史合同区分；后台合同列表与教师端我的合同同源展示', constraints: { system: true, readOnly: true } },
+          { id: 'FD-TEACHER-050', label: '合同文件', type: '文件组', length: 'PDF，单文件≤10MB', required: '系统生成／按角色上传', note: '系统生成待签署 PDF；教师上传本人线下签署 PDF；后台上传学校签署或盖章 PDF；双方文件均保留，当前有效合同文件取学校签署件，不能直接覆盖', constraints: { pdfOnly: true, maxSizeMb: 10, files: ['pending_pdf', 'teacher_signed_pdf', 'school_signed_pdf'], uploaderByFile: { pending_pdf: 'system', teacher_signed_pdf: 'teacher', school_signed_pdf: 'admin' }, immutableAfterUpload: true } },
           { id: 'FD-TEACHER-046', label: '备注', type: '多行文本', length: '≤ 200 字', required: '否', note: '补充约定或内部说明', constraints: { maxLength: 200 } }
         ] }
       ],
@@ -199,7 +199,7 @@ export const TEACHER_FIELD_SPEC = {
         '一份合同可以覆盖多门课程；同一教师对同一课程在同一时段只允许一份生效合同。',
         '后续申报通过新课程时，由后台针对该课程另行发起合同补充，不在已推送或已生效的合同上追加课程。',
         '教师工资按课次数乘以合同约定的每课次含税单价计算。',
-        '续签基于原合同带入信息，生成新合同编号与递增版本，原合同不被覆盖。',
+        '续签基于原合同带入信息，生成新合同编号，原合同不被覆盖。',
         '终止须记录原因及生效日期，两端同步，已完成课次和历史计薪保留。',
         '合同与证书、离职日期、账号状态独立维护，不相互级联。'
       ]
@@ -228,23 +228,23 @@ export const TEACHER_FIELD_SPEC = {
           { id: 'FD-TEACHER-055', label: '姓名', type: '文本', length: '2–30 字', required: '是', note: '教师真实姓名，导入后写入教师档案', constraints: { minLength: 2, maxLength: 30 } },
           { id: 'FD-TEACHER-056', label: '人员类型', type: '单选', length: '在编 / 签约 / 外聘', required: '是', note: '决定人员用工口径，与账号状态相互独立', constraints: { options: ['在编', '签约', '外聘'] } },
           { id: 'FD-TEACHER-057', label: '身份证号', type: '文本', length: '18 位', required: '是', note: '需唯一，重复或格式不符的行不建档', constraints: { maxLength: 18, pattern: '^\\d{17}[\\dXx]$', unique: true } },
-          { id: 'FD-TEACHER-058', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '需唯一；作为账号激活与登录身份', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$', unique: true } },
+          { id: 'FD-TEACHER-058', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '需唯一；作为账号登录身份', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$', unique: true } },
           { id: 'FD-TEACHER-059', label: '授课专业', type: '三级级联多选', length: '至少 1 个', required: '是', note: '按门类 → 分类 → 专业选择，可填写多个', constraints: { minItems: 1 } },
           { id: 'FD-TEACHER-060', label: '车牌号', type: '文本', length: '7–8 位', required: '否', note: '选填，教师端不可维护', constraints: { minLength: 7, maxLength: 8 } }
         ] },
         { heading: '列表状态操作字段', fields: [
           { id: 'FD-TEACHER-061', label: '名师推荐', type: '开关', length: '是 / 否', required: '否', note: '仅控制学员端名师推荐展示，不参与教师能力计算；默认关闭', constraints: { boolean: true } },
-          { id: 'FD-TEACHER-062', label: '操作类型', type: '单选', length: '冻结 / 解冻 / 离职 / 重新发送邀请', required: '是', note: '冻结与解冻只改账号状态，离职只写入离职日期，两者不互相改写', constraints: { options: ['冻结', '解冻', '离职', '重新发送邀请'] } },
+          { id: 'FD-TEACHER-062', label: '操作类型', type: '单选', length: '冻结 / 解冻 / 离职', required: '是', note: '冻结与解冻只改账号状态，离职只写入离职日期，两者不互相改写', constraints: { options: ['冻结', '解冻', '离职'] } },
           { id: 'FD-TEACHER-066', label: '离职日期', type: '日期', length: 'YYYY-MM-DD', required: '办理离职时必填', note: '默认当天，允许修改；空值即在职，离职后禁止新增未来排课，历史记录保留', constraints: { format: 'YYYY-MM-DD', requiredWhen: 'FD-TEACHER-062=离职' } },
           { id: 'FD-TEACHER-063', label: '操作原因', type: '多行文本', length: '≤ 200 字', required: '冻结与离职时必填', note: '写入状态变更记录，供审计与复核', constraints: { maxLength: 200, requiredWhen: 'FD-TEACHER-062=冻结,离职' } }
         ] }
       ],
       notes: [
-        '批量导入固定模板六字段，先校验后确认，确认后才建档并发送激活邀请。',
-        '允许部分成功：失败行不建档并给出逐行原因，已建档行的邀请失败不回滚。',
+        '批量导入固定模板六字段，先校验后确认，确认后建档，账号状态直接为“正常”。',
+        '允许部分成功：失败行不建档并给出逐行原因，已建档行不因账号状态问题回滚。',
         '工号由系统生成，不导入密码、证书和合同，不覆盖已有教师。',
         '冻结只暂停登录，离职只停止新增未来排课，历史授课、考勤与结算记录均保留。',
-        '重新发送邀请仅用于未激活账号；教师完成激活后账号状态转为正常。'
+        '教师账号只接受“正常/冻结”两态；冻结与解冻可逆，离职不改变账号状态。'
       ]
     }
   }

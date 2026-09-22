@@ -14,11 +14,6 @@ export const STATE_MACHINES = [
     ],
     "states": [
       [
-        "inactive",
-        "未激活",
-        false
-      ],
-      [
         "active",
         "正常",
         false
@@ -30,18 +25,6 @@ export const STATE_MACHINES = [
       ]
     ],
     "transitions": [
-      [
-        "未激活",
-        "教师激活",
-        "正常",
-        "教师本人"
-      ],
-      [
-        "未激活",
-        "重新发送邀请",
-        "未激活",
-        "超级管理员/教务主管"
-      ],
       [
         "正常",
         "冻结账号",
@@ -87,7 +70,7 @@ export const STATE_MACHINES = [
       ],
       [
         "待完善",
-        "完成建档并发送邀请",
+        "完成建档",
         "已建档",
         "超级管理员/教务主管"
       ]
@@ -191,13 +174,13 @@ export const STATE_MACHINES = [
     "transitions": [
       [
         "待教师签署",
-        "教师签署",
+        "上传教师签署件 PDF",
         "待学校签署",
         "教师本人"
       ],
       [
         "待学校签署",
-        "学校签署",
+        "上传学校签署件 PDF",
         "已签署",
         "超级管理员/教务主管"
       ],

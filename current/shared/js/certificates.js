@@ -14,6 +14,8 @@ const rows = table ? [...table.querySelectorAll('tbody tr[data-certificate-id]')
 rows.forEach((row) => {
   row.children[8]?.setAttribute('data-cell', 'source');
   row.children[10]?.setAttribute('data-cell', 'file-version');
+  row.children[5]?.setAttribute('data-cell', 'expiry');
+  row.children[7]?.setAttribute('data-cell', 'validity');
 });
 let activeRow = null;
 let toastTimer;
@@ -32,6 +34,30 @@ const statusClass = (value) => ({
 }[value] || 'gray');
 
 const validityClass = (value) => ({有效: 'green', 即将过期: 'amber', 已过期: 'red'}[value] || 'gray');
+
+// 证书有效性只按「演示基准日 + 30 天窗口」派生：静态行与渲染期补行共用这一处口径，
+// 避免静态 HTML 写死的有效性随基准日推移与窗口判定分叉（R57-UI-01）。
+const CERTIFICATE_VALIDITY_WINDOW_DAYS = 30;
+function certificateValidityOf(expiry) {
+  if (!expiry) return '有效';
+  const soon = demoDateTime(DEMO_TODAY);
+  soon.setDate(soon.getDate() + CERTIFICATE_VALIDITY_WINDOW_DAYS);
+  const soonDate = toLocalDateString(soon);
+  return expiry > soonDate ? '有效' : expiry < DEMO_TODAY ? '已过期' : '即将过期';
+}
+
+// 列表、筛选、详情与导出同源：渲染期统一重算有效性，并同步到期日单元格的提示配色。
+function syncCertificateValidityCells() {
+  rows.forEach((row) => {
+    if (!row.isConnected) return;
+    const validity = certificateValidityOf(row.dataset.expiry);
+    row.dataset.validity = validity;
+    const expiryCell = row.querySelector('[data-cell="expiry"]');
+    if (expiryCell) expiryCell.className = validity === '已过期' ? 'expiry-danger' : validity === '即将过期' ? 'expiry-warning' : '';
+    const validityCell = row.querySelector('[data-cell="validity"]');
+    if (validityCell) validityCell.innerHTML = `<span class="tag ${validityClass(validity)}">${validity}</span>`;
+  });
+}
 
 // 本地旧值兼容：审核状态只取 待审核／已通过／已驳回／已撤销（05-状态字典 §4.1）。
 // 一是 CR-2026-019 删除的“已录入”按来源迁移；二是旧标签“审核通过／审核不通过”改名。
@@ -97,7 +123,7 @@ function renderCertificateFactCells() {
 renderCertificateFactCells();
 
 // 9.2 可自动化复现：撤回使用标准 dialog，确认按钮带 data-confirm-action 便于测试定位提交结果。
-// 口径（2026-09-16）：证书不设归档状态；撤回后进入状态字典的“已撤销”，可重新上传生成新版本。
+// 口径（2026-09-22）：证书只保留待审核／已通过／已驳回／已撤销四态；撤回后进入“已撤销”，可重新上传生成新版本。
 function openWithdrawConfirm(row) {
   activeRow = row;
   text('certificate-status-title', '撤回证书');
@@ -190,6 +216,10 @@ function updateStatusCell(row) {
   cell.innerHTML = `<span class="tag ${statusClass(row.dataset.status)}">${row.dataset.status}</span>`;
 }
 
+function canDeleteCertificate(row) {
+  return row.dataset.status === '待审核' && row.dataset.referenced !== '是';
+}
+
 function updateActionCell(row) {
   const cell = row.querySelector('[data-cell="actions"]');
   if (!cell) return;
@@ -198,9 +228,10 @@ function updateActionCell(row) {
   const reupload = ['已通过', '已驳回', '已撤销'].includes(row.dataset.status) || row.dataset.validity === '已过期';
   const review = row.dataset.status === '待审核';
   // UI v1.2 状态—操作矩阵 + 2026-09-16 口径：未引用且未审核可撤回（撤回后为“已撤销”）；
-  // 证书不设归档状态，已审核的记录通过重新上传生成新版本改变材料。
+  // 已审核的证书通过重新上传生成新版本改变材料。
   const withdraw = row.dataset.status === '待审核' && row.dataset.referenced !== '是';
-  cell.innerHTML = `${review ? '<button type="button" class="text-button" data-action="review" data-perm="PERM-TEACHER-005">审核</button>' : ''}${reupload ? '<button type="button" class="text-button" data-action="reupload">重新上传</button>' : ''}<button type="button" class="text-button" data-action="view">查看</button>${withdraw ? '<button type="button" class="text-button" data-action="withdraw">撤回</button>' : ''}<button type="button" class="text-button danger-link" data-action="delete">删除</button>`;
+  const remove = canDeleteCertificate(row);
+  cell.innerHTML = `${review ? '<button type="button" class="text-button" data-action="review" data-perm="PERM-TEACHER-005">审核</button>' : ''}${reupload ? '<button type="button" class="text-button" data-action="reupload">重新上传</button>' : ''}<button type="button" class="text-button" data-action="view">查看</button>${withdraw ? '<button type="button" class="text-button" data-action="withdraw">撤回</button>' : ''}${remove ? '<button type="button" class="text-button danger-link" data-action="delete">删除</button>' : ''}`;
 }
 
 // 证书审核状态以页签切换：状态取值只读 spec/states 的 SM-TEACHER-CERTIFICATE，
@@ -400,6 +431,12 @@ document.addEventListener('click', (event) => {
   if (event.target.matches('[data-review-result]')) handleReview(event.target.dataset.reviewResult);
   if (event.target.id === 'detail-preview' && activeRow) { closeDialog('detail-dialog'); openPreview(activeRow); }
   if (event.target.id === 'delete-confirm' && activeRow) {
+    if (!canDeleteCertificate(activeRow)) {
+      closeDialog('delete-dialog');
+      showToast('仅待审核且未被课程或排课引用的证书可以删除。');
+      activeRow = null;
+      return;
+    }
     const deletedName = activeRow.dataset.name;
     activeRow.remove();
     closeDialog('delete-dialog');
@@ -446,10 +483,6 @@ function appendTeacherEnteredRows(teacherId, teacherName) {
   const entered = (readDemoState().teacherCertificates || []).filter((item) => item.teacherId === teacherId);
   if (!entered.length || !table || !rows.length) return;
   const template = rows[0];
-  const today = DEMO_TODAY;
-  const soonDate = demoDateTime(DEMO_TODAY);
-  soonDate.setDate(soonDate.getDate() + 30);
-  const soon = toLocalDateString(soonDate);
   entered.forEach((item) => {
     const key = certificateDedupKey(item);
     const sameTeacher = (row) => row.dataset.teacher === teacherName;
@@ -471,7 +504,7 @@ function appendTeacherEnteredRows(teacherId, teacherName) {
     row.dataset.reviewedAt = item.enteredAt || '';
     row.dataset.reviewNote = '后台录入默认通过。';
     row.dataset.referenced = '否';
-    row.dataset.validity = !item.expiresAt || item.expiresAt > soon ? '有效' : item.expiresAt < today ? '已过期' : '即将过期';
+    row.dataset.validity = certificateValidityOf(item.expiresAt);
     const cells = row.children;
     cells[0].innerHTML = `<a class="link" href="profile.html?teacher_id=${encodeURIComponent(teacherId)}">${item.teacherName || teacherName}</a>`;
     cells[1].textContent = item.name;
@@ -504,6 +537,7 @@ if (teacherNameOfQuery) document.querySelector('#certificate-teacher').value = t
 // 第二步录入的证书归属演示态教师（静态列表里没有该行），按 teacher_id 进入时补行后再统一渲染。
 if (queryTeacherId) appendTeacherEnteredRows(queryTeacherId, teacherNameOfQuery || '本次建档教师');
 // 操作列由 updateActionCell 统一渲染，静态标记只作占位，避免静态与动态分叉成两套动作。
+syncCertificateValidityCells();
 rows.forEach(updateActionCell);
 syncCertificateSourceCells();
 rows.forEach(updateFileVersionCell);

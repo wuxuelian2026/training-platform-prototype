@@ -43,6 +43,7 @@ button.nav-section-title:hover { color: var(--brand); }
 .admin-app.is-rail-collapsed .admin-sidebar .nav-sublink { justify-content: center; padding: 0; }
 .admin-app.is-rail-collapsed .admin-sidebar .nav-icon { width: 20px; }
 .nav-icon { width: 18px; text-align: center; }
+.admin-app.is-rail-collapsed .admin-sidebar .nav-sublink { position: relative; }
 .admin-main { min-width: 0; flex: 1; }
 .admin-topbar { height: 70px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; background: var(--card); border-bottom: 1px solid var(--line); }
 .crumb { display: flex; align-items: center; gap: 8px; color: var(--muted); }

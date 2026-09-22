@@ -1,11 +1,10 @@
 // D-03（ZK-D-17 9.1）：轮播图 Mock 种子，字段对齐 10-数据库模型与约束.md 的 banner 定义。
 // 后台轮播图管理列表与学员端首页轮播共用这一份种子，避免两端各写一套演示数据。
-// 学员端文案来自运营维护的主标题（title）与描述（desc），角标字自动取主标题首字。
+// 学员端首页轮播只展示图片与点击跳转：标题与描述都由运营做进图片里，页面不再叠加文案。
 // `status` 只允许状态机 SM-BANNER 的「启用 / 停用」，未启用的轮播图即停用状态。
 
 export const bannerSeed = [
-  // 后台行名（name）只是运营侧的档案名称，学员端展示的是主标题（title）与描述（desc）；
-  // copy 保留为历史兼容字段，展示口径以 title／desc 为准。
+  // 后台行名（name）只用于运营侧辨识，学员端不展示；title／desc／copy 保留为历史兼容字段，学员端不再渲染。
   {
     id: 'banner-001',
     name: '秋季艺术课程招生',
@@ -81,10 +80,8 @@ export function resolveHomeBanners(shared) {
   return mergeBanners(shared)
     .filter((item) => item.status === '启用')
     .sort((left, right) => Number(left.sort || 0) - Number(right.sort || 0))
-    // CR-2026-037 §2.3：学员端文案取主标题与描述，角标字取主标题首字；未填主标题的记录不展示。
-    .map((item) => {
-      const title = item.title || item.copy?.title || '';
-      return { title, text: item.desc || item.copy?.text || '', mark: title.slice(0, 1), kicker: item.copy?.kicker || '', jumpTarget: item.jumpTarget || '' };
-    })
-    .filter((item) => Boolean(item.title));
+    // 2026-09-22 裁定：学员端轮播只展示图片与点击跳转，标题与描述由图片承载；
+    // 因此这里只保留图片文件名与跳转目标，不再输出 title／desc／kicker／mark。
+    .map((item) => ({ id: item.id, name: item.name, imageFile: item.imageFile || '', jumpTarget: item.jumpTarget || '' }))
+    .filter((item) => Boolean(item.imageFile || item.name));
 }

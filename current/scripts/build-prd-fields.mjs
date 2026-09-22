@@ -59,11 +59,6 @@ const PRD_TARGETS = [
     file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/06-后台管理端-面授招生与CRM.md')
   },
   {
-    pageKey: 'academic/scheduling',
-    marker: 'FIELDS academic/scheduling',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/07-后台管理端-教务执行监管.md')
-  },
-  {
     pageKey: 'crm/trials',
     marker: 'FIELDS crm/trials',
     file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/06-后台管理端-面授招生与CRM.md')

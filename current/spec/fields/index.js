@@ -11,6 +11,7 @@ import { ACADEMIC_FIELD_SPEC } from './academic.js';
 import { TEACHER_APP_FIELD_SPEC } from './teacher.js';
 import { LEARNER_APP_FIELD_SPEC } from './learner.js';
 import { ADMIN_FIELD_SPEC } from './admin.js';
+import { pageTypeOf } from '../pages/page-types.js';
 
 export const FIELD_MODULES = [
   TEACHER_FIELD_SPEC,
@@ -39,12 +40,22 @@ export const allSpecFields = () =>
   );
 
 // 结构化字段 → 页面说明表格结构（五列固定为：参数名 / 类型 / 长度 / 是否必填 / 说明）
-export const toPageSpec = (page) => ({
+// 字段规格的补充说明挂在哪一节取决于页面类型：只有表单页才叫「提交与校验说明」，
+// 列表、详情、配置页应挂在规则类小节下，否则会出现页面没有提交动作却写着提交校验的标题。
+const NOTES_HEADINGS = {
+  form: '提交与校验说明',
+  list: '业务规则',
+  detail: '业务规则',
+  dashboard: '数据更新时机',
+  config: '生效范围与影响'
+};
+
+export const toPageSpec = (page, pageKey = '') => ({
   groups: [
     ...page.groups.map((group) => ({
       heading: group.heading,
       rows: group.fields.map((field) => [field.label, field.type, field.length, field.required, field.note])
     })),
-    ...(page.notes?.length ? [{ heading: '提交与校验说明', items: page.notes }] : [])
+    ...(page.notes?.length ? [{ heading: NOTES_HEADINGS[pageTypeOf(pageKey)] || '业务规则', items: page.notes }] : [])
   ]
 });

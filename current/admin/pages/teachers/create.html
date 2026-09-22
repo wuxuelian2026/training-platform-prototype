@@ -73,14 +73,14 @@
 
         <section class="teacher-tabpanel" id="teacher-panel-account" role="tabpanel" aria-labelledby="teacher-tab-account" data-teacher-panel="account" hidden>
 
-          <div class="form-section"><h2>账号邀请</h2><div class="form-grid">
-            <label class="form-field"><span>邀请手机号</span><input value="使用联系方式中的手机号" readonly class="readonly-field" /></label>
-            <label class="form-field"><span>初始账号状态</span><input value="未激活" readonly class="readonly-field" /></label>
+          <div class="form-section"><h2>账号状态</h2><div class="form-grid">
+
+            <label class="form-field"><span>账号状态</span><input value="正常" readonly class="readonly-field" /></label>
             <label class="form-field wide"><span>备注</span><textarea name="remark" placeholder="请输入内部备注"></textarea></label>
           </div></div>
         </section>
 
-        <div class="teacher-build-result" data-build-result hidden role="status"><div><strong>已建档，邀请发送失败</strong><p>教师资料已保存为“已建档”，账号保持“未激活”。请复用当前教师记录重新发送邀请。</p></div><button type="button" class="button" data-action="retry-invite" data-api="API-TEACHER-14">重新发送邀请</button></div>
+        <div class="teacher-build-result" data-build-result hidden role="status"><div><strong>教师已建档</strong><p>教师资料已保存，账号状态为“正常”。</p></div></div>
         <!-- 操作条固定在页签内容之外；提交按钮旁展示必填项完成度。 -->
         <div class="form-actions teacher-form-actions"><a class="button" href="list.html">取消</a><span class="teacher-required-hint" data-required-hint>必填项还差 0 项</span><button type="button" class="button" data-action="save-draft" data-api-action="save_draft">保存草稿</button><button type="submit" class="button primary" data-api-action="complete_and_invite">完成建档</button></div>
       </form>

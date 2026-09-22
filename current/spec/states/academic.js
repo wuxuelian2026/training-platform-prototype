@@ -9,8 +9,7 @@ export const STATE_MACHINES = [
     "diagram": true,
     "pages": [
       "academic/timetable",
-      "teacher/index",
-      "academic/scheduling"
+      "teacher/index"
     ],
     "states": [
       [
@@ -26,11 +25,6 @@ export const STATE_MACHINES = [
       [
         "completed",
         "已完成",
-        true
-      ],
-      [
-        "cancelled",
-        "已取消",
         true
       ],
       [
@@ -51,12 +45,6 @@ export const STATE_MACHINES = [
         "结束上课",
         "已完成",
         "教师本人"
-      ],
-      [
-        "待上课",
-        "取消课次（填原因）",
-        "已取消",
-        "教务主管"
       ],
       [
         "待上课",
@@ -364,9 +352,9 @@ export const STATE_MACHINES = [
       ],
       [
         "生成失败",
-        "自动重试（≤3 次）或人工重试",
+        "人工重试",
         "生成中",
-        "系统/教务主管"
+        "教务主管"
       ]
     ]
   },
@@ -420,9 +408,9 @@ export const STATE_MACHINES = [
       ],
       [
         "生成失败",
-        "自动重试（≤3 次）或人工重试",
+        "人工重试",
         "生成中",
-        "系统/教务主管"
+        "教务主管"
       ]
     ]
   },

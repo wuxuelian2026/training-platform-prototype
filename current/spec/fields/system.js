@@ -10,11 +10,21 @@ export const SYSTEM_FIELD_SPEC = {
         { heading: '平台基础参数', fields: [
           { id: 'FD-SYSTEM-001', label: '平台名称', type: '文本', length: '≤ 50 字', required: '否', note: '用于后台页头等平台标识展示', constraints: { maxLength: 50 } },
           { id: 'FD-SYSTEM-002', label: '默认时区', type: '下拉', length: 'Asia/Shanghai（UTC+8）', required: '否', note: '平台统一时间口径，影响课次与流水时间展示' },
-          { id: 'FD-SYSTEM-003', label: '默认课时时长（分钟）', type: '数字', length: '30–240', required: '否', note: '新建课次时的默认时长，单个课次仍可单独调整', constraints: { min: 30, max: 240 } },
           { id: 'FD-SYSTEM-004', label: '作业默认截止时间（小时）', type: '数字', length: '1–720', required: '否', note: '布置作业时的默认截止时间', constraints: { min: 1, max: 720 } },
           { id: 'FD-SYSTEM-005', label: '最低出勤率（%）', type: '数字', length: '0–100', required: '否', note: '结业判定使用', constraints: { min: 0, max: 100 } },
           { id: 'FD-SYSTEM-006', label: '最低作业提交率（%）', type: '数字', length: '0–100', required: '否', note: '结业判定使用', constraints: { min: 0, max: 100 } },
-          { id: 'FD-SYSTEM-033', label: '视频退款最多观看课时数', type: '数字', length: '0–999', required: '否', note: '视频订单退款资格的观看课时上限，默认 3 课时；按账号与课程去重计数', constraints: { min: 0, max: 999 } }
+          { id: 'FD-SYSTEM-033', label: '视频退款最多观看课时数', type: '数字', length: '0–999', required: '否', note: '视频订单退款资格的观看课时上限，默认 3 课时；按账号与课程去重计数', constraints: { min: 0, max: 999 } },
+          { id: 'FD-SYSTEM-034', label: '合同签署截止期限（天）', type: '数字', length: '1–30', required: '否', note: '合同推送后按该天数生成签署截止日期，默认 7 天；后台合同列表与教师端我的合同读取同一份配置，修改后对新推送的合同生效', constraints: { min: 1, max: 30 } },
+          { id: 'FD-SYSTEM-047', label: '待支付订单支付时限（分钟）', type: '数字', length: '1–1440', required: '否', note: '待支付订单创建后按该时限关闭为「已取消（超时）」，默认 30 分钟；学员端支付页与统一订单管理同源展示', constraints: { min: 1, max: 1440 } },
+          { id: 'FD-SYSTEM-048', label: '退款申请窗口（自然日）', type: '数字', length: '1–30', required: '否', note: '视频订单支付后按该窗口判断退款资格，默认 7 个自然日；与该页的观看课时上限共同决定资格', constraints: { min: 1, max: 30 } },
+          { id: 'FD-SYSTEM-049', label: '图片上传上限（MB）', type: '数字', length: '1–1024', required: '否', note: '封面、证书与成果等图片类上传的统一上限，默认 10MB', constraints: { min: 1, max: 1024 } },
+          { id: 'FD-SYSTEM-050', label: '文档上传上限（MB）', type: '数字', length: '1–1024', required: '否', note: 'PDF、Word、PPT 等文档类上传的统一上限，默认 50MB；合同签署件按本项校验', constraints: { min: 1, max: 1024 } },
+          { id: 'FD-SYSTEM-051', label: '视频上传上限（MB）', type: '数字', length: '1–10240', required: '否', note: '视频课程与教学视频上传的统一上限，默认 500MB', constraints: { min: 1, max: 10240 } },
+          { id: 'FD-SYSTEM-052', label: '教学资源库单文件上限（GB）', type: '数字', length: '1–10240', required: '否', note: '教学资源库单文件上限，默认 100GB；与其他上传项独立校验', constraints: { min: 1, max: 10240 } },
+          { id: 'FD-SYSTEM-053', label: '消息失败最大重试次数', type: '数字', length: '1–5', required: '否', note: '通知发送失败后的最大重试次数，默认 3 次；超过次数进入补发队列', constraints: { min: 1, max: 5 } },
+          { id: 'FD-SYSTEM-054', label: '消息重试间隔（分钟）', type: '数字组', length: '每项 1–1440，至少一项', required: '否', note: '按顺序生效的重试间隔，默认 5／30／120 分钟；保存时去重升序，仅在启用消息失败自动重试时生效', constraints: { min: 1, max: 1440, multi: true } },
+          { id: 'FD-SYSTEM-038', label: '教师转场最小间隔（分钟）', type: '数字', length: '1–120', required: '否', note: '同一教师当天两节课之间小于该间隔且更换教室时提示“转场紧张”，默认 30 分钟', constraints: { min: 1, max: 120 } },
+          { id: 'FD-SYSTEM-039', label: '跨校区额外预留（分钟）', type: '数字', length: '0–120', required: '否', note: '跨校区转场在最小间隔基础上叠加的额外预留，默认 15 分钟；有效间隔 = 最小间隔 + 额外预留', constraints: { min: 0, max: 120 } },
         ] },
         { heading: '业务开关', fields: [
           { id: 'FD-SYSTEM-007', label: '启用教师端课程申报', type: '开关', length: '开 / 关', required: '否', note: '关闭后教师端不展示课程申报入口' },
@@ -24,10 +34,29 @@ export const SYSTEM_FIELD_SPEC = {
         ] }
       ],
       notes: [
-        '保存前校验数值范围：默认课时 30–240 分钟、作业截止 1–720 小时、出勤率与作业提交率 0–100%、最多观看课时 0–999；视频退款期限固定为购课 7 日。',
+        '保存前校验数值范围：作业截止 1–720 小时、出勤率与作业提交率 0–100%、最多观看课时 0–999、合同签署截止期限 1–30 天、转场最小间隔 1–120 分钟、跨校区额外预留 0–120 分钟、支付时限 1–1440 分钟、退款窗口 1–30 天、文件规格为正整数、重试次数 1–5 且至少一个重试间隔。',
+        '业务枚举（难度等级、适合年龄、课时类型、课时时长）不在本页维护，统一在「系统管理 → 数据字典」页维护，本页不得出现这些枚举的增删入口。',
         '任一参数超出范围时整体不保存，并提示需要修正的取值区间。',
+        '固定规则不提供配置：课表时间轴（每天 08:00–21:00、15 分钟 1 刻度、共 52 格）是本页唯一的固定规则，页面只做只读说明；调整需走变更单。',
+        '待支付支付时限、视频退款申请窗口、文件上传规格与消息重试策略都在本页配置：学员端支付页、统一订单管理、退款资格校验、证书与合同上传、教学资源上传读取同一份配置，页面不得写死数值。',
         '保存成功后记录审计日志，参数的变更时间与操作人可追溯。',
         '结业判定使用最低出勤率和最低作业提交率；待补录考勤不参与计算。'
+      ]
+    },
+    // CR-2026-103：业务枚举集中到「数据字典」页维护，参数配置页不再承载课时时长。
+    'system/dictionaries': {
+      groups: [
+        { heading: '字典维护字段', fields: [
+          { id: 'FD-SYSTEM-036', label: '字典项', type: '文本组', length: '每项 ≤ 20 字，至少一项', required: '是', note: '难度等级、适合年龄、课时类型等文本字典的字典项；保存时按维护顺序去重，留空项不保存', constraints: { maxLength: 20, multi: true } },
+          { id: 'FD-SYSTEM-003', label: '课时时长字典项（分钟）', type: '数字组', length: '每项为大于 0 的整数', required: '是', note: '数据字典项：排班表单、班级默认值与课程库编排的课时时长统一读取本字典，不支持写死在页面；至少保留一项', constraints: { min: 1, integer: true, multi: true } },
+          { id: 'FD-SYSTEM-037', label: '默认课时时长（分钟）', type: '下拉', length: '取自课时时长字典项', required: '是', note: '新建课次与班级的默认时长，取值必须在课时时长字典项内；删除默认项时默认值回落到首项' }
+        ] }
+      ],
+      notes: [
+        '本页只维护业务枚举，平台参数、业务开关与排课策略参数在「参数配置」页维护。',
+        '字典类型由产品口径固定为难度等级、适合年龄、课时类型、课时时长；新增或删除字典类型须走变更单，不提供页面自助新增。',
+        '字典维护即时生效并写入审计日志；已排课次保留原时长，只有新建或编辑时按新字典取值。',
+        '字典项重复或留空时按去重与过滤处理，不静默产生第二条同名字典项。'
       ]
     },
     'system/profile': {

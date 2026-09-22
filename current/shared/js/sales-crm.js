@@ -1,5 +1,7 @@
 import { demoId, demoTime, readDemoState, removeDemoRecord, resetDemoData, subscribeDemoState, updateDemoRecord, upsertDemoRecord } from './demo-store.js';
+import { DEMO_TODAY } from './demo-clock.js';
 import { cloneClassSeed } from './class-seed.js';
+import { cloneBatchSeed } from './batch-seed.js';
 import { cloneCourseCatalogSeed } from './course-catalog-seed.js';
 import { addWeeksLocal, toLocalDateString } from './date-utils.js';
 import { cloneProductSeed } from './product-seed.js';
@@ -7,7 +9,7 @@ import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor,
 import { mountRichEditor, richTextToHtml, richTextValue } from './rich-editor.js';
 import { classCapacityStatus, classDisplayStatus, classEnrollmentCondition, classEnrollmentStatus, classLessonProgress, classScheduleStatus, classStageProjection, classTeachingStatus, deriveClassStatus } from './class-lifecycle.js';
 import { mergeVenues, resolveVenueId } from './venue-seed.js';
-import { DEFAULT_LESSON_DURATION, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions as buildLessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
+import { defaultLessonDuration, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions as buildLessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
 import { openSchedulePlanner, openSessionAdjustment } from './academic.js';
 
 const businessRoot = document.querySelector('[data-business-page]');
@@ -17,7 +19,7 @@ let businessActive = null;
 let businessToastTimer;
 
 const professionalOptions = ['音乐类', '舞蹈类', '美术类', '戏剧类'];
-const lessonDurationOptions = buildLessonDurationOptions().map(option => Number(option.value));
+const lessonDurationOptions = () => buildLessonDurationOptions().map(option => Number(option.value));
 // RM-F-01: the mall module no longer keeps its own course copy — it reads the shared publishable catalog.
 const courseCatalog = cloneCourseCatalogSeed();
 const businessParams = new URLSearchParams(window.location.search);
@@ -39,12 +41,12 @@ const dataSets = {
     },
     {
       id: 'order-offline', number: 'OD202609060008', name: '少儿中国舞基础班', type: '面授课程', account: '演示家长A', accountPhone: '139****2027', student: '周子涵',
-      amount: '1680.00', status: '待支付', fulfillment: '待分班', linked: '未占用名额', time: '2026-09-06 15:22',
+      amount: '1680.00', status: '待支付', fulfillment: '已分班', linked: '未占用名额', time: '2026-09-06 15:22',
       payment: null, refund: null,
       fulfillmentDetail: { 班级: '2026秋季中国舞启蒙一班', 校区: '龙泉校区', 分班结果: '待支付后自动分班', 名额占用: '未占用（以支付成功为占用时点）' },
       logs: [
         { at: '2026-09-06 15:22', role: '学员端', from: '—', to: '待支付', reason: '学员提交报名' },
-        { at: '2026-09-06 18:00', role: '系统', from: '待支付', to: '待支付', reason: '支付时限内未支付，订单保留' }
+        { at: '2026-09-06 15:32', role: '系统', from: '待支付', to: '待支付', reason: '支付时限剩余不足 20 分钟，已向学员发送支付提醒' }
       ]
     },
     {
@@ -60,12 +62,8 @@ const dataSets = {
       ]
     }
   ],
-  batches: [
-    { id: 'batch-autumn', name: '2026年秋季艺术培训', season: '秋季', start: '2026-09-01', end: '2027-01-30', classes: '12', status: '进行中' },
-    { id: 'batch-summer', name: '2026年暑期艺术培训', season: '暑假', start: '2026-07-01', end: '2026-08-31', classes: '8', status: '已结束' },
-    { id: 'batch-winter', name: '2027年寒假艺术培训', season: '寒假', start: '2027-02-01', end: '2027-02-28', classes: '0', status: '未开始' },
-    { id: 'batch-spring', name: '2027年春季艺术培训', season: '春季', start: '2027-03-01', end: '2027-06-30', classes: '0', status: '未开始' }
-  ],
+  // 批次状态不落库，按 start/end 派生（batchStatusOf）；取值来自批次种子，与课表学期下拉同源。
+  batches: cloneBatchSeed(),
   classes: cloneClassSeed(),
   trials: [
     { id: 'trial-zhou', leadNo: 'CL20260908012', student: '周子涵', phone: '139****8612', course: '少儿中国舞基础班', time: '2026-09-12 09:00', campus: '龙泉校区', status: '待确认', source: '后台登记', owner: '赵顾问' },
@@ -151,7 +149,7 @@ function syncSharedBusinessData() {
     const account = (shared.accounts || []).find(item => item.id === order.accountId);
     const isClass = course?.type === '面授课程' || Boolean(order.classId);
     // RM-F-07 / I1-DEC-25: video orders are keyed by the purchasing account, never a placeholder label.
-    return { id: `shared-${order.id}`, number: order.id, name: classRecord?.name || course?.name || order.courseName || order.courseId, type: isClass ? '面授课程' : '视频课程', student: isClass ? (student?.name || order.studentName || '—') : (account?.name || order.accountName || order.accountId || '—'), account: account?.name || order.accountName || order.accountId || '—', accountPhone: account?.phone || '', amount: Number(order.amount || 0).toFixed(2), status: order.status, fulfillment: order.status === '已支付' ? (isClass ? '已分班' : '学习中') : (isClass ? '待分班' : '待开通'), linked: isClass ? (classRecord?.name || '待分班') : (order.status === '已支付' ? '学习权限：已开通' : '学习权限：未开通'), time: order.createdAt || demoTime(), accountId: order.accountId, studentId: order.studentId, classId: order.classId, sourceOrderId: order.id };
+    return { id: `shared-${order.id}`, number: order.id, name: classRecord?.name || course?.name || order.courseName || order.courseId, type: isClass ? '面授课程' : '视频课程', student: isClass ? (student?.name || order.studentName || '—') : (account?.name || order.accountName || order.accountId || '—'), account: account?.name || order.accountName || order.accountId || '—', accountPhone: account?.phone || '', amount: Number(order.amount || 0).toFixed(2), status: order.status, fulfillment: order.status === '已支付' ? (isClass ? '已分班' : '学习中') : (isClass ? '未生成报名' : '待开通'), linked: isClass ? (classRecord?.name || '未生成报名') : (order.status === '已支付' ? '学习权限：已开通' : '学习权限：未开通'), time: order.createdAt || demoTime(), accountId: order.accountId, studentId: order.studentId, classId: order.classId, sourceOrderId: order.id };
   });
   dynamicOrders.forEach(row => {
     const index = dataSets.orders.findIndex(item => item.id === row.id);
@@ -161,12 +159,20 @@ function syncSharedBusinessData() {
 }
 function persistProduct(record) { upsertDemoRecord('products', record); }
 function persistClass(record) { upsertDemoRecord('classes', record); }
+// CR-2026-088：批次状态按起止日期派生，不落库、无人工流转（见 PRD/开发实施PRD/05-状态字典.md 第 10 节）。
+function batchStatusOf(batch, today = DEMO_TODAY) {
+  const start = String(batch?.start || '');
+  const end = String(batch?.end || '');
+  if (start && today < start) return '未开始';
+  if (end && today > end) return '已结束';
+  return '进行中';
+}
 function batchForClass(record) {
   if (!record) return null;
   return dataSets.batches.find(batch => batch.id === record.batchId)
     || dataSets.batches.find(batch => batch.name === record.batch)
-    || dataSets.batches.find(batch => batch.season === record.batch && batch.status === '进行中')
-    || dataSets.batches.find(batch => batch.season === record.batch && batch.status !== '已结束')
+    || dataSets.batches.find(batch => batch.season === record.batch && batchStatusOf(batch) === '进行中')
+    || dataSets.batches.find(batch => batch.season === record.batch && batchStatusOf(batch) !== '已结束')
     || dataSets.batches.find(batch => batch.season === record.batch)
     || null;
 }
@@ -189,7 +195,7 @@ function productCanDelete(product) {
 syncSharedBusinessData();
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-const statusClass = (value) => ({ 已上架: 'green', 已下架: 'gray', 草稿: 'gray', 已支付: 'green', 待支付: 'amber', 退款中: 'amber', 已退款: 'gray', 已取消: 'gray', 进行中: 'brand', 已结束: 'gray', 未开始: 'gray', 招生中: 'brand', 已满员: 'amber', 未发布: 'gray', 已展示: 'green', 待确认: 'amber', 已确认: 'brand', 已试听: 'green', 已报名: 'green', 已放弃: 'gray', 待分班: 'amber', 已分班: 'green', 学习中: 'brand', 已完成: 'green', 跟进中: 'brand', 已转化: 'green', 已流失: 'gray', 未转化: 'amber' }[value] || 'gray');
+const statusClass = (value) => ({ 已上架: 'green', 已下架: 'gray', 草稿: 'gray', 已支付: 'green', 待支付: 'amber', 退款中: 'amber', 已退款: 'gray', 已取消: 'gray', 进行中: 'brand', 已结束: 'gray', 未开始: 'gray', 招生中: 'brand', 已满员: 'amber', 未发布: 'gray', 已展示: 'green', 待确认: 'amber', 已确认: 'brand', 已试听: 'green', 已报名: 'green', 已放弃: 'gray', 已分班: 'green', 学习中: 'brand', 已完成: 'green', 跟进中: 'brand', 已转化: 'green', 已流失: 'gray', 未转化: 'amber' }[value] || 'gray');
 const tag = (value) => `<span class="tag ${statusClass(value)}">${escapeHtml(value)}</span>`;
 
 function showToast(message, kind = 'success') {
@@ -208,7 +214,9 @@ function openBusinessDialog(title, subtitle, body, actions = '<button type="butt
 function pageFrame(title, description, controls, content) {
   const contentRoot = businessRoot;
   if (!contentRoot) return;
-  contentRoot.innerHTML = `<div class="sales-page"><div class="page-head"><div><h1>${title}</h1>${description ? `<p>${description}</p>` : ''}</div>${controls || ''}</div>${content}<div class="toast" data-business-toast role="status" aria-live="polite" hidden></div></div>`;
+  // 页头按钮统一包进 toolbar-actions 成组靠右；直接平铺会被 .page-head 的 space-between 拆散。
+  const toolbar = controls ? `<div class="toolbar-actions">${controls}</div>` : '';
+  contentRoot.innerHTML = `<div class="sales-page"><div class="page-head"><div><h1>${title}</h1>${description ? `<p>${description}</p>` : ''}</div>${toolbar}</div>${content}<div class="toast" data-business-toast role="status" aria-live="polite" hidden></div></div>`;
 }
 function filterPanel(id, fields) {
   return `<div class="filter-panel" data-filter-drawer-shell="${id}"><button type="button" class="button filter-drawer-trigger" data-filter-drawer-trigger="${id}" aria-expanded="false" aria-controls="${id}"><span class="filter-trigger-icon" aria-hidden="true"></span>筛选条件</button><div class="filter-drawer-backdrop" data-filter-drawer-backdrop="${id}" hidden></div><form class="card filter-form" id="${id}"><div class="filter-head"><strong>筛选条件</strong><button type="button" class="icon-button filter-drawer-close" data-filter-drawer-close="${id}" title="关闭筛选条件" aria-label="关闭筛选条件">×</button></div><div class="filter-grid sales-filter-grid">${fields}</div><div class="filter-actions"><button type="reset" class="button">重置</button><button type="submit" class="button primary">查询</button></div></form></div>`;
@@ -381,7 +389,7 @@ function addWeeks(dateText, weeks) { return addWeeksLocal(dateText, weeks); }
 // human-maintained slot scheme — rows are derived from the session times.
 function buildClassSessions(lessons, weekday, start, lessonDuration, firstDate, classroom, semester = '2026秋季') {
   const total = Number(lessons) || 0;
-  const duration = Number(lessonDuration) || DEFAULT_LESSON_DURATION;
+  const duration = Number(lessonDuration) || defaultLessonDuration();
   if (!total || !weekday || !start || !firstDate) return [];
   const shared = readDemoState();
   const roomId = resolveVenueId(classroom, mergeVenues(shared));
@@ -498,7 +506,7 @@ function renderOrders() {
   businessData = dataSets.orders;
   // CR-2026-032 §2：指标卡可点击筛选（再次点击取消）、新增下单时间范围、关联状态并入订单状态列副行。
   const metricCard = ([label, value, note, progress, metric]) => `<button type="button" class="card metric-card" data-order-metric="${metric}"><span class="metric-label">${label}</span><span class="metric-value">${value}</span><span class="metric-note">${note}</span>${progress ? `<span class="metric-progress"><span style="width:${progress}%"></span></span>` : ''}</button>`;
-  pageFrame('统一订单管理', '', '<button class="button" data-business-action="order-export">导出订单</button>', `<div class="card-grid compact-metrics">${[['今日订单', '26', '视频与面授合计', 0, 'today'], ['待支付', '1', '待完成支付', 0, '待支付'], ['退款中', '1', '符合规则的退款申请', 0, '退款中'], ['已支付', '18', '交易已完成', 70, '已支付']].map(metricCard).join('')}</div>` + filterPanel('order-filter', selectField('订单类型', 'type', ['视频课程', '面授课程']) + selectField('订单状态', 'status', ['待支付', '已支付', '已取消', '退款中', '已退款']) + selectField('关联状态', 'fulfillment', ['待分班', '已分班', '已取消', '学习中', '未开始', '已完成']) + `<label class="form-field"><span>下单时间起</span><input name="from" type="date"></label><label class="form-field"><span>下单时间止</span><input name="to" type="date"></label>` + inputField('关键词', 'keyword', '订单号 / 课程名称 / 购买账号', true)) + table('<thead><tr><th>订单号</th><th>课程名称</th><th>课程类型</th><th>购买账号 / 学员</th><th>订单金额</th><th>订单状态 / 关联状态</th><th>关联班级 / 权限</th><th>下单时间</th><th>操作</th></tr></thead>'));
+  pageFrame('统一订单管理', '', '<button class="button" data-business-action="order-export">导出订单</button>', `<div class="card-grid compact-metrics">${[['今日订单', '26', '视频与面授合计', 0, 'today'], ['待支付', '1', '待完成支付', 0, '待支付'], ['退款中', '1', '符合规则的退款申请', 0, '退款中'], ['已支付', '18', '交易已完成', 70, '已支付']].map(metricCard).join('')}</div>` + filterPanel('order-filter', selectField('订单类型', 'type', ['视频课程', '面授课程']) + selectField('订单状态', 'status', ['待支付', '已支付', '已取消', '退款中', '已退款']) + selectField('关联状态', 'fulfillment', ['已分班', '已取消', '学习中', '未开始', '已完成']) + `<label class="form-field"><span>下单时间起</span><input name="from" type="date"></label><label class="form-field"><span>下单时间止</span><input name="to" type="date"></label>` + inputField('关键词', 'keyword', '订单号 / 课程名称 / 购买账号', true)) + table('<thead><tr><th>订单号</th><th>课程名称</th><th>课程类型</th><th>购买账号 / 学员</th><th>订单金额</th><th>订单状态 / 关联状态</th><th>关联班级 / 权限</th><th>下单时间</th><th>操作</th></tr></thead>'));
   const params = new URLSearchParams(window.location.search);
   // RM-F-07: video orders name the purchasing account; offline orders keep account + student.
   const rows = (row) => `<td>${row.number}</td><td>${row.name}</td><td>${row.type}</td><td>${row.type === '视频课程' ? `${row.account || row.student}${row.account ? `<span class="sub-cell">${row.accountPhone || ''}</span>` : ''}` : `${row.account || '—'}<span class="sub-cell">学员：${row.student || '—'}</span>`}</td><td class="amount-cell">¥${row.amount}</td><td>${tag(row.status)}<span class="sub-cell">${row.fulfillment ? `关联状态：${row.fulfillment}` : '关联状态：—'}</span></td><td>${row.linked}</td><td>${row.time}</td><td><button class="text-button" data-business-action="order-view">查看详情</button></td>`;
@@ -531,11 +539,15 @@ function renderOrders() {
 }
 
 function renderBatches() {
-  businessData = dataSets.batches;
-  pageFrame('批次管理', '', '', metricCards([['年度批次', '4', '固定批次规则'], ['进行中', '1', '当前招生季'], ['已结束', '1', '历史批次保留'], ['待发布班级', '2', '可进入班级管理']]) + filterPanel('batch-filter', selectField('招生季', 'season', ['春季', '暑假', '秋季', '寒假']) + selectField('批次状态', 'status', ['未开始', '进行中', '已结束']) + inputField('关键词', 'keyword', '批次名称', true)) + table('<thead><tr><th>批次名称</th><th>招生季</th><th>开始日期</th><th>结束日期</th><th>关联班级</th><th>状态</th><th>操作</th></tr></thead>'));
-  const rows = (row) => `<td><a class="reference-link" href="/admin/pages/crm/classes.html">${row.name}</a></td><td>${row.season}</td><td>${row.start}</td><td>${row.end}</td><td>${row.classes}</td><td>${tag(row.status)}</td><td><a class="link" href="/admin/pages/crm/classes.html">查看班级</a></td>`;
+  // 列表默认按批次开始日期倒序；关联班级数按班级归属实时计数，不用种子里的静态值。
+  businessData = [...dataSets.batches].sort((a, b) => String(b.start).localeCompare(String(a.start)));
+  const classCountOf = (batch) => dataSets.classes.filter((row) => batchNameForClass(row) === batch.name).length;
+  const statusCount = (value) => dataSets.batches.filter((batch) => batchStatusOf(batch) === value).length;
+  const pendingScheduleCount = dataSets.classes.filter((row) => classScheduleStatus(row) === '待排课').length;
+  pageFrame('批次管理', '', '', metricCards([['年度批次', String(dataSets.batches.length), '按年自动生成，固定四批'], ['进行中', String(statusCount('进行中')), '按起止日期派生'], ['已结束', String(statusCount('已结束')), '按起止日期派生'], ['待排课班级', String(pendingScheduleCount), '需进入排课工作台']]) + filterPanel('batch-filter', selectField('招生季', 'season', ['春季', '暑假', '秋季', '寒假']) + selectField('批次状态', 'status', ['未开始', '进行中', '已结束']) + inputField('关键词', 'keyword', '批次名称', true)) + table('<thead><tr><th>批次名称</th><th>招生季</th><th>开始日期</th><th>结束日期</th><th>关联班级</th><th>状态</th><th>操作</th></tr></thead>'));
+  const rows = (row) => `<td><a class="reference-link" href="/admin/pages/crm/classes.html?batch=${encodeURIComponent(row.name)}">${row.name}</a></td><td>${row.season}</td><td>${row.start}</td><td>${row.end}</td><td>${classCountOf(row)}</td><td>${tag(batchStatusOf(row))}</td><td><a class="link" href="/admin/pages/crm/classes.html?batch=${encodeURIComponent(row.name)}">查看班级</a></td>`;
   renderRows(businessData, rows, () => true);
-  document.querySelector('#batch-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { season, status, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!season.value || row.season === season.value) && (!status.value || row.status === status.value) && (!keyword.value.trim() || row.name.includes(keyword.value.trim()))); });
+  document.querySelector('#batch-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { season, status, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!season.value || row.season === season.value) && (!status.value || batchStatusOf(row) === status.value) && (!keyword.value.trim() || row.name.includes(keyword.value.trim()))); });
 }
 
 function classStageTabs(activeStage) {
@@ -551,7 +563,8 @@ function classStageConfig(stage) {
 }
 
 function renderClasses(stage = new URLSearchParams(window.location.search).get('stage') || 'schedule') {
-  businessData = dataSets.classes;
+  // 列表默认按最近编辑时间倒序（class-seed 的 updatedAt），无时间字段时退化为数据源顺序。
+  businessData = [...dataSets.classes].sort((a, b) => String(b.updatedAt || b.created || '').localeCompare(String(a.updatedAt || a.created || '')));
   const config = classStageConfig(stage);
   // CR-2026-054：三个阶段是并行工作视图；状态投影来自共享生命周期函数，不在页面内重复计算。
   const projections = new Map(businessData.map(row => [row.id, classStageProjection(row)]));
@@ -577,10 +590,10 @@ function renderClasses(stage = new URLSearchParams(window.location.search).get('
   const rows = (row) => {
     const projection = projectionOf(row);
     const scheduleButton = ['待排课', '排课中'].includes(projection.scheduleStatus)
-      ? '<button class="text-button" data-business-action="class-schedule-create">去排课</button>'
-      : `<button class="text-button" data-business-action="class-schedule-view">排班查看</button>${projection.teachingStatus === '待开课' ? '<button class="text-button" data-business-action="class-schedule-change">排班变更</button>' : ''}`;
+      ? '<button class="text-button" data-perm="PERM-ACADEMIC-002" data-business-action="class-schedule-create">去排课</button>'
+      : `<button class="text-button" data-business-action="class-schedule-view">排班查看</button>${projection.teachingStatus === '待开课' ? '<button class="text-button" data-perm="PERM-ACADEMIC-002" data-business-action="class-schedule-change">排班变更</button>' : ''}`;
     if (stage === 'schedule') return `<td><a class="reference-link" href="#">${escapeHtml(row.name)}</a></td><td>${escapeHtml(row.course)}</td><td>${escapeHtml(batchNameForClass(row))}</td><td>${escapeHtml(row.teacher || '待排课')}</td><td>${escapeHtml(row.campus || '—')}</td><td>${tag(projection.scheduleStatus)}</td><td>${row.scheduleVersion ? `v${row.scheduleVersion}` : '—'}</td><td class="action-cell"><button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-edit">编辑</button>${scheduleButton}</td>`;
-    if (stage === 'enrollment') return `<td><a class="reference-link" href="#">${escapeHtml(row.name)}</a></td><td>${escapeHtml(row.course)}</td><td>${tag(projection.enrollmentStatus)}</td><td>${tag(projection.displayStatus)} <button class="text-button" data-business-action="class-display-toggle">${projection.displayStatus === '显示' ? '隐藏' : '显示'}</button></td><td>${recommendationSwitch(row, 'class-recommend-toggle', projection.displayStatus === '显示', '班级显示后可设置首页推荐')}</td><td>${row.enrolled || 0} / ${row.capacity || 0}</td><td>${tag(projection.capacityStatus)}</td><td>${escapeHtml(row.deadline || '—')}</td><td class="action-cell"><button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-schedule-view">排班查看</button>${projection.teachingStatus === '待开课' ? '<button class="text-button" data-business-action="class-schedule-change">排班变更</button>' : ''}${projection.enrollmentStatus === '已结束' && projection.capacityStatus === '否' && projection.teachingStatus === '待开课' ? '<button class="text-button" data-business-action="class-extend-deadline">延长报名</button>' : ''}</td>`;
+    if (stage === 'enrollment') return `<td><a class="reference-link" href="#">${escapeHtml(row.name)}</a></td><td>${escapeHtml(row.course)}</td><td>${tag(projection.enrollmentStatus)}</td><td>${tag(projection.displayStatus)} <button class="text-button" data-business-action="class-display-toggle">${projection.displayStatus === '显示' ? '隐藏' : '显示'}</button></td><td>${recommendationSwitch(row, 'class-recommend-toggle', projection.displayStatus === '显示', '班级显示后可设置首页推荐')}</td><td>${row.enrolled || 0} / ${row.capacity || 0}</td><td>${tag(projection.capacityStatus)}</td><td>${escapeHtml(row.deadline || '—')}</td><td class="action-cell"><button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-schedule-view">排班查看</button>${projection.teachingStatus === '待开课' ? '<button class="text-button" data-perm="PERM-ACADEMIC-002" data-business-action="class-schedule-change">排班变更</button>' : ''}${projection.enrollmentStatus === '已结束' && projection.capacityStatus === '否' && projection.teachingStatus === '待开课' ? '<button class="text-button" data-business-action="class-extend-deadline">延长报名</button>' : ''}</td>`;
     const progress = classLessonProgress(row);
     return `<td><a class="reference-link" href="#">${escapeHtml(row.name)}</a></td><td>${escapeHtml(row.course)}</td><td>${tag(projection.teachingStatus)}</td><td>${escapeHtml(row.firstLessonDate || '—')}</td><td>${progress.completed} / ${progress.total}</td><td>${escapeHtml(row.teacher || '—')}<span class="sub-cell">${escapeHtml(row.campus || '—')}</span></td><td class="action-cell"><button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-teaching-schedule">查看课表</button>${progress.completed < progress.total ? '<button class="text-button" data-business-action="class-session-adjust">课次调整</button>' : ''}</td>`;
   };
@@ -603,6 +616,29 @@ function renderClasses(stage = new URLSearchParams(window.location.search).get('
         && (!searchText || `${row.name}${row.course}${row.teacher || ''}`.includes(searchText));
     });
   });
+  // 批次管理「查看班级」带 batch 深链进入时，预选所属批次并立即过滤。
+  const initialBatch = businessParams.get('batch') || '';
+  if (initialBatch) {
+    const batchField = document.querySelector('#class-filter [name=batch]');
+    if (batchField && [...batchField.options].some((option) => option.value === initialBatch)) {
+      batchField.value = initialBatch;
+      document.querySelector('#class-filter')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  }
+  // 课表管理「去班级排课」深链：?classId=<班级ID> 进入时直接打开该班级的排课抽屉，
+  // 排课已完成的班级按只读「排班查看」打开（教学阶段班级不再走变更）。
+  const deepClassId = businessParams.get('classId') || '';
+  if (deepClassId) {
+    const target = dataSets.classes.find((item) => item.id === deepClassId);
+    if (target) {
+      const requestedAction = businessParams.get('action') || '';
+      const mode = classScheduleStatus(target) === '已完成' ? 'view' : 'create';
+      if (requestedAction === 'adjust') window.setTimeout(() => openSessionAdjustment({ classId: deepClassId, sessionIndex: Number(businessParams.get('session')) || undefined }), 0);
+      else window.setTimeout(() => openSchedulePlanner({ classId: deepClassId, mode }), 0);
+    } else {
+      showToast('未找到该课次所属班级，可能已被删除。', 'warning');
+    }
+  }
 }
 
 function renderTrials() {
@@ -720,7 +756,7 @@ function openClassDetail(row) {
   const roster = enrollments.length ? enrollments.map(item => { const student = students.find(entry => entry.id === item.studentId); return `<tr><td>${escapeHtml(student?.name || item.studentId)}</td><td>${escapeHtml(item.enrolledAt || '—')}</td><td>已分班</td></tr>`; }).join('') : '<tr><td colspan="3">暂无学员报名</td></tr>';
   const sessions = Array.isArray(row.sessions) ? row.sessions : [];
   const projection = classStageProjection(row);
-  const body = `${workspaceTabs([['overview', '班级与招生'], ['course', '关联课程'], ['display', '展示信息'], ['teaching', '状态与教学'], ['students', '学员与记录']], 'overview')}<section data-workspace-panel="overview" class="sales-workspace-panel">${readonlyRows([['班级名称', row.name], ['所属批次', batchNameForClass(row)], ['招生容量', row.capacity || 0], ['课程定价', `¥${row.price}`], ['是否支持试听', row.trialEnabled || '是'], ['试听是否收费', row.trialFee || '否'], ['试听价格', row.trialFee === '是' ? `¥${row.trialPrice || 0}` : '免费'], ['试听说明', row.trialNote || '—'], ['报名开始时间', row.enrollStart || '—'], ['报名截止时间', row.deadline || '—'], ['快速报名入口', row.fast || '否'], ['班级状态', deriveClassStatus(row)]])}</section><section data-workspace-panel="course" class="sales-workspace-panel" hidden>${readonlyRows([['关联课程', row.course]])}${courseReadonlyContent(course)}</section><section data-workspace-panel="display" class="sales-workspace-panel" hidden>${saleUnitDisplayReadonly(row)}</section><section data-workspace-panel="teaching" class="sales-workspace-panel" hidden>${readonlyRows([['班级编号', row.id], ['排课状态', projection.scheduleStatus], ['招生状态', projection.enrollmentStatus], ['教学状态', projection.teachingStatus], ['展示状态', projection.displayStatus], ['名额已满', projection.capacityStatus], ['报名条件', classEnrollmentCondition(row)], ['授课教师', row.teacher], ['校区', row.campus], ['教室', row.classroom], ['上课规则', row.schedule], ['首次上课', row.firstLessonDate || '—'], ['课次时长', `${row.lessonDuration || DEFAULT_LESSON_DURATION} 分钟`], ['已生成课次', sessions.length]])}</section><section data-workspace-panel="students" class="sales-workspace-panel" hidden><div class="sales-dialog-summary"><div><span>已报名</span><strong>${row.enrolled || 0}</strong></div><div><span>招生容量</span><strong>${row.capacity || 0}</strong></div><div><span>剩余名额</span><strong>${Math.max(0, Number(row.capacity || 0) - Number(row.enrolled || 0))}</strong></div></div><div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>状态</th></tr></thead><tbody>${roster}</tbody></table></div></section>`;
+  const body = `${workspaceTabs([['overview', '班级与招生'], ['course', '关联课程'], ['display', '展示信息'], ['teaching', '状态与教学'], ['students', '学员与记录']], 'overview')}<section data-workspace-panel="overview" class="sales-workspace-panel">${readonlyRows([['班级名称', row.name], ['所属批次', batchNameForClass(row)], ['招生容量', row.capacity || 0], ['课程定价', `¥${row.price}`], ['是否支持试听', row.trialEnabled || '是'], ['试听是否收费', row.trialFee || '否'], ['试听价格', row.trialFee === '是' ? `¥${row.trialPrice || 0}` : '免费'], ['试听说明', row.trialNote || '—'], ['报名开始时间', row.enrollStart || '—'], ['报名截止时间', row.deadline || '—'], ['快速报名入口', row.fast || '否'], ['班级状态', deriveClassStatus(row)]])}</section><section data-workspace-panel="course" class="sales-workspace-panel" hidden>${readonlyRows([['关联课程', row.course]])}${courseReadonlyContent(course)}</section><section data-workspace-panel="display" class="sales-workspace-panel" hidden>${saleUnitDisplayReadonly(row)}</section><section data-workspace-panel="teaching" class="sales-workspace-panel" hidden>${readonlyRows([['班级编号', row.id], ['排课状态', projection.scheduleStatus], ['招生状态', projection.enrollmentStatus], ['教学状态', projection.teachingStatus], ['展示状态', projection.displayStatus], ['名额已满', projection.capacityStatus], ['报名条件', classEnrollmentCondition(row)], ['授课教师', row.teacher], ['校区', row.campus], ['教室', row.classroom], ['上课规则', row.schedule], ['首次上课', row.firstLessonDate || '—'], ['课次时长', `${row.lessonDuration || defaultLessonDuration()} 分钟`], ['已生成课次', sessions.length]])}</section><section data-workspace-panel="students" class="sales-workspace-panel" hidden><div class="sales-dialog-summary"><div><span>已报名</span><strong>${row.enrolled || 0}</strong></div><div><span>招生容量</span><strong>${row.capacity || 0}</strong></div><div><span>剩余名额</span><strong>${Math.max(0, Number(row.capacity || 0) - Number(row.enrolled || 0))}</strong></div></div><div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>状态</th></tr></thead><tbody>${roster}</tbody></table></div></section>`;
   const scheduleAction = projection.scheduleStatus !== '已完成'
     ? `<button type="button" class="button primary" data-class-schedule-mode="create">去排课</button>`
     : '<button type="button" class="button" data-class-schedule-mode="view">排班查看</button><button type="button" class="button primary" data-class-schedule-mode="change">排班变更</button>';

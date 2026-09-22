@@ -1,13 +1,15 @@
-import { demoId, demoTime, readDemoState, removeDemoRecord, upsertDemoRecord } from './demo-store.js';
+import { demoId, demoTime, readDemoState, removeDemoRecord, timetableSettings, upsertDemoRecord } from './demo-store.js';
 import { cloneCourseCatalogSeed } from './course-catalog-seed.js';
 import { classSeed } from './class-seed.js';
 import { readXlsxSheetRows } from './xlsx-lite.js';
 import { toLocalDateString } from './date-utils.js';
-import { SEMESTERS, mergeVenues, resolveVenueId } from './venue-seed.js';
+import { DEMO_NOW, DEMO_TODAY } from './demo-clock.js';
+import { mergeVenues, resolveVenueId } from './venue-seed.js';
+import { SEMESTERS, semesterAnchorOf, semesterRangeOf } from './batch-seed.js';
 import { TEACHER_FACTS } from './teacher-facts.js';
 import { explainTeacherCapacity } from './teacher-capacity.js';
 import { mountRichEditor, richTextValue } from './rich-editor.js';
-import { DEFAULT_LESSON_DURATION, HALF_DAY_BOUNDARIES, HALF_DAY_LABELS, LESSON_DURATIONS, TIMELINE_END, TIMELINE_START, TIMELINE_STEP_MINUTES, TIMELINE_TICK_COUNT, halfDayRows, isWithinTimeline, lessonDurationOptions, lessonEndTime, mergeBusyRanges, snapToStep, toMinutes, toTime } from './timetable-settings.js';
+import { defaultLessonDuration, lessonDurationValues, TIMELINE_END, TIMELINE_START, TIMELINE_STEP_MINUTES, TIMELINE_TICK_COUNT, isWithinTimeline, lessonDurationOptions, lessonEndTime, snapToStep, toMinutes, toTime } from './timetable-settings.js';
 import { classEnrollmentCondition, classScheduleStatus, classTeachingStatus } from './class-lifecycle.js';
 
 const academicRoot = document.querySelector('[data-academic-page]');
@@ -28,7 +30,7 @@ function plannerTeacherOptions(selectedTeacher, major, course, date) {
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const statusClass = (value) => ({
   启用: 'green', 停用: 'gray', 未发布: 'gray', 招生中: 'brand', 已满员: 'amber', 进行中: 'brand', 已结束: 'gray', 已排班: 'green', 待排课: 'amber', 排课中: 'brand', 已完成: 'green', 冲突: 'red', 无: 'green',
-  待上课: 'amber', 上课中: 'brand', 已完成: 'green', 已取消: 'gray', 已停课: 'red', 已到: 'green', 迟到: 'amber', 请假: 'gray', 缺勤: 'red', 正常: 'green', 待补录: 'amber', 已补录: 'green',
+  待上课: 'amber', 上课中: 'brand', 已完成: 'green', 已停课: 'red', 已到: 'green', 迟到: 'amber', 请假: 'gray', 缺勤: 'red', 正常: 'green', 待补录: 'amber', 已补录: 'green',
   作业进行中: 'brand', 作业已结束: 'gray', 发送成功: 'green', 部分失败: 'amber', 发送中: 'brand', 发送失败: 'red', 待复核: 'brand', 建议结业: 'green', 需补课: 'amber', 补课中: 'amber', 已通过: 'green', 已取消结业: 'gray', 未发起: 'gray', 复核中: 'brand', 已归档: 'gray',
   草稿: 'gray', 已发布: 'green', 已撤回: 'amber', 已生成: 'green', 生成中: 'brand', 生成失败: 'red'
 }[value] || 'gray');
@@ -65,14 +67,41 @@ function pageFrame(title, description, controls, content) {
 }
 function metrics(items) { return `<div class="card-grid compact-metrics">${items.map(([label, value, note]) => `<div class="card"><div class="metric-label">${label}</div><div class="metric-value">${value}</div><div class="metric-note">${note}</div></div>`).join('')}</div>`; }
 function field(label, name, type = 'text', placeholder = '', wide = false) { return `<label class="form-field${wide ? ' wide' : ''}"><span>${label}</span><input type="${type}" name="${name}" placeholder="${placeholder}"></label>`; }
-function select(label, name, options, wide = false, includeAll = true) { return `<label class="form-field${wide ? ' wide' : ''}"><span>${label}</span><select name="${name}">${includeAll ? `<option value="">全部${label}</option>` : ''}${options.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join('')}</select></label>`; }
+function select(label, name, options, wide = false, includeAll = true, selected = '') { return `<label class="form-field${wide ? ' wide' : ''}"><span>${label}</span><select name="${name}">${includeAll ? `<option value="">全部${label}</option>` : ''}${options.map((item) => `<option value="${escapeHtml(item)}"${item === selected ? ' selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></label>`; }
 function table(head, extraClass = '') { return `<div class="table-wrap academic-table ${extraClass}"><table>${head}<tbody class="table-body"></tbody></table></div><div class="pagination-bar"><span class="result-count">—</span><button class="button" disabled>上一页</button><button class="button primary">1</button><button class="button" disabled>下一页</button></div>`; }
 function filterPanel(id, fields) { return `<div class="filter-panel" data-filter-drawer-shell="${id}"><button type="button" class="button filter-drawer-trigger" data-filter-drawer-trigger="${id}" aria-expanded="false" aria-controls="${id}"><span class="filter-trigger-icon" aria-hidden="true"></span>筛选条件</button><div class="filter-drawer-backdrop" data-filter-drawer-backdrop="${id}" hidden></div><form class="card filter-form" id="${id}"><div class="filter-head"><strong>筛选条件</strong><button type="button" class="icon-button filter-drawer-close" data-filter-drawer-close="${id}" title="关闭筛选条件" aria-label="关闭筛选条件">×</button></div><div class="filter-grid academic-filter-grid">${fields}</div><div class="filter-actions"><button type="reset" class="button">重置</button><button type="submit" class="button primary">查询</button></div></form></div>`; }
-function renderRows(rows, rowTemplate, empty = '暂无符合条件的数据。') {
+let academicPager = { page: 1, size: 20 };
+let academicRowsCache = { rows: [], template: null, empty: '' };
+// CR-2026-103：列表按页渲染，筛选条件变化回到第 1 页；分页按钮复用同一份行模板。
+function renderRows(rows, rowTemplate, empty = '暂无符合条件的数据。', keepPage = false) {
   const body = academicRoot.querySelector('.table-body'); if (!body) return;
-  body.innerHTML = rows.length ? rows.map((row) => `<tr data-row-id="${escapeHtml(row.id)}">${rowTemplate(row)}</tr>`).join('') : `<tr><td colspan="20"><div class="empty">${empty}</div></td></tr>`;
-  const count = academicRoot.querySelector('.result-count'); if (count) count.textContent = `共 ${rows.length} 条`;
+  academicRowsCache = { rows, template: rowTemplate, empty };
+  const totalPages = Math.max(1, Math.ceil(rows.length / academicPager.size));
+  if (!keepPage) academicPager.page = 1;
+  academicPager.page = Math.min(Math.max(1, academicPager.page), totalPages);
+  const page = academicPager.page;
+  const pageRows = rows.slice((page - 1) * academicPager.size, page * academicPager.size);
+  body.innerHTML = pageRows.length ? pageRows.map((row) => `<tr data-row-id="${escapeHtml(row.id)}">${rowTemplate(row)}</tr>`).join('') : `<tr><td colspan="20"><div class="empty">${empty}</div></td></tr>`;
+  const count = academicRoot.querySelector('.result-count'); if (count) count.textContent = `共 ${rows.length} 条 · 第 ${page} / ${totalPages} 页`;
+  const bar = academicRoot.querySelector('.pagination-bar');
+  if (bar) bar.innerHTML = `<span class="result-count">共 ${rows.length} 条 · 第 ${page} / ${totalPages} 页</span><button type="button" class="button" data-academic-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>上一页</button><button type="button" class="button" data-academic-page="${page + 1}" ${page >= totalPages ? 'disabled' : ''}>下一页</button><select data-academic-page-size aria-label="每页条数">${[20, 50, 100].map((size) => `<option value="${size}" ${size === academicPager.size ? 'selected' : ''}>${size} 条 / 页</option>`).join('')}</select>`;
 }
+// 分页与每页条数：只重渲染行，不重跑业务逻辑。
+academicRoot?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-academic-page]');
+  if (!button) return;
+  const target = Number(button.dataset.academicPage);
+  if (!Number.isFinite(target)) return;
+  academicPager.page = target;
+  renderRows(academicRowsCache.rows, academicRowsCache.template, academicRowsCache.empty, true);
+});
+academicRoot?.addEventListener('change', (event) => {
+  const select = event.target.closest('[data-academic-page-size]');
+  if (!select) return;
+  academicPager.size = Number(select.value) || 20;
+  academicPager.page = 1;
+  renderRows(academicRowsCache.rows, academicRowsCache.template, academicRowsCache.empty, true);
+});
 function applyFilter(formId, source, predicate, rowTemplate) { document.querySelector(`#${formId}`)?.addEventListener('submit', (event) => { event.preventDefault(); renderRows(source.filter(predicate(event.currentTarget)), rowTemplate); }); document.querySelector(`#${formId}`)?.addEventListener('reset', () => window.setTimeout(() => renderRows(source, rowTemplate), 0)); }
 
 // E03: venues live in the shared demo store so scheduling, matrix and export read the same archive.
@@ -131,10 +160,75 @@ function plannerWeekdayTimeRows(weekdays, weekdayTimes, duration) {
     return `<div class="planner-weekday-time-row" data-planner-weekday-time="${escapeHtml(weekday)}"><strong>${escapeHtml(weekday)}</strong><label><span>上课开始时间</span><input data-weekday-start type="time" step="900" min="${TIMELINE_START}" max="${TIMELINE_END}" required value="${escapeHtml(start)}"></label><label><span>上课结束时间</span><input data-weekday-end class="readonly-field" readonly value="${escapeHtml(end)}"></label></div>`;
   }).join('');
 }
+// CR-2026-102：学员时间冲突是硬校验——发布排班与调整课次时，同一学员不能在同一时段出现在两个班。
+// 课表风险提示、排课预览与提交守卫共用这一份判定，避免“提示有冲突、提交却放行”。
+function studentConflictsWithOthers(classRecord, sessions) {
+  if (!classRecord?.id) return [];
+  const shared = readDemoState();
+  const enrollments = shared.enrollments || [];
+  const mine = new Set(enrollments.filter((item) => item.classId === classRecord.id && item.status === '已分班').map((item) => item.studentId));
+  if (!mine.size) return [];
+  const others = schedulingClasses().filter((row) => row.id !== classRecord.id);
+  const conflicts = [];
+  (sessions || []).forEach((session) => {
+    if (!session?.date || !session.start || !session.end) return;
+    others.forEach((row) => {
+      const sharedStudents = enrollments.filter((item) => item.classId === row.id && item.status === '已分班' && mine.has(item.studentId)).map((item) => item.studentId);
+      if (!sharedStudents.length) return;
+      (row.sessions || []).forEach((other) => {
+        if (other.status === '已停课' || other.date !== session.date) return;
+        const start = other.startTime || other.start; const end = other.endTime || other.end;
+        if (!start || !end || !(session.start < end && start < session.end)) return;
+        sharedStudents.forEach((studentId) => conflicts.push({ studentId, className: row.name, date: session.date, start, end }));
+      });
+    });
+  });
+  return conflicts.filter((item, index, list) => list.findIndex((row) => `${row.studentId}-${row.className}-${row.date}-${row.start}` === `${item.studentId}-${item.className}-${item.date}-${item.start}`) === index);
+}
+// 学员冲突的改期建议：先试同一天的其他时段，再试后续 7 天的原时段，返回前 3 个不冲突的时段。
+function sessionConflictSuggestions(classRecord, session, limit = 3) {
+  const suggestions = [];
+  const duration = Number(session.lessonDuration || classRecord.lessonDuration || defaultLessonDuration());
+  const roomId = sessionRoomId(classRecord, session);
+  const trySlot = (date, start) => {
+    if (suggestions.length >= limit || !date || !start) return;
+    const end = lessonEndTime(start, duration);
+    if (!isWithinTimeline(start, duration)) return;
+    const candidate = { ...session, date, start, end, startTime: start, endTime: end };
+    if (studentConflictsWithOthers(classRecord, [candidate]).length) return;
+    if (sessionAdjustmentConflicts(classRecord, session.index, { date, start, end, teacher: session.teacher || classRecord.teacher, roomId }).length) return;
+    suggestions.push({ date, start, end });
+  };
+  ['15:45', '17:00', '18:30', '09:00', '10:45'].forEach((start) => trySlot(session.date, start));
+  for (let day = 1; day <= 7 && suggestions.length < limit; day += 1) {
+    trySlot(addPlannerDays(session.date, day), session.startTime || session.start);
+  }
+  return suggestions;
+}
+function sessionSuggestionButtons(classRecord, session, limit = 3) {
+  const suggestions = sessionConflictSuggestions(classRecord, session, limit);
+  if (!suggestions.length) return "";
+  return `<div class="academic-suggestions"><strong>建议时段（点击采用）</strong>${suggestions.map((item, index) => `<button type="button" class="button" data-session-suggestion="${index}" data-suggest-date="${item.date}" data-suggest-start="${item.start}">${escapeHtml(item.date)} ${escapeHtml(item.start)}</button>`).join("")}<span class="muted">同一天其他时段优先，其次后续 7 天原时段</span></div>`;
+}
+function sessionSuggestionText(classRecord, session) {
+  const suggestions = sessionConflictSuggestions(classRecord, session);
+  if (!suggestions.length) return '';
+  return `；可改到 ${suggestions.map((item) => `${item.date} ${item.start}`).join(' 或 ')}`;
+}
+function studentNamesOf(ids = []) {
+  const shared = readDemoState();
+  return ids.map((id) => (shared.students || []).find((student) => student.id === id)?.name || id);
+}
+function plannerStudentConflicts(preview) {
+  return studentConflictsWithOthers(preview.classRecord, preview.sessions);
+}
+function studentConflictText(conflict) {
+  return `学员时间冲突：${studentNamesOf([conflict.studentId])[0]} 在 ${conflict.date} 与“${conflict.className}”${conflict.start}–${conflict.end} 重叠`;
+}
 function plannerOverlap(left, right) { return left.start < right.end && right.start < left.end; }
 function plannerConflicts(preview) {
   const existing = allTimetableSessions(); const conflicts = [];
-  preview.sessions.forEach(session => existing.filter(item => item.weekday === session.weekday && plannerOverlap(session, item)).forEach(item => {
+  preview.sessions.forEach(session => existing.filter(item => ((session.date && item.date) ? session.date === item.date : item.weekday === session.weekday) && plannerOverlap(session, item)).forEach(item => {
     if (preview.teacher && preview.teacher === item.teacher) conflicts.push({ type: '教师', target: item.teacher, existing: item.className, weekday: session.weekday });
     if (preview.roomId && preview.roomId === item.roomId) conflicts.push({ type: '教室', target: preview.roomName, existing: item.className, weekday: session.weekday });
   }));
@@ -144,7 +238,7 @@ function plannerFormState(form) {
   const data = new FormData(form); const classRecord = schedulingClasses().find(item => item.id === data.get('classId'));
   const course = scheduleCourseCatalog.find(item => item.id === classRecord?.courseId) || { id: classRecord?.courseId, name: classRecord?.course, hours: classRecord?.lessons, major: classRecord?.professional || classRecord?.category || '' };
   const weekdays = [...form.querySelectorAll('[name=weekdays]:checked')].map(item => item.value);
-  const duration = Number(data.get('lessonDuration')) || DEFAULT_LESSON_DURATION;
+  const duration = Number(data.get('lessonDuration')) || defaultLessonDuration();
   const weekdayTimes = {}; const rawWeekdayTimes = {};
   form.querySelectorAll('[data-planner-weekday-time]').forEach(row => {
     const weekday = row.dataset.plannerWeekdayTime; const field = row.querySelector('[data-weekday-start]');
@@ -155,7 +249,7 @@ function plannerFormState(form) {
   const firstTime = weekdayTimes[weekdays[0]] || { startTime: '', endTime: '' };
   const room = venues.find(item => item.id === data.get('roomId')); const total = Number(classRecord?.lessons || course?.hours || 0);
   const preview = { classRecord, course, name: classRecord?.name || '', batch: classRecord?.batch || '', teacher: String(data.get('teacher') || '').trim(), campus: data.get('campus') || '', building: String(data.get('building') || ''), roomId: room?.id || '', roomName: room?.name || '', capacity: Number(classRecord?.capacity || 0), price: Number(classRecord?.price || 0), weekdays, weekdayTimes, rawWeekdayTimes, start: firstTime.startTime, end: firstTime.endTime, duration, firstLessonDate: String(data.get('firstLessonDate') || ''), deadline: classRecord?.deadline || '', total, sessions: plannerSessions(total, weekdayTimes, duration, String(data.get('firstLessonDate') || ''), room?.id || '', classRecord?.batch === '暑假' ? '2026暑期' : '2026秋季') };
-  preview.conflicts = plannerConflicts(preview); preview.timeComplete = weekdays.length > 0 && weekdays.every(weekday => Boolean(weekdayTimes[weekday]?.startTime)); preview.withinTimeline = preview.timeComplete && weekdays.every(weekday => isWithinTimeline(weekdayTimes[weekday].startTime, duration)); preview.roomCapacityOk = Boolean(room && preview.capacity > 0 && room.capacity >= preview.capacity);
+  preview.conflicts = plannerConflicts(preview); preview.studentConflicts = plannerStudentConflicts(preview); preview.timeComplete = weekdays.length > 0 && weekdays.every(weekday => Boolean(weekdayTimes[weekday]?.startTime)); preview.withinTimeline = preview.timeComplete && weekdays.every(weekday => isWithinTimeline(weekdayTimes[weekday].startTime, duration)); preview.roomCapacityOk = Boolean(room && preview.capacity > 0 && room.capacity >= preview.capacity);
   return preview;
 }
 function plannerRecommendationRows(preview) {
@@ -191,6 +285,7 @@ function plannerPreviewMarkup(preview) {
   }
   if (preview.roomId && preview.capacity && !preview.roomCapacityOk) issues.push(`教室容量不足，当前 ${preview.capacity} 人，${preview.roomName}容量不足`);
   if (preview.conflicts.length) issues.push(...preview.conflicts.map(item => `${item.type}冲突：${item.target}与“${item.existing}”在${item.weekday}有重叠课次`));
+  if (preview.studentConflicts?.length) issues.push(...preview.studentConflicts.slice(0, 3).map(studentConflictText));
   const snappedTimes = preview.weekdays.filter(weekday => preview.rawWeekdayTimes[weekday] && preview.rawWeekdayTimes[weekday] !== preview.weekdayTimes[weekday]?.startTime).map(weekday => `${weekday} ${preview.rawWeekdayTimes[weekday]} 已吸附为 ${preview.weekdayTimes[weekday].startTime}`);
   const rawNote = snappedTimes.length ? snappedTimes.join('；') : '各上课日开始时间均对齐 15 分钟刻度';
   const sessionRows = preview.sessions.slice(0, 8).map(session => `<tr><td>第${session.index}次</td><td>${session.date} ${session.weekday}</td><td>${session.startTime}–${session.endTime}</td><td>${escapeHtml(preview.roomName || '待选教室')}</td></tr>`).join('');
@@ -215,40 +310,47 @@ export function openSchedulePlanner(prefill = {}) {
     showToast('班级已开课，不能变更整体排班，请使用“课次调整”。', 'warning');
     return;
   }
-  const draft = selectedClass.schedulePreview?.length ? selectedClass : { ...selectedClass, ...prefill };
-  const selectedWeekdays = draft.weekdays || (draft.weekday ? [draft.weekday] : ['周六']);
+  // A grid-sourced prefill (weekday/start/room dragged on the classroom timetable) describes the
+  // slot to fill, so it must win over the selected class's own schedule preview.
+  const gridPrefill = !prefill.classId && !prefill.id && Boolean(prefill.weekday || prefill.startTime || prefill.start);
+  const draft = gridPrefill
+    ? { ...selectedClass, ...prefill, schedulePreview: [], weekdayTimes: {}, sessions: [] }
+    : selectedClass.schedulePreview?.length ? selectedClass : { ...selectedClass, ...prefill };
+  // An empty weekdays array means "not configured yet" and must not shadow a single weekday prefill.
+  const selectedWeekdays = (Array.isArray(draft.weekdays) && draft.weekdays.length ? draft.weekdays : null) || (draft.weekday ? [draft.weekday] : ['周六']);
   const selectedCampus = draft.campus || campuses.find(item => item.status === '启用')?.name || ''; const selectedRoom = draft.roomId || venues.find(item => venueAvailable(item) && item.campus === selectedCampus)?.id || ''; const selectedStart = draft.startTime || draft.start || '09:00';
   const selectedWeekdayTimes = Object.fromEntries(selectedWeekdays.map(weekday => {
     const stored = draft.weekdayTimes?.[weekday];
     const session = draft.schedulePreview?.find(item => item.weekday === weekday) || draft.sessions?.find(item => item.weekday === weekday);
     const startTime = stored?.startTime || session?.startTime || session?.start || selectedStart;
-    return [weekday, { startTime, endTime: lessonEndTime(startTime, draft.lessonDuration || DEFAULT_LESSON_DURATION) }];
+    return [weekday, { startTime, endTime: lessonEndTime(startTime, draft.lessonDuration || defaultLessonDuration()) }];
   }));
   const classOptions = classes.map(item => `<option value="${escapeHtml(item.id)}" ${item.id === selectedClass.id ? 'selected' : ''}>${escapeHtml(item.name)} · ${escapeHtml(classScheduleStatus(item))}</option>`).join('');
   if (plannerMode === 'view') {
     const sessions = Array.isArray(selectedClass.sessions) ? selectedClass.sessions : [];
     const sessionRows = sessions.map(session => { const room = venues.find(item => item.id === sessionRoomId(selectedClass, session)); return `<tr><td>第 ${session.index} 次</td><td>${escapeHtml(session.date)}</td><td>${escapeHtml(session.startTime || session.start)}-${escapeHtml(session.endTime || session.end)}</td><td>${escapeHtml(session.teacher || selectedClass.teacher || '—')}</td><td>${escapeHtml(room?.name || selectedClass.classroom || '—')}</td><td>${tag(session.status || '待上课')}</td></tr>`; }).join('');
-    const facts = [['班级名称', selectedClass.name], ['关联课程', selectedClass.course || course?.name || '—'], ['批次 / 容量', `${selectedClass.batch || '—'} · ${selectedClass.capacity || 0}人`], ['排课状态', classScheduleStatus(selectedClass)], ['授课教师', selectedClass.teacher || '—'], ['授课校区', selectedClass.campus || '—'], ['授课教室', selectedClass.classroom || '—'], ['上课规则', selectedClass.schedule || '—'], ['首次上课日期', selectedClass.firstLessonDate || '—'], ['总课时', selectedClass.lessons || sessions.length], ['单次课时长', `${selectedClass.lessonDuration || DEFAULT_LESSON_DURATION} 分钟`], ['排班版本', `v${selectedClass.scheduleVersion || 0}`]];
+    const facts = [['班级名称', selectedClass.name], ['关联课程', selectedClass.course || course?.name || '—'], ['批次 / 容量', `${selectedClass.batch || '—'} · ${selectedClass.capacity || 0}人`], ['排课状态', classScheduleStatus(selectedClass)], ['授课教师', selectedClass.teacher || '—'], ['授课校区', selectedClass.campus || '—'], ['授课教室', selectedClass.classroom || '—'], ['上课规则', selectedClass.schedule || '—'], ['首次上课日期', selectedClass.firstLessonDate || '—'], ['总课时', selectedClass.lessons || sessions.length], ['单次课时长', `${selectedClass.lessonDuration || defaultLessonDuration()} 分钟`], ['排班版本', `v${selectedClass.scheduleVersion || 0}`]];
     const body = `<div class="academic-readonly-grid">${facts.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</div><div class="planner-preview-panel"><div class="planner-section-title"><strong>正式课次</strong><span>共 ${sessions.length} 条</span></div><div class="planner-session-list"><table><thead><tr><th>课次</th><th>日期</th><th>时间</th><th>授课教师</th><th>教室</th><th>状态</th></tr></thead><tbody>${sessionRows || '<tr><td colspan="6">暂无正式课次</td></tr>'}</tbody></table></div></div>`;
     openDialog('排班查看', '只读查看当前已发布的排班版本和正式课次。', body, '<button type="button" class="button" data-dialog-close>关闭</button>', 'academic-planner-dialog');
     return;
   }
-  const body = `<form id="schedule-planner-form" class="academic-form-grid"><div class="planner-form-column"><div class="planner-form-title"><strong>已有班级与排课条件</strong></div><label class="form-field wide"><span>已有班级 <b class="required-mark">*</b></span><select name="classId" required>${classOptions}</select></label><label class="form-field wide"><span>关联课程 / 版本</span><input class="readonly-field" readonly value="${escapeHtml(selectedClass.course || course?.name || '—')} · v${selectedClass.courseVersion || 1}"></label><label class="form-field"><span>班级名称</span><input class="readonly-field" readonly value="${escapeHtml(selectedClass.name)}"></label><label class="form-field"><span>批次 / 容量</span><input class="readonly-field" readonly value="${escapeHtml(selectedClass.batch || '—')} · ${selectedClass.capacity || 0}人"></label><label class="form-field"><span>授课教师 <b class="required-mark">*</b></span><select name="teacher" required>${plannerTeacherOptions(draft.teacher || course?.teacher, course?.major || selectedClass.professional, course?.name || selectedClass.course, draft.firstLessonDate || '2026-09-19')}</select></label><label class="form-field"><span>授课校区 <b class="required-mark">*</b></span><select name="campus" required>${['龙泉校区', '南湖校区'].map(value => `<option ${value === selectedCampus ? 'selected' : ''}>${value}</option>`).join('')}</select></label><label class="form-field"><span>授课教学楼 <b class="required-mark">*</b></span><select name="building" required>${plannerBuildingOptions(selectedCampus)}</select></label><label class="form-field"><span>授课教室 <b class="required-mark">*</b></span><select name="roomId" required>${schedulePlannerRoomOptions(selectedRoom, selectedCampus)}</select></label><label class="form-field wide"><span>每周上课日 <b class="required-mark">*</b></span><div class="planner-weekday-grid">${SCHEDULE_WEEKDAYS.map(value => `<label class="planner-weekday-option"><input type="checkbox" name="weekdays" value="${value}" ${selectedWeekdays.includes(value) ? 'checked' : ''}><span>${value.replace('周', '')}</span></label>`).join('')}</div></label><label class="form-field"><span>单次课时长 <b class="required-mark">*</b></span><select name="lessonDuration" required>${lessonDurationOptions(draft.lessonDuration || DEFAULT_LESSON_DURATION).map(item => `<option value="${item.value}" ${item.selected ? 'selected' : ''}>${item.label}</option>`).join('')}</select></label><label class="form-field"><span>首次上课日期 <b class="required-mark">*</b></span><input name="firstLessonDate" type="date" required value="${escapeHtml(draft.firstLessonDate || '2026-09-19')}"></label><label class="form-field"><span>总课时</span><input name="totalLessons" class="readonly-field" readonly value="${selectedClass.lessons || course?.hours || 0}"></label><div class="planner-weekday-time-section wide"><div class="planner-weekday-time-head"><strong>每周上课时间</strong><span>按上课日分别设置，结束时间按公用课时长自动计算</span></div><div class="planner-weekday-time-list" data-planner-weekday-time-list>${plannerWeekdayTimeRows(selectedWeekdays, selectedWeekdayTimes, draft.lessonDuration || DEFAULT_LESSON_DURATION)}</div></div></div><div class="planner-preview-wrap" data-planner-preview></div></form>`;
+  const body = `<form id="schedule-planner-form" class="academic-form-grid"><div class="planner-form-column"><div class="planner-form-title"><strong>已有班级与排课条件</strong></div><label class="form-field wide"><span>已有班级 <b class="required-mark">*</b></span><select name="classId" required>${classOptions}</select></label><label class="form-field wide"><span>关联课程 / 版本</span><input class="readonly-field" readonly value="${escapeHtml(selectedClass.course || course?.name || '—')} · v${selectedClass.courseVersion || 1}"></label><label class="form-field"><span>班级名称</span><input class="readonly-field" readonly value="${escapeHtml(selectedClass.name)}"></label><label class="form-field"><span>批次 / 容量</span><input class="readonly-field" readonly value="${escapeHtml(selectedClass.batch || '—')} · ${selectedClass.capacity || 0}人"></label><label class="form-field"><span>授课教师 <b class="required-mark">*</b></span><select name="teacher" required>${plannerTeacherOptions(draft.teacher || course?.teacher, course?.major || selectedClass.professional, course?.name || selectedClass.course, draft.firstLessonDate || '2026-09-19')}</select></label><label class="form-field"><span>授课校区 <b class="required-mark">*</b></span><select name="campus" required>${['龙泉校区', '南湖校区'].map(value => `<option ${value === selectedCampus ? 'selected' : ''}>${value}</option>`).join('')}</select></label><label class="form-field"><span>授课教学楼 <b class="required-mark">*</b></span><select name="building" required>${plannerBuildingOptions(selectedCampus)}</select></label><label class="form-field"><span>授课教室 <b class="required-mark">*</b></span><select name="roomId" required>${schedulePlannerRoomOptions(selectedRoom, selectedCampus)}</select></label><label class="form-field wide"><span>每周上课日 <b class="required-mark">*</b></span><div class="planner-weekday-grid">${SCHEDULE_WEEKDAYS.map(value => `<label class="planner-weekday-option"><input type="checkbox" name="weekdays" value="${value}" ${selectedWeekdays.includes(value) ? 'checked' : ''}><span>${value.replace('周', '')}</span></label>`).join('')}</div></label><label class="form-field"><span>单次课时长 <b class="required-mark">*</b></span><select name="lessonDuration" required>${lessonDurationOptions(draft.lessonDuration || defaultLessonDuration()).map(item => `<option value="${item.value}" ${item.selected ? 'selected' : ''}>${item.label}</option>`).join('')}</select></label><label class="form-field"><span>首次上课日期 <b class="required-mark">*</b></span><input name="firstLessonDate" type="date" required value="${escapeHtml(draft.firstLessonDate || '2026-09-19')}"></label><label class="form-field"><span>总课时</span><input name="totalLessons" class="readonly-field" readonly value="${selectedClass.lessons || course?.hours || 0}"></label><div class="planner-weekday-time-section wide"><div class="planner-weekday-time-head"><strong>每周上课时间</strong><span>按上课日分别设置，结束时间按公用课时长自动计算</span></div><div class="planner-weekday-time-list" data-planner-weekday-time-list>${plannerWeekdayTimeRows(selectedWeekdays, selectedWeekdayTimes, draft.lessonDuration || defaultLessonDuration())}</div></div></div><div class="planner-preview-wrap" data-planner-preview></div></form>`;
+  const displayBody = body.replace('关联课程 / 版本', '关联课程').replace(/ · v[^\"]+/, '');
   const isChange = plannerMode === 'change';
   const actions = isChange
     ? '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-planner-submit="publish">确认变更并发布</button>'
     : '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button" data-planner-submit="draft">保存草稿</button><button type="button" class="button primary" data-planner-submit="publish">确认并发布</button>';
-  const dialog = openDialog(isChange ? '排班变更' : '去排课', isChange ? '编辑当前排班；确认后生成新排班版本。' : '首次维护排课；保存草稿不生成正式课次。', body, actions, 'academic-planner-dialog');
+  const dialog = openDialog(isChange ? '排班变更' : '去排课', isChange ? '编辑当前排班：确认后重排该班级全部课次并生成新排班版本（不是新增单次课次）。' : '首次维护排课：按所选上课日与首次上课日期重排该班级全部课次（不是新增单次课次）；保存草稿不生成正式课次。', displayBody, actions, 'academic-planner-dialog');
   const form = dialog.querySelector('#schedule-planner-form');
   const campusField = form.querySelector('[name=campus]');
   if (campusField) { campusField.innerHTML = campuses.filter(item => item.status === '启用').map(item => `<option ${item.name === selectedCampus ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join(''); }
   const weekdayTimeDraft = { ...selectedWeekdayTimes };
-  const captureWeekdayTimes = () => form.querySelectorAll('[data-planner-weekday-time]').forEach(row => { const startTime = row.querySelector('[data-weekday-start]')?.value || ''; weekdayTimeDraft[row.dataset.plannerWeekdayTime] = { startTime, endTime: startTime ? lessonEndTime(startTime, Number(form.elements.lessonDuration.value) || DEFAULT_LESSON_DURATION) : '' }; });
+  const captureWeekdayTimes = () => form.querySelectorAll('[data-planner-weekday-time]').forEach(row => { const startTime = row.querySelector('[data-weekday-start]')?.value || ''; weekdayTimeDraft[row.dataset.plannerWeekdayTime] = { startTime, endTime: startTime ? lessonEndTime(startTime, Number(form.elements.lessonDuration.value) || defaultLessonDuration()) : '' }; });
   const renderWeekdayTimes = () => {
     captureWeekdayTimes();
     const weekdays = [...form.querySelectorAll('[name=weekdays]:checked')].map(item => item.value);
-    weekdays.forEach(weekday => { if (!weekdayTimeDraft[weekday]) weekdayTimeDraft[weekday] = { startTime: selectedStart, endTime: lessonEndTime(selectedStart, Number(form.elements.lessonDuration.value) || DEFAULT_LESSON_DURATION) }; });
-    form.querySelector('[data-planner-weekday-time-list]').innerHTML = plannerWeekdayTimeRows(weekdays, weekdayTimeDraft, Number(form.elements.lessonDuration.value) || DEFAULT_LESSON_DURATION);
+    weekdays.forEach(weekday => { if (!weekdayTimeDraft[weekday]) weekdayTimeDraft[weekday] = { startTime: selectedStart, endTime: lessonEndTime(selectedStart, Number(form.elements.lessonDuration.value) || defaultLessonDuration()) }; });
+    form.querySelector('[data-planner-weekday-time-list]').innerHTML = plannerWeekdayTimeRows(weekdays, weekdayTimeDraft, Number(form.elements.lessonDuration.value) || defaultLessonDuration());
   };
   const refresh = () => { const campus = form.querySelector('[name=campus]')?.value || ''; const roomField = form.querySelector('[name=roomId]'); const currentRoom = roomField?.value || ''; const buildingField = form.querySelector('[name=building]'); if (buildingField) { const buildings = plannerBuildings(campus); const currentBuilding = buildingField.value; buildingField.innerHTML = buildings.map(name => `<option>${name}</option>`).join(''); buildingField.value = buildings.includes(currentBuilding) ? currentBuilding : (buildings[0] || ''); } const building = buildingField?.value || ''; if (roomField) { const options = venues.filter(item => item.status === '启用' && (!campus || item.campus === campus) && (!building || item.building === building)); roomField.innerHTML = options.map(item => `<option value="${escapeHtml(item.id)}" ${item.id === currentRoom ? 'selected' : ''}>${escapeHtml(item.name)} · ${escapeHtml(item.building)} · ${item.capacity}人</option>`).join(''); if (!options.some(item => item.id === roomField.value) && options.length) roomField.value = options[0].id; } form.querySelectorAll('[data-weekday-start]').forEach(startField => { const rawStart = startField.value || ''; const snapped = rawStart ? snapToStep(rawStart) : ''; if (snapped && rawStart !== snapped) { startField.dataset.originalTime = rawStart; startField.value = snapped; } }); const preview = plannerFormState(form); form.querySelectorAll('[data-planner-weekday-time]').forEach(row => { const weekday = row.dataset.plannerWeekdayTime; const endField = row.querySelector('[data-weekday-end]'); if (endField) endField.value = preview.weekdayTimes[weekday]?.endTime || ''; }); dialog.querySelector('[data-planner-preview]').innerHTML = plannerPreviewMarkup(preview); return preview; };
   form.addEventListener('input', (event) => { if (event.target.matches('[data-weekday-start]')) delete event.target.dataset.originalTime; refresh(); }); form.addEventListener('change', (event) => { if (event.target.name === 'classId') { closeDialog(); openSchedulePlanner({ classId: event.target.value, mode: plannerMode }); return; } if (event.target.name === 'weekdays' || event.target.name === 'lessonDuration') renderWeekdayTimes(); refresh(); }); refresh();
@@ -265,19 +367,22 @@ function saveSchedulePlanner(mode, dialog, preview) {
   if (!preview.withinTimeline) { showToast(`各上课日时间均需落在 ${TIMELINE_START}–${TIMELINE_END} 内`, 'error'); return; }
   if (!preview.roomCapacityOk) { showToast('招生人数超过所选教室容量，请更换教室或调整人数。', 'error'); return; }
   if (mode === 'publish' && preview.conflicts.length) { showToast('存在教师或教室冲突，处理冲突后才能发布排班。', 'error'); return; }
+  const publishStudentConflicts = studentConflictsWithOthers(preview.classRecord, preview.sessions);
+  if (mode === 'publish' && publishStudentConflicts.length) { showToast(`${studentConflictText(publishStudentConflicts[0])}${sessionSuggestionText(preview.classRecord, preview.sessions[0] || {})}。`, 'error'); return; }
   const semester = String(preview.batch || '').includes('暑假') ? '2026暑期' : '2026秋季';
   const record = { ...preview.classRecord, semester, teacher: preview.teacher, campus: preview.campus, classroom: preview.roomName, roomId: preview.roomId, schedule: plannerScheduleLabel(preview.weekdays, preview.weekdayTimes), weekdays: preview.weekdays, weekdayTimes: preview.weekdayTimes, weekday: preview.weekdays[0], startTime: preview.start, endTime: preview.end, lessonDuration: preview.duration, firstLessonDate: preview.firstLessonDate, scheduleStatus: mode === 'publish' ? '已发布' : '草稿', status: mode === 'publish' ? '招生中' : '排班草稿', display: mode === 'publish' ? '已展示' : '未发布', schedulePreview: preview.sessions, sessions: mode === 'publish' ? preview.sessions : [], scheduleVersion: mode === 'publish' ? Number(preview.classRecord.scheduleVersion || 0) + 1 : Number(preview.classRecord.scheduleVersion || 0), schedulePublishedAt: mode === 'publish' ? toLocalDateString() : preview.classRecord.schedulePublishedAt };
   upsertDemoRecord('classes', record);
-  closeDialog(); renderScheduling(); showToast(mode === 'publish' ? `排班已发布，已生成 ${record.sessions.length} 个正式课次。${snappedNotes.length ? `时间已按 15 分钟刻度调整：${snappedNotes.join('、')}。` : ''}` : `排班草稿已保存，预览 ${preview.sessions.length} 个课次，尚未进入正式课表。`);
+  closeDialog(); if (academicPage === 'timetable') renderTimetable(); showToast(mode === 'publish' ? `排班已发布，已按规则重排该班级 ${record.sessions.length} 个课次。${snappedNotes.length ? `时间已按 15 分钟刻度调整：${snappedNotes.join('、')}。` : ''}` : `排班草稿已保存，预览 ${preview.sessions.length} 个课次，尚未进入正式课表。`);
 }
-const SESSION_ADJUST_TODAY = '2026-09-17';
+// 课次调整只允许调整演示当天及以后的课次；日期与班级阶段派生同取演示当天，不另立一套今天。
+const SESSION_ADJUST_TODAY = DEMO_TODAY;
 function sessionCanAdjust(session) {
-  return Boolean(session && String(session.date || '') >= SESSION_ADJUST_TODAY && !['上课中', '已完成', '已上课', '已取消', '已停课'].includes(session.status));
+  return Boolean(session && String(session.date || '') >= SESSION_ADJUST_TODAY && !['上课中', '已完成', '已上课', '已停课'].includes(session.status));
 }
 function sessionAdjustmentConflicts(classRecord, sessionIndex, candidate) {
   return schedulingClasses().flatMap(item => (item.sessions || []).map(session => ({ classRecord: item, session }))).filter(({ classRecord: item, session }) => {
     if (item.id === classRecord.id && Number(session.index) === Number(sessionIndex)) return false;
-    if (['已取消', '已停课'].includes(session.status)) return false;
+    if (session.status === '已停课') return false;
     if (session.date !== candidate.date) return false;
     const overlap = plannerOverlap({ start: session.startTime || session.start, end: session.endTime || session.end }, candidate);
     if (!overlap) return false;
@@ -312,10 +417,20 @@ export function openSessionAdjustment(prefill = {}) {
     ['teacher', 'date', 'startTime', 'roomId'].forEach(name => { field(name).disabled = stopped; });
     field('shiftFollowing').disabled = !stopped;
     if (!stopped) field('shiftFollowing').checked = false;
-    const duration = Number(selected.lessonDuration || classRecord.lessonDuration || DEFAULT_LESSON_DURATION);
+    const duration = Number(selected.lessonDuration || classRecord.lessonDuration || defaultLessonDuration());
     field('endTime').value = lessonEndTime(field('startTime').value || selected.startTime || selected.start, duration);
     const affected = stopped && field('shiftFollowing').checked ? adjustable.filter(session => Number(session.index) > Number(selected.index)).length + 1 : 1;
     dialog.querySelector('[data-session-adjustment-impact]').textContent = stopped ? `本次将停课第 ${selected.index} 次；${field('shiftFollowing').checked ? `后续课次顺延并补课，预计影响 ${affected} 个课次` : '后续课次保持不变'}` : `仅调整第 ${selected.index} 次课，不改变班级整体排班规则。`;
+    const suggestionHost = dialog.querySelector('[data-session-adjustment-impact]');
+    if (!stopped) suggestionHost.insertAdjacentHTML('beforeend', sessionSuggestionButtons(classRecord, { ...selected, index: selected.index, date: field('date').value || selected.date, startTime: field('startTime').value || selected.startTime || selected.start, start: field('startTime').value || selected.startTime || selected.start }));
+    suggestionHost.addEventListener('click', (event) => {
+      const pick = event.target.closest('[data-session-suggestion]');
+      if (!pick) return;
+      // 按钮上写什么就填什么：直接用渲染时的候选快照，避免在已变化的字段上重算导致索引错位。
+      field('date').value = pick.dataset.suggestDate || field('date').value;
+      field('startTime').value = pick.dataset.suggestStart || field('startTime').value;
+      refresh(false);
+    });
   };
   field('sessionIndex').addEventListener('change', () => refresh(true));
   form.addEventListener('input', () => refresh(false));
@@ -338,7 +453,7 @@ export function openSessionAdjustment(prefill = {}) {
       const teacher = String(data.get('teacher') || '');
       const date = String(data.get('date') || '');
       const start = snapToStep(String(data.get('startTime') || ''));
-      const duration = Number(target.lessonDuration || classRecord.lessonDuration || DEFAULT_LESSON_DURATION);
+      const duration = Number(target.lessonDuration || classRecord.lessonDuration || defaultLessonDuration());
       const end = lessonEndTime(start, duration);
       const room = venues.find(item => item.id === data.get('roomId'));
       const teacherFacts = TEACHER_FACTS.find(item => item.name === teacher);
@@ -348,6 +463,8 @@ export function openSessionAdjustment(prefill = {}) {
       if (!room || Number(room.capacity || 0) < Number(classRecord.capacity || 0)) { showToast('所选教室未启用或容量不足。', 'error'); return; }
       const conflicts = sessionAdjustmentConflicts(classRecord, selectedIndex, { date, start, end, teacher, roomId: room.id });
       if (conflicts.length) { const conflict = conflicts[0]; showToast(`冲突校验未通过：${conflict.teacherConflict ? '教师' : '教室'}与“${conflict.className}”课次冲突。`, 'error'); return; }
+      const adjustStudentConflicts = studentConflictsWithOthers(classRecord, [sessions[targetIndex]]);
+      if (adjustStudentConflicts.length) { showToast(`${studentConflictText(adjustStudentConflicts[0])}${sessionSuggestionText(classRecord, sessions[targetIndex])}。`, 'error'); return; }
       sessions[targetIndex] = { ...target, date, weekday: plannerWeekday(date), startTime: start, endTime: end, start, end, teacher, roomId: room.id, status: '待上课', adjusted: true };
       log.after = { date, startTime: start, endTime: end, teacher, roomId: room.id, status: '待上课' };
     } else {
@@ -355,7 +472,7 @@ export function openSessionAdjustment(prefill = {}) {
       sessions[targetIndex] = { ...target, status: '已停课', stopped: true, stopReason: reason };
       if (shiftFollowing) {
         sessions.forEach(session => { if (Number(session.index) > selectedIndex && sessionCanAdjust(session)) { session.date = addPlannerDays(session.date, 7); session.weekday = plannerWeekday(session.date); session.shiftedByAdjustmentId = log.id; } });
-        const lastActive = [...sessions].reverse().find(session => !['已停课', '已取消'].includes(session.status)) || target;
+        const lastActive = [...sessions].reverse().find(session => session.status !== '已停课') || target;
         const replacementDate = addPlannerDays(lastActive.date, 7);
         sessions.push({ ...target, index: Math.max(...sessions.map(session => Number(session.index) || 0)) + 1, date: replacementDate, weekday: plannerWeekday(replacementDate), status: '待上课', stopped: false, stopReason: '', makeupFor: selectedIndex, shiftedByAdjustmentId: log.id });
       }
@@ -370,53 +487,82 @@ export function openSessionAdjustment(prefill = {}) {
     showToast(`${type}已保存${notify ? '，通知记录已生成' : ''}。`);
   });
 }
-const sessions = [
-  // B2-UI-01：课次日期与班级排课中的同班级规则一致（少儿舞蹈基础班每周六、成人声乐班每周日、国画入门工作坊每周三）。
-  { id: 'session-1', date: '2026-09-12', day: '周六', time: '09:00-10:30', course: '舞蹈基本功', className: '少儿舞蹈基础班', teacher: '王玥', campus: '龙泉校区', room: '综合楼302', status: '上课中', attendance: '待补录' },
-  { id: 'session-2', date: '2026-08-30', day: '周日', time: '14:00-15:30', course: '声乐基础', className: '成人声乐班', teacher: '陈晨', campus: '南湖校区', room: '音乐楼201', status: '已完成', attendance: '正常' },
-  { id: 'session-3', date: '2026-09-16', day: '周三', time: '18:30-20:00', course: '中国画基础', className: '国画入门工作坊', teacher: '赵老师', campus: '龙泉校区', room: '艺术楼105', status: '待上课', attendance: '—' },
-  { id: 'session-4', date: '2026-09-13', day: '周日', time: '09:00-10:30', course: '声乐演唱技巧', className: '暑期声乐提高班', teacher: '陈晨', campus: '南湖校区', room: '音乐楼201', status: '已停课', attendance: '—' }
-];
+// 课次列表与教师视图、教室视图共用 allTimetableSessions() 一份数据源，不再保留独立的列表演示种子。
 // I1-DEC-29: matrix rows are derived from the fixed time axis — never from a maintained slot scheme.
 const academicSemesterKey = 'hbyx-academic-semester';
 function currentSemester() { try { const stored = localStorage.getItem(academicSemesterKey); return SEMESTERS.includes(stored) ? stored : SEMESTERS[0]; } catch { return SEMESTERS[0]; } }
-function setSemester(semester) { try { localStorage.setItem(academicSemesterKey, semester); } catch { /* ignore */ } }
-const academicRowModeKey = 'hbyx-academic-row-mode';
-function currentRowMode() { try { return localStorage.getItem(academicRowModeKey) === 'busy' ? 'busy' : 'half-day'; } catch { return 'half-day'; } }
-function setRowMode(mode) { try { localStorage.setItem(academicRowModeKey, mode); } catch { /* ignore */ } }
-const ACADEMIC_WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-function isOutsideTimeline(session) { return toMinutes(session.start) < toMinutes(TIMELINE_START) || toMinutes(session.end) > toMinutes(TIMELINE_END); }
-// half-day: fixed 上午/下午/晚上 rows per weekday; busy: rows merged from the ranges that actually have sessions.
-function timetableRows(sessions) {
-  if (currentRowMode() === 'busy') {
-    return ACADEMIC_WEEKDAYS.flatMap(weekday => mergeBusyRanges(weekday, sessions.filter(session => !isOutsideTimeline(session))).map((range, index) => ({
-      id: `${weekday}-${index}-${toTime(range.start)}`,
-      weekday,
-      name: `${weekday} ${toTime(range.start)}–${toTime(range.end)}`,
-      start: toTime(range.start),
-      end: toTime(range.end),
-      sort: index
-    })));
-  }
-  return halfDayRows(ACADEMIC_WEEKDAYS);
+// 学期与日期范围共同过滤；学期取值与起止日期来自批次管理种子（batch-seed.js），课表内不再另立一套字典。
+const SEMESTER_RANGES = Object.fromEntries(SEMESTERS.map((semester) => [semester, semesterRangeOf(semester)]).filter(([, range]) => range));
+function semesterOfDate(date) {
+  const match = Object.entries(SEMESTER_RANGES).find(([, [from, to]]) => date && date >= from && date <= to);
+  return match ? match[0] : SEMESTERS[0];
 }
-const timetableSeedSessions = [
-  { id: 'mts-1', className: '少儿舞蹈基础班', course: '舞蹈基本功', teacher: '王玥', campus: '龙泉校区', building: '综合楼', roomId: 'venue-302', weekday: '周六', start: '09:00', end: '10:30', status: '待上课', conflict: null },
-  { id: 'mts-2', className: '成人形体班', course: '形体训练', teacher: '王玥', campus: '龙泉校区', building: '综合楼', roomId: 'venue-302', weekday: '周六', start: '09:30', end: '11:00', status: '待上课', conflict: { type: 'teacher', target: '王玥' } },
-  { id: 'mts-3', className: '少儿舞蹈提高班', course: '舞蹈基本功', teacher: '王玥', campus: '龙泉校区', building: '综合楼', roomId: 'venue-302', weekday: '周六', start: '11:00', end: '12:30', status: '已停课', stopped: true, conflict: null },
-  { id: 'mts-4', className: '成人声乐班', course: '声乐基础', teacher: '陈晨', campus: '南湖校区', building: '音乐楼', roomId: 'venue-201', weekday: '周日', start: '14:00', end: '15:30', status: '待上课', conflict: null },
-  { id: 'mts-5', className: '声乐演唱提高班', course: '声乐演唱技巧', teacher: '陈晨', campus: '南湖校区', building: '音乐楼', roomId: 'venue-201', weekday: '周日', start: '14:00', end: '15:30', status: '待上课', conflict: { type: 'room', target: '音乐楼201' } },
-  { id: 'mts-6', className: '合唱基础训练', course: '合唱', teacher: '李青', campus: '南湖校区', building: '音乐楼', roomId: 'venue-201', weekday: '周日', start: '15:30', end: '17:00', status: '待上课', conflict: null },
-  { id: 'mts-7', className: '声乐表演工作坊', course: '声乐演唱技巧', teacher: '陈晨', campus: '南湖校区', building: '音乐楼', roomId: 'venue-201', weekday: '周日', start: '16:00', end: '17:30', status: '待上课', conflict: null },
-  { id: 'mts-8', className: '国画入门工作坊', course: '中国画基础', teacher: '赵老师', campus: '龙泉校区', building: '艺术楼', roomId: 'venue-105', weekday: '周三', start: '18:30', end: '20:00', status: '待上课', conflict: null },
-  { id: 'mts-9', className: '书法基础班', course: '书法基础', teacher: '赵老师', campus: '龙泉校区', building: '艺术楼', roomId: 'venue-105', weekday: '周一', start: '07:30', end: '08:15', status: '待上课', conflict: null }
+function setSemester(semester) {
+  try { localStorage.setItem(academicSemesterKey, semester); } catch { /* ignore */ }
+  const range = SEMESTER_RANGES[semester];
+  const anchor = getTimetableAnchor();
+  if (!range || (anchor >= range[0] && anchor <= range[1])) return;
+  try { localStorage.setItem(timetableAnchorKey, semesterAnchorDate(semester)); } catch { /* ignore */ }
+}
+// 切学期时优先落在该学期「第一个有课次的日期」，落不到再退回学期起始日，
+// 避免切到暑期后停在 7 月 1 日这种没有课次的日子，看起来像课表是空的。
+function semesterAnchorDate(semester) {
+  const range = SEMESTER_RANGES[semester];
+  if (!range) return semesterAnchorOf(semester);
+  if (DEMO_TODAY >= range[0] && DEMO_TODAY <= range[1]) return DEMO_TODAY;
+  const dates = timetableSessionItems()
+    .map((item) => item.date)
+    .filter((date) => date && date >= range[0] && date <= range[1])
+    .sort();
+  return dates[0] || semesterAnchorOf(semester);
+}
+const ACADEMIC_WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+// CR-2026-103：课次状态筛选统一取固定 5 值（与 SM-LESSON 取值一致），不再按当前数据动态枚举。
+const TIMETABLE_STATUS_OPTIONS = ['待上课', '上课中', '已完成', '已停课'];
+function isOutsideTimeline(session) { return toMinutes(session.start) < toMinutes(TIMELINE_START) || toMinutes(session.end) > toMinutes(TIMELINE_END); }
+// 课表演示课次：模板按周展开到所属学期，每条都带真实日期（不再靠「星期 + 锚点周」临时映射，
+// 因此既不会漂到别的周，也不会跑到别的学期）。教师与教室按专业铺开，仅保留 1 组故意冲突用于演示。
+const timetableSeedTemplates = [
+  { key: 'dance-basic', className: '少儿舞蹈基础班', course: '舞蹈基本功', teacher: '王玥', campus: '龙泉校区', building: '综合楼', roomId: 'venue-302', weekday: '周六', start: '09:00', end: '10:30' },
+  { key: 'dance-adult', className: '成人形体班', course: '形体训练', teacher: '王玥', campus: '龙泉校区', building: '综合楼', roomId: 'venue-302', weekday: '周六', start: '09:30', end: '11:00' },
+  { key: 'dance-adv', className: '少儿舞蹈提高班', course: '舞蹈基本功', teacher: '王玥', campus: '南湖校区', building: '艺术楼', roomId: 'venue-art201', weekday: '周六', start: '11:30', end: '13:00', statusOverrides: { '2026-09-19': { status: '已停课', stopped: true } } },
+  { key: 'vocal-adult', className: '成人声乐班', course: '声乐基础', teacher: '陈晨', campus: '南湖校区', building: '音乐楼', roomId: 'venue-201', weekday: '周日', start: '14:00', end: '15:30' },
+  { key: 'chorus', className: '合唱基础训练', course: '合唱', teacher: '陈晨', campus: '南湖校区', building: '音乐楼', roomId: 'venue-201', weekday: '周日', start: '15:30', end: '17:00' },
+  { key: 'vocal-adv', className: '声乐演唱提高班', course: '声乐演唱技巧', teacher: '陈晨', campus: '龙泉校区', building: '艺术楼', roomId: 'venue-105', weekday: '周日', start: '17:00', end: '18:30' },
+  { key: 'vocal-workshop', className: '声乐表演工作坊', course: '声乐演唱技巧', teacher: '陈晨', campus: '南湖校区', building: '音乐楼', roomId: 'venue-201', weekday: '周日', start: '18:30', end: '20:00' },
+  { key: 'painting', className: '国画入门工作坊', course: '中国画基础', teacher: '李青', campus: '南湖校区', building: '艺术楼', roomId: 'venue-art103', weekday: '周三', start: '18:30', end: '20:00', statusOverrides: { '2026-09-16': { status: '已停课' } } },
+  { key: 'calligraphy', className: '书法基础班', course: '书法基础', teacher: '赵老师', campus: '龙泉校区', building: '艺术楼', roomId: 'venue-105', weekday: '周一', start: '07:30', end: '08:15' }
 ];
+function firstWeekdayOnOrAfter(date, weekdayLabel) {
+  let cursor = date;
+  for (let step = 0; step < 7; step += 1) {
+    if (weekdayLabelOf(cursor) === weekdayLabel) return cursor;
+    cursor = shiftDate(cursor, 1);
+  }
+  return date;
+}
+function expandTimetableSeed(template) {
+  const { key, statusOverrides = {}, ...base } = template;
+  const term = semesterRangeOf(SEMESTERS[0]);
+  if (!term) return [];
+  const sessions = [];
+  let cursor = firstWeekdayOnOrAfter(term[0], base.weekday);
+  while (cursor <= term[1]) {
+    const override = statusOverrides[cursor] || {};
+    sessions.push({ ...base, ...override, id: `mts-${key}-${cursor}`, date: cursor, status: override.status || '待上课', lessonDuration: toMinutes(base.end) - toMinutes(base.start) });
+    cursor = shiftDate(cursor, 7);
+  }
+  return sessions;
+}
+const timetableSeedSessions = timetableSeedTemplates.flatMap(expandTimetableSeed);
 // E06: published class sessions (which carry room, slot and start/end) are projected into the matrix
 // alongside the demo rows, so a class published in the CRM shows up in the timetable.
+// 与「面授班级」列表同源：读 schedulingClasses()（班级种子 + demo state），否则演示班级只存在于
+// 班级列表、课表里永远看不到它们排出来的课次。
 function sharedTimetableSessions() {
-  const shared = readDemoState();
-  return (shared.classes || []).filter(item => item?.scheduleStatus === '已发布' && Array.isArray(item.sessions)).flatMap(classRow => classRow.sessions.map(session => ({
+  return schedulingClasses().filter(item => item?.scheduleStatus === '已发布' && Array.isArray(item.sessions)).flatMap(classRow => classRow.sessions.map(session => ({
     id: `${classRow.id}-session-${session.index}`,
+    classId: classRow.id,
     className: classRow.name,
     course: classRow.course,
     teacher: session.teacher || classRow.teacher,
@@ -427,12 +573,97 @@ function sharedTimetableSessions() {
     end: session.endTime,
     date: session.date,
     weekday: session.weekday,
-    lessonDuration: session.lessonDuration || DEFAULT_LESSON_DURATION,
+    sessionIndex: session.index,
+    lessonDuration: session.lessonDuration || defaultLessonDuration(),
     status: session.status || '待上课',
-    conflict: null
   })));
 }
-function allTimetableSessions() { return [...timetableSeedSessions, ...sharedTimetableSessions()]; }
+// 课表内实时派生教师／教室冲突：同一天、时间段重叠且教师或教室相同即为冲突，与排课抽屉的校验口径一致。
+// 有具体日期的课次按日期比，只有星期的演示课次按星期比；不再依赖种子数据里写死的冲突字段。
+// 教务关注的三类课表风险（与教师／教室冲突并列展示）：
+// 1) 学员时间冲突：同一学员在两个班的课次时段重叠；
+// 2) 教师转场紧张：同一教师当天两节课之间不足 30 分钟且换了教室（含跨校区）；
+// 3) 超容量：班级报名数超过所选教室容量。
+// 已停课的课次不参与判定（课次不设「已取消」状态，见 CR-2026-099）。
+function timetableClassStudentNames(classId) {
+  if (!classId) return [];
+  const shared = readDemoState();
+  return (shared.enrollments || [])
+    .filter((item) => item.classId === classId && item.status === '已分班')
+    .map((item) => (shared.students || []).find((student) => student.id === item.studentId)?.name || item.studentId);
+}
+function withTimetableRisks(items) {
+  const classes = schedulingClasses();
+  const studentsOf = new Map();
+  const classOf = new Map();
+  items.forEach((item) => {
+    if (!item.classId) return;
+    if (!studentsOf.has(item.classId)) studentsOf.set(item.classId, timetableClassStudentNames(item.classId));
+    if (!classOf.has(item.classId)) classOf.set(item.classId, classes.find((row) => row.id === item.classId) || null);
+  });
+  const active = items.filter((item) => item.status !== '已停课');
+  return items.map((item) => {
+    if (item.status === '已停课' || !item.date) return { ...item };
+    const risks = {};
+    const mine = studentsOf.get(item.classId) || [];
+    if (mine.length) {
+      const clash = active.find((other) => other.id !== item.id
+        && other.date === item.date && other.start < item.end && item.start < other.end
+        && (studentsOf.get(other.classId) || []).some((name) => mine.includes(name)));
+      if (clash) risks.studentConflict = (studentsOf.get(clash.classId) || []).find((name) => mine.includes(name)) || '已报名学员';
+    }
+    const gapSettings = timetableSettings();
+    const campusOf = (roomId) => venues.find((venue) => venue.id === roomId)?.campus || '';
+    const transferThreshold = (left, right) => gapSettings.transferGapMinutes + (campusOf(left.roomId) === campusOf(right.roomId) ? 0 : gapSettings.crossCampusExtraMinutes);
+    const tight = active.find((other) => other.id !== item.id
+      && other.date === item.date && other.teacher === item.teacher && other.roomId !== item.roomId
+      && ((other.start >= item.end && toMinutes(other.start) - toMinutes(item.end) < transferThreshold(item, other)) || (item.start >= other.end && toMinutes(item.start) - toMinutes(other.end) < transferThreshold(item, other))));
+    if (tight) {
+      const minutes = tight.start >= item.end ? toMinutes(tight.start) - toMinutes(item.end) : toMinutes(item.start) - toMinutes(tight.end);
+      risks.transferGap = { minutes, room: venues.find((venue) => venue.id === tight.roomId)?.name || '其他教室', crossCampus: campusOf(item.roomId) !== campusOf(tight.roomId) };
+    }
+
+    const classRecord = classOf.get(item.classId);
+    const room = venues.find((venue) => venue.id === item.roomId);
+    if (classRecord && room && Number(classRecord.enrolled) > Number(room.capacity || 0)) {
+      risks.overCapacity = { enrolled: Number(classRecord.enrolled), capacity: Number(room.capacity || 0) };
+    }
+    return Object.keys(risks).length ? { ...item, risks } : { ...item };
+  });
+}
+// 课次列表／教师视图／班级视图的「排课提示」列统一用它渲染，避免各视图各写一套。
+function timetableRiskTags(item) {
+  const parts = [];
+  if (isOutsideTimeline(item)) parts.push('<span class="tag amber">超出时间轴</span>');
+  if (item.conflict) parts.push(`<span class="teacher-view-conflict">${escapeHtml(matrixConflictText(item.conflict))}</span>`);
+  if (item.risks?.studentConflict) parts.push(`<span class="tag amber">学员冲突：${escapeHtml(item.risks.studentConflict)}</span>`);
+  if (item.risks?.transferGap) parts.push(`<span class="tag amber">转场紧张 ${item.risks.transferGap.minutes} 分钟 · ${escapeHtml(item.risks.transferGap.room)}${item.risks.transferGap.crossCampus ? '（跨校区）' : ''}</span>`);
+  if (item.risks?.overCapacity) parts.push(`<span class="tag amber">超容量 ${item.risks.overCapacity.enrolled}/${item.risks.overCapacity.capacity}</span>`);
+  return parts.length ? parts.join(' ') : '—';
+}
+function withDerivedConflicts(items) {
+  // 已停课的课次不再占用时段，也不参与冲突判定（与排课抽屉的校验口径一致）。
+  const active = items.filter((item) => item.status !== '已停课');
+  return items.map((item) => {
+    if (item.status === '已停课') return { ...item };
+    if (!item.start || !item.end) return { ...item };
+    const overlap = active.find((other) => other.id !== item.id
+      && other.start && other.end
+      && (item.date && other.date ? item.date === other.date : other.weekday === item.weekday)
+      && item.start < other.end && other.start < item.end
+      && (other.teacher === item.teacher || (item.roomId && other.roomId === item.roomId)));
+    if (!overlap) return { ...item };
+    const isTeacher = overlap.teacher === item.teacher;
+    return {
+      ...item,
+      conflict: {
+        type: isTeacher ? 'teacher' : 'room',
+        target: isTeacher ? item.teacher : (venues.find((venue) => venue.id === item.roomId)?.name || item.roomId || '—')
+      }
+    };
+  });
+}
+function allTimetableSessions() { return withTimetableRisks(withDerivedConflicts([...timetableSeedSessions, ...sharedTimetableSessions()])); }
 const attendance = [
   { id: 'att-1', className: '少儿舞蹈基础班', session: '第8次课', date: '2026-09-08', student: '林知夏', status: '已到', process: '正常', time: '08:54', teacher: '王玥' },
   { id: 'att-2', className: '少儿舞蹈基础班', session: '第8次课', date: '2026-09-08', student: '周子涵', status: '缺勤', process: '待补录', time: '—', teacher: '王玥' },
@@ -475,7 +706,7 @@ function renderVenues() {
   academicData = source;
   const createAction = venueLevel === 'campus' ? 'campus-create' : venueLevel === 'building' ? 'building-create' : 'venue-create';
   const createLabel = venueLevel === 'campus' ? '新增校区' : venueLevel === 'building' ? '新增教学楼' : '新增教室';
-  const controls = `${venueLevel === 'room' ? '<button class="button" data-academic-action="venue-import">Excel 批量导入</button>' : ''}<button class="button primary" data-academic-action="${createAction}">${createLabel}</button>`;
+  const controls = `<div class="toolbar-actions"><button class="button primary" data-academic-action="${createAction}">${createLabel}</button>${venueLevel === 'room' ? '<button class="button" data-academic-action="venue-import">Excel 批量导入</button>' : ''}</div>`;
   const metricBlock = metrics([['校区', campuses.length, `启用 ${campuses.filter(item => item.status === '启用').length}`], ['教学楼', buildings.length, `启用 ${buildings.filter(item => item.status === '启用').length}`], ['教室', venues.length, `启用 ${venues.filter(venueAvailable).length}`]]);
   let head = '';
   let row;
@@ -489,88 +720,250 @@ function renderVenues() {
     head = '<thead><tr><th>教室</th><th>所属校区</th><th>教学楼</th><th>类型</th><th>容量</th><th>设备标签</th><th>状态</th><th>操作</th></tr></thead>';
     row = item => `<td><strong>${escapeHtml(item.name)}</strong></td><td>${escapeHtml(item.campus)}</td><td>${escapeHtml(item.building)}</td><td>${escapeHtml(item.type)}</td><td>${item.capacity}人</td><td class="muted">${escapeHtml(item.tags || '—')}</td><td>${tag(item.status)}</td><td class="action-cell"><button class="text-button" data-academic-action="venue-edit">编辑</button><button class="text-button" data-academic-action="venue-toggle">${item.status === '启用' ? '停用' : '启用'}</button><button class="text-button" data-academic-action="venue-schedule">查看排课</button><button class="text-button danger-link" data-academic-action="venue-delete">删除</button></td>`;
   }
-  pageFrame('场地管理', '', controls, tabs + metricBlock + table(head));
+  const roomFilter = venueLevel === 'room'
+    ? filterPanel('venue-room-filter',
+      select('所属校区', 'campus', [...new Set(venues.map(item => item.campus))])
+      + select('所属教学楼', 'building', [...new Set(venues.map(item => item.building))])
+      + '<label class="form-field"><span>关键词</span><input name="keyword" placeholder="搜索教室名称或设备标签" /></label>'
+      + select('状态', 'status', ['启用', '停用']))
+    : '';
+  pageFrame('场地管理', '', controls, tabs + metricBlock + roomFilter + table(head));
   renderRows(source, row);
+  if (venueLevel === 'room') {
+    const filter = document.querySelector('#venue-room-filter');
+    const campusField = filter?.querySelector('[name="campus"]');
+    const buildingField = filter?.querySelector('[name="building"]');
+    const syncBuildings = () => {
+      if (!buildingField) return;
+      const campus = campusField?.value || '';
+      const names = [...new Set(venues.filter(item => !campus || item.campus === campus).map(item => item.building))];
+      const current = buildingField.value;
+      buildingField.innerHTML = `<option value="">全部所属教学楼</option>${names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}`;
+      buildingField.value = names.includes(current) ? current : '';
+    };
+    syncBuildings();
+    campusField?.addEventListener('change', syncBuildings);
+    filter?.addEventListener('reset', () => window.setTimeout(syncBuildings, 0));
+    applyFilter('venue-room-filter', venues, (form) => {
+      const campus = form.campus?.value || '';
+      const building = form.building?.value || '';
+      const status = form.status?.value || '';
+      const keyword = (form.keyword?.value || '').trim();
+      return (item) => (!campus || item.campus === campus)
+        && (!building || item.building === building)
+        && (!status || item.status === status)
+        && (!keyword || `${item.name} ${item.tags || ''}`.includes(keyword));
+    }, row);
+  }
   document.querySelectorAll('[data-venue-level]').forEach(button => button.addEventListener('click', () => { venueLevel = button.dataset.venueLevel; renderVenues(); }));
 }
-// I1-DEC-29 / RM-T-F01: the timetable axis is fixed (08:00-21:00, 52 x 15-minute ticks) and rows are
-// derived from session times, so this page is a read-only specification instead of a maintenance screen.
-function renderTimelineSpec() {
-  const semester = currentSemester();
-  const sessions = allTimetableSessions();
-  const outside = sessions.filter(isOutsideTimeline).length;
-  const ticks = Array.from({ length: TIMELINE_TICK_COUNT }, (_, index) => toTime(toMinutes(TIMELINE_START) + index * TIMELINE_STEP_MINUTES));
-  const perLabel = LABELS_HALF_DAY.map((label, index) => {
-    const start = HALF_DAY_BOUNDARIES[index]; const end = HALF_DAY_BOUNDARIES[index + 1];
-    const rows = sessions.filter(session => !isOutsideTimeline(session) && toMinutes(session.start) >= toMinutes(start) && toMinutes(session.start) < toMinutes(end));
-    return [label, rows.length, `${start}–${end}`];
-  });
-  pageFrame('排课时间轴', '',
-    `<select class="academic-inline-select" data-academic-semester>${SEMESTERS.map(item => `<option ${item === semester ? 'selected' : ''}>${item}</option>`).join('')}</select><a class="button primary" href="/admin/pages/academic/timetable.html">查看课表矩阵</a>`,
-    metrics([['时间轴', `${TIMELINE_START}–${TIMELINE_END}`, '固定不可修改'], ['刻度', `${TIMELINE_TICK_COUNT} 格`, `每 ${TIMELINE_STEP_MINUTES} 分钟一格`], ['课时时长', `${LESSON_DURATIONS.join(' / ')} 分钟`, `默认 ${DEFAULT_LESSON_DURATION} 分钟`], ['超出时间轴课次', outside, '归入「其他时段」兜底行']])
-    + '<div class="card-grid compact-metrics">' + perLabel.map(([label, count, range]) => `<div class="card"><div class="metric-label">${label}段边界</div><div class="metric-value">${range}</div><div class="metric-note">当前 ${count} 条课次</div></div>`).join('') + '</div>'
-    + '<section class="card"><h2 class="table-title">时间轴刻度（共 ' + TIMELINE_TICK_COUNT + ' 格）</h2><div class="academic-timeline-ticks">' + ticks.map(tick => `<span>${tick}</span>`).join('') + '</div></section>');
-  document.querySelector('[data-academic-semester]')?.addEventListener('change', (event) => { setSemester(event.target.value); renderTimelineSpec(); });
-}
-const LABELS_HALF_DAY = HALF_DAY_LABELS;
 
-
-function renderScheduling() {
-  // CR-2026-047 §6.3：排课页班级状态与班级列表同源（主状态 6 值）；报名条件只作徽标，不进入排班筛选与状态列。
-  academicData = schedulingClasses().map(item => ({ ...item, status: classScheduleStatus(item), enrollmentCondition: classEnrollmentCondition(item), room: item.classroom || '—', rule: item.schedule || '待配置', generated: `${Array.isArray(item.sessions) ? item.sessions.length : 0} / ${item.lessons || 0}`, conflict: '无' }));
-  const deepLinkedId = new URLSearchParams(location.search).get('classId');
-  // CR-2026-047 §6.3：指标保持「待排课／待发布／已发布／进行中」，「已发布」取排班版本大于 0 的班级数；
-  // 报名条件不进入排班筛选，只按徽标展示。
-  pageFrame('班级排课', '', '<button class="button primary" data-academic-action="schedule-create">为已有班级排课</button>', metrics([['待排课', academicData.filter((s) => s.status === '待排课').length, '缺教师、场地或上课规则'], ['排课中', academicData.filter((s) => s.status === '排课中').length, '排课草稿，不进入正式课表'], ['已完成', academicData.filter((s) => s.status === '已完成').length, '已生成正式课次']]) + filterPanel('schedule-filter', select('排课状态', 'status', ['待排课', '排课中', '已完成']) + select('授课教师', 'teacher', ['王玥', '陈晨', '赵老师']) + select('校区', 'campus', ['龙泉校区', '南湖校区']) + field('关键词', 'keyword', 'text', '班级名称')) + '<p class="academic-note warning">本页只为已有班级排课。保存草稿为“排课中”，不生成正式课次；确认并发布后为“已完成”，才进入正式课表并对学员可见。</p>' + table('<thead><tr><th>班级名称</th><th>课程 / 版本</th><th>教师 / 校区</th><th>教室</th><th>上课规则</th><th>正式课次</th><th>排课状态</th><th>报名条件</th><th>排班版本</th><th>操作</th></tr></thead>'));
-  // CR-2026-047 §6.3／§7：状态列取主状态；报名条件以徽标展示（不参与筛选）；动作门控只看主状态。
-  const row = (item) => { const actions = ['待排课', '排课中'].includes(item.status) ? '<button class="text-button" data-academic-action="schedule-create">去排课</button>' : '<button class="text-button" data-academic-action="schedule-view">排班查看</button><button class="text-button" data-academic-action="schedule-change">排班变更</button>'; return `<td><strong>${escapeHtml(item.name)}</strong></td><td>${escapeHtml(item.course)}<br><span class="muted">v${item.courseVersion || 1}</span></td><td>${escapeHtml(item.teacher || '待排课')}<br><span class="muted">${escapeHtml(item.campus || '—')}</span></td><td>${escapeHtml(item.room)}</td><td>${escapeHtml(item.rule)}</td><td>${item.generated}</td><td>${tag(item.status)}</td><td><span class="tag ${item.enrollmentCondition === '报名中' ? 'green' : item.enrollmentCondition === '已满员' ? 'amber' : 'gray'}">${escapeHtml(item.enrollmentCondition || '—')}</span></td><td>${item.scheduleVersion ? `v${item.scheduleVersion}` : '—'}</td><td class="action-cell">${actions}</td>`; };
-  renderRows(academicData, row);
-  applyFilter('schedule-filter', academicData, (form) => { const { status, teacher, campus, keyword } = form; return (item) => (!status.value || item.status === status.value) && (!teacher.value || item.teacher === teacher.value) && (!campus.value || item.campus === campus.value) && (!keyword.value.trim() || item.name.includes(keyword.value.trim())); }, row);
-  if (deepLinkedId) window.setTimeout(() => openSchedulePlanner({ classId: deepLinkedId }), 0);
-}
 const timetableViewKey = 'hbyx-academic-timetable-view';
-function getTimetableView() { const requested = new URLSearchParams(window.location.search).get('view'); if (['list', 'matrix', 'teacher'].includes(requested)) return requested; try { const stored = localStorage.getItem(timetableViewKey); return ['matrix', 'teacher'].includes(stored) ? stored : 'list'; } catch { return 'list'; } }
-function setTimetableView(view) { try { localStorage.setItem(timetableViewKey, view); } catch { /* ignore */ } renderTimetable(); }
+function getTimetableView() { const requested = new URLSearchParams(window.location.search).get('view'); if (['list', 'matrix', 'teacher', 'class'].includes(requested)) return requested; try { const stored = localStorage.getItem(timetableViewKey); return ['matrix', 'teacher', 'class'].includes(stored) ? stored : 'list'; } catch { return 'list'; } }
+function setTimetableView(view) {
+  try { localStorage.setItem(timetableViewKey, view); } catch { /* ignore */ }
+  // 深链带 view= 参数时，点击视图页签必须同步覆盖 URL 参数，否则每次重渲染都会被参数拉回旧视图。
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('view')) { url.searchParams.set('view', view); window.history.replaceState({}, '', url); }
+  renderTimetable();
+}
+const timetableModeKey = 'hbyx-academic-timetable-mode';
+function getTimetableMode() { try { const stored = localStorage.getItem(timetableModeKey); return ['日视图', '周视图', '月视图'].includes(stored) ? stored : '周视图'; } catch { return '周视图'; } }
+function setTimetableMode(mode) { try { localStorage.setItem(timetableModeKey, mode); } catch { /* ignore */ } renderTimetable(); }
+
+// 日期窗口：日／周／月三种模式共用一个锚点日期，日期导航按模式移动锚点，箭头才是真的换页。
+const timetableAnchorKey = 'hbyx-academic-timetable-anchor';
+function getTimetableAnchor() { try { const stored = localStorage.getItem(timetableAnchorKey); return /^\d{4}-\d{2}-\d{2}$/.test(stored || '') ? stored : DEMO_TODAY; } catch { return DEMO_TODAY; } }
+function setTimetableAnchor(value) {
+  try { localStorage.setItem(timetableAnchorKey, value); } catch { /* ignore */ }
+  // 日期与学期是同一套过滤：手动定位到某一天时，学期跟着切到该日期所属的学期，避免空课表。
+  try { localStorage.setItem(academicSemesterKey, semesterOfDate(value)); } catch { /* ignore */ }
+  renderTimetable();
+}
+function shiftDate(date, days) { const next = new Date(`${date}T00:00:00`); next.setDate(next.getDate() + days); return toLocalDateString(next); }
+function shiftMonth(date, months) { const [year, month, day] = date.split('-').map(Number); const lastDay = new Date(year, month + months, 0).getDate(); return toLocalDateString(new Date(year, month - 1 + months, Math.min(day, lastDay))); }
+function dateRange(from, to) { const dates = []; let cursor = from; while (cursor <= to) { dates.push(cursor); cursor = shiftDate(cursor, 1); } return dates; }
+function anchorWeekDates() {
+  const anchor = getTimetableAnchor();
+  const weekday = new Date(`${anchor}T00:00:00`).getDay();
+  const monday = shiftDate(anchor, -((weekday + 6) % 7));
+  const dates = dateRange(monday, shiftDate(monday, 6));
+  return Object.fromEntries(ACADEMIC_WEEKDAYS.map((label, index) => [label, dates[index]]));
+}
+function timetableWindow() {
+  const mode = getTimetableMode();
+  const anchor = getTimetableAnchor();
+  if (mode === '日视图') return { anchor, mode, from: anchor, to: anchor, dates: [anchor] };
+  if (mode === '月视图') {
+    const [year, month] = anchor.split('-').map(Number);
+    const first = `${anchor.slice(0, 7)}-01`;
+    const last = `${anchor.slice(0, 7)}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
+    return { anchor, mode, from: first, to: last, dates: dateRange(first, last) };
+  }
+  const weekday = new Date(`${anchor}T00:00:00`).getDay();
+  const from = shiftDate(anchor, -((weekday + 6) % 7));
+  const to = shiftDate(from, 6);
+  return { anchor, mode, from, to, dates: dateRange(from, to) };
+}
+function weekdayLabelOf(date) { return ACADEMIC_WEEKDAYS[(new Date(`${date}T00:00:00`).getDay() + 6) % 7]; }
+function formatTimetableLabel(win) {
+  const [year, month, day] = win.anchor.split('-').map(Number);
+  if (win.mode === '日视图') return `${year}年${month}月${day}日`;
+  if (win.mode === '月视图') return `${year}年${month}月`;
+  const [, fromMonth, fromDay] = win.from.split('-').map(Number);
+  const [, toMonth, toDay] = win.to.split('-').map(Number);
+  return `${year}年${fromMonth}月${fromDay}日 - ${toMonth}月${toDay}日`;
+}
+function withinWindow(date, win) { return Boolean(date) && date >= win.from && date <= win.to; }
+function timetableSemesterSelect() {
+  const semester = currentSemester();
+  return `<select class="academic-inline-select" aria-label="学期" data-academic-semester>${SEMESTERS.map((item) => `<option ${item === semester ? 'selected' : ''}>${item}</option>`).join('')}</select>`;
+}
+// 各视图的筛选条件按视图缓存，切换视图后回填，避免来回切换时条件丢失。
+const timetableFilters = { list: {}, teacher: {}, matrix: {}, classView: {} };
+function bindTimetableSemester() { document.querySelector('[data-academic-semester]')?.addEventListener('change', (event) => { setSemester(event.target.value); renderTimetable(); }); }
 function timetableViewSwitch() {
   const view = getTimetableView();
-  return `<div class="academic-view-switch" role="tablist" aria-label="课表视图切换"><button type="button" class="${view === 'list' ? 'active' : ''}" data-academic-action="timetable-view" data-view="list" role="tab" aria-selected="${view === 'list'}">课次列表</button><button type="button" class="${view === 'matrix' ? 'active' : ''}" data-academic-action="timetable-view" data-view="matrix" role="tab" aria-selected="${view === 'matrix'}">教室视图</button><button type="button" class="${view === 'teacher' ? 'active' : ''}" data-academic-action="timetable-view" data-view="teacher" role="tab" aria-selected="${view === 'teacher'}">教师视图</button></div>`;
+  const tab = (key, label) => `<button type="button" class="${view === key ? 'active' : ''}" data-academic-action="timetable-view" data-view="${key}" role="tab" aria-selected="${view === key}">${label}</button>`;
+  return `<div class="academic-view-switch" role="tablist" aria-label="课表视图切换">${tab('list', '课次列表')}${tab('matrix', '教室视图')}${tab('teacher', '教师视图')}${tab('class', '班级视图')}</div>`;
 }
-function renderTimetable() { const view = getTimetableView(); return view === 'matrix' ? renderTimetableMatrix() : view === 'teacher' ? renderTeacherTimetable() : renderTimetableList(); }
+function timetableModeSwitch() {
+  const mode = getTimetableMode();
+  return `<div class="academic-view-switch" role="tablist" aria-label="日周月视图切换">${['日视图', '周视图', '月视图'].map(item => `<button type="button" class="${mode === item ? 'active' : ''}" data-academic-action="timetable-mode" data-mode="${item}" role="tab" aria-selected="${mode === item}">${item}</button>`).join('')}</div>`;
+}
+function timetableDateNav() {
+  const win = timetableWindow();
+  const step = win.mode === '日视图' ? '日' : win.mode === '月视图' ? '月' : '周';
+  return `<div class="academic-date-nav" aria-label="课表日期导航"><button type="button" class="icon-button" data-academic-action="timetable-prev" aria-label="上一个${step}">‹</button><strong data-timetable-label>${formatTimetableLabel(win)}</strong><button type="button" class="icon-button" data-academic-action="timetable-next" aria-label="下一个${step}">›</button><button type="button" class="button" data-academic-action="timetable-today">今天</button></div>`;
+}
+function renderTimetable() { const view = getTimetableView(); return view === 'matrix' ? renderTimetableMatrix() : view === 'teacher' ? renderTeacherTimetable() : view === 'class' ? renderClassTimetable() : renderTimetableList(); }
+// 课次列表：与教师视图、教室视图共用同一份课次数据源，并按「日期范围 + 学期」真实过滤。
+// 日／周／月与日期导航联动同一锚点日期，学期下拉在三个视图都出现；筛选条件按视图缓存。
 function renderTimetableList() {
-  academicData = sessions;
-  pageFrame('课表管理', '', `${timetableViewSwitch()}<div class="toolbar-actions"><button class="button" data-academic-action="timetable-prev">上一周</button><button class="button primary" data-academic-action="timetable-current">本周</button><button class="button" data-academic-action="timetable-next">下一周</button></div>`, '<div class="academic-calendar-toolbar"><strong data-timetable-label>2026年9月7日 - 9月13日</strong><div class="toolbar-actions"><button class="button primary" data-academic-action="timetable-mode" data-mode="周视图">周视图</button><button class="button" data-academic-action="timetable-mode" data-mode="日视图">日视图</button><button class="button" data-academic-action="timetable-mode" data-mode="月视图">月视图</button></div></div>' + filterPanel('timetable-filter', select('校区', 'campus', ['龙泉校区', '南湖校区']) + select('授课教师', 'teacher', ['王玥', '陈晨', '赵老师']) + select('班级', 'className', ['少儿舞蹈基础班', '成人声乐班', '国画入门工作坊']) + select('课次状态', 'status', ['待上课', '上课中', '已完成', '已取消', '已停课'])) + table('<thead><tr><th>日期</th><th>时间</th><th>课程 / 班级</th><th>教师</th><th>校区 / 教室</th><th>课次状态</th><th>考勤处理</th><th>操作</th></tr></thead>'));
-  const row = (item) => `<td>${item.date} ${item.day}</td><td>${item.time}</td><td>${item.course}<br><span class="muted">${item.className}</span></td><td>${item.teacher}</td><td>${item.campus}<br>${item.room}</td><td>${tag(item.status)}</td><td>${item.attendance === '—' ? '—' : tag(item.attendance)}</td><td><button class="text-button" data-academic-action="session-view">查看课次</button></td>`;
-  renderRows(academicData, row);
-  applyFilter('timetable-filter', academicData, (form) => { const { campus, teacher, className, status } = form; return (item) => (!campus.value || item.campus === campus.value) && (!teacher.value || item.teacher === teacher.value) && (!className.value || item.className === className.value) && (!status.value || item.status === status.value); }, row);
+  const win = timetableWindow();
+  const semester = currentSemester();
+  const cache = timetableFilters.list;
+  const items = timetableSessionItems()
+    .filter((item) => withinWindow(item.date, win) && item.semester === semester)
+    .sort((a, b) => a.date.localeCompare(b.date) || timetableSessionSort(a, b));
+  academicData = items;
+  const unique = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  const conflicts = items.filter((item) => item.conflict).length;
+  const controls = `<div class="toolbar-actions">${timetableToolbar()}</div>`;
+  const content = `<div class="academic-calendar-toolbar"><div><strong>${escapeHtml(formatTimetableLabel(win))}</strong><p class="academic-subnote">${escapeHtml(semester)} · 按所选日期范围与学期过滤课次；只有星期的循环课次按所选周补出具体日期。</p></div><div class="teacher-view-summary"><span>课次 ${items.length} 条</span><span class="${conflicts ? 'has-conflict' : ''}">冲突 ${conflicts} 个</span></div></div>`
+    + filterPanel('timetable-filter', select('校区', 'campus', unique(items.map((item) => item.campus)), false, true, cache.campus || '') + select('授课教师', 'teacher', unique(items.map((item) => item.teacher)), false, true, cache.teacher || '') + select('班级', 'className', unique(items.map((item) => item.className)), false, true, cache.className || '') + select('课次状态', 'status', TIMETABLE_STATUS_OPTIONS, false, true, cache.status || ''))
+    + table('<thead><tr><th>日期</th><th>时间</th><th>课程 / 班级</th><th>授课教师</th><th>校区 / 教室</th><th>课次状态</th><th>排课提示</th><th>考勤处理</th><th>操作</th></tr></thead>');
+  pageFrame('课表管理', '', controls, content);
+  const row = (item) => `<td>${escapeHtml(item.day)}</td><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.course)}<br><span class="muted">${escapeHtml(item.className)}</span></td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.campus)}<br>${escapeHtml(item.room)}</td><td>${item.stopped ? `<span class="tag gray is-stopped">${escapeHtml(item.status)}</span>` : tag(item.status)}</td><td>${timetableRiskTags(item)}</td><td>${item.attendanceProcess === '—' ? '—' : tag(item.attendanceProcess)}</td><td><button class="text-button" data-academic-action="session-view">查看课次</button></td>`;
+  const applyListFilter = () => {
+    const form = document.querySelector('#timetable-filter');
+    if (!form) return;
+    const { campus, teacher, className, status } = form;
+    cache.campus = campus.value; cache.teacher = teacher.value; cache.className = className.value; cache.status = status.value;
+    renderRows(items.filter((item) => (!campus.value || item.campus === campus.value) && (!teacher.value || item.teacher === teacher.value) && (!className.value || item.className === className.value) && (!status.value || item.status === status.value)), row, '当前日期范围内暂无课次。');
+  };
+  applyListFilter();
+  document.querySelector('#timetable-filter')?.addEventListener('submit', (event) => { event.preventDefault(); applyListFilter(); });
+  document.querySelector('#timetable-filter')?.addEventListener('reset', () => window.setTimeout(applyListFilter, 0));
+  bindTimetableSemester();
 }
-function teacherViewItems() {
-  const weekdayDates = { 周一: '2026-09-07', 周二: '2026-09-08', 周三: '2026-09-09', 周四: '2026-09-10', 周五: '2026-09-11', 周六: '2026-09-12', 周日: '2026-09-13' };
+// 课次条目的唯一构造入口：只有星期的循环课次按当前锚点周补出具体日期，再按日期派生星期、
+// 学期与考勤处理状态；课次列表、教师视图、教室视图与导出共用同一份条目，口径不再分叉。
+// 课次状态派生：已停课保持原状态；其余按演示当天判断——已上完为「已完成」、
+// 正在上为「上课中」、未开始为「待上课」。演示数据里不再靠写死的「待上课」冒充全部课次。
+function deriveTimetableStatus(item) {
+  if (!item?.date || !item.start || !item.end) return item?.status || '待上课';
+  if (['已停课', '已完成', '上课中'].includes(item.status)) return item.status;
+  const startAt = `${item.date} ${item.start}`;
+  const endAt = `${item.date} ${item.end}`;
+  if (endAt <= DEMO_NOW) return '已完成';
+  if (startAt <= DEMO_NOW && DEMO_NOW < endAt) return '上课中';
+  return '待上课';
+}
+function timetableSessionItems() {
+  const weekdayDates = anchorWeekDates();
   return allTimetableSessions().map(item => {
     const room = venues.find(venue => venue.id === item.roomId);
-    return { ...item, date: item.date || weekdayDates[item.weekday] || '—', day: item.weekday || '—', course: item.course || '—', className: item.className || '—', campus: item.campus || room?.campus || '—', room: room?.name || '—', attendance: '—' };
+    const date = item.date || weekdayDates[item.weekday] || '';
+    const weekday = date ? weekdayLabelOf(date) : (item.weekday || '');
+    // 考勤处理状态与「考勤监控」同源：按班级 + 日期匹配同一批考勤记录派生，课表内不单独维护。
+    // 演示数据里考勤记录的日期与课次日期未完全对齐，匹配不到时回退为按班级汇总。
+    const dated = attendance.filter(row => row.className === item.className && row.date === date);
+    const records = dated.length ? dated : attendance.filter(row => row.className === item.className);
+    const attendanceProcess = item.status === '已停课' ? '—' : records.length ? (records.some(row => row.process === '待补录') ? '待补录' : '正常') : item.status === '待上课' ? '未开始' : '待补录';
+    return { ...item, date, weekday, status: deriveTimetableStatus({ ...item, date }), day: date ? `${date.slice(5)} ${weekday}` : (weekday || '—'), time: `${item.start || '—'}–${item.end || '—'}`, course: item.course || '—', className: item.className || '—', campus: item.campus || room?.campus || '—', room: room?.name || '—', semester: item.semester || semesterOfDate(date), attendanceProcess };
   });
 }
+// 教师视图：与课次列表同列口径（含考勤处理），按当前日期范围与学期过滤，筛选条件按视图缓存。
 function renderTeacherTimetable(filterState = {}) {
-  const items = teacherViewItems();
-  academicData = items;
+  const win = timetableWindow();
+  const semester = currentSemester();
   const queryTeacher = new URLSearchParams(window.location.search).get('teacher') || '';
-  const teacherOptions = [...new Set(items.map(item => item.teacher).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
-  const campusOptions = [...new Set(items.map(item => item.campus).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
-  const statusOptions = ['待上课', '上课中', '已完成', '已停课', '已取消'];
-  const option = (value, selected) => `<option value="${escapeHtml(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(value)}</option>`;
-  const selectedTeacher = filterState.teacher ?? queryTeacher;
-  const selectedCampus = filterState.campus || '';
-  const selectedStatus = filterState.status || '';
-  const filterHtml = `<div class="filter-panel" data-filter-drawer-shell="teacher-timetable-filter"><button type="button" class="button filter-drawer-trigger" data-filter-drawer-trigger="teacher-timetable-filter" aria-expanded="false" aria-controls="teacher-timetable-filter"><span class="filter-trigger-icon" aria-hidden="true"></span>筛选条件</button><div class="filter-drawer-backdrop" data-filter-drawer-backdrop="teacher-timetable-filter" hidden></div><form class="card filter-form" id="teacher-timetable-filter"><div class="filter-head"><strong>筛选条件</strong><button type="button" class="icon-button filter-drawer-close" data-filter-drawer-close="teacher-timetable-filter" title="关闭筛选条件" aria-label="关闭筛选条件">×</button></div><div class="filter-grid academic-filter-grid"><label class="form-field"><span>教师</span><select name="teacher"><option value="">全部教师</option>${teacherOptions.map(value => option(value, selectedTeacher)).join('')}</select></label><label class="form-field"><span>校区</span><select name="campus"><option value="">全部校区</option>${campusOptions.map(value => option(value, selectedCampus)).join('')}</select></label><label class="form-field"><span>课次状态</span><select name="status"><option value="">全部状态</option>${statusOptions.map(value => option(value, selectedStatus)).join('')}</select></label></div><div class="filter-actions"><button type="reset" class="button">重置</button><button type="submit" class="button primary">查询</button></div></form></div>`;
-  const visible = items.filter(item => (!selectedTeacher || item.teacher === selectedTeacher) && (!selectedCampus || item.campus === selectedCampus) && (!selectedStatus || item.status === selectedStatus));
-  const conflicts = visible.filter(item => item.conflict).length;
-  const controls = `${timetableViewSwitch()}<div class="toolbar-actions"><button class="button" data-academic-action="timetable-prev">上一周</button><button class="button primary" data-academic-action="timetable-current">本周</button><button class="button" data-academic-action="timetable-next">下一周</button></div>`;
-  const content = `<div class="academic-calendar-toolbar"><div><strong data-timetable-label>2026年9月7日 - 9月13日</strong><p class="academic-subnote">按教师查看周内课次；调整时间、教室或教师请前往班级排课。</p></div><div class="teacher-view-summary"><span>当前 ${visible.length} 个课次</span><span class="${conflicts ? 'has-conflict' : ''}">冲突 ${conflicts} 个</span></div></div>${filterHtml}${table('<thead><tr><th>日期</th><th>时间</th><th>教师</th><th>课程 / 班级</th><th>校区 / 教室</th><th>课次状态</th><th>排课提示</th><th>操作</th></tr></thead>')}`;
+  const cache = { ...timetableFilters.teacher, teacher: timetableFilters.teacher.teacher || queryTeacher, ...filterState };
+  timetableFilters.teacher = cache;
+  const scoped = timetableSessionItems().filter((item) => withinWindow(item.date, win) && item.semester === semester);
+  const items = scoped
+    .filter((item) => (!cache.teacher || item.teacher === cache.teacher) && (!cache.campus || item.campus === cache.campus) && (!cache.status || item.status === cache.status))
+    .sort((a, b) => a.date.localeCompare(b.date) || timetableSessionSort(a, b));
+  academicData = items;
+  const unique = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  const conflicts = items.filter((item) => item.conflict).length;
+  const controls = `<div class="toolbar-actions">${timetableToolbar()}</div>`;
+  const content = `<div class="academic-calendar-toolbar"><div><strong>${escapeHtml(formatTimetableLabel(win))}</strong><p class="academic-subnote">${escapeHtml(semester)} · 按教师查看所选日期范围内的课次；调整时间、教室或教师请前往班级排课。</p></div><div class="teacher-view-summary"><span>当前 ${items.length} 个课次</span><span class="${conflicts ? 'has-conflict' : ''}">冲突 ${conflicts} 个</span></div></div>`
+    + filterPanel('teacher-timetable-filter', select('教师', 'teacher', unique(scoped.map((item) => item.teacher)), false, true, cache.teacher || '') + select('校区', 'campus', unique(scoped.map((item) => item.campus)), false, true, cache.campus || '') + select('课次状态', 'status', TIMETABLE_STATUS_OPTIONS, false, true, cache.status || ''))
+    + table('<thead><tr><th>日期</th><th>时间</th><th>授课教师</th><th>课程 / 班级</th><th>校区 / 教室</th><th>课次状态</th><th>排课提示</th><th>考勤处理</th><th>操作</th></tr></thead>');
   pageFrame('课表管理 · 教师视图', '', controls, content);
-  const row = item => `<td>${escapeHtml(item.date)} ${escapeHtml(item.day)}</td><td>${escapeHtml(item.start)}–${escapeHtml(item.end)}</td><td><strong>${escapeHtml(item.teacher)}</strong></td><td>${escapeHtml(item.course)}<br><span class="muted">${escapeHtml(item.className)}</span></td><td>${escapeHtml(item.campus)}<br><span class="muted">${escapeHtml(item.room)}</span></td><td>${tag(item.status)}</td><td>${item.conflict ? `<span class="teacher-view-conflict">${escapeHtml(matrixConflictText(item.conflict))}</span>` : '—'}</td><td><button class="text-button" data-academic-action="session-view">查看课次</button></td>`;
-  renderRows(visible, row, '当前筛选条件下暂无课次。');
-  document.querySelector('#teacher-timetable-filter')?.addEventListener('submit', event => { event.preventDefault(); renderTeacherTimetable(Object.fromEntries(new FormData(event.currentTarget).entries())); });
-  document.querySelector('#teacher-timetable-filter')?.addEventListener('reset', () => window.setTimeout(() => renderTeacherTimetable({}), 0));
+  const row = (item) => `<td>${escapeHtml(item.day)}</td><td>${escapeHtml(item.time)}</td><td><strong>${escapeHtml(item.teacher)}</strong></td><td>${escapeHtml(item.course)}<br><span class="muted">${escapeHtml(item.className)}</span></td><td>${escapeHtml(item.campus)}<br><span class="muted">${escapeHtml(item.room)}</span></td><td>${item.stopped ? `<span class="tag gray is-stopped">${escapeHtml(item.status)}</span>` : tag(item.status)}</td><td>${timetableRiskTags(item)}</td><td>${item.attendanceProcess === '—' ? '—' : tag(item.attendanceProcess)}</td><td><button class="text-button" data-academic-action="session-view">查看课次</button></td>`;
+  renderRows(items, row, '当前日期范围内暂无课次。');
+  document.querySelector('#teacher-timetable-filter')?.addEventListener('submit', (event) => { event.preventDefault(); timetableFilters.teacher = { ...timetableFilters.teacher, ...Object.fromEntries(new FormData(event.currentTarget).entries()) }; renderTeacherTimetable(); });
+  document.querySelector('#teacher-timetable-filter')?.addEventListener('reset', () => window.setTimeout(() => { timetableFilters.teacher = {}; renderTeacherTimetable(); }, 0));
+  bindTimetableSemester();
+}
+// 班级视图：按班级聚合所选日期范围内的课次，供教务把某个班的课表发给教师／家长。
+// 与课次列表、教师视图共用同一份课次条目与筛选缓存，只把分组维度从教师换成班级。
+function renderClassTimetable(filterState = {}) {
+  const win = timetableWindow();
+  const semester = currentSemester();
+  const cache = { ...timetableFilters.classView, ...filterState };
+  timetableFilters.classView = cache;
+  const scoped = timetableSessionItems().filter((item) => withinWindow(item.date, win) && item.semester === semester);
+  const unique = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  const items = scoped.filter((item) => (!cache.className || item.className === cache.className) && (!cache.teacher || item.teacher === cache.teacher) && (!cache.status || item.status === cache.status));
+  academicData = items;
+  const groups = [...new Set(items.map((item) => item.className))].map((className) => ({
+    className,
+    rows: items.filter((item) => item.className === className).sort((a, b) => a.date.localeCompare(b.date) || timetableSessionSort(a, b))
+  }));
+  const controls = timetableToolbar();
+  const content = `<div class="academic-calendar-toolbar"><div><strong>${escapeHtml(formatTimetableLabel(win))}</strong><p class="academic-subnote">${escapeHtml(semester)} · 按班级汇总课次，可打印单个班级的课表；调整课次仍走面授班级的「课次调整」。</p></div><div class="teacher-view-summary"><span>班级 ${groups.length} 个</span><span>课次 ${items.length} 条</span></div></div>`
+    + filterPanel('class-timetable-filter', select('班级', 'className', unique(scoped.map((item) => item.className)), false, true, cache.className || '') + select('授课教师', 'teacher', unique(scoped.map((item) => item.teacher)), false, true, cache.teacher || '') + select('课次状态', 'status', TIMETABLE_STATUS_OPTIONS, false, true, cache.status || ''))
+    + (groups.length ? groups.map((group) => {
+      const first = group.rows[0];
+      const conflicts = group.rows.filter((item) => item.conflict).length;
+      return `<section class="academic-class-sheet"><header><div><strong>${escapeHtml(group.className)}</strong><span>${escapeHtml(first.course)} · ${escapeHtml(first.teacher)} · ${escapeHtml(first.campus)} · 共 ${group.rows.length} 次</span></div><div class="academic-class-sheet-actions">${conflicts ? `<span class="tag amber">冲突 ${conflicts} 条</span>` : ''}<button type="button" class="button" data-academic-action="class-sheet-print" data-class-name="${escapeHtml(group.className)}">打印本班课表</button></div></header><table><thead><tr><th>课次</th><th>日期</th><th>上课时间</th><th>教室</th><th>授课教师</th><th>课次状态</th><th>排课提示</th><th>操作</th></tr></thead><tbody>${group.rows.map((item, index) => `<tr data-row-id="${escapeHtml(item.id)}"><td>第 ${index + 1} 次</td><td>${escapeHtml(item.day)}</td><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.room)}</td><td>${escapeHtml(item.teacher)}</td><td>${item.stopped ? `<span class="tag gray is-stopped">${escapeHtml(item.status)}</span>` : tag(item.status)}</td><td>${timetableRiskTags(item)}</td><td><button type="button" class="text-button" data-academic-action="session-view">查看课次</button></td></tr>`).join('')}</tbody></table></section>`;
+    }).join('') : '<div class="card empty">当前日期范围内暂无课次。</div>');
+  pageFrame('课表管理 · 班级视图', '', controls, content);
+  document.querySelector('#class-timetable-filter')?.addEventListener('submit', (event) => { event.preventDefault(); timetableFilters.classView = { ...timetableFilters.classView, ...Object.fromEntries(new FormData(event.currentTarget).entries()) }; renderClassTimetable(); });
+  document.querySelector('#class-timetable-filter')?.addEventListener('reset', () => window.setTimeout(() => { timetableFilters.classView = {}; renderClassTimetable(); }, 0));
+  bindTimetableSemester();
+}
+// 打印单个班级的课表：A4 纵向，一条课次一行，供张贴或发给家长；与屏幕班级视图同源同范围。
+function printClassTimetable(className) {
+  const win = timetableWindow();
+  const semester = currentSemester();
+  const rows = timetableSessionItems()
+    .filter((item) => item.className === className && withinWindow(item.date, win) && item.semester === semester)
+    .sort((a, b) => a.date.localeCompare(b.date) || timetableSessionSort(a, b));
+  if (!rows.length) { showToast('当前日期范围内没有该班级的课次。', 'warning'); return; }
+  const first = rows[0];
+  const table = `<table class="academic-print-table"><thead><tr><th class="matrix-slot">课次</th><th>日期</th><th>星期</th><th>上课时间</th><th>教室</th><th>授课教师</th><th>课次状态</th></tr></thead><tbody>${rows.map((item, index) => `<tr><th class="matrix-slot">第 ${index + 1} 次</th><td>${escapeHtml(item.date)}</td><td>${escapeHtml(item.weekday)}</td><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.room)}</td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.status)}</td></tr>`).join('')}</tbody></table>`;
+  const markup = `<section class="academic-print-sheet"><header><h1>${escapeHtml(className)} · 课表</h1><p>${escapeHtml(semester)} · ${escapeHtml(formatTimetableLabel(win))} · ${escapeHtml(first.course)} · ${escapeHtml(first.campus)} ${escapeHtml(first.room)}</p></header>${table}<footer><span>${escapeHtml(className)}</span><span>导出时间 ${new Date().toLocaleString('zh-CN')}</span></footer></section>`;
+  document.querySelector('.academic-print-root')?.remove();
+  const root = document.createElement('div');
+  root.className = 'academic-print-root';
+  root.innerHTML = markup;
+  document.body.append(root);
+  window.print();
 }
 function timetableSessionSort(a, b) { return a.start.localeCompare(b.start) || a.end.localeCompare(b.end); }
 function matrixConflictText(conflict) { return conflict?.type === 'teacher' ? `冲突：教师 ${conflict.target} 同时段已有课次` : conflict?.type === 'room' ? `冲突：教室 ${conflict.target} 同时段已有课次` : ''; }
@@ -578,15 +971,131 @@ function matrixEntryMarkup(session) {
   const cls = ['matrix-entry'];
   if (session.conflict) cls.push('is-conflict');
   else if (session.stopped) cls.push('is-stopped');
-  return `<button type="button" class="${cls.join(' ')}" data-academic-action="matrix-session-view" data-session-id="${escapeHtml(session.id)}"><strong>${escapeHtml(session.className)}</strong><span>${escapeHtml(session.start)}–${escapeHtml(session.end)}</span><span>${escapeHtml(session.teacher)}</span>${session.conflict ? `<em>${escapeHtml(matrixConflictText(session.conflict))}</em>` : ''}</button>`;
+  const extra = [
+    session.conflict ? `<em>${escapeHtml(matrixConflictText(session.conflict))}</em>` : '',
+    session.risks?.studentConflict ? `<em>学员冲突：${escapeHtml(session.risks.studentConflict)}</em>` : '',
+    session.risks?.transferGap ? `<em>转场紧张 ${session.risks.transferGap.minutes} 分钟</em>` : '',
+    session.risks?.overCapacity ? `<em>超容量 ${session.risks.overCapacity.enrolled}/${session.risks.overCapacity.capacity}</em>` : ''
+  ].join('');
+  return `<button type="button" class="${cls.join(' ')}" data-academic-action="matrix-session-view" data-session-id="${escapeHtml(session.id)}"><strong>${escapeHtml(session.className)}</strong><span>${escapeHtml(session.start)}–${escapeHtml(session.end)}</span><span>${escapeHtml(session.teacher)}</span>${extra}</button>`;
 }
-function matrixCell(sessions, context = null) {
-  if (!sessions.length) return context ? `<button type="button" class="matrix-create" data-academic-action="matrix-create" data-weekday="${escapeHtml(context.weekday)}" data-start="${escapeHtml(context.start)}" data-room-id="${escapeHtml(context.roomId)}" data-campus="${escapeHtml(context.campus)}" aria-label="在${escapeHtml(context.weekday)}${escapeHtml(context.start)}${escapeHtml(context.roomName)}创建排班">创建排班</button>` : '';
-  const collapsed = sessions.length > 3;
-  const visible = collapsed ? sessions.slice(0, 3) : sessions;
-  const more = collapsed ? `<button type="button" class="matrix-more" data-academic-action="matrix-expand" data-count="${sessions.length - 3}">还有 ${sessions.length - 3} 条</button>` : '';
-  const rest = collapsed ? `<div class="matrix-cell-all" hidden>${sessions.slice(3).map(matrixEntryMarkup).join('')}</div>` : '';
-  return `<div class="matrix-cell">${visible.map(matrixEntryMarkup).join('')}${more}${rest}</div>`;
+function quarterTimeSlots() {
+  const start = toMinutes(TIMELINE_START);
+  return Array.from({ length: TIMELINE_TICK_COUNT }, (_, index) => {
+    const slotStart = start + index * TIMELINE_STEP_MINUTES;
+    return { start: toTime(slotStart), end: toTime(slotStart + TIMELINE_STEP_MINUTES), index };
+  });
+}
+// 课表工具栏：视图切换 / 日周月 / 「日期范围 + 学期」成组 / 更多（导出、打印、键盘创建排班）。
+// 三个视图共用同一套控件，避免列表与教师视图看得到问题却找不到导出入口。
+function timetableToolbar() {
+  return `<div class="toolbar-actions">${timetableViewSwitch()}${timetableModeSwitch()}<div class="academic-range-group"><span class="academic-range-label">范围</span>${timetableDateNav()}${timetableSemesterSelect()}</div><details class="academic-more"><summary class="button">更多</summary><div class="academic-more-menu"><button type="button" class="text-button" data-academic-action="timetable-export" data-kind="excel">导出 Excel</button><button type="button" class="text-button" data-academic-action="timetable-export" data-kind="pdf">导出 PDF</button><button type="button" class="text-button" data-academic-action="timetable-print">打印</button><button type="button" class="text-button" data-academic-action="matrix-keyboard-create">键盘排课（按所选日期）</button></div></details></div>`;
+}
+// 同一教室同一天的重叠课次合并成一个跨行区块，避免在每个 15 分钟刻度上重复出现。
+function matrixRoomBlocks(room, date, sessions, slotCount) {
+  const dayStart = toMinutes(TIMELINE_START);
+  const blocks = [];
+  sessions
+    .filter((s) => s.roomId === room.id && s.date === date && !isOutsideTimeline(s))
+    .sort(timetableSessionSort)
+    .forEach((session) => {
+      const startIndex = Math.max(0, Math.floor((toMinutes(session.start) - dayStart) / TIMELINE_STEP_MINUTES));
+      const endIndex = Math.min(slotCount, Math.ceil((toMinutes(session.end) - dayStart) / TIMELINE_STEP_MINUTES));
+      if (endIndex <= startIndex) return;
+      const owner = blocks.find((block) => startIndex < block.endIndex && endIndex > block.startIndex);
+      if (owner) {
+        owner.startIndex = Math.min(owner.startIndex, startIndex);
+        owner.endIndex = Math.max(owner.endIndex, endIndex);
+        owner.sessions.push(session);
+        return;
+      }
+      blocks.push({ startIndex, endIndex, sessions: [session] });
+    });
+  return blocks.sort((a, b) => a.startIndex - b.startIndex);
+}
+// 空白刻度带上具体日期：从矩阵创建排班时同时带入星期、日期与教室，首次上课日期按该格日期预填。
+// 键盘用户不逐个 Tab 过上千个空格子：空格按钮不进 Tab 序列，键盘走工具栏「更多 → 键盘创建排班」。
+function matrixSlotCell(room, date, weekday, slot) {
+  return `<td class="matrix-slot-cell" data-slot-index="${slot.index}" data-date="${escapeHtml(date)}" data-weekday="${escapeHtml(weekday)}" data-room-id="${escapeHtml(room.id)}" data-start="${escapeHtml(slot.start)}" data-campus="${escapeHtml(room.campus)}"><button type="button" class="matrix-slot-create" tabindex="-1" data-academic-action="matrix-create" data-date="${escapeHtml(date)}" data-weekday="${escapeHtml(weekday)}" data-start="${escapeHtml(slot.start)}" data-room-id="${escapeHtml(room.id)}" data-campus="${escapeHtml(room.campus)}" aria-label="在${escapeHtml(date)} ${escapeHtml(weekday)} ${escapeHtml(slot.start)} ${escapeHtml(room.name)} 为该班级排课"><span>按此时间排课</span></button></td>`;
+}
+let matrixDragState = null;
+// 触摸端的选择状态：手指点选无法做纵向拖动，改为「点起点刻度 + 点同列终点刻度」。
+let matrixTouchSelection = null;
+// 密度开关只决定展示哪些刻度行，不改变时间轴与课次数据；默认仍是完整的 15 分钟刻度。
+let matrixDensity = 'all';
+function matrixDragRange(state) {
+  return { from: Math.min(state.anchor, state.head), to: Math.max(state.anchor, state.head) };
+}
+function matrixSelectionKey(state) {
+  return `${state?.date || ''}|${state?.roomId || ''}`;
+}
+function activeMatrixSelection() {
+  return matrixDragState || matrixTouchSelection;
+}
+function paintMatrixSelection(wrap) {
+  if (!wrap) return;
+  const state = activeMatrixSelection();
+  const range = state ? matrixDragRange(state) : null;
+  wrap.querySelectorAll('.matrix-slot-cell').forEach((cell) => {
+    const inRange = Boolean(range)
+      && matrixSelectionKey(cell.dataset) === matrixSelectionKey(state)
+      && Number(cell.dataset.slotIndex) >= range.from
+      && Number(cell.dataset.slotIndex) <= range.to;
+    cell.classList.toggle('is-selected', inRange);
+  });
+}
+function beginMatrixDrag(cell) {
+  matrixDragState = { date: cell.dataset.date, weekday: cell.dataset.weekday, roomId: cell.dataset.roomId, campus: cell.dataset.campus, anchor: Number(cell.dataset.slotIndex), head: Number(cell.dataset.slotIndex), moved: false };
+  document.documentElement.classList.add('is-matrix-dragging');
+}
+function extendMatrixDrag(cell) {
+  if (!matrixDragState) return;
+  if (matrixSelectionKey(cell.dataset) !== matrixSelectionKey(matrixDragState)) return;
+  const index = Number(cell.dataset.slotIndex);
+  if (index === matrixDragState.head) return;
+  matrixDragState.head = index;
+  if (index !== matrixDragState.anchor) matrixDragState.moved = true;
+}
+function matrixTimeRange(state) {
+  const range = matrixDragRange(state);
+  return { start: toTime(toMinutes(TIMELINE_START) + range.from * TIMELINE_STEP_MINUTES), duration: (range.to - range.from + 1) * TIMELINE_STEP_MINUTES, ticks: range.to - range.from + 1 };
+}
+function finishMatrixDrag(wrap) {
+  if (!matrixDragState) return;
+  const state = matrixDragState;
+  matrixDragState = null;
+  document.documentElement.classList.remove('is-matrix-dragging');
+  paintMatrixSelection(wrap);
+  if (!state.moved) return;
+  // 跨多个刻度的拖动就是所选课次时间窗；抑制随之而来的 click，避免再按单格创建重复打开抽屉。
+  const swallow = (event) => { event.preventDefault(); event.stopPropagation(); };
+  document.addEventListener('click', swallow, { capture: true, once: true });
+  window.setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 0);
+  const time = matrixTimeRange(state);
+  openSchedulePlanner({ weekday: state.weekday, date: state.date, start: time.start, lessonDuration: time.duration, roomId: state.roomId, campus: state.campus, firstLessonDate: state.date });
+}
+function matrixTouchHintMarkup() {
+  const state = matrixTouchSelection;
+  if (!state) return '';
+  const time = matrixTimeRange(state);
+  const end = toTime(toMinutes(time.start) + time.duration);
+  return `<div class="matrix-touch-hint-text">已选 <strong>${escapeHtml(state.date)} ${escapeHtml(state.weekday)} ${escapeHtml(time.start)}–${escapeHtml(end)}</strong>（${time.ticks} 格 · ${time.duration} 分钟）· ${escapeHtml(state.campus || '—')} ${escapeHtml(state.roomName || '')}<small>再点同一教室列的其他刻度可调整时间窗，点「创建排班」带入去排课抽屉。</small></div><div class="matrix-touch-hint-actions"><button type="button" class="button" data-academic-action="matrix-touch-clear">取消选择</button><button type="button" class="button primary" data-academic-action="matrix-touch-create">创建排班</button></div>`;
+}
+function updateMatrixTouchHint() {
+  const hint = document.querySelector('[data-matrix-touch-hint]');
+  if (!hint) return;
+  const markup = matrixTouchHintMarkup();
+  hint.innerHTML = markup;
+  hint.hidden = !markup;
+}
+function beginMatrixTouchSelect(cell, wrap) {
+  const sameColumn = Boolean(matrixTouchSelection) && matrixSelectionKey(matrixTouchSelection) === matrixSelectionKey(cell.dataset);
+  const room = venues.find((item) => item.id === cell.dataset.roomId);
+  matrixTouchSelection = sameColumn
+    ? { ...matrixTouchSelection, head: Number(cell.dataset.slotIndex) }
+    : { date: cell.dataset.date, weekday: cell.dataset.weekday, roomId: cell.dataset.roomId, roomName: room?.name || '', campus: cell.dataset.campus, anchor: Number(cell.dataset.slotIndex), head: Number(cell.dataset.slotIndex) };
+  paintMatrixSelection(wrap);
+  updateMatrixTouchHint();
 }
 function readTimetableMatrixFilter(form) {
   return {
@@ -598,73 +1107,214 @@ function readTimetableMatrixFilter(form) {
     status: form.status?.value || ''
   };
 }
+// 教室数量多时矩阵会很宽：按教学楼切换教室列（筛选条件里的教学楼与这里同源）。
+// 可选项按校区／场地类型范围给出、不受当前教学楼筛选影响，否则只剩一栋楼时无法切回「全部教学楼」。
+function matrixBuildingSwitch(scope) {
+  const buildings = [...new Set(scope.map((room) => room.building).filter(Boolean))];
+  if (buildings.length < 2) return '';
+  const current = timetableFilters.matrix.building || '';
+  return `<div class="academic-view-switch academic-building-switch" role="tablist" aria-label="按教学楼切换教室列">${['', ...buildings].map((name) => `<button type="button" class="${current === name ? 'active' : ''}" data-academic-action="matrix-building" data-building="${escapeHtml(name)}" role="tab" aria-selected="${current === name}">${name ? escapeHtml(name) : '全部教学楼'}</button>`).join('')}</div>`;
+}
+function matrixDensitySwitch() {
+  return `<label class="academic-checkbox academic-density-switch"><input type="checkbox" data-academic-action="matrix-density" ${matrixDensity === 'busy' ? 'checked' : ''}>只显示有课次的时段</label>`;
+}
+// 月视图：日期 × 教室聚合。31 天 × 52 刻度会把矩阵拉到 1500 行以上，月粒度改看聚合格，
+// 点击单元格下钻到该日 15 分钟刻度视图；日／周视图仍保留完整刻度。
+function matrixMonthAggregate(win, rooms, sessions) {
+  const header = `<tr><th class="matrix-day-column">日期</th><th class="matrix-room-column">教室 / 课次</th></tr>`;
+  const body = win.dates.map((date) => {
+    const today = date === DEMO_TODAY;
+    const chips = rooms.map((room) => {
+      const entries = sessions.filter((session) => session.roomId === room.id && session.date === date).sort(timetableSessionSort);
+      if (!entries.length) return '';
+      const conflicts = entries.filter((entry) => entry.conflict).length;
+      const outside = entries.some(isOutsideTimeline);
+      const times = [...new Set(entries.map((entry) => `${entry.start}–${entry.end}`))].join('、');
+      return `<button type="button" class="matrix-aggregate-entry${conflicts ? ' is-conflict' : ''}" data-academic-action="matrix-open-day" data-date="${escapeHtml(date)}" data-room-id="${escapeHtml(room.id)}" title="下钻查看该日 15 分钟刻度"><strong>${escapeHtml(room.name)} · ${entries.length} 节</strong><span>${escapeHtml(times)}</span><small>${escapeHtml([...new Set(entries.map((entry) => entry.className))].join('、'))}</small>${conflicts ? `<em>冲突 ${conflicts} 条</em>` : ''}${outside ? '<em>含超出时间轴课次</em>' : ''}</button>`;
+    }).join('');
+    return `<tr class="${today ? 'is-today-row' : ''}"><th class="matrix-day${today ? ' is-today' : ''}">${escapeHtml(date.slice(5))}<br><span>${escapeHtml(weekdayLabelOf(date))}</span>${today ? '<em class="matrix-today-flag">今天</em>' : ''}</th><td class="matrix-aggregate-cell">${chips || '<span class="muted">当日无课次</span>'}</td></tr>`;
+  }).join('');
+  return `<div class="academic-matrix-wrap" data-matrix-grid><table class="academic-matrix academic-matrix-aggregate"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+}
 function renderTimetableMatrix(filterState = {}) {
-  academicData = allTimetableSessions();
-  window.__timetableMatrixFilter = filterState;
-  const stateParam = new URLSearchParams(window.location.search).get('state') || '';
+  const win = timetableWindow();
   const semester = currentSemester();
-  const rowMode = currentRowMode();
-  const controls = `${timetableViewSwitch()}<div class="toolbar-actions"><select class="academic-inline-select" aria-label="学期" data-academic-semester>${SEMESTERS.map(item => `<option ${item === semester ? 'selected' : ''}>${item}</option>`).join('')}</select><div class="academic-view-switch" role="tablist" aria-label="行分段方式"><button type="button" class="${rowMode === 'half-day' ? 'active' : ''}" data-academic-action="timetable-row-mode" data-mode="half-day" role="tab" aria-selected="${rowMode === 'half-day'}">半天段</button><button type="button" class="${rowMode === 'busy' ? 'active' : ''}" data-academic-action="timetable-row-mode" data-mode="busy" role="tab" aria-selected="${rowMode === 'busy'}">自动聚合</button></div><button class="button" data-academic-action="timetable-export" data-kind="excel">导出 Excel</button><button class="button" data-academic-action="timetable-export" data-kind="pdf">导出 PDF</button><button class="button" data-academic-action="timetable-print">打印</button></div>`;
-  const description = '按教室查看学期课次分布；矩阵只读，调整课次仍走班级排课。';
-  const filterHtml = filterPanel('timetable-matrix-filter', select('校区', 'campus', ['龙泉校区', '南湖校区']) + select('教学楼', 'building', ['综合楼', '音乐楼', '艺术楼']) + select('场地类型', 'type', ['舞蹈房', '琴房', '画室', '普通教室']) + select('授课教师', 'teacher', ['王玥', '陈晨', '赵老师', '李青']) + select('班级', 'className', ['少儿舞蹈基础班', '成人声乐班', '国画入门工作坊', '成人形体班', '合唱基础训练', '书法基础班']) + select('课次状态', 'status', ['待上课', '已停课']));
+  timetableFilters.matrix = { ...timetableFilters.matrix, ...filterState };
+  const cache = timetableFilters.matrix;
+  window.__timetableMatrixFilter = cache;
+  matrixDragState = null;
+  matrixTouchSelection = null;
+  const stateParam = new URLSearchParams(window.location.search).get('state') || '';
+  const scoped = timetableSessionItems().filter((item) => withinWindow(item.date, win) && item.semester === semester);
+  const unique = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  const rooms = venues.filter(venueAvailable)
+    .filter((v) => !cache.campus || v.campus === cache.campus)
+    .filter((v) => !cache.building || v.building === cache.building)
+    .filter((v) => !cache.type || v.type === cache.type)
+    .sort((a, b) => a.building.localeCompare(b.building, 'zh-CN') || a.name.localeCompare(b.name, 'zh-CN'));
+  const sessions = scoped
+    .filter((s) => !cache.teacher || s.teacher === cache.teacher)
+    .filter((s) => !cache.className || s.className === cache.className)
+    .filter((s) => !cache.status || s.status === cache.status);
+  const controls = timetableToolbar();
+  // 页头不显示说明文案：课表管理的口径放在页面说明弹窗里，不在标题下方重复提示。
+  const description = '';
+  const filterHtml = filterPanel('timetable-matrix-filter', select('校区', 'campus', unique(venues.map((item) => item.campus)), false, true, cache.campus || '')
+    + select('教学楼', 'building', unique(venues.map((item) => item.building)), false, true, cache.building || '')
+    + select('场地类型', 'type', unique(venues.map((item) => item.type)), false, true, cache.type || '')
+    + select('授课教师', 'teacher', unique(scoped.map((item) => item.teacher)), false, true, cache.teacher || '')
+    + select('班级', 'className', unique(scoped.map((item) => item.className)), false, true, cache.className || '')
+    + select('课次状态', 'status', TIMETABLE_STATUS_OPTIONS, false, true, cache.status || ''));
 
   if (stateParam === 'no-permission') { pageFrame('课表管理', description, controls, '<div class="card empty">当前角色无权查看课表矩阵数据。</div>'); return; }
   if (stateParam === 'no-venue') { pageFrame('课表管理', description, controls, `${filterHtml}<div class="card empty">暂无启用教室，请先在场地管理中维护教室。<a class="button" href="/admin/pages/academic/venues.html">去场地管理</a></div>`); return; }
-  if (stateParam === 'no-slot' || stateParam === 'out-of-timeline') { pageFrame('课表管理', description, controls, `${filterHtml}<div class="card empty">部分课次超出 08:00–21:00 时间轴，已归入「其他时段」兜底行；时间轴为固定口径，无需配置。<a class="button" href="/admin/pages/academic/scheduling.html">去班级排课</a></div>`); return; }
+  if (stateParam === 'no-slot' || stateParam === 'out-of-timeline') { pageFrame('课表管理', description, controls, `${filterHtml}<div class="card empty">部分课次超出 ${TIMELINE_START}–${TIMELINE_END} 时间轴，未在矩阵中展示；时间轴为固定口径，无需配置。<a class="button" href="/admin/pages/crm/classes.html?stage=schedule">去班级排课</a></div>`); return; }
 
-  const rooms = venues.filter(venueAvailable)
-    .filter((v) => !filterState.campus || v.campus === filterState.campus)
-    .filter((v) => !filterState.building || v.building === filterState.building)
-    .filter((v) => !filterState.type || v.type === filterState.type)
-    .sort((a, b) => a.building.localeCompare(b.building, 'zh-CN') || a.name.localeCompare(b.name, 'zh-CN'));
-  const sessions = allTimetableSessions()
-    .filter((s) => !filterState.teacher || s.teacher === filterState.teacher)
-    .filter((s) => !filterState.className || s.className === filterState.className)
-    .filter((s) => !filterState.status || s.status === filterState.status);
-  if (stateParam === 'no-session') sessions.splice(0);
-  // RM-T-F02: rows come from session times — half-day segments by default, merged busy ranges on demand.
-  const slots = timetableRows(sessions);
+  const isMonth = win.mode === '月视图';
   const otherSessions = sessions.filter(isOutsideTimeline);
-  const cellsFor = (room, row) => sessions.filter((s) => s.roomId === room.id && s.weekday === row.weekday && toMinutes(s.start) >= toMinutes(row.start) && toMinutes(s.start) < toMinutes(row.end)).sort(timetableSessionSort);
+  const outsideLink = '<button type="button" class="text-button" data-academic-action="timetable-view-outside">在课次列表查看</button>';
+  const notice = stateParam === 'no-session'
+    ? '<div class="card empty">当前日期范围内暂无课次。</div>'
+    : otherSessions.length
+      ? (isMonth
+        ? `<p class="academic-note warning">${otherSessions.length} 条课次时间超出 ${TIMELINE_START}–${TIMELINE_END}，已在聚合单元格内标注：${outsideLink}。</p>`
+        : `<p class="academic-note warning">${otherSessions.length} 条课次时间超出 ${TIMELINE_START}–${TIMELINE_END} 时间轴，不在矩阵中展示。${outsideLink}（导出时归入「其他时段」分组）。</p>`)
+      : '';
+  const legend = '<div class="academic-matrix-legend"><span><i class="legend-normal"></i>正常课次</span><span><i class="legend-conflict"></i>冲突课次</span><span><i class="legend-stopped"></i>已停课</span><span><i class="legend-today"></i>今天／当前时间</span></div>';
 
-  const header = `<tr><th class="matrix-corner"><span>时段 / 教室</span></th>${rooms.map((room) => `<th><strong>${escapeHtml(room.name)}</strong><small>${escapeHtml(room.building)}</small></th>`).join('')}</tr>`;
-  const body = slots.map((slot) => `<tr><th class="matrix-slot"><strong>${escapeHtml(slot.name)}</strong><small>${escapeHtml(slot.start)}–${escapeHtml(slot.end)}</small></th>${rooms.map((room) => `<td>${matrixCell(cellsFor(room, slot), { weekday: slot.weekday, start: slot.start, roomId: room.id, roomName: room.name, campus: room.campus })}</td>`).join('')}</tr>`).join('');
-  const otherRow = otherSessions.length ? `<tr class="matrix-other-row"><th class="matrix-slot">其他时段<small>超出 08:00–21:00</small></th>${rooms.map((room) => `<td>${matrixCell(otherSessions.filter((s) => s.roomId === room.id).sort(timetableSessionSort))}</td>`).join('')}</tr>` : '';
-  const notice = stateParam === 'no-session' ? '<p class="academic-note">当前学期暂无课次。</p>' : otherSessions.length ? `<p class="academic-note warning">${otherSessions.length} 条课次时间超出 08:00–21:00，已归入「其他时段」；请检查排课时间。</p>` : '';
-  const legend = '<div class="academic-matrix-legend"><span><i class="legend-normal"></i>正常课次</span><span><i class="legend-conflict"></i>冲突课次</span><span><i class="legend-stopped"></i>已停课</span></div>';
-  const matrix = rooms.length ? `<div class="academic-matrix-wrap"><table class="academic-matrix"><thead>${header}</thead><tbody>${body}${otherRow}</tbody></table></div>` : '<div class="card empty">暂无启用教室。</div>';
+  let matrix = '';
+  if (!rooms.length) matrix = '<div class="card empty">暂无启用教室。</div>';
+  else if (isMonth) matrix = matrixMonthAggregate(win, rooms, sessions);
+  else {
+    // 行按所选日期范围逐天展开，每行是一个 15 分钟刻度；列是启用教室，左侧固定「日期」「时段」两列。
+    const slots = quarterTimeSlots();
+    const nowTime = DEMO_NOW.slice(11);
+    const nowIndex = win.dates.includes(DEMO_TODAY) ? slots.findIndex((slot) => slot.start <= nowTime && nowTime < slot.end) : -1;
+    const body = win.dates.map((date) => {
+      const weekday = weekdayLabelOf(date);
+      const blocksByRoom = new Map(rooms.map((room) => [room.id, matrixRoomBlocks(room, date, sessions, slots.length)]));
+      const busy = [];
+      blocksByRoom.forEach((blocks) => blocks.forEach((block) => {
+        for (let index = block.startIndex; index < block.endIndex; index += 1) busy.push(index);
+        if (block.endIndex < slots.length) busy.push(block.endIndex);
+        if (block.startIndex > 0) busy.push(block.startIndex - 1);
+      }));
+      const visible = matrixDensity === 'busy' ? [...new Set(busy)].sort((a, b) => a - b) : slots.map((slot) => slot.index);
+      const position = new Map(visible.map((index, order) => [index, order]));
+      const dayCell = (rowspan) => `<th class="matrix-day${date === DEMO_TODAY ? ' is-today' : ''}" rowspan="${rowspan}">${escapeHtml(date.slice(5))}<br><span>${escapeHtml(weekday)}</span>${date === DEMO_TODAY ? '<em class="matrix-today-flag">今天</em>' : ''}</th>`;
+      if (!visible.length) return `<tr class="is-day-start">${dayCell(1)}<th class="matrix-slot">—</th><td class="matrix-empty-day" colspan="${Math.max(rooms.length, 1)}">该日暂无课次</td></tr>`;
+      return visible.map((index, order) => {
+        const slot = slots[index];
+        const cells = rooms.map((room) => {
+          const blocks = blocksByRoom.get(room.id) || [];
+          const block = blocks.find((item) => item.startIndex === index);
+          if (block) return `<td class="matrix-block-cell" rowspan="${(position.get(block.endIndex - 1) ?? position.get(index)) - position.get(index) + 1}"><div class="matrix-cell matrix-quarter-cell">${block.sessions.map(matrixEntryMarkup).join('')}</div></td>`;
+          if (blocks.some((item) => item.startIndex < index && index < item.endIndex)) return '';
+          return matrixSlotCell(room, date, weekday, slot);
+        }).join('');
+        const onHalfHour = /:(00|30)$/.test(slot.start);
+        const gap = order > 0 && index - visible[order - 1] > 1;
+        const tickClass = `${onHalfHour ? 'matrix-slot' : 'matrix-slot is-minor'}${index === nowIndex ? ' is-now' : ''}`;
+        const tickLabel = `${gap ? '<span class="matrix-gap-flag" title="已隐藏无课次的刻度">⋯</span>' : ''}${onHalfHour ? escapeHtml(slot.start) : ''}${index === nowIndex ? '<span class="matrix-now-flag">现在</span>' : ''}`;
+        return `<tr class="${order === 0 ? 'is-day-start' : ''}${gap ? ' is-gap' : ''}">${order === 0 ? dayCell(visible.length) : ''}<th class="${tickClass}">${tickLabel}</th>${cells}</tr>`;
+      }).join('');
+    }).join('');
+    matrix = `<div class="academic-matrix-wrap" data-matrix-grid><table class="academic-matrix academic-matrix-ticks"><thead><tr><th class="matrix-day-column">日期</th><th class="matrix-time-column">时段</th>${rooms.map((room) => `<th><strong>${escapeHtml(room.name)}</strong><small>${escapeHtml(room.building)}</small></th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
+  }
+  const meta = `<div class="academic-calendar-toolbar"><div><strong>${escapeHtml(formatTimetableLabel(win))}</strong><p class="academic-subnote">${escapeHtml(semester)} · 日／周／月与学期都是真实过滤；空格悬浮显示创建入口，拖动可选中时间窗。</p></div><div class="teacher-view-summary"><span>课次 ${sessions.length} 条</span><span>教室 ${rooms.length} 间</span></div></div>`;
+  const buildingScope = venues.filter(venueAvailable)
+    .filter((v) => !cache.campus || v.campus === cache.campus)
+    .filter((v) => !cache.type || v.type === cache.type);
 
-  pageFrame('课表管理', description, controls, filterHtml + notice + matrix + legend);
+  pageFrame('课表管理', description, controls, meta + filterHtml + matrixBuildingSwitch(buildingScope) + (isMonth ? '' : matrixDensitySwitch()) + '<div class="matrix-touch-hint" data-matrix-touch-hint hidden></div>' + notice + matrix + legend);
+  const matrixWrap = document.querySelector('[data-matrix-grid]');
+  matrixWrap?.addEventListener('pointerdown', (event) => {
+    const cell = event.target.closest('.matrix-slot-cell');
+    if (!cell) return;
+    // 触摸端保留原生滚动，只用两次点选选择时间窗。
+    if (event.pointerType === 'touch') {
+      const swallow = (clickEvent) => { clickEvent.preventDefault(); clickEvent.stopPropagation(); };
+      document.addEventListener('click', swallow, { capture: true, once: true });
+      window.setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 0);
+      beginMatrixTouchSelect(cell, matrixWrap);
+      return;
+    }
+    event.preventDefault();
+    beginMatrixDrag(cell);
+    paintMatrixSelection(matrixWrap);
+  });
+  matrixWrap?.addEventListener('pointerover', (event) => {
+    if (!matrixDragState) return;
+    const cell = event.target.closest('.matrix-slot-cell');
+    if (!cell) return;
+    extendMatrixDrag(cell);
+    paintMatrixSelection(matrixWrap);
+  });
   document.querySelector('#timetable-matrix-filter')?.addEventListener('submit', (event) => { event.preventDefault(); renderTimetableMatrix(readTimetableMatrixFilter(event.currentTarget)); });
-  document.querySelector('#timetable-matrix-filter')?.addEventListener('reset', () => window.setTimeout(() => renderTimetableMatrix(), 0));
-  document.querySelector('[data-academic-semester]')?.addEventListener('change', (event) => { setSemester(event.target.value); renderTimetable(); });
+  document.querySelector('#timetable-matrix-filter')?.addEventListener('reset', () => window.setTimeout(() => { timetableFilters.matrix = {}; renderTimetableMatrix(); }, 0));
+  bindTimetableSemester();
 }
+// 课次详情：只读展示课次事实、风险提示与最近调整记录，并提供「去课次调整」深链，
+// 形成「课表发现问题 → 调整 → 留痕 → 复查」的闭环。
 function openTimetableSessionDialog(session) {
   const room = venues.find((v) => v.id === session.roomId);
-  openDialog(`${session.className} · 课次详情`, '课次为只读展示，调整时间或教室请前往班级排课。', `<div class="academic-detail-list"><div><span>班级名称</span><strong>${escapeHtml(session.className)}</strong></div><div><span>课程名称</span><strong>${escapeHtml(session.course)}</strong></div><div><span>授课教师</span><strong>${escapeHtml(session.teacher)}</strong></div><div><span>校区 / 教室</span><strong>${escapeHtml(session.campus)} / ${escapeHtml(room?.name || '—')}</strong></div><div><span>上课时间</span><strong>${escapeHtml(session.start)}–${escapeHtml(session.end)}</strong></div><div><span>课次状态</span><strong>${tag(session.status)}</strong></div><div><span>冲突校验</span><strong>${escapeHtml(session.conflict ? matrixConflictText(session.conflict) : '无')}</strong></div><div><span>考勤处理</span><strong>待补录</strong></div></div>`, '<button type="button" class="button" data-dialog-close>关闭</button><a class="button primary" href="/admin/pages/academic/scheduling.html">去班级排课</a>');
+  const classRecord = schedulingClasses().find((item) => item.id === session.classId || item.name === session.className);
+  const logs = (classRecord?.adjustmentLogs || []).slice().reverse();
+  const related = session.sessionIndex ? logs.filter((log) => Number(log.sessionIndex) === Number(session.sessionIndex)) : logs;
+  const shown = (related.length ? related : logs).slice(0, 5);
+  const riskList = [
+    session.conflict ? `<span class="tag amber">${escapeHtml(matrixConflictText(session.conflict))}</span>` : '',
+    session.risks?.studentConflict ? `<span class="tag amber">学员时间冲突：${escapeHtml(session.risks.studentConflict)}</span>` : '',
+    session.risks?.transferGap ? `<span class="tag amber">换教室仅 ${session.risks.transferGap.minutes} 分钟（换 ${escapeHtml(session.risks.transferGap.room)}）</span>` : '',
+    session.risks?.overCapacity ? `<span class="tag amber">报名超出教室容量 ${session.risks.overCapacity.enrolled}/${session.risks.overCapacity.capacity}</span>` : '',
+    isOutsideTimeline(session) ? `<span class="tag amber">超出 ${TIMELINE_START}–${TIMELINE_END} 时间轴</span>` : ''
+  ].filter(Boolean).join(' ') || '无';
+  const logList = shown.length
+    ? `<ul class="academic-adjustment-log">${shown.map((log) => `<li><strong>第 ${escapeHtml(String(log.sessionIndex || '—'))} 次 · ${escapeHtml(log.type || '调整课次')}</strong><span>${escapeHtml(log.before?.date || '—')} ${escapeHtml(log.before?.startTime || '')} → ${escapeHtml(log.after?.date || '—')} ${escapeHtml(log.after?.startTime || '')}</span><small>${escapeHtml(log.reason || '未填写原因')} · ${escapeHtml(log.operator || '教务')} · ${escapeHtml(log.adjustedAt || '')}</small></li>`).join('')}</ul>`
+    : '<p class="academic-subnote">该课次暂无调整记录。</p>';
+  const body = `<div class="academic-detail-list"><div><span>班级名称</span><strong>${escapeHtml(session.className)}</strong></div><div><span>课程名称</span><strong>${escapeHtml(session.course)}</strong></div><div><span>授课教师</span><strong>${escapeHtml(session.teacher)}</strong></div><div><span>校区 / 教室</span><strong>${escapeHtml(session.campus)} / ${escapeHtml(room?.name || '—')}</strong></div><div><span>上课日期</span><strong>${escapeHtml(session.date || '—')} ${escapeHtml(session.weekday || '')}</strong></div><div><span>上课时间</span><strong>${escapeHtml(session.start)}–${escapeHtml(session.end)}</strong></div><div><span>课次状态</span><strong>${tag(session.status)}</strong></div><div><span>考勤处理</span><strong>${session.attendanceProcess && session.attendanceProcess !== '—' ? escapeHtml(session.attendanceProcess) : '待补录'}</strong></div></div>`
+    + `<section class="academic-session-block"><strong>风险提示</strong><div class="academic-session-risks">${riskList}</div></section>`
+    + `<section class="academic-session-block"><strong>最近调整记录</strong>${logList}</section>`;
+  // CR-2026-108：只有该班级存在可调整的未开始课次时才显示「去课次调整」，避免点开只弹提示。
+  const adjustableCount = (classRecord?.sessions || []).filter(sessionCanAdjust).length;
+  const actions = `<button type="button" class="button" data-dialog-close>关闭</button>${session.classId && adjustableCount ? `<a class="button" href="/admin/pages/crm/classes.html?stage=teaching&classId=${encodeURIComponent(session.classId)}&action=adjust${session.sessionIndex ? `&session=${encodeURIComponent(session.sessionIndex)}` : ''}">去课次调整</a>` : ''}<a class="button primary" href="/admin/pages/crm/classes.html?stage=schedule${session.classId ? `&classId=${encodeURIComponent(session.classId)}` : ''}">去班级排课</a>`;
+  openDialog(`${session.className} · 课次详情`, '课次为只读展示；调整课次时间、教室或教师走「去课次调整」，整班排班变更走「去班级排课」。', body, actions);
 }
-// E11: A4 landscape export. Columns paginate by teaching building, rows paginate by weekday group,
+// E11: A4 landscape export. Columns paginate by teaching building, rows paginate by date group,
 // the header row repeats on every sheet and empty slot rows are hidden by default.
+// 导出与屏幕同源：沿用当前日期范围（日／周／月）、学期与矩阵筛选条件，只是把 15 分钟刻度
+// 折成半天段行以控制 A4 页数；超出时间轴的课次统一归入「其他时段」。
 const EXPORT_ROOMS_PER_SHEET = 4;
-const EXPORT_SLOTS_PER_SHEET = 9;
+const EXPORT_DAYS_PER_SHEET = 3;
+const EXPORT_HALF_DAYS = [['上午段', '08:00', '12:00'], ['下午段', '12:00', '18:00'], ['晚上段', '18:00', '21:00']];
+function exportHalfDayRows(win) {
+  return win.dates.flatMap((date) => EXPORT_HALF_DAYS.map(([label, start, end], index) => ({
+    id: `${date}-${index}`,
+    date,
+    weekday: weekdayLabelOf(date),
+    name: `${date.slice(5)} ${weekdayLabelOf(date)} ${label}`,
+    start,
+    end
+  })));
+}
 function buildTimetableSheets(hideEmpty = true, filterState = {}) {
+  const win = timetableWindow();
   const semester = currentSemester();
   const rooms = venues.filter(venueAvailable)
     .filter((v) => !filterState.campus || v.campus === filterState.campus)
     .filter((v) => !filterState.building || v.building === filterState.building)
     .filter((v) => !filterState.type || v.type === filterState.type)
     .sort((a, b) => a.building.localeCompare(b.building, 'zh-CN') || a.name.localeCompare(b.name, 'zh-CN'));
-  const sessions = allTimetableSessions()
+  const sessions = timetableSessionItems()
+    .filter((item) => withinWindow(item.date, win) && item.semester === semester)
     .filter((s) => !filterState.teacher || s.teacher === filterState.teacher)
     .filter((s) => !filterState.className || s.className === filterState.className)
     .filter((s) => !filterState.status || s.status === filterState.status);
-  const allSlots = timetableRows(sessions);
-  const otherSlots = sessions.some(isOutsideTimeline) ? [{ id: 'other', name: '其他时段', start: '', end: '', weekday: '超出时间轴' }] : [];
-  const rows = [...allSlots, ...otherSlots];
-  // Export uses the same rows and columns as the on-screen matrix.
-  const cellOf = (room, row) => row.id === 'other'
-    ? sessions.filter((s) => s.roomId === room.id && isOutsideTimeline(s)).sort(timetableSessionSort)
-    : sessions.filter((s) => s.roomId === room.id && s.weekday === row.weekday && toMinutes(s.start) >= toMinutes(row.start) && toMinutes(s.start) < toMinutes(row.end)).sort(timetableSessionSort);
+  const rows = exportHalfDayRows(win);
+  const cellOf = (room, row) => sessions
+    .filter((s) => s.roomId === room.id && s.date === row.date && !isOutsideTimeline(s) && toMinutes(s.start) >= toMinutes(row.start) && toMinutes(s.start) < toMinutes(row.end))
+    .sort(timetableSessionSort);
+  const otherEntries = (room) => sessions.filter((s) => s.roomId === room.id && isOutsideTimeline(s)).sort(timetableSessionSort);
   const sheets = [];
   const buildings = [...new Set(rooms.map((room) => room.building))];
   buildings.forEach((building) => {
@@ -672,49 +1322,56 @@ function buildTimetableSheets(hideEmpty = true, filterState = {}) {
     const roomChunks = [];
     for (let i = 0; i < buildingRooms.length; i += EXPORT_ROOMS_PER_SHEET) roomChunks.push(buildingRooms.slice(i, i + EXPORT_ROOMS_PER_SHEET));
     roomChunks.forEach((roomChunk, chunkIndex) => {
-      let remaining = rows.filter((row) => !hideEmpty || row.id === 'other' || roomChunk.some((room) => cellOf(room, row.id).length));
+      const remaining = rows.filter((row) => !hideEmpty || roomChunk.some((room) => cellOf(room, row).length));
       const groups = [];
       let cursor = 0;
       while (cursor < remaining.length) {
-        const slice = remaining.slice(cursor, cursor + EXPORT_SLOTS_PER_SHEET);
-        const firstWeekday = slice[0]?.weekday;
-        const sameDay = slice.filter((row) => row.weekday === firstWeekday);
-        groups.push(sameDay.length === slice.length ? slice : slice.filter((row) => row.weekday === firstWeekday));
-        cursor += groups[groups.length - 1].length;
+        const date = remaining[cursor].date;
+        const end = remaining.findIndex((row, index) => index > cursor && row.date !== date);
+        const group = remaining.slice(cursor, end < 0 ? remaining.length : end);
+        groups.push(group);
+        cursor += group.length;
       }
-      groups.forEach((slotGroup, groupIndex) => sheets.push({ building, roomChunk, chunkIndex, slotGroup, groupIndex, cellOf, semester }));
+      // 纵向按日期分页：每页最多 3 天（不足 3 天时不跨日拆分），与固定行的半分页等价。
+      const pages = [];
+      let page = [];
+      groups.forEach((group) => {
+        if (page.length && page.length + group.length > EXPORT_DAYS_PER_SHEET * EXPORT_HALF_DAYS.length) { pages.push(page); page = []; }
+        page = page.concat(group);
+      });
+      if (page.length) pages.push(page);
+      pages.forEach((slotGroup, groupIndex) => sheets.push({ building, roomChunk, chunkIndex, slotGroup, groupIndex, cellOf, otherEntries, semester, windowLabel: formatTimetableLabel(win) }));
     });
   });
-  const hiddenCount = rows.length * Math.max(rooms.length, 0) - rooms.reduce((sum, room) => sum + rows.filter((row) => cellOf(room, row.id).length).length, 0);
-  return { sheets, rooms, rows, sessions, hiddenCount: hideEmpty ? hiddenCount : 0 };
+  const hiddenCount = hideEmpty ? rooms.reduce((sum, room) => sum + rows.filter((row) => !cellOf(room, row).length).length, 0) : 0;
+  return { sheets, rooms, rows, sessions, hiddenCount, windowLabel: formatTimetableLabel(win), semester };
 }
 function timetableSheetMarkup(sheet, index, total) {
+  const entryCell = (entries) => (entries.length ? `<td>${entries.map((entry) => `<div class="export-entry${entry.conflict ? ' is-conflict' : ''}"><strong>${escapeHtml(entry.className)}</strong><span>${escapeHtml(entry.start)}–${escapeHtml(entry.end)} · ${escapeHtml(entry.teacher)}</span>${entry.conflict ? `<em>${escapeHtml(matrixConflictText(entry.conflict))}</em>` : ''}</div>`).join('')}</td>` : '<td class="export-empty">—</td>');
   const header = `<tr><th class="matrix-corner">时段 / 教室</th>${sheet.roomChunk.map((room) => `<th><strong>${escapeHtml(room.name)}</strong><small>${escapeHtml(room.campus)} · 容量 ${room.capacity}</small></th>`).join('')}</tr>`;
-  const body = sheet.slotGroup.map((slot) => `<tr><th class="matrix-slot"><strong>${escapeHtml(slot.name)}</strong><small>${slot.start ? `${escapeHtml(slot.start)}–${escapeHtml(slot.end)}` : '超出时间轴'}</small></th>${sheet.roomChunk.map((room) => {
-    const entries = sheet.cellOf(room, slot.id);
-    if (!entries.length) return '<td class="export-empty">—</td>';
-    return `<td>${entries.map((entry) => `<div class="export-entry${entry.conflict ? ' is-conflict' : ''}"><strong>${escapeHtml(entry.className)}</strong><span>${escapeHtml(entry.start)}–${escapeHtml(entry.end)} · ${escapeHtml(entry.teacher)}</span>${entry.conflict ? `<em>${escapeHtml(matrixConflictText(entry.conflict))}</em>` : ''}</div>`).join('')}</td>`;
-  }).join('')}</tr>`).join('');
-  return `<section class="academic-print-sheet"><header><h1>${escapeHtml(sheet.semester)}课程表（${new Date().toLocaleDateString('zh-CN')}）</h1><p>${escapeHtml(sheet.building)} · ${escapeHtml(sheet.semester)} · 只读矩阵导出</p></header><table class="academic-print-table"><thead>${header}</thead><tbody>${body}</tbody></table><footer><span>${escapeHtml(sheet.building)}${sheet.chunkIndex ? `（第 ${sheet.chunkIndex + 1} 组教室）` : ''}</span><span>第 ${index + 1} 页 / 共 ${total} 页 · 导出时间 ${new Date().toLocaleString('zh-CN')}</span></footer></section>`;
+  const body = sheet.slotGroup.map((slot) => `<tr><th class="matrix-slot"><strong>${escapeHtml(slot.name)}</strong><small>${escapeHtml(slot.start)}–${escapeHtml(slot.end)}</small></th>${sheet.roomChunk.map((room) => entryCell(sheet.cellOf(room, slot.id))).join('')}</tr>`).join('');
+  const otherRow = sheet.otherEntries && sheet.roomChunk.some((room) => sheet.otherEntries(room).length)
+    ? `<tr><th class="matrix-slot"><strong>其他时段</strong><small>超出时间轴</small></th>${sheet.roomChunk.map((room) => entryCell(sheet.otherEntries(room))).join('')}</tr>`
+    : '';
+  return `<section class="academic-print-sheet"><header><h1>${escapeHtml(sheet.semester)}课程表（${escapeHtml(sheet.windowLabel)}）</h1><p>${escapeHtml(sheet.building)} · 只读矩阵导出</p></header><table class="academic-print-table"><thead>${header}</thead><tbody>${body}${otherRow}</tbody></table><footer><span>${escapeHtml(sheet.building)}${sheet.chunkIndex ? `（第 ${sheet.chunkIndex + 1} 组教室）` : ''}</span><span>第 ${index + 1} 页 / 共 ${total} 页 · 导出时间 ${new Date().toLocaleString('zh-CN')}</span></footer></section>`;
 }
 function openTimetableExport(kind, filterState = {}) {
   const label = kind === 'excel' ? 'Excel' : 'PDF';
   const preview = buildTimetableSheets(true, filterState);
   const pageCount = preview.sheets.length || 1;
   const roomCount = preview.rooms.length;
-  const body = `<div class="academic-export-preview"><div class="academic-export-title">2026秋季课程表 · A4 横向预览</div>
-    
+  const body = `<div class="academic-export-preview"><div class="academic-export-title">${escapeHtml(preview.semester)}课程表 · ${escapeHtml(preview.windowLabel)} · A4 横向预览</div>
     <div class="academic-export-pages">${(preview.sheets.length ? preview.sheets.slice(0, 2) : []).map((sheet, index) => `<div class="academic-export-page"><strong>第 ${index + 1} 页</strong><span>${escapeHtml(sheet.building)} · ${sheet.roomChunk.length} 间教室 · ${sheet.slotGroup.length} 个时段</span></div>`).join('') || '<div class="academic-export-page"><strong>暂无课次</strong><span>当前筛选条件下没有可导出的课次。</span></div>'}</div>
-    <div class="academic-export-meta"><span>启用教室 ${roomCount} 间</span><span>课次 ${preview.sessions.length} 条</span><span>默认隐藏空时段 ${preview.hiddenCount} 格</span></div></div>
+    <div class="academic-export-meta"><span>日期范围 ${escapeHtml(preview.windowLabel)}</span><span>启用教室 ${roomCount} 间</span><span>课次 ${preview.sessions.length} 条</span><span>默认隐藏空时段 ${preview.hiddenCount} 格</span><span>共 ${pageCount} 页</span></div></div>
     <label class="academic-checkbox"><input type="checkbox" data-export-hide-empty checked>隐藏整行无课次的时段（取消勾选则导出全部时段）</label>`;
-  openDialog(`导出课表（${label}）`, 'A4 横向；超出单页按教学楼横向分页、按周内天数纵向分页，表头每页重复。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-academic-action="timetable-export-confirm" data-kind="' + kind + '">确认导出</button>', 'academic-export-dialog');
+  openDialog(`导出课表（${label}）`, 'A4 横向；导出范围与屏幕一致（当前日期范围、学期与筛选条件）；超出单页按教学楼横向分页、按日期纵向分页，表头每页重复。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-academic-action="timetable-export-confirm" data-kind="' + kind + '">确认导出</button>', 'academic-export-dialog');
 }
 function printTimetable(hideEmpty) {
   const { sheets } = buildTimetableSheets(hideEmpty, window.__timetableMatrixFilter || {});
   document.querySelector('.academic-print-root')?.remove();
   const root = document.createElement('div');
   root.className = 'academic-print-root';
-  root.innerHTML = sheets.length ? sheets.map((sheet, index) => timetableSheetMarkup(sheet, index, sheets.length)).join('') : '<section class="academic-print-sheet"><header><h1>2026秋季课程表</h1></header><p>当前筛选条件下没有可导出的课次。</p></section>';
+  root.innerHTML = sheets.length ? sheets.map((sheet, index) => timetableSheetMarkup(sheet, index, sheets.length)).join('') : '<section class="academic-print-sheet"><header><h1>课程表</h1></header><p>当前筛选条件下没有可导出的课次。</p></section>';
   document.body.append(root);
   window.print();
 }
@@ -822,7 +1479,7 @@ function openVenueForm(row = null) {
     <label class="form-field"><span>场地状态</span><select name="status">${['启用', '停用'].map(v => option(v, row?.status || '启用')).join('')}</select></label>
     
   </form>`;
-  const dialog = openDialog(row ? '编辑场地' : '新增场地', '维护校区、教学楼与教室档案，排课和课表都读取同一份数据。', body, '<button type="button" class="button" data-dialog-close>取消</button><button class="button primary" type="submit" form="venue-form">保存场地</button>', 'academic-venue-dialog');
+  const dialog = openDialog(row ? '编辑教室' : '新增教室', '维护校区、教学楼与教室档案，排课和课表都读取同一份数据。', body, '<button type="button" class="button" data-dialog-close>取消</button><button class="button primary" type="submit" form="venue-form">保存教室</button>', 'academic-venue-dialog');
   dialog.querySelector('[name="campus"]')?.addEventListener('change', event => { const buildingField = dialog.querySelector('[name="building"]'); const options = buildings.filter(item => item.campus === event.target.value && item.status === '启用'); buildingField.innerHTML = '<option value="">请选择教学楼</option>' + options.map(item => option(item.name, '')).join(''); });
   dialog.querySelector('#venue-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -837,6 +1494,8 @@ function openVenueForm(row = null) {
       tags: String(data.get('tags') || '').trim(),
       status: data.get('status') || '启用'
     };
+    // 唯一键：校区 + 教学楼 + 教室名称（与批量导入的匹配口径一致）。
+    if (venues.some(item => item.id !== record.id && item.campus === record.campus && item.building === record.building && item.name === record.name)) return showToast('该教学楼下已存在同名教室。', 'error');
     const index = venues.findIndex(item => item.id === record.id);
     if (index < 0) venues.unshift(record); else venues[index] = { ...venues[index], ...record };
     persistVenue(record);
@@ -891,7 +1550,7 @@ function validateVenueImportRows(rows) {
     if (!building) { fail('缺少教学楼'); return; }
     if (!buildings.some(item => item.campus === campus && item.name === building && item.status === '启用')) { fail('教学楼不存在、已停用或不属于所选校区'); return; }
     if (type && !VENUE_IMPORT_TYPES.includes(type)) { fail('场地类型不在字典内（舞蹈房／琴房／画室／普通教室）'); return; }
-    if (capacity && !/^\d+$/.test(capacity)) { fail('容量需为正整数'); return; }
+    if (capacity && !/^[1-9]\d*$/.test(capacity)) { fail('容量需为正整数'); return; }
     imported.push({ campus, building, name, type: type || '普通教室', capacity: Number(capacity) || 20 });
   });
   return { imported, failures };
@@ -923,7 +1582,8 @@ function openVenueImport() {
     let created = 0;
     let updated = 0;
     imported.forEach((line) => {
-      const existing = venues.find((item) => item.name === line.name && item.building === line.building);
+      // 唯一键：校区 + 教学楼 + 教室名称，避免跨校区同名教学楼误判为同一条。
+      const existing = venues.find((item) => item.campus === line.campus && item.building === line.building && item.name === line.name);
       const record = { id: existing?.id || demoId('venue'), campus: line.campus, building: line.building, name: line.name, type: line.type, capacity: line.capacity, tags: existing?.tags || '', status: existing?.status || '启用' };
       const index = venues.findIndex((item) => item.id === record.id);
       if (index < 0) { venues.unshift(record); created += 1; } else { venues[index] = { ...venues[index], ...record }; updated += 1; }
@@ -970,12 +1630,6 @@ function handleAction(action, row) {
   if (action === 'venue-toggle') return toggleVenue(row);
   if (action === 'venue-delete') return deleteVenue(row);
   if (action === 'venue-schedule') return detailDialog(`${row.name} · 排课查看`, '已按校区和教室筛选课表。', [['所属校区', row.campus], ['教学楼', row.building], ['场地类型', row.type], ['容量', `${row.capacity}人`], ['本周排课', row.status === '启用' ? '周六 09:00 · 少儿舞蹈基础班' : '暂无有效排课'], ['状态', tag(row.status)]]);
-  if (action === 'schedule-create') return openSchedulePlanner(row ? { classId: row.id, mode: 'create' } : { mode: 'create' });
-  if (action === 'schedule-view') return openSchedulePlanner({ classId: row.id, mode: 'view' });
-  if (action === 'schedule-change') return openSchedulePlanner({ classId: row.id, mode: 'change' });
-  if (action === 'schedule-reschedule') return openSimpleForm('调课', '保存前自动校验教师和教室在新时间是否已有有效课次。', field('新上课日期', 'date', 'date') + field('新上课时间', 'time', 'text', '如 周六 11:00-12:30') + select('新教室', 'room', ['综合楼302', '音乐楼201', '艺术楼105'], false, false) + field('调整原因', 'reason', 'text', '请输入调课原因', true), (form, dialog) => { const room = form.get('room'); if (room === '综合楼302' && row.teacher === '王玥') { dialog.querySelector('#academic-form').insertAdjacentHTML('beforebegin', '<div class="academic-conflict"><strong>冲突校验未通过</strong>综合楼302在该时段已有少儿舞蹈基础班课次，请修改时间或教室。</div>'); return; } closeDialog(); showToast('调课已保存，通知将发送给教师和学员。'); });
-  if (action === 'schedule-suspend') return openSimpleForm('登记停课', '停课后选定课次状态变为“已停课”，并推送班级通知。', field('停课课次', 'session', 'text', '如 第9次课') + field('停课原因', 'reason', 'text', '请输入原因', true) + field('补课安排', 'makeup', 'text', '可填写待定或补课时间', true), () => { closeDialog(); showToast('停课登记已保存，班级通知已进入发送队列。'); });
-  if (action === 'session-view') return detailDialog(`${row.className} · ${row.date}`, '课次执行明细。', [['课程 / 课次', `${row.course} / ${row.time}`], ['授课教师', row.teacher], ['校区 / 教室', `${row.campus} / ${row.room}`], ['课次状态', tag(row.status)], ['考勤处理状态', row.attendance === '—' ? '未开始' : tag(row.attendance)], ['结束上课要求', '教学目标已填写且全员考勤完成']]);
   if (action === 'attendance-view') return detailDialog('考勤打卡详情', '展示教师端上传的最终考勤状态。', [['班级 / 课次', `${row.className} / ${row.session}`], ['学员', row.student], ['上课日期', row.date], ['考勤状态', tag(row.status)], ['处理状态', tag(row.process)], ['打卡时间', row.time], ['授课教师', row.teacher], ['统计口径', row.process === '待补录' ? '待补录完成前不计入统计和结业判定' : '纳入出勤统计和结业判定']]);
   if (action === 'attendance-supplement') return openSimpleForm('补录 / 修正考勤', '当前记录为待补录；教师需填写原因，超时处理需填写教务处理说明。', select('最终考勤状态', 'status', ['已到', '迟到', '请假', '缺勤'], false, false) + field('补录原因', 'reason', 'text', '必填：说明漏记或迟记原因', true) + field('教务处理说明', 'note', 'text', '超时处理时必填', true), (form) => { row.status = form.get('status'); row.process = '已补录'; row.time = '教务补录'; renderAttendance(); showToast('考勤已补录，已纳入统计并同步相关端。'); });
   if (action === 'homework-view') return openDialog(`${row.title} · 作业详情`, '监督提交和文本批阅进度。', `<div class="academic-detail-list"><div><span>作业内容</span><strong>${escapeHtml(row.content)}</strong></div><div><span>提交情况</span><strong>${row.submitted} / ${row.total} 人</strong></div><div><span>批阅进度</span><strong>${row.reviewed} / ${row.submitted} 份</strong></div><div><span>批阅规则</span><strong>仅文本评语，可选批注文件；无分数、无等级</strong></div></div><div class="form-section"><h3>示例文本评语</h3><div class="academic-report-content">动作完成度较好，建议继续保持练习频率。</div></div>`);
@@ -1007,6 +1661,12 @@ function confirmAction(action, row) {
   if (action === 'report-publish') { row.status = '已发布'; row.updated = '2026-09-08 11:25'; closeDialog(); renderReports(); showToast('学习报告已发布，学员端现已可见。'); }
   if (action === 'report-delete') { reports.splice(reports.findIndex((item) => item.id === row.id), 1); closeDialog(); renderReports(); showToast('报告记录已删除。'); }
 }
+// Drag selection lives on the matrix itself; releasing anywhere ends the gesture so a stray
+// pointer-out never leaves the classroom grid stuck in a selecting state.
+document.addEventListener('pointerup', () => {
+  if (!matrixDragState) return;
+  finishMatrixDrag(document.querySelector('[data-matrix-grid]'));
+});
 document.addEventListener('click', (event) => {
   if (!academicRoot) return;
   if (event.target.closest('[data-dialog-close]')) { closeDialog(); return; }
@@ -1015,9 +1675,10 @@ document.addEventListener('click', (event) => {
   const button = event.target.closest('[data-academic-action]'); if (!button) return;
   const action = button.dataset.academicAction;
   if (action === 'timetable-view') { setTimetableView(button.dataset.view); return; }
-  if (action === 'timetable-row-mode') { setRowMode(button.dataset.mode); renderTimetable(); return; }
+  if (action === 'timetable-view-outside') { setTimetableView('list'); showToast('已在课次列表列出超出时间轴的课次。'); return; }
   if (action === 'timetable-export') { openTimetableExport(button.dataset.kind, window.__timetableMatrixFilter || {}); return; }
   if (action === 'timetable-print') { printTimetable(true); return; }
+  if (action === 'class-sheet-print') { printClassTimetable(button.dataset.className || ''); return; }
   if (action === 'timetable-export-confirm') {
     const hideEmpty = document.querySelector('[data-export-hide-empty]')?.checked !== false;
     closeDialog();
@@ -1026,21 +1687,34 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (action === 'matrix-expand') { const cell = button.closest('.matrix-cell'); const all = cell?.querySelector('.matrix-cell-all'); const hidden = all?.hasAttribute('hidden'); if (hidden) all?.removeAttribute('hidden'); else all?.setAttribute('hidden', ''); button.textContent = hidden ? '收起' : `还有 ${button.dataset.count} 条`; return; }
-  if (action === 'matrix-create') { openSchedulePlanner({ weekday: button.dataset.weekday, start: button.dataset.start, roomId: button.dataset.roomId, campus: button.dataset.campus }); return; }
+  if (action === 'matrix-create') { openSchedulePlanner({ weekday: button.dataset.weekday, date: button.dataset.date, start: button.dataset.start, roomId: button.dataset.roomId, campus: button.dataset.campus, firstLessonDate: button.dataset.date }); return; }
+  if (action === 'matrix-building') { timetableFilters.matrix = { ...timetableFilters.matrix, building: button.dataset.building || '' }; renderTimetableMatrix(); return; }
+  if (action === 'matrix-density') { matrixDensity = button.checked ? 'busy' : 'all'; renderTimetableMatrix(); return; }
+  if (action === 'matrix-open-day') { const date = button.dataset.date || getTimetableAnchor(); setTimetableMode('日视图'); setTimetableAnchor(date); showToast(`已下钻到 ${date} 的 15 分钟刻度视图。`); return; }
+  if (action === 'matrix-keyboard-create') { const anchor = getTimetableAnchor(); openSchedulePlanner({ mode: 'create', firstLessonDate: anchor, weekday: weekdayLabelOf(anchor) }); return; }
+  if (action === 'matrix-touch-create') { if (!matrixTouchSelection) return; const touchState = matrixTouchSelection; const touchTime = matrixTimeRange(touchState); matrixTouchSelection = null; updateMatrixTouchHint(); openSchedulePlanner({ weekday: touchState.weekday, date: touchState.date, start: touchTime.start, lessonDuration: touchTime.duration, roomId: touchState.roomId, campus: touchState.campus, firstLessonDate: touchState.date }); return; }
+  if (action === 'matrix-touch-clear') { matrixTouchSelection = null; paintMatrixSelection(document.querySelector('[data-matrix-grid]')); updateMatrixTouchHint(); return; }
+  if (action === 'session-view') { const rowElement = button.closest('tr[data-row-id]'); const session = rowElement ? academicData.find((item) => item.id === rowElement.dataset.rowId) : null; if (session) openTimetableSessionDialog(session); return; }
   if (action === 'matrix-session-view') { const session = allTimetableSessions().find((s) => s.id === button.dataset.sessionId); if (session) openTimetableSessionDialog(session); return; }
-  if (action === 'timetable-mode') { academicRoot.querySelectorAll('[data-academic-action="timetable-mode"]').forEach((item) => item.classList.toggle('primary', item === button)); showToast(`已切换至${button.dataset.mode}。`); return; }
-  if (['timetable-prev', 'timetable-current', 'timetable-next'].includes(action)) { const label = academicRoot.querySelector('[data-timetable-label]'); if (label) label.textContent = action === 'timetable-prev' ? '2026年8月31日 - 9月6日' : action === 'timetable-next' ? '2026年9月14日 - 9月20日' : '2026年9月7日 - 9月13日'; return; }
+  if (action === 'timetable-mode') { setTimetableMode(button.dataset.mode); showToast(`已切换至${button.dataset.mode}。`); return; }
+  if (['timetable-prev', 'timetable-next'].includes(action)) {
+    const win = timetableWindow();
+    const mode = win.mode;
+    const anchor = mode === '日视图' ? shiftDate(win.anchor, action === 'timetable-prev' ? -1 : 1) : mode === '月视图' ? shiftMonth(win.anchor, action === 'timetable-prev' ? -1 : 1) : shiftDate(win.anchor, action === 'timetable-prev' ? -7 : 7);
+    setTimetableAnchor(anchor);
+    return;
+  }
+  if (action === 'timetable-today') { setTimetableAnchor(DEMO_TODAY); return; }
+
   if (action === 'graduation-batch') { const classRow = currentClassFromDialog(button); if (!classRow) return; const selected = [...button.closest('dialog').querySelectorAll('[data-learner-select]:checked')]; if (!selected.length) { showToast('请先选择系统判定为建议结业的学员。', 'warning'); return; } openDialog('确认学员结业', '二次确认后仅更新选中学员，不改变班级整体结业状态。', `<p>确认将 ${selected.length} 名学员标记为“已通过”？系统将为每名学员生成学习报告和证书产物。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-academic-action="graduation-batch-confirm">确认结业</button>'); document.querySelector('[data-academic-dialog]').dataset.classId = classRow.id; document.querySelector('[data-academic-dialog]').dataset.selectedIds = selected.map((item) => item.dataset.learnerSelect).join(','); return; }
   if (action === 'graduation-batch-confirm') { const dialog = button.closest('dialog'); const classRow = graduation.find((item) => item.id === dialog.dataset.classId); const ids = (dialog.dataset.selectedIds || '').split(','); classRow.learners.forEach((learner) => { if (ids.includes(learner.id)) learner.status = '已通过'; }); closeDialog(); document.querySelector('[data-academic-dialog]')?.remove(); renderGraduation(); showToast('选中学员已确认结业，报告和证书进入生成队列。'); return; }
   const rowElement = button.closest('tr[data-row-id]'); const row = rowElement ? academicData.find((item) => item.id === rowElement.dataset.rowId) : null;
   if (action.startsWith('learner-')) { const classRow = currentClassFromDialog(button); const learnerId = button.closest('tr')?.dataset.learnerId; const learner = classRow?.learners.find((item) => item.id === learnerId); if (!learner) return; if (action === 'learner-retake') return openSimpleForm('退回补课', '此操作只更新当前学员，不影响同班其他已通过学员。', field('补课说明', 'reason', 'text', '请输入未达标原因', true) + field('补课课次', 'session', 'text', '如 第17次补课'), (form) => { learner.status = '补课中'; learner.comment = `${learner.comment} 补课安排：${form.get('session') || '待排课'}。`; closeDialog(); showToast('已登记补课安排，等待教师完成补课教学记录。'); }); if (action === 'learner-makeup') return openSimpleForm('登记补课课次', '教师完成补课教学记录后，学员可重新提交结业材料。', field('补课日期', 'date', 'date') + field('补课课次', 'session', 'text', '如 第17次补课') + field('安排说明', 'note', 'text', '填写教务安排', true), (form) => { learner.status = '补课中'; closeDialog(); showToast('补课课次已登记，已同步教师端。'); }); if (action === 'learner-resubmit') { learner.status = '待复核'; closeDialog(); showToast('补课教学记录已提交，学员重新进入待复核列表。'); return; } }
-  if (!row && ['campus-create', 'building-create', 'venue-create', 'venue-import', 'schedule-create', 'message-create', 'graduation-export', 'report-export', 'attendance-export', 'homework-export'].includes(action)) return handleAction(action);
+  if (!row && ['campus-create', 'building-create', 'venue-create', 'venue-import', 'message-create', 'graduation-export', 'report-export', 'attendance-export', 'homework-export'].includes(action)) return handleAction(action);
   handleAction(action, row);
 });
 
 if (academicPage === 'venues') renderVenues();
-if (academicPage === 'periods') renderTimelineSpec();
-if (academicPage === 'scheduling') renderScheduling();
 if (academicPage === 'timetable') renderTimetable();
 if (academicPage === 'attendance') renderAttendance();
 if (academicPage === 'homework') renderHomework();

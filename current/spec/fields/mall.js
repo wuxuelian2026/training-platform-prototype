@@ -11,10 +11,8 @@ export const MALL_FIELD_SPEC = {
     'mall/banners': {
       groups: [
         { heading: '新增轮播图字段', fields: [
-          { id: 'FD-MALL-012', label: '轮播图名称', type: '文本', length: '≤ 50 字', required: '否', note: '运营侧档案名称，不在学员端展示；学员端文案取主标题与描述', constraints: { maxLength: 50 } },
+          { id: 'FD-MALL-012', label: '轮播图名称', type: '文本', length: '≤ 50 字', required: '是', note: '运营侧档案名称，只用于后台列表辨识；学员端首页轮播只展示图片与点击跳转，标题与描述由图片承载，页面不叠加文案（2026-09-22 裁定）', constraints: { maxLength: 50 } },
           { id: 'FD-MALL-013', label: '图片', type: '图片上传', length: '单个图片', required: '是', note: '建议尺寸 1242×414px', constraints: { maxFiles: 1, image: true } },
-          { id: 'FD-MALL-055', label: '主标题', type: '文本', length: '≤ 20 字', required: '是', note: '学员端轮播展示的第一行文案；角标字自动取主标题首字，不单独配置', constraints: { maxLength: 20 } },
-          { id: 'FD-MALL-056', label: '描述', type: '文本', length: '≤ 40 字', required: '否', note: '学员端轮播展示的说明文案', constraints: { maxLength: 40 } },
           { id: 'FD-MALL-014', label: '跳转链接类型', type: '下拉', length: '无跳转 / 课程详情 / 商品详情 / 课程列表 / 名师列表 / 教师详情', required: '否', note: '决定点击轮播图的跳转目标', constraints: { options: ['无跳转', '课程详情', '商品详情', '课程列表', '名师列表', '教师详情'] } },
           { id: 'FD-MALL-015', label: '跳转对象', type: '对象选择器', length: '单个课程 / 商品 / 名师', required: '条件必填', note: '选择课程详情、商品详情或教师详情时，从对应对象中选择一项，目标地址由系统生成', constraints: { requiredWhen: 'FD-MALL-014=课程详情|商品详情|教师详情' } },
           { id: 'FD-MALL-016', label: '排序序号', type: '数字', length: '≥ 1 的整数', required: '否', note: '数字越小越靠前；上移下移后自动重算序号', constraints: { min: 1, integer: true } },
@@ -26,7 +24,7 @@ export const MALL_FIELD_SPEC = {
         '轮播图按排序序号升序展示，序号越小越靠前。',
         '轮播图不设置有效期，是否展示只由启用状态决定。',
         '跳转链接类型为无跳转时，点击轮播图不产生跳转；详情类型必须选择具体课程、商品或名师。',
-        'CR-2026-037：学员端文案来自主标题与描述，未填写主标题的记录不允许启用；角标字自动取主标题首字。',
+        'CR-2026-073：新增／编辑表单不维护主标题与描述；编辑旧记录时保留既有展示文案，新建记录以轮播图名称作为展示标题、描述为空。',
         'CR-2026-037：状态只有启用与停用两种；列表提供上移／下移并自动重排序号，与手工输入序号结果一致；列表不展示「展示位置」列。'
       ]
     },

@@ -54,7 +54,7 @@
       <dialog id="teacher-action-dialog" class="modal-dialog small-dialog teacher-action-dialog"><div class="modal-card"><div class="modal-header"><div><h2 id="teacher-action-title">更新教师状态</h2><p>只更新当前业务维度，不改写资料、证书、合同或历史教学记录。</p></div><button type="button" class="icon-button" data-dialog-close title="关闭" aria-label="关闭">×</button></div><div class="teacher-action-summary"><strong id="teacher-action-teacher">—</strong><span id="teacher-action-copy">—</span></div><label class="form-field" id="teacher-action-date-field" hidden><span>离职日期 <b class="required-mark">*</b></span><input type="date" id="teacher-action-date" /><small>默认当天，可修改；离职后禁止新增未来排课</small></label><div class="modal-actions"><button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" id="teacher-action-confirm">确认</button></div></div></dialog>
       <dialog id="teacher-import-dialog" class="modal-dialog teacher-import-dialog">
         <div class="modal-card">
-          <div class="modal-header"><div><h2>批量导入教师</h2><p>先校验文件，确认后再建档并发送激活邀请。</p></div><button type="button" class="icon-button" data-dialog-close title="关闭" aria-label="关闭">×</button></div>
+          <div class="modal-header"><div><h2>批量导入教师</h2><p>先校验文件，确认后再建档并设置账号为正常。</p></div><button type="button" class="icon-button" data-dialog-close title="关闭" aria-label="关闭">×</button></div>
           <section class="teacher-import-section" data-import-upload>
             <div class="teacher-import-section-head"><div><strong>1. 准备导入文件</strong><span>仅支持 .xlsx，单文件不超过 5MB，单次不超过 500 行</span></div><a class="button" href="../../../assets/templates/教师批量导入模板.xlsx" download>下载模板</a></div>
             <label class="upload-control upload-control-wide teacher-import-upload"><input id="teacher-import-file" type="file" accept=".xlsx" />选择 Excel 文件<span id="teacher-import-file-name">未选择文件</span></label>
@@ -73,11 +73,11 @@
           </section>
           <section class="teacher-import-section teacher-import-result" data-import-result hidden>
             <div class="teacher-import-section-head"><div><strong>导入完成</strong><span id="teacher-import-result-copy">按本次校验结果生成</span></div></div>
-            <div class="teacher-import-summary teacher-import-result-summary"><div><span>校验总行数</span><strong id="teacher-import-result-total">—</strong></div><div><span>建档成功</span><strong id="teacher-import-result-created">—</strong></div><div><span>邀请成功</span><strong class="success-text" id="teacher-import-result-invite-ok">—</strong></div><div><span>邀请失败</span><strong class="danger-text" id="teacher-import-result-invite-fail">—</strong></div><div><span>未导入</span><strong class="danger-text" id="teacher-import-result-skipped">—</strong></div></div>
-            <p class="teacher-import-note" id="teacher-import-result-note">失败行未导入；邀请失败不回滚已建档数据。</p>
+            <div class="teacher-import-summary teacher-import-result-summary"><div><span>校验总行数</span><strong id="teacher-import-result-total">—</strong></div><div><span>建档成功</span><strong id="teacher-import-result-created">—</strong></div><div><span>账号状态正常</span><strong class="success-text" id="teacher-import-result-invite-ok">—</strong></div><div><span>账号状态异常</span><strong class="danger-text" id="teacher-import-result-invite-fail">—</strong></div><div><span>未导入</span><strong class="danger-text" id="teacher-import-result-skipped">—</strong></div></div>
+            <p class="teacher-import-note" id="teacher-import-result-note">失败行未导入；账号异常不回滚已建档数据。</p>
             <button type="button" class="text-button teacher-import-result-download" data-action="teacher-import-errors">下载失败明细</button>
           </section>
-          <div class="modal-actions"><button type="button" class="button" data-dialog-close data-import-cancel>取消</button><button type="button" class="button primary" data-action="teacher-import-validate">开始校验</button><button type="button" class="button primary" data-action="teacher-import-commit" hidden>确认导入并发送邀请</button><button type="button" class="button primary" data-dialog-close data-import-finish hidden>完成</button></div>
+          <div class="modal-actions"><button type="button" class="button" data-dialog-close data-import-cancel>取消</button><button type="button" class="button primary" data-action="teacher-import-validate">开始校验</button><button type="button" class="button primary" data-action="teacher-import-commit" hidden>确认导入</button><button type="button" class="button primary" data-dialog-close data-import-finish hidden>完成</button></div>
         </div>
       </dialog>
       <div class="toast" data-teacher-toast role="status" aria-live="polite" hidden></div>

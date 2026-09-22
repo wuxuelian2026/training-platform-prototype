@@ -9,7 +9,6 @@ export const STATE_MACHINES = [
     "diagram": true,
     "pages": [
       "crm/classes",
-      "academic/scheduling",
       "learner/fast-registration",
       "learner/class-detail"
     ],
@@ -244,11 +243,6 @@ export const STATE_MACHINES = [
     ],
     "states": [
       [
-        "pending",
-        "待分班",
-        false
-      ],
-      [
         "assigned",
         "已分班",
         false
@@ -266,13 +260,7 @@ export const STATE_MACHINES = [
     ],
     "transitions": [
       [
-        "待分班",
-        "系统自动分班",
         "已分班",
-        "系统"
-      ],
-      [
-        "待分班/已分班",
         "退款完成",
         "已取消",
         "系统"

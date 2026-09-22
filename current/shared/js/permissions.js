@@ -33,9 +33,8 @@ export const PERMISSION_POINTS = [
   { id: 'PERM-COURSE-005', module: '课程中心', object: '专业目录', action: '目录维护', scopes: SYSTEM, note: '门类、分类与专业的维护与启停' },
   { id: 'PERM-MALL-001', module: '商城运营', object: '视频商品', action: '查看', scopes: VIEW, note: '查看视频课程商品列表与详情' },
   { id: 'PERM-MALL-002', module: '商城运营', object: '视频商品', action: '发布与上下架', scopes: MANAGE, note: '发布商品、改价、上架与下架' },
-  { id: 'PERM-MALL-003', module: '商城运营', object: '订单', action: '订单查看', scopes: VIEW, note: '查看统一订单列表与订单详情' },
-  { id: 'PERM-MALL-004', module: '商城运营', object: '轮播图', action: '轮播管理', scopes: SYSTEM, note: '新增、编辑、排序与启停轮播图' },
-  { id: 'PERM-MALL-005', module: '商城运营', object: '协议', action: '协议管理', scopes: SYSTEM, note: '维护关于我们、用户协议与隐私政策正文' },
+  { id: 'PERM-MALL-003', module: '商城运营', object: '轮播图', action: '轮播管理', scopes: SYSTEM, note: '新增、编辑、排序与启停轮播图' },
+  { id: 'PERM-MALL-004', module: '商城运营', object: '协议', action: '协议管理', scopes: SYSTEM, note: '维护关于我们、用户协议与隐私政策正文' },
   { id: 'PERM-CRM-001', module: '面授运营', object: '班级', action: '查看', scopes: TEACHING, note: '查看面授班级列表与详情' },
   { id: 'PERM-CRM-002', module: '面授运营', object: '班级', action: '发布与上下架', scopes: TEACHING, note: '发布班级、定价与报名窗口、上下架' },
   { id: 'PERM-CRM-003', module: '面授运营', object: '批次', action: '批次管理', scopes: TEACHING, note: '维护招生批次与班级归属' },
@@ -54,20 +53,24 @@ export const PERMISSION_POINTS = [
   { id: 'PERM-ACADEMIC-006', module: '教务执行监管', object: '消息', action: '消息推送', scopes: TEACHING, note: '发送班级通知与补发失败通知' },
   { id: 'PERM-ACADEMIC-007', module: '教务执行监管', object: '结业', action: '结业审核', scopes: TEACHING, note: '按学员复核结业结果' },
   { id: 'PERM-ACADEMIC-008', module: '教务执行监管', object: '学习报告', action: '报告管理', scopes: TEACHING, note: '生成、发布、撤回与删除学习报告' },
+  // CR-2026-085：交易中心承接订单与退款单据（交易状态、退款审批与执行）；资金流水与结算仍在财务中心。
+  { id: 'PERM-TRADE-001', module: '交易中心', object: '订单', action: '订单查看', scopes: VIEW, note: '查看统一订单列表与订单详情' },
+  { id: 'PERM-TRADE-002', module: '交易中心', object: '退款', action: '退款记录', scopes: TEACHING, note: '查看退款单、审批结论与线下退款登记' },
   { id: 'PERM-FINANCE-001', module: '财务中心', object: '教师工资', action: '工资管理', scopes: TEACHING, note: '生成与发布教师工资单' },
   { id: 'PERM-FINANCE-002', module: '财务中心', object: '收款', action: '收款记录', scopes: TEACHING, note: '查看收款流水与到账状态' },
-  { id: 'PERM-FINANCE-003', module: '财务中心', object: '退款', action: '退款记录', scopes: TEACHING, note: '查看退款流水与处理结果' },
   { id: 'PERM-SYSTEM-001', module: '系统管理', object: '后台用户', action: '后台用户管理', scopes: SYSTEM, note: '新增、编辑、启停与重置后台用户' },
   { id: 'PERM-SYSTEM-002', module: '系统管理', object: '学员用户', action: '学员用户管理', scopes: TEACHING, note: '查看学员账号与关系、启停学员账号' },
   { id: 'PERM-SYSTEM-003', module: '系统管理', object: '角色权限', action: '角色权限管理', scopes: SYSTEM, note: '维护角色、权限点与数据范围' },
-  { id: 'PERM-SYSTEM-004', module: '系统管理', object: '参数配置', action: '参数配置', scopes: SYSTEM, note: '维护平台参数与开关' }
+  { id: 'PERM-SYSTEM-004', module: '系统管理', object: '参数配置', action: '参数配置', scopes: SYSTEM, note: '维护平台参数与开关' },
+  // CR-2026-103：业务枚举由「数据字典」独立承载，与平台参数分开授权。
+  { id: 'PERM-SYSTEM-005', module: '系统管理', object: '数据字典', action: '字典维护', scopes: SYSTEM, note: '维护难度等级、适合年龄、课时类型、课时时长等业务字典项' }
 ];
 
 // 预置角色：仅初始数据，等价于当前演示账号的可见性，可由角色表格勾选自由调整。
 const ALL_PERMISSIONS = PERMISSION_POINTS.map((item) => item.id);
 // 预置角色初始勾选与原型既有可见性保持一致（避免演示账号突然少菜单／少按钮）：
-// 学员用户��理、教师导入、名师推荐三项在当前实现里只对平台管理员与教务主管开放。
-const RESTRICTED_POINTS = ['PERM-SYSTEM-002', 'PERM-TEACHER-003', 'PERM-TEACHER-007'];
+// 学员用户管理、教师导入、名师推荐三项在当前实现里只对平台管理员与教务主管开放。
+const RESTRICTED_POINTS = ['PERM-SYSTEM-002', 'PERM-SYSTEM-005', 'PERM-TEACHER-003', 'PERM-TEACHER-007'];
 const BASELINE_ROLE = ALL_PERMISSIONS.filter((id) => !RESTRICTED_POINTS.includes(id));
 export const ROLE_PRESETS = [
   { key: 'super_admin', name: '超级管理员', description: '全局配置、系统运维（预置初始数据）', permissions: ALL_PERMISSIONS },
@@ -105,9 +108,9 @@ export const ADMIN_PAGE_PERMISSIONS = {
   '/admin/pages/courses/resources.html': ['PERM-COURSE-004'],
   '/admin/pages/courses/catalog.html': ['PERM-COURSE-005'],
   '/admin/pages/mall/products.html': ['PERM-MALL-001'],
-  '/admin/pages/mall/orders.html': ['PERM-MALL-003'],
-  '/admin/pages/mall/banners.html': ['PERM-MALL-004'],
-  '/admin/pages/mall/agreements.html': ['PERM-MALL-005'],
+  '/admin/pages/mall/orders.html': ['PERM-TRADE-001'],
+  '/admin/pages/mall/banners.html': ['PERM-MALL-003'],
+  '/admin/pages/mall/agreements.html': ['PERM-MALL-004'],
   '/admin/pages/crm/classes.html': ['PERM-CRM-001'],
   '/admin/pages/crm/batches.html': ['PERM-CRM-003'],
   '/admin/pages/crm/trials.html': ['PERM-CRM-004'],
@@ -119,7 +122,6 @@ export const ADMIN_PAGE_PERMISSIONS = {
   '/admin/pages/inventory/stock-out.html': ['PERM-INVENTORY-003'],
   '/admin/pages/inventory/ledger.html': ['PERM-INVENTORY-004'],
   '/admin/pages/academic/venues.html': ['PERM-ACADEMIC-001'],
-  '/admin/pages/academic/scheduling.html': ['PERM-ACADEMIC-002'],
   '/admin/pages/academic/timetable.html': ['PERM-ACADEMIC-003'],
   '/admin/pages/academic/attendance.html': ['PERM-ACADEMIC-004'],
   '/admin/pages/academic/homework.html': ['PERM-ACADEMIC-005'],
@@ -128,11 +130,12 @@ export const ADMIN_PAGE_PERMISSIONS = {
   '/admin/pages/academic/reports.html': ['PERM-ACADEMIC-008'],
   '/admin/pages/finance/salary.html': ['PERM-FINANCE-001'],
   '/admin/pages/finance/payments.html': ['PERM-FINANCE-002'],
-  '/admin/pages/finance/refunds.html': ['PERM-FINANCE-003'],
+  '/admin/pages/finance/refunds.html': ['PERM-TRADE-002'],
   '/admin/pages/system/users.html': ['PERM-SYSTEM-001'],
   '/admin/pages/system/student-users.html': ['PERM-SYSTEM-002'],
   '/admin/pages/system/roles.html': ['PERM-SYSTEM-003'],
-  '/admin/pages/system/settings.html': ['PERM-SYSTEM-004']
+  '/admin/pages/system/settings.html': ['PERM-SYSTEM-004'],
+  '/admin/pages/system/dictionaries.html': ['PERM-SYSTEM-005']
 };
 
 export const pagePermissionState = (pathname, roleKey) => {

@@ -1,5 +1,5 @@
 import { DATA_SCOPES, PERMISSION_POINTS, permissionById, permissionPointsByModule, permissionsOfRole } from './permissions.js';
-import { readDemoState, writeDemoState } from './demo-store.js';
+import { contractSettings, dataDictionary, fileSpecSettings, messageRetrySettings, paymentTimeoutSettings, readDemoState, videoRefundSettings, writeDemoState, writeDictionary } from './demo-store.js';
 
 const systemRoot = document.querySelector('[data-system-page]');
 const systemPage = systemRoot?.dataset.systemPage;
@@ -35,8 +35,38 @@ const roles = [
   { id: 'role-finance', name: '财务', key: 'finance', description: '财务核算、对账', users: 2, modules: '财务中心、商城订单', updated: '2026-09-04', status: '启用', preset: true }
 ];
 // CR-2026-027：原 permissionGroups 字面量清单已迁移到 shared/js/permissions.js（权限点单一事实源）。
-const sharedSettings = readDemoState().videoRefundSettings || {};
-const settings = { platform: '湖北艺术职业学院继续教育', timezone: 'Asia/Shanghai（UTC+8）', defaultLessonMinutes: 90, homeworkDeadlineHours: 72, attendanceThreshold: 80, homeworkThreshold: 80, videoRefundMaxLessons: Math.max(0, Number(sharedSettings.maxLessons ?? 3)), switches: { teacherApplication: true, anonymousConsultation: true, messageRetry: true, consultantTrial: true } };
+const sharedRefund = videoRefundSettings();
+const sharedFileSpec = fileSpecSettings();
+const sharedRetry = messageRetrySettings();
+const settings = { platform: '湖北艺术职业学院继续教育', timezone: 'Asia/Shanghai（UTC+8）', defaultLessonMinutes: 90, homeworkDeadlineHours: 72, attendanceThreshold: 80, homeworkThreshold: 80, videoRefundMaxLessons: sharedRefund.maxLessons, switches: { teacherApplication: true, anonymousConsultation: true, messageRetry: true, consultantTrial: true } };
+// CR-2026-083：合同签署截止期限默认 7 天，由「参数配置」维护，合同列表与教师端同源读取。
+settings.contractSignDeadlineDays = contractSettings().signDeadlineDays;
+// CR-2026-104：待支付支付时限、视频退款申请窗口、文件上传规格与消息重试策略均由「参数配置」维护。
+settings.refundWindowDays = sharedRefund.windowDays;
+settings.paymentTimeoutMinutes = paymentTimeoutSettings().paymentTimeoutMinutes;
+settings.fileSpec = sharedFileSpec;
+settings.messageRetry = sharedRetry;
+// 模块归属调整后的历史权限点迁移：交易中心拆出后，本地已保存的角色配置里仍是旧 ID，
+// 直接沿用会让账号丢掉订单／退款菜单，因此读取时先做一次映射。
+const LEGACY_PERMISSION_IDS = {
+  'PERM-MALL-003': 'PERM-TRADE-001',
+  'PERM-MALL-004': 'PERM-MALL-003',
+  'PERM-MALL-005': 'PERM-MALL-004',
+  'PERM-FINANCE-003': 'PERM-TRADE-002'
+};
+const migratePermissionIds = (list) => [...new Set(list.map((id) => LEGACY_PERMISSION_IDS[id] || id))];
+// CR-2026-103：新引入的权限点在本地已保存的角色配置里不存在，会让演示账号看不到新菜单。
+// 读取时按“同模块既有权限点已勾选即补授”迁移一次，保持演示可见性；管理员仍可在角色权限管理里撤销。
+const PERMISSION_MIGRATION_COHORTS = [
+  { point: 'PERM-SYSTEM-005', requires: 'PERM-SYSTEM-003' }
+];
+const migrateNewPermissionPoints = (list) => {
+  const granted = [...list];
+  PERMISSION_MIGRATION_COHORTS.forEach(({ point, requires }) => {
+    if (granted.includes(requires) && !granted.includes(point)) granted.push(point);
+  });
+  return granted;
+};
 bootstrapRolePermissions();
 // CR-2026-027：角色的权限点与模块列来自预置初始数据，勾选结果保存在本地并可覆盖预置值。
 function bootstrapRolePermissions() {
@@ -46,7 +76,8 @@ function bootstrapRolePermissions() {
   roles.forEach((role) => {
     const preset = permissionsOfRole(role.key);
     const saved = storedByKey[role.key];
-    role.permissions = saved?.permissions?.length ? saved.permissions : preset;
+    const savedPermissions = Array.isArray(saved?.permissions) ? migrateNewPermissionPoints(migratePermissionIds(saved.permissions)) : [];
+    role.permissions = savedPermissions.length ? savedPermissions : preset;
     role.scopes = saved?.scopes || role.scopes || {};
     role.modules = saved?.modules || [...new Set(role.permissions.map((id) => permissionById(id)?.module).filter(Boolean))].join('、') || '未配置';
   });
@@ -78,9 +109,117 @@ function renderRoles() {
   renderRows(systemData, row);
   bindFilter('role-filter', systemData, (form) => { const keyword = form.keyword.value.trim(); return (item) => !keyword || `${item.name}${item.key}`.includes(keyword); }, row);
 }
+// CR-2026-083：合同参数卡片在参数配置页渲染后挂载，与既有卡片共用同一保存表单。
+function mountContractSettingsCard() {
+  const form = document.querySelector('#settings-form');
+  const layout = form?.querySelector('.settings-layout');
+  if (!form || !layout || layout.querySelector('[data-contract-settings]')) return;
+  const card = document.createElement('section');
+  card.className = 'card settings-card';
+  card.dataset.contractSettings = 'true';
+  card.innerHTML = `<h2>合同参数</h2><div class="form-grid">${field('签署截止期限（天）', 'contractSignDeadlineDays', 'number', '1-30', false, settings.contractSignDeadlineDays)}</div><p class="ops-form-help">合同推送后按该期限生成签署截止日期，后台合同列表与教师端同源展示；修改后对新推送的合同生效，历史合同不改写。</p>`;
+  layout.append(card);
+  form.addEventListener('submit', () => {
+    const value = Number(new FormData(form).get('contractSignDeadlineDays'));
+    if (!Number.isFinite(value) || value < 1 || value > 30) { showToast('合同签署截止期限需为 1–30 天。'); return; }
+    settings.contractSignDeadlineDays = Math.round(value);
+    writeDemoState((next) => ({ ...next, contractSettings: { signDeadlineDays: settings.contractSignDeadlineDays } }));
+  });
+}
+// CR-2026-101：固定规则不进参数配置——课表时间轴等由业务口径直接冻结，
+// 页面只做只读说明，避免被当成可调参数。
+// CR-2026-103：课时时长一类业务枚举不在参数配置维护，改由「系统管理 → 数据字典」承载。
+function mountFixedRulesCard() {
+  const layout = document.querySelector('#settings-form .settings-layout');
+  if (!layout || layout.querySelector('[data-fixed-rules]')) return;
+  const card = document.createElement('section');
+  card.className = 'card settings-card';
+  card.dataset.fixedRules = 'true';
+  card.innerHTML = `<h2>固定规则（不提供配置）</h2><p class="ops-form-help">以下为业务口径冻结的固定规则，不在本页提供配置入口；调整需走变更单。</p><ul class="settings-fixed-list"><li>课表时间轴：每天 08:00–21:00，15 分钟 1 个刻度，共 52 格；开始时间吸附到刻度，超时间轴课次不上屏但导出保留「其他时段」。</li></ul>`;
+  layout.append(card);
+}
+// CR-2026-104：订单支付时限、文件上传规格与消息重试策略由本页维护（固定规则只剩课表时间轴）。
+function mountConfigurableLimitCards() {
+  const layout = document.querySelector('#settings-form .settings-layout');
+  if (!layout || layout.querySelector('[data-limit-settings]')) return;
+  const card = document.createElement('section');
+  card.className = 'card settings-card';
+  card.dataset.limitSettings = 'true';
+  card.innerHTML = `<h2>订单与文件规格参数</h2><div class="form-grid">${field('待支付订单支付时限（分钟）', 'paymentTimeoutMinutes', 'number', '1-1440', false, settings.paymentTimeoutMinutes)}${field('图片上传上限（MB）', 'imageSpecMb', 'number', '1-1024', false, settings.fileSpec.imageMb)}${field('文档上传上限（MB）', 'documentSpecMb', 'number', '1-1024', false, settings.fileSpec.documentMb)}${field('视频上传上限（MB）', 'videoSpecMb', 'number', '1-10240', false, settings.fileSpec.videoMb)}${field('教学资源库单文件上限（GB）', 'resourceSpecGb', 'number', '1-10240', false, settings.fileSpec.resourceGb)}</div><p class="ops-form-help">待支付订单创建后按该时限关闭为「已取消（超时）」；文件规格用于图片、文档、视频与教学资源库的上传校验，证书、合同与教学资源上传读取同一份配置。</p>`;
+  layout.append(card);
+  const retryCard = document.createElement('section');
+  retryCard.className = 'card settings-card';
+  retryCard.dataset.retrySettings = 'true';
+  retryCard.innerHTML = `<h2>消息失败重试策略</h2><div class="form-grid">${field('最大重试次数', 'messageRetryAttempts', 'number', '1-5', false, settings.messageRetry.maxAttempts)}${field('重试间隔（分钟，逗号分隔）', 'messageRetryIntervals', 'text', '如 5,30,120', false, settings.messageRetry.intervalsMinutes.join(','))}</div><p class="ops-form-help">通知发送失败后按间隔依次重试，超过重试次数进入补发队列；仅在「启用消息失败自动重试」打开时生效。</p>`;
+  layout.append(retryCard);
+}
+// CR-2026-103：数据字典维护页。业务枚举（难度等级、适合年龄、课时类型、课时时长）
+// 统一在这里维护；字典类型由产品口径固定，新增类型需走变更单。
+const DICTIONARY_TYPE_ORDER = ['course_difficulty', 'suitable_age', 'lesson_kind', 'lesson_duration'];
+function renderDictionaries() {
+  const all = dataDictionary();
+  const types = [...new Set([...DICTIONARY_TYPE_ORDER, ...Object.keys(all)])].filter((type) => all[type]);
+  const requested = new URLSearchParams(window.location.search).get('type');
+  const activeType = all[requested] ? requested : types[0];
+  const current = all[activeType];
+  const isNumber = current.kind === 'number';
+  const itemLabel = isNumber ? `${current.label}（${current.unit || '数值'}）` : current.label;
+  const tabs = types.map((type) => `<button type="button" class="dictionary-tab${type === activeType ? ' active' : ''}" data-dict-type="${type}">${escapeHtml(all[type].label)} <small>(${all[type].items.length})</small></button>`).join('');
+  const row = (value, index) => `<div class="dictionary-row" data-dict-row><span class="dictionary-order">${index + 1}</span><input ${isNumber ? 'type="number" min="1" step="1"' : ''} value="${escapeHtml(value)}" aria-label="${escapeHtml(itemLabel)}字典项" data-dict-item /><button type="button" class="button" data-dict-remove>删除</button></div>`;
+  const defaultValueSelect = isNumber ? `<label class="form-field"><span>默认${escapeHtml(current.label)}（${escapeHtml(current.unit || '')}）</span><select data-dict-default>${current.items.map((value) => `<option value="${value}" ${value === current.defaultItem ? 'selected' : ''}>${value} ${escapeHtml(current.unit || '')}</option>`).join('')}</select></label>` : '';
+  const consumers = {
+    course_difficulty: '课程申报、课程库编排与后台新增面授课程读取同一份字典；发布商品与班级时只读带入。',
+    suitable_age: '课程申报、课程库编排、后台新增面授课程与学员端筛选读取同一份字典。',
+    lesson_kind: '课程库编排的课时类型读取同一份字典。',
+    lesson_duration: '排班表单、班级默认课时时长与课程库编排读取同一份字典；已排课次保留原时长，仅新建或编辑时按新字典取值。'
+  };
+  const content = `<section class="card dictionary-card"><div class="dictionary-head"><div><h2>${escapeHtml(current.label)}</h2><p class="ops-form-help">${escapeHtml(consumers[activeType] || '本字典由页面与接口统一读取。')}</p></div><button type="button" class="button primary" data-dict-save>保存字典</button></div><div class="dictionary-list" data-dict-list>${current.items.map(row).join('')}</div><div class="toolbar-actions"><button type="button" class="button" data-dict-add>新增字典项</button></div>${defaultValueSelect}<p class="ops-form-help">${isNumber ? '字典项为大于 0 的整数，保存时按数值去重升序；默认值必须属于字典项，删除默认项时默认值回落到首项。' : '字典项保存时去重并保持维护顺序；留空的字典项不会保存。'}</p></section>`;
+  pageFrame('数据字典', '业务枚举统一在这里维护：字典项增删后即时生效，页面与接口读取同一份字典，不得写死选项。', '', `<div class="dictionary-tabs">${tabs}</div>${content}`);
+  const list = systemRoot.querySelector('[data-dict-list]');
+  const defaultSelect = systemRoot.querySelector('[data-dict-default]');
+  const valuesInList = () => [...new Set([...list.querySelectorAll('[data-dict-item]')]
+    .map((input) => (isNumber ? Math.round(Number(input.value)) : input.value.trim()))
+    .filter((value) => (isNumber ? Number.isFinite(value) && value > 0 : Boolean(value))))].sort(isNumber ? ((a, b) => a - b) : undefined);
+  const syncDefaultOptions = () => {
+    if (!defaultSelect) return;
+    const previous = isNumber ? Number(defaultSelect.value) : defaultSelect.value;
+    const values = valuesInList();
+    if (!values.length) { defaultSelect.innerHTML = ''; return; }
+    defaultSelect.innerHTML = values.map((value) => `<option value="${value}" ${value === previous ? 'selected' : ''}>${value}${isNumber ? ` ${current.unit || ''}` : ''}</option>`).join('');
+  };
+  systemRoot.querySelectorAll('[data-dict-type]').forEach((button) => button.addEventListener('click', () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('type', button.dataset.dictType);
+    window.location.href = url.toString();
+  }));
+  systemRoot.querySelector('[data-dict-add]')?.addEventListener('click', () => {
+    const values = valuesInList();
+    const next = isNumber ? (values.at(-1) || 45) + 15 : '';
+    list.insertAdjacentHTML('beforeend', row(next, list.querySelectorAll('[data-dict-row]').length));
+    syncDefaultOptions();
+  });
+  list.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-dict-remove]');
+    if (!target) return;
+    const rows = [...list.querySelectorAll('[data-dict-row]')];
+    if (rows.length <= 1) { showToast(`「${current.label}」至少保留一个字典项。`); return; }
+    target.closest('[data-dict-row]')?.remove();
+    [...list.querySelectorAll('[data-dict-row]')].forEach((element, index) => { element.querySelector('.dictionary-order').textContent = index + 1; });
+    syncDefaultOptions();
+  });
+  systemRoot.querySelector('[data-dict-save]')?.addEventListener('click', () => {
+    const items = valuesInList();
+    if (!items.length) { showToast(`「${current.label}」至少保留一个字典项。`); return; }
+    const defaultItem = isNumber ? Number(defaultSelect?.value) : undefined;
+    writeDictionary(activeType, { items, defaultItem });
+    showToast(`「${current.label}」字典已保存，相关页面即时生效。`);
+    renderDictionaries();
+  });
+}
+
 function renderSettings() {
-  pageFrame('参数配置', '', '<button class="button primary" data-system-action="settings-save">保存修改</button>', `<form id="settings-form"><div class="settings-layout"><section class="card settings-card"><h2>平台基础参数</h2><div class="form-grid">${field('平台名称', 'platform', 'text', '', false, settings.platform)}<label class="form-field"><span>默认时区</span><select name="timezone"><option>${settings.timezone}</option></select></label>${field('默认课时时长（分钟）', 'defaultLessonMinutes', 'number', '30-240', false, settings.defaultLessonMinutes)}${field('作业默认截止时间（小时）', 'homeworkDeadlineHours', 'number', '1-720', false, settings.homeworkDeadlineHours)}${field('最低出勤率（%）', 'attendanceThreshold', 'number', '0-100', false, settings.attendanceThreshold)}${field('最低作业提交率（%）', 'homeworkThreshold', 'number', '0-100', false, settings.homeworkThreshold)}</div><p class="ops-form-help">结业判定使用最低出勤率和最低作业提交率，待补录考勤不参与计算。</p></section><section class="card settings-card"><h2>视频课程退款参数</h2><p class="ops-form-help">退款资格固定为购课 7 日内，观看课时上限可配置；满足条件时可申请实付金额全额退款。</p><div class="form-grid">${field('最多观看课时数', 'videoRefundMaxLessons', 'number', '0-999', false, settings.videoRefundMaxLessons)}</div><p class="ops-form-help">修改后对新提交的退款资格判断生效，历史订单不改写。</p></section><section class="card settings-card"><h2>业务开关</h2><div class="settings-switches"><label class="settings-switch"><span>启用教师端课程申报</span><span class="switch"><input type="checkbox" name="teacherApplication" ${settings.switches.teacherApplication ? 'checked' : ''}><i class="switch-track"></i></span></label><label class="settings-switch"><span>启用学员端匿名咨询</span><span class="switch"><input type="checkbox" name="anonymousConsultation" ${settings.switches.anonymousConsultation ? 'checked' : ''}><i class="switch-track"></i></span></label><label class="settings-switch"><span>启用消息失败自动重试</span><span class="switch"><input type="checkbox" name="messageRetry" ${settings.switches.messageRetry ? 'checked' : ''}><i class="switch-track"></i></span></label><label class="settings-switch"><span>允许课程顾问登记试听</span><span class="switch"><input type="checkbox" name="consultantTrial" ${settings.switches.consultantTrial ? 'checked' : ''}><i class="switch-track"></i></span></label></div></section></div><div class="form-actions"><button type="submit" class="button primary">保存修改</button></div></form>`);
-  document.querySelector('#settings-form')?.addEventListener('submit', (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const lesson = Number(form.get('defaultLessonMinutes')); const deadline = Number(form.get('homeworkDeadlineHours')); const attendance = Number(form.get('attendanceThreshold')); const homeworkRate = Number(form.get('homeworkThreshold')); const refundLessons = Number(form.get('videoRefundMaxLessons')); if (lesson < 30 || lesson > 240 || deadline < 1 || deadline > 720 || attendance < 0 || attendance > 100 || homeworkRate < 0 || homeworkRate > 100 || refundLessons < 0 || refundLessons > 999) { showToast('请检查参数范围：课时30-240分钟，截止时间1-720小时，阈值0-100%，观看课时0-999。'); return; } settings.platform = form.get('platform'); settings.defaultLessonMinutes = lesson; settings.homeworkDeadlineHours = deadline; settings.attendanceThreshold = attendance; settings.homeworkThreshold = homeworkRate; settings.videoRefundMaxLessons = refundLessons; writeDemoState(next => ({ ...next, videoRefundSettings: { windowDays: 7, maxLessons: refundLessons } })); Object.keys(settings.switches).forEach((key) => { settings.switches[key] = form.get(key) === 'on'; }); showToast('参数配置已保存，变更将记录审计日志。'); });
+  pageFrame('参数配置', '', '<button class="button primary" data-system-action="settings-save">保存修改</button>', `<form id="settings-form"><div class="settings-layout"><section class="card settings-card"><h2>平台基础参数</h2><div class="form-grid">${field('平台名称', 'platform', 'text', '', false, settings.platform)}<label class="form-field"><span>默认时区</span><select name="timezone"><option>${settings.timezone}</option></select></label>${field('作业默认截止时间（小时）', 'homeworkDeadlineHours', 'number', '1-720', false, settings.homeworkDeadlineHours)}${field('最低出勤率（%）', 'attendanceThreshold', 'number', '0-100', false, settings.attendanceThreshold)}${field('最低作业提交率（%）', 'homeworkThreshold', 'number', '0-100', false, settings.homeworkThreshold)}</div><p class="ops-form-help">结业判定使用最低出勤率和最低作业提交率，待补录考勤不参与计算。</p></section><section class="card settings-card"><h2>视频课程退款参数</h2><p class="ops-form-help">退款申请窗口与观看课时上限均可配置，同时满足两个条件时可申请实付金额全额退款。</p><div class="form-grid">${field('退款申请窗口（自然日）', 'videoRefundWindowDays', 'number', '1-30', false, settings.refundWindowDays)}${field('最多观看课时数', 'videoRefundMaxLessons', 'number', '0-999', false, settings.videoRefundMaxLessons)}</div><p class="ops-form-help">修改后对新提交的退款资格判断生效，历史订单不改写。</p></section><section class="card settings-card"><h2>业务开关</h2><div class="settings-switches"><label class="settings-switch"><span>启用教师端课程申报</span><span class="switch"><input type="checkbox" name="teacherApplication" ${settings.switches.teacherApplication ? 'checked' : ''}><i class="switch-track"></i></span></label><label class="settings-switch"><span>启用学员端匿名咨询</span><span class="switch"><input type="checkbox" name="anonymousConsultation" ${settings.switches.anonymousConsultation ? 'checked' : ''}><i class="switch-track"></i></span></label><label class="settings-switch"><span>启用消息失败自动重试</span><span class="switch"><input type="checkbox" name="messageRetry" ${settings.switches.messageRetry ? 'checked' : ''}><i class="switch-track"></i></span></label><label class="settings-switch"><span>允许课程顾问登记试听</span><span class="switch"><input type="checkbox" name="consultantTrial" ${settings.switches.consultantTrial ? 'checked' : ''}><i class="switch-track"></i></span></label></div></section></div><div class="form-actions"><button type="submit" class="button primary">保存修改</button></div></form>`);
+  document.querySelector('#settings-form')?.addEventListener('submit', (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const deadline = Number(form.get('homeworkDeadlineHours')); const attendance = Number(form.get('attendanceThreshold')); const homeworkRate = Number(form.get('homeworkThreshold')); const refundLessons = Number(form.get('videoRefundMaxLessons')); const refundWindow = Number(form.get('videoRefundWindowDays')); const payTimeout = Number(form.get('paymentTimeoutMinutes')); const inRange = (value, min, max) => Number.isFinite(value) && value >= min && value <= max; const fileSpec = { imageMb: Number(form.get('imageSpecMb')), documentMb: Number(form.get('documentSpecMb')), videoMb: Number(form.get('videoSpecMb')), resourceGb: Number(form.get('resourceSpecGb')) }; const retryAttempts = Number(form.get('messageRetryAttempts')); const retryIntervals = [...new Set(String(form.get('messageRetryIntervals') || '').split(/[，,\s]+/).map((value) => Math.round(Number(value))).filter((value) => Number.isFinite(value) && value > 0 && value <= 1440))].sort((a, b) => a - b); if (!inRange(deadline, 1, 720) || !inRange(attendance, 0, 100) || !inRange(homeworkRate, 0, 100) || !inRange(refundLessons, 0, 999) || !inRange(refundWindow, 1, 30) || !inRange(payTimeout, 1, 1440) || !inRange(fileSpec.imageMb, 1, 1024) || !inRange(fileSpec.documentMb, 1, 1024) || !inRange(fileSpec.videoMb, 1, 10240) || !inRange(fileSpec.resourceGb, 1, 10240) || !inRange(retryAttempts, 1, 5) || !retryIntervals.length) { showToast('请检查参数范围：截止 1-720 小时、阈值 0-100%、观看课时 0-999、退款窗口 1-30 天、支付时限 1-1440 分钟、文件规格为正整数、重试次数 1-5 且至少一个重试间隔。'); return; } settings.platform = form.get('platform'); settings.homeworkDeadlineHours = deadline; settings.attendanceThreshold = attendance; settings.homeworkThreshold = homeworkRate; settings.videoRefundMaxLessons = refundLessons; settings.refundWindowDays = refundWindow; settings.paymentTimeoutMinutes = payTimeout; settings.fileSpec = fileSpec; settings.messageRetry = { maxAttempts: retryAttempts, intervalsMinutes: retryIntervals }; writeDemoState(next => ({ ...next, videoRefundSettings: { windowDays: Math.round(refundWindow), maxLessons: Math.round(refundLessons) }, orderSettings: { paymentTimeoutMinutes: Math.round(payTimeout) }, fileSpecSettings: fileSpec, messageRetrySettings: { maxAttempts: Math.round(retryAttempts), intervalsMinutes: retryIntervals } })); Object.keys(settings.switches).forEach((key) => { settings.switches[key] = form.get(key) === 'on'; }); showToast('参数配置已保存，变更将记录审计日志。'); });
 }
 
 function studentUserCanView() { return ['super_admin', 'academic_lead'].includes(studentUserRole); }
@@ -194,4 +333,28 @@ document.addEventListener('click', (event) => {
 if (systemPage === 'users') renderUsers();
 if (systemPage === 'student-users') { loadStudentUserState(); const accountId = new URLSearchParams(window.location.search).get('accountId'); if (accountId) renderStudentUserDetail(studentUserAccounts.find((item) => item.id === accountId)); else renderStudentUsersV2(); }
 if (systemPage === 'roles') renderRoles();
-if (systemPage === 'settings') renderSettings();
+// CR-2026-102：排课策略参数（教师转场最小间隔、跨校区额外预留）由参数配置维护；
+// 课表风险提示与排课／调整校验同源读取，时间轴等固定规则仍不在此配置。
+function mountTimetableSettingsCard() {
+  const form = document.querySelector('#settings-form');
+  const layout = form?.querySelector('.settings-layout');
+  if (!form || !layout || layout.querySelector('[data-timetable-settings]')) return;
+  const current = readDemoState().timetableSettings || {};
+  const card = document.createElement('section');
+  card.className = 'card settings-card';
+  card.dataset.timetableSettings = 'true';
+  card.innerHTML = `<h2>排课策略参数</h2><p class="ops-form-help">同一教师当天两节课之间小于该间隔且更换教室时提示“转场紧张”；跨校区再叠加额外预留（有效间隔 = 最小间隔 + 额外预留）。</p><div class="form-grid">${field('教师转场最小间隔（分钟）', 'transferGapMinutes', 'number', '1-120', false, current.transferGapMinutes ?? 30)}${field('跨校区额外预留（分钟）', 'crossCampusExtraMinutes', 'number', '0-120', false, current.crossCampusExtraMinutes ?? 15)}</div><p class="ops-form-help">课表时间轴（08:00–21:00、15 分钟刻度）为固定规则，不在此配置。</p>`;
+  layout.append(card);
+  form.addEventListener('submit', () => {
+    const data = new FormData(form);
+    const gap = Number(data.get('transferGapMinutes'));
+    const extra = Number(data.get('crossCampusExtraMinutes'));
+    if (!Number.isFinite(gap) || gap < 1 || gap > 120 || !Number.isFinite(extra) || extra < 0 || extra > 120) {
+      showToast('排课策略参数需为：转场最小间隔 1–120 分钟、跨校区额外预留 0–120 分钟。');
+      return;
+    }
+    writeDemoState((next) => ({ ...next, timetableSettings: { transferGapMinutes: Math.round(gap), crossCampusExtraMinutes: Math.round(extra) } }));
+  });
+}
+if (systemPage === 'settings') { renderSettings(); mountContractSettingsCard(); mountTimetableSettingsCard(); mountConfigurableLimitCards(); mountFixedRulesCard(); }
+if (systemPage === 'dictionaries') renderDictionaries();

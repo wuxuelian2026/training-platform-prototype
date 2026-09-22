@@ -18,6 +18,10 @@ const COURSE_OUTLINES = {
     { name: '第一章：演唱基础', desc: '建立气息、发声与共鸣的基础方法。', lessons: [{ name: '气息支持', target: '理解并完成腹式呼吸练习', duration: 36, kind: '理论', description: '建立气息支撑的基本概念。', resources: ['res-001'] }, { name: '共鸣位置', target: '找到自然共鸣位置', duration: 42, kind: '示范', description: '通过示范建立共鸣感受。', resources: ['res-003'] }] },
     { name: '第二章：作品处理', desc: '将咬字、吐字与表达方法应用到作品中。', lessons: [{ name: '咬字与吐字', target: '完成作品咬字练习', duration: 40, kind: '练习', description: '围绕歌词完成清晰咬字。', resources: ['res-004'] }] }
   ],
+  '少儿国画入门': [
+    { name: '第一章：笔墨基础', desc: '认识毛笔、宣纸与基本用色，完成点线练习。', lessons: [{ name: '握笔与运笔', target: '掌握中锋运笔与基本点线', duration: 45, kind: '示范', description: '认识毛笔、墨色和宣纸特性。', resources: [] }, { name: '墨色层次', target: '调出浓淡五色并完成练习', duration: 45, kind: '练习', description: '通过调墨认识浓淡干湿变化。', resources: [] }] },
+    { name: '第二章：花鸟入门', desc: '完成一幅简单的花鸟小品。', lessons: [{ name: '花朵结构', target: '完成一朵花的勾染练习', duration: 50, kind: '示范', description: '拆解花瓣结构与勾染步骤。', resources: [] }, { name: '枝叶穿插', target: '完成枝叶穿插与画面呼应', duration: 50, kind: '练习', description: '练习枝干走向与叶片的疏密关系。', resources: [] }, { name: '小品创作', target: '独立完成一幅花鸟小品', duration: 60, kind: '创作', description: '综合运用笔墨完成小幅创作。', resources: [] }] }
+  ],
   '艺术歌曲示范课': [
     { name: '第一章：作品理解', desc: '认识作品结构、风格与演唱要求。', lessons: [{ name: '作品分析', target: '说出作品的结构与情绪变化', duration: 45, kind: '理论', description: '结合示范分析作品段落与表达重点。', resources: [] }, { name: '示范演唱', target: '完成作品重点段落跟唱', duration: 45, kind: '示范', description: '通过分句示范建立演唱处理方法。', resources: [] }] }
   ],
@@ -74,6 +78,11 @@ const COURSE_ARCHIVE_SEED = [
       archiveVersion(1, '2026-08-20 10:15', '教研管理员', ['建档'], { name: '舞蹈基本功', archive: '完整课程', type: '面授课程', major: '中国舞', teacher: '王玥', hours: 12, difficulty: '启蒙', ages: ['少儿'], structureKey: '', structure: '1 个章节 · 2 个课时', outline: COURSE_OUTLINES['舞蹈基本功'].slice(0, 1) }),
       archiveVersion(2, '2026-09-02 14:40', '教研管理员', ['总课时', '编排结构'], { name: '舞蹈基本功', archive: '完整课程', type: '面授课程', major: '中国舞', teacher: '王玥', hours: 16, difficulty: '初级', ages: ['少儿'], structureKey: '', structure: '2 个章节 · 3 个课时', outline: COURSE_OUTLINES['舞蹈基本功'] })
     ]
+  },
+  {
+    id: 'LIB-007', sourceCourseId: 'COURSE-CR-2026-0003', source: '教师申报', name: '少儿国画入门', archive: '完整课程', type: '面授课程', major: '中国画', teacher: '李青', hours: 20, status: '已完成', difficulty: '启蒙', ages: ['少儿'], updatedAt: '2026-09-05 10:20',
+    chapters: COURSE_OUTLINES['少儿国画入门'],
+    versions: [archiveVersion(1, '2026-09-05 10:20', '教研管理员', ['建档', '编排结构'], { name: '少儿国画入门', archive: '完整课程', type: '面授课程', major: '中国画', teacher: '李青', hours: 20, difficulty: '启蒙', ages: ['少儿'], structureKey: '', structure: '2 个章节 · 5 个课时', outline: COURSE_OUTLINES['少儿国画入门'] })]
   },
   {
     id: 'LIB-003', sourceCourseId: 'LIB-003', source: '后台新增', name: '少儿美术兴趣班', archive: '轻量课程档案', type: '面授课程', major: '少儿绘画', teacher: '李青', hours: 20, status: '已完成', difficulty: '启蒙', ages: ['少儿'], updatedAt: '2026-08-18 11:00',

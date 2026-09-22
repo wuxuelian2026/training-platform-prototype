@@ -4,7 +4,7 @@ import { mountPageHelp } from './page-help.js';
 import { toLocalDateTimeString, toLocalMonthString } from './date-utils.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
-import { accountStudents, demoId, demoTime, getCurrentAccountId, readDemoState, subscribeDemoState, transitionVideoEntitlement, upsertDemoRecord, updateDemoRecord, videoRefundSettings, writeDemoState } from './demo-store.js';
+import { accountStudents, demoId, demoTime, getCurrentAccountId, paymentTimeoutSettings, readDemoState, subscribeDemoState, transitionVideoEntitlement, upsertDemoRecord, updateDemoRecord, videoRefundSettings, writeDemoState } from './demo-store.js';
 import { DEMO_TODAY, demoDateTime } from './demo-clock.js';
 import { classSeed } from './class-seed.js';
 import { resolveHomeBanners } from './banner-seed.js';
@@ -14,14 +14,14 @@ import { allProducts, productForCourse } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseArchiveSeed, courseArchiveVersionFor, saleUnitDisplay, VIDEO_DEMO_COURSES } from './course-display.js';
 import { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } from './teacher-facts.js';
 import { isRichMarkup, richTextToHtml, sanitizeRichText } from './rich-editor.js';
-import { classSalesProjection } from './class-lifecycle.js';
+import { classLessonProgress, classSalesProjection, classTeachingStatus } from './class-lifecycle.js';
 
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
 const params = new URLSearchParams(location.search);
 // CR-2026-054：固定班级演示记录已下线；视频课程与用户后来新建的班级不受影响。
 const LEGACY_CLASS_DEMO_IDS = new Set(['class-001', 'class-002', 'class-003', 'class-004']);
-const isLegacyClassRecord = (record) => LEGACY_CLASS_DEMO_IDS.has(record?.classId) || LEGACY_CLASS_DEMO_IDS.has(record?.courseId);
+const isLegacyClassRecord = (record) => record?.demoScenario !== true && (LEGACY_CLASS_DEMO_IDS.has(record?.classId) || LEGACY_CLASS_DEMO_IDS.has(record?.courseId));
 
 // CR-2026-026 §3.3：订单金额一律两位小数，禁止硬编码 .00 拼接。
 const money2 = (value) => '¥' + Number(value || 0).toFixed(2).replace(/B(?=(d{3})+(?!d))/g, ',');
@@ -411,9 +411,12 @@ function renderHome() {
   const categoryItems = [['音乐', '乐', '音乐'], ['美术', '绘', '美术'], ['舞蹈', '舞', '舞蹈'], ['戏剧', '剧', '戏剧'], ['更多', '＋', '']];
   const recommendedClasses = (state.classOptions || []).filter(item => item.recommended === true && item.visible);
   const recommendedVideos = state.courses.filter(item => item.type === 'video' && item.sellable !== false && item.recommended === true);
-  const classSpotlight = recommendedClasses.length ? `<div class="mp-list">${recommendedClasses.map(courseCard).join('')}</div>` : '<div class="mp-empty">暂无推荐面授班级</div>';
-  const videoSpotlight = recommendedVideos.length ? `<div class="mp-list">${recommendedVideos.map(courseCard).join('')}</div>` : '<div class="mp-empty">暂无推荐视频课程</div>';
-  layout(stack(`<form id="home-search-form" class="mp-home-search" role="search"><input id="home-search" aria-label="搜索课程或老师" placeholder="搜索课程或老师"><button class="mp-search-submit" type="submit" aria-label="搜索">⌕</button></form><section id="home-carousel" class="mp-carousel">${homeBanners.map((banner, index) => { const tag = banner.jumpTarget ? 'a' : 'article'; const href = banner.jumpTarget ? ` href="${esc(banner.jumpTarget)}"` : ''; return `<${tag} class="mp-banner ${index === 0 ? 'active' : ''}" data-banner-index="${index}"${href}><div class="mp-banner-copy"><span class="mp-eyebrow">${banner.kicker}</span><h2>${banner.title}</h2><p>${banner.text}</p></div><span class="mp-banner-mark">${banner.mark}</span></${tag}>`; }).join('')}<div class="mp-carousel-dots">${homeBanners.map((_, index) => `<button class="mp-carousel-dot ${index === 0 ? 'active' : ''}" data-banner-dot="${index}" aria-label="第${index + 1}张轮播图"></button>`).join('')}</div></section>${card(`<div class="mp-section-head"><h2>分类入口</h2><span class="mp-muted">探索艺术方向</span></div><div class="mp-category-row">${categoryItems.map(([label, icon, category]) => `<a class="mp-category" href="${category ? `/learner/pages/courses.html?category=${encodeURIComponent(category)}` : '/learner/pages/courses.html'}"><span class="mp-category-icon">${icon}</span><span>${label}</span></a>`).join('')}</div>`)}${card(`<div class="mp-section-head"><h2>面授课程招生</h2><a class="mp-link" href="/learner/pages/fast-registration.html">查看全部</a></div>${classSpotlight}`)}${card(`<div class="mp-section-head"><h2>视频课程推荐</h2><a class="mp-link" href="/learner/pages/courses.html?type=video">课程库</a></div>${videoSpotlight}`)}${card(`<div class="mp-section-head"><h2>名师推荐</h2><a class="mp-link" href="/learner/pages/teachers.html">更多名师</a></div><div class="mp-scroll-row">${state.teachers.map(teacherCard).join('')}</div>`)}`));
+  // D-03／首页口径：面授课程招生与视频课程推荐均为横向滚动卡片，与名师推荐一致；
+  // 只有一张卡片时铺满整行，避免右侧留下大片空白。
+  const spotlightRow = (items) => `<div class="mp-scroll-row${items.length === 1 ? ' is-single' : ''}">${items.map(courseCard).join('')}</div>`;
+  const classSpotlight = recommendedClasses.length ? spotlightRow(recommendedClasses) : '<div class="mp-empty">暂无推荐面授班级</div>';
+  const videoSpotlight = recommendedVideos.length ? spotlightRow(recommendedVideos) : '<div class="mp-empty">暂无推荐视频课程</div>';
+  layout(stack(`<form id="home-search-form" class="mp-home-search" role="search"><input id="home-search" aria-label="搜索课程或老师" placeholder="搜索课程或老师"><button class="mp-search-submit" type="submit" aria-label="搜索">⌕</button></form><section id="home-carousel" class="mp-carousel">${homeBanners.map((banner, index) => { const tag = banner.jumpTarget ? 'a' : 'article'; const href = banner.jumpTarget ? ` href="${esc(banner.jumpTarget)}"` : ''; return `<${tag} class="mp-banner ${index === 0 ? 'active' : ''}" data-banner-index="${index}"${href} aria-label="${esc(banner.name || '轮播图')}"><span class="mp-banner-image">${esc(banner.imageFile || '轮播图片')}</span></${tag}>`; }).join('')}<div class="mp-carousel-dots">${homeBanners.map((_, index) => `<button class="mp-carousel-dot ${index === 0 ? 'active' : ''}" data-banner-dot="${index}" aria-label="第${index + 1}张轮播图"></button>`).join('')}</div></section>${card(`<div class="mp-section-head"><h2>分类入口</h2><span class="mp-muted">探索艺术方向</span></div><div class="mp-category-row">${categoryItems.map(([label, icon, category]) => `<a class="mp-category" href="${category ? `/learner/pages/courses.html?category=${encodeURIComponent(category)}` : '/learner/pages/courses.html'}"><span class="mp-category-icon">${icon}</span><span>${label}</span></a>`).join('')}</div>`)}${card(`<div class="mp-section-head"><h2>面授课程招生</h2><a class="mp-link" href="/learner/pages/fast-registration.html">查看全部</a></div>${classSpotlight}`)}${card(`<div class="mp-section-head"><h2>视频课程推荐</h2><a class="mp-link" href="/learner/pages/courses.html?type=video">课程库</a></div>${videoSpotlight}`)}${card(`<div class="mp-section-head"><h2>名师推荐</h2><a class="mp-link" href="/learner/pages/teachers.html">更多名师</a></div><div class="mp-scroll-row">${state.teachers.map(teacherCard).join('')}</div>`)}`));
   const searchForm = document.querySelector('#home-search-form');
   searchForm.addEventListener('submit', event => { event.preventDefault(); const keyword = document.querySelector('#home-search').value.trim(); go(`/learner/pages/courses.html${keyword ? `?q=${encodeURIComponent(keyword)}` : ''}`); });
   const setBanner = index => { document.querySelectorAll('[data-banner-index]').forEach(item => item.classList.toggle('active', Number(item.dataset.bannerIndex) === index)); document.querySelectorAll('[data-banner-dot]').forEach(item => item.classList.toggle('active', Number(item.dataset.bannerDot) === index)); };
@@ -638,6 +641,9 @@ function hasPurchasedVideo(item) {
 }
 function videoLessonLink(item, index, preview = false) { return `/learner/pages/video.html?courseId=${encodeURIComponent(item.id)}&chapter=${index}${preview ? '&preview=1' : ''}`; }
 function courseTeacherSection(item) {
+  // 面授分支不展示教师板块：面授课程档案上的人是申报教师，真正上课的教师属于班级，
+  // 课程级不借用任一班级的授课教师。视频课程才展示课程档案对应的教师卡片。
+  if (item?.type !== 'video') return '';
   const teacher = (state.allTeachers || state.teachers).find(row => row.name === item.teacher);
   return teacher ? `<section class="mp-course-detail-teacher-section"><div class="mp-section-head"><h3>授课教师</h3><a class="mp-link" href="${teacherLink(teacher)}">查看详情</a></div>${teacherCard(teacher, 'list')}</section>` : '';
 }
@@ -940,12 +946,35 @@ function classAttendanceHomeworkView(item) {
   const work = homeworkState();
   return `<section class="mp-class-detail-block"><div class="mp-section-head"><h3>我的考勤</h3><span class="mp-muted">按课次记录</span></div><div class="mp-class-attendance-list"><div class="mp-class-attendance-row"><div><strong>第1课 · 基础训练</strong><small>2026-09-05 09:00</small></div>${pill('已签到', 'green')}</div><div class="mp-class-attendance-row"><div><strong>第2课 · 身韵练习</strong><small>2026-09-12 09:00</small></div>${pill('迟到', 'amber')}</div><div class="mp-class-attendance-row"><div><strong>第3课 · 组合训练</strong><small>2026-09-19 09:00</small></div>${pill('待签到', 'gray')}</div></div></section><section class="mp-class-detail-block"><div class="mp-section-head"><h3>我的作业</h3>${pill(work.status === '已提交' ? '已提交' : work.status === '草稿' ? '草稿' : '待提交', work.status === '已提交' ? 'green' : 'amber')}</div><article class="mp-class-homework-item"><div><strong>节奏练习视频</strong><p>截止时间：2026-09-27 23:59</p><small>${work.status === '已提交' ? `已提交${work.fileName ? ` · ${esc(work.fileName)}` : ''}；教师评语：${esc(work.feedback || '教师尚未完成批改。')}` : '提交文字说明，并可附加图片、视频或音频文件。'}</small></div><a class="mp-button secondary" href="/learner/pages/homework.html?courseId=${item.id}">${work.status === '已提交' ? '查看作业' : '提交作业'}</a></article></section>`;
 }
+// CR-2026-102：班级课表从班级主体（种子 + demo state）读取正式课次，与后台课表同一份数据；
+// 家长／学员可查看每次课的日期、时间、教室与状态，并通过「分享给家长」生成分享链接。
+function classTimetableSessions(classId) {
+  const shared = readDemoState();
+  const seed = classSeed.find((entry) => entry.id === classId) || {};
+  const stored = (shared.classes || []).find((entry) => entry.id === classId) || {};
+  return (stored.sessions || seed.sessions || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+function classTimetableView(item) {
+  const sessions = classTimetableSessions(item.id);
+  const statusTone = (value) => (value === '已完成' || value === '已上课' ? 'gray' : value === '已停课' || value === '已取消' ? 'amber' : 'green');
+  const list = sessions.length
+    ? `<ol class="mp-class-timetable">${sessions.map((session, index) => `<li><div><strong>第 ${index + 1} 次 · ${esc(session.date)} ${esc(session.weekday || '')}</strong><small>${esc(session.startTime || session.start || '—')}–${esc(session.endTime || session.end || '—')} · ${esc(item.classroom || '教室待定')}</small></div>${pill(session.status || '待上课', statusTone(session.status))}</li>`).join('')}</ol>`
+    : '<p class="mp-muted">课表尚未发布，发布后会在这里显示每次课的日期、时间与教室。</p>';
+  return `<section class="mp-class-detail-block"><div class="mp-section-head"><h3>班级课表</h3><span class="mp-muted">共 ${sessions.length} 次课</span></div>${list}<div class="mp-class-timetable-actions"><button type="button" class="mp-button" data-class-share>分享给家长</button><small class="mp-muted">分享链接只展示本班课表，不含学员个人信息。</small></div></section>`;
+}
+function shareClassTimetable(item) {
+  const link = `${location.origin}/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.id)}&tab=timetable`;
+  if (navigator.share) { navigator.share({ title: `${item.className || item.name} · 班级课表`, text: '班级课表：上课日期、时间与教室', url: link }).catch(() => {}); return; }
+  if (navigator.clipboard?.writeText) { navigator.clipboard.writeText(link).then(() => toast('班级课表链接已复制，可发送给家长')).catch(() => toast('已生成班级课表分享链接')); return; }
+  toast('已生成班级课表分享链接，可发送给家长');
+}
 function renderClassDetail(item = course('class-001'), tab = params.get('tab') || 'overview') {
   const record = classLearningRecord(item);
-  const activeTab = ['overview', 'attendance', 'result'].includes(tab) ? tab : 'overview';
-  const content = activeTab === 'attendance' ? classAttendanceHomeworkView(item) : activeTab === 'result' ? resultView(item, record) : classInfoView(item, record);
-  layout(stack(`<section class="mp-class-detail-tabs" role="tablist"><button class="mp-tab ${activeTab === 'overview' ? 'active' : ''}" type="button" role="tab" aria-selected="${activeTab === 'overview'}" data-class-tab="overview">课程信息</button><button class="mp-tab ${activeTab === 'attendance' ? 'active' : ''}" type="button" role="tab" aria-selected="${activeTab === 'attendance'}" data-class-tab="attendance">考勤作业</button><button class="mp-tab ${activeTab === 'result' ? 'active' : ''}" type="button" role="tab" aria-selected="${activeTab === 'result'}" data-class-tab="result">我的成果</button></section>`, content));
+  const activeTab = ['overview', 'timetable', 'attendance', 'result'].includes(tab) ? tab : 'overview';
+  const content = activeTab === 'timetable' ? classTimetableView(item) : activeTab === 'attendance' ? classAttendanceHomeworkView(item) : activeTab === 'result' ? resultView(item, record) : classInfoView(item, record);
+  layout(stack(`<section class="mp-class-detail-tabs" role="tablist"><button class="mp-tab ${activeTab === 'overview' ? 'active' : ''}" type="button" role="tab" aria-selected="${activeTab === 'overview'}" data-class-tab="overview">课程信息</button><button class="mp-tab ${activeTab === 'timetable' ? 'active' : ''}" type="button" role="tab" aria-selected="${activeTab === 'timetable'}" data-class-tab="timetable">班级课表</button><button class="mp-tab ${activeTab === 'attendance' ? 'active' : ''}" type="button" role="tab" aria-selected="${activeTab === 'attendance'}" data-class-tab="attendance">考勤作业</button><button class="mp-tab ${activeTab === 'result' ? 'active' : ''}" type="button" role="tab" aria-selected="${activeTab === 'result'}" data-class-tab="result">我的成果</button></section>`, content));
   document.querySelectorAll('[data-class-tab]').forEach(tabButton => tabButton.addEventListener('click', () => go(`/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.id)}&tab=${tabButton.dataset.classTab}`)));
+  document.querySelector('[data-class-share]')?.addEventListener('click', () => shareClassTimetable(item));
 }
 function homeworkView(item) { return `<h3>我的作业</h3><div class="mp-list" style="margin-top:10px"><div class="mp-item"><div><strong>课堂组合练习记录</strong><small>截止时间：2026-09-20 · 教师评语：动作衔接自然，继续保持。</small></div>${pill('已批改', 'green')}</div><div class="mp-item"><div><strong>节奏练习视频</strong><small>截止时间：2026-09-27 · 仅支持文字说明和附件。</small></div>${button('提交作业', `data-action="homework" data-course-id="${item.id}"`, 'secondary')}</div></div>`; }
 function resultView(item = course('class-001'), record) { const completion = state.completionStatus || (record?.status === 'ended' ? '已结业' : '审核中'); const completionTone = completion === '已结业' ? 'green' : completion === '补课中' ? 'amber' : 'gray'; const report = reportState(); const certificate = state.certificateStatus || (completion === '已结业' ? '已生成' : '生成中'); return `<section class="mp-class-detail-block"><h3>结业状态</h3><div class="mp-class-result-status"><div><strong>${esc(completion)}</strong><p>班级“${esc(classLearningLabel(record) || '—')}”不代表当前学员已结业，以下状态仅针对当前学员。</p></div>${pill(completion, completionTone)}</div></section>${completion === '已结业' ? `<section class="mp-class-detail-block"><h3>结业评语</h3><p>综合评语：课堂参与积极，基本功和组合衔接持续进步。</p><p>成长建议：保持每周练习，关注动作细节和节奏稳定性。</p></section>` : ''}<section class="mp-class-detail-block"><div class="mp-section-head"><h3>学习报告</h3>${pill(report, report === '已发布' ? 'green' : report === '已撤回' ? 'gray' : 'amber')}</div><p>${report === '已发布' ? '学习报告已发布，包含课堂参与、作品练习和阶段展示成果。' : report === '已撤回' ? '报告暂不可查看，教务正在更新。' : '学习报告正在生成中，完成后会通过消息通知。'}</p>${report === '已发布' ? `<a class="mp-button secondary" href="/learner/pages/results.html?courseId=${item.id}">查看报告详情</a>` : ''}</section><section class="mp-class-detail-block"><div class="mp-section-head"><h3>结业证书</h3>${pill(certificate, certificate === '已生成' ? 'green' : certificate === '生成异常' ? 'gray' : 'amber')}</div><p>${certificate === '已生成' ? '证书已生成，可在线查看。' : certificate === '生成异常' ? '证书生成异常，请联系教务。' : '证书将在结业通过后异步生成。'}</p></section>`; }
@@ -1145,8 +1174,9 @@ function orderCredentials(order) {
     refundReason: order.refundReason || order.paymentReason || '用户申请退款'
   };
 }
-// 支付时限提示：SM-ORDER 未定义支付时限时长，因此只给时限文案不启用倒计时（CR-2026-026 §6 待确认项 2）。
-const ORDER_PAY_WINDOW_HINT = '请在 30 分钟内完成支付，超时订单将自动关闭；继续支付会复用当前订单号。';
+// 支付时限提示：时限由「参数配置 → 待支付订单支付时限」维护（CR-2026-104），超时由服务端关闭为已取消（超时）。
+// 本原型按静态时限文案呈现，不跳秒、不自动关闭，也不在本地改写订单状态；真实实现按服务端 pay_deadline_at 计算剩余时限。
+const ORDER_PAY_WINDOW_HINT = `请在 ${paymentTimeoutSettings().paymentTimeoutMinutes} 分钟内完成支付，超时订单将自动关闭；继续支付会复用当前订单号。`;
 const ORDER_SECTIONS = [
   { key: 'pending', title: '待处理', statuses: ['待支付', '退款中'], note: '需要你处理的动作' },
   { key: 'history', title: '历史订单', statuses: ['已支付', '已退款', '已取消'], note: '已完成的交易记录' }
@@ -1294,9 +1324,10 @@ function renderSeatFailureOrder(order, item, student) {
 function learningRecords() {
   const videoProgress = state.chapterDone.includes('chapter-003') ? 100 : course('COURSE-CR-2026-0002').progress;
   const records = [
-    { id: 'learning-class-001', courseId: 'class-001', studentIds: ['student-001'], type: 'class', status: 'ongoing', progress: 50, completedLessons: 8, className: '2026秋季中国舞启蒙一班', teacher: '王玥', classroom: '龙泉校区 · 综合楼302', nextLesson: '09-16 09:00', lessonNo: 9, lessonStatus: '待上课', lessonNote: '09-16 09:00-10:30' },
-    { id: 'learning-class-002-ongoing', courseId: 'class-001', studentIds: ['student-001'], type: 'class', status: 'ongoing', progress: 38, completedLessons: 6, name: '少儿中国舞提高班', className: '2026秋季中国舞提高二班', teacher: '王玥', classroom: '南湖校区 · 艺术楼201', nextLesson: '正在上课', lessonNo: 7, lessonStatus: '上课中', lessonNote: '今日 10:00-11:30' },
-    { id: 'learning-class-003-ongoing', courseId: 'class-001', studentIds: ['student-001'], type: 'class', status: 'ongoing', progress: 38, completedLessons: 6, name: '少儿中国舞基础班', className: '2026秋季中国舞基础三班', teacher: '王玥', classroom: '南湖校区 · 艺术楼201', nextLesson: '09-20 10:00', lessonNo: 6, lessonStatus: '已完成', lessonNote: '09-13 10:00-11:30' },
+    { id: 'learning-class-001', demoScenario: true, courseId: 'class-001', studentIds: ['student-001', 'student-002'], type: 'class', status: 'ongoing', progress: 50, completedLessons: 8, className: '2026秋季中国舞启蒙一班', teacher: '王玥', classroom: '龙泉校区 · 综合楼302', nextLesson: '09-16 09:00', lessonNo: 9, lessonStatus: '待上课', lessonNote: '09-16 09:00-10:30' },
+    { id: 'learning-class-002-ongoing', demoScenario: true, courseId: 'class-001', studentIds: ['student-001', 'student-002'], type: 'class', status: 'ongoing', progress: 38, completedLessons: 6, name: '少儿中国舞提高班', className: '2026秋季中国舞提高二班', teacher: '王玥', classroom: '南湖校区 · 艺术楼201', nextLesson: '正在上课', lessonNo: 7, lessonStatus: '上课中', lessonNote: '今日 10:00-11:30' },
+    { id: 'learning-class-003-ongoing', demoScenario: true, courseId: 'class-001', studentIds: ['student-001', 'student-002'], type: 'class', status: 'ongoing', progress: 38, completedLessons: 6, name: '少儿中国舞基础班', className: '2026秋季中国舞基础三班', teacher: '王玥', classroom: '南湖校区 · 艺术楼201', nextLesson: '09-20 10:00', lessonNo: 6, lessonStatus: '已完成', lessonNote: '09-13 10:00-11:30', homeworkStatus: '待提交' },
+    { id: 'learning-class-006-ongoing', demoScenario: true, courseId: 'class-004', studentIds: ['student-001', 'student-002'], type: 'class', status: 'ongoing', progress: 63, completedLessons: 7, name: '国画入门工作坊', className: '2026秋季国画入门工作坊', teacher: '李青', classroom: '南湖校区 · 艺术楼103', nextLesson: '09-22 14:00', lessonNo: 7, lessonStatus: '已完成', lessonNote: '09-15 14:00-15:30', homeworkStatus: '待教师点评' },
     { id: 'learning-class-004-ongoing', courseId: 'class-003', studentIds: ['student-002'], type: 'class', status: 'ongoing', progress: 19, completedLessons: 3, name: '少儿中国舞提高班', className: '2026秋季中国舞提高二班', teacher: '王玥', classroom: '南湖校区 · 艺术楼201', nextLesson: '09-20 10:00', lessonNo: 4, lessonStatus: '待上课', lessonNote: '09-20 10:00-11:30' },
     { id: 'learning-class-005-ongoing', courseId: 'class-003', studentIds: ['student-002'], type: 'class', status: 'ongoing', progress: 25, completedLessons: 4, name: '少儿中国舞提高班', className: '2026秋季中国舞提高排练班', teacher: '王玥', classroom: '南湖校区 · 艺术楼201', nextLesson: '09-21 10:00', lessonNo: 5, lessonStatus: '待上课', lessonNote: '09-21 10:00-11:30' },
     { id: 'learning-video-001', courseId: 'COURSE-CR-2026-0002', studentIds: ['student-001', 'student-002'], type: 'video', status: 'ongoing', progress: videoProgress, lastPosition: '第3章 · 作品演唱 18:36' },
@@ -1306,7 +1337,35 @@ function learningRecords() {
   const shared = readDemoState();
   const videoHasAccess = state.orders.some(order => !order.classId && order.courseId === 'COURSE-CR-2026-0002' && order.status === '已支付') || (shared.videoEntitlements || []).some(item => item.accountId === state.accountId && item.courseId === 'COURSE-CR-2026-0002' && item.status === '生效');
   const sharedVideo = (shared.videoEntitlements || []).filter(item => item.accountId === state.accountId && item.status === '生效').map(entitlement => { const progress = shared.progress?.[`${state.accountId}-${entitlement.courseId}`] || {}; return { ...(entitlement.snapshot?.course || {}), courseId: entitlement.courseId, courseVersion: entitlement.courseVersion, studentIds: state.students.map(student => student.id), type: 'video', status: 'ongoing', progress: Number(progress.percent || 0), lastPosition: progress.lastPosition || '尚未开始学习' }; });
-  const sharedClasses = (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.status === '已分班').map(enrollment => { const source = state.courses.find(courseItem => courseItem.id === enrollment.classId) || {}; return { ...source, courseId: enrollment.classId, studentIds: [state.currentStudentId], type: 'class', status: 'upcoming', progress: 0, className: source.className || source.name, teacher: source.teacher, classroom: `${source.campus || ''} · ${source.classroom || ''}`, nextLesson: source.schedule || '待排课' }; });
+  const sharedClassRecords = classSeed.map(seed => ({ ...seed, ...(shared.classes || []).find(row => row.id === seed.id) })).concat((shared.classes || []).filter(row => !classSeed.some(seed => seed.id === row.id)));
+  const sharedClassById = new Map(sharedClassRecords.map(record => [record.id, record]));
+  const sharedClasses = (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.status === '已分班').map(enrollment => {
+    const record = sharedClassById.get(enrollment.classId) || {};
+    const teachingStatus = classTeachingStatus(record);
+    const progress = classLessonProgress(record);
+    const learningStatus = teachingStatus === '已结课' ? 'ended' : teachingStatus === '授课中' ? 'ongoing' : 'upcoming';
+    const totalLessons = progress.total || Number(record.lessons || 0);
+    const completedLessons = progress.completed;
+    const nextSession = (record.sessions || []).find(session => session.status !== '已完成' && session.status !== '已上课');
+    const classItem = classToLearnerItem(record);
+    return {
+      ...classItem,
+      courseId: enrollment.classId,
+      studentIds: [state.currentStudentId],
+      type: 'class',
+      objectType: 'class',
+      status: learningStatus,
+      progress: totalLessons ? Math.round((completedLessons / totalLessons) * 100) : 0,
+      completedLessons,
+      lessons: totalLessons,
+      className: record.name || classItem.className,
+      classroom: `${record.campus || ''} · ${record.classroom || ''}`.replace(/^ · | · $/g, ''),
+      nextLesson: nextSession ? `${nextSession.date} ${nextSession.startTime || nextSession.start || ''}`.trim() : (learningStatus === 'ended' ? '课程已结束' : '待定'),
+      lessonNo: Math.min(completedLessons + 1, totalLessons || 1),
+      lessonStatus: learningStatus === 'ended' ? '已完成' : learningStatus === 'ongoing' ? '待上课' : '',
+      lessonNote: nextSession ? `${nextSession.date} ${nextSession.startTime || nextSession.start || ''}-${nextSession.endTime || nextSession.end || ''}` : ''
+    };
+  });
   return [...records.filter(item => !isLegacyClassRecord(item)), ...sharedVideo, ...sharedClasses].filter(item => item.studentIds.includes(state.currentStudentId)).map(item => {
     const source = item.courseId ? course(item.courseId) : {};
     const activeOrderSnapshot = item.type === 'video' ? state.orders.find(order => !order.classId && order.courseId === item.courseId && order.status === '已支付')?.snapshot?.course : null;
@@ -1340,13 +1399,22 @@ function learningCourseCard(item) {
   const totalLessons = item.lessons || item.totalLessons || 0;
   const completedLessons = item.completedLessons ?? Math.round((item.progress || 0) * totalLessons / 100);
   const courseStatus = item.status === 'ongoing' ? '' : pill(statusLabels[item.status], statusTones[item.status]);
+  const homeworkTone = item.homeworkStatus === '待教师点评' ? 'green' : 'amber';
+  const homeworkInfo = item.homeworkStatus ? ` ${pill(`作业：${item.homeworkStatus}`, homeworkTone)}` : '';
   const classInfo = item.lessonStatus
-    ? `<div class="mp-learning-lesson-row"><span>第${esc(item.lessonNo)}/${esc(totalLessons)}课</span>${pill(item.lessonStatus, lessonTone)}</div><p class="mp-learning-schedule">${esc(item.lessonNote || item.nextLesson)} · ${esc(item.classroom)}</p>`
+    ? `<div class="mp-learning-lesson-row"><span>第${esc(item.lessonNo)}/${esc(totalLessons)}课</span>${pill(item.lessonStatus, lessonTone)}${homeworkInfo}</div><p class="mp-learning-schedule">${esc(item.lessonNote || item.nextLesson)} · ${esc(item.classroom)}</p>`
     : `<p class="mp-learning-schedule">${item.status === 'upcoming' ? `首次上课：${esc(item.nextLesson)}` : item.status === 'ended' ? '课程已结束' : esc(item.nextLesson)} · ${esc(item.classroom)}</p>`;
   const videoInfo = `<p class="mp-learning-resume">上次学习：${esc(item.lastPosition)}</p>`;
   const progressLabel = isClass ? `已完成 ${completedLessons}/${totalLessons} 课次` : '学习进度';
   const actionLabel = item.accessRevoked ? '查看订单' : item.status === 'ended' ? '查看成果' : isClass ? '进入班级' : '继续学习';
   return `<article class="mp-learning-course-card ${isClass ? 'is-class' : 'is-video'}"><div class="mp-learning-course-main"><div class="mp-learning-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}"><span>${typeLabel}</span></div><div class="mp-learning-course-copy"><div class="mp-learning-title-row"><h3>${esc(item.name)}</h3>${courseStatus}</div>${isClass ? `<p class="mp-learning-class-name">${esc(item.className)}</p>${classInfo}` : videoInfo}</div></div><div class="mp-learning-progress"><div><span>${progressLabel}</span><strong>${item.progress}%</strong></div><div class="mp-progress"><span style="width:${item.progress}%"></span></div></div><footer class="mp-learning-course-footer">${item.status === 'ended' ? `<span class="mp-learning-completion">当前学员：${esc(item.completionStatus)}</span>` : '<span></span>'}<a class="mp-button secondary" href="${item.href}">${actionLabel}</a></footer></article>`;
+}
+function learningCoursePriority(item) {
+  if (item.type === 'class' && item.lessonStatus === '上课中') return 0;
+  if (item.type === 'class' && item.status === 'ongoing') return 1;
+  if (item.type === 'video' && item.status === 'ongoing') return 2;
+  if (item.status === 'upcoming') return 3;
+  return 4;
 }
 function renderLearning() {
   if (!isLoggedIn()) {
@@ -1360,17 +1428,23 @@ function renderLearning() {
     const records = learningRecords();
     const tasks = learningTasks();
     const filtered = records.filter(item => item.status === activeStatus);
-    const groupedCourses = [
-      { type: 'class', label: '面授课程', records: filtered.filter(item => item.type === 'class') },
-      { type: 'video', label: '视频课程', records: filtered.filter(item => item.type === 'video') }
-    ];
-    const courseGroups = groupedCourses.map(group => `<section class="mp-learning-type-group"><div class="mp-learning-type-head"><h3>${group.label}</h3><span>${group.records.length}门</span></div>${group.records.length ? `<div class="mp-learning-course-list">${group.records.map(learningCourseCard).join('')}</div>` : `<div class="mp-learning-type-empty">暂无${group.label}</div>`}</section>`).join('');
+    const sortedCourses = [...filtered].sort((a, b) => {
+      const priority = learningCoursePriority(a) - learningCoursePriority(b);
+      if (priority !== 0) return priority;
+      return String(a.nextLesson || a.lastPosition || '').localeCompare(String(b.nextLesson || b.lastPosition || ''));
+    });
+    const courseList = sortedCourses.length
+      ? `<div class="mp-learning-course-list">${sortedCourses.map(learningCourseCard).join('')}</div>`
+      : '<div class="mp-learning-type-empty">暂无课程</div>';
     const activeCount = records.filter(item => item.status !== 'ended').length;
     const certificates = records.filter(item => item.status === 'ended' && item.completionStatus === '已结业').length;
+    const visibleTasks = tasks.slice(0, 2);
+    const taskSummary = tasks.length
+      ? `<div class="mp-learning-inline-tasks"><div class="mp-learning-inline-task-head"><strong>待办</strong><span>${tasks.length}项</span></div><div class="mp-learning-task-list">${visibleTasks.map(task => `<a class="mp-learning-task" href="${task.href}"><div><strong>${esc(task.title)}</strong><small>${esc(task.detail)}</small></div>${pill(task.label, task.tone)}</a>`).join('')}</div>${tasks.length > 2 ? `<span class="mp-learning-task-more">还有 ${tasks.length - 2} 项待处理</span>` : ''}</div>`
+      : '';
     layout(stack(
-      card(`<div class="mp-learning-student"><div><span class="mp-muted">当前学员</span><strong>${esc(currentStudent().name)}</strong></div><div class="mp-field"><label class="mp-sr-only" for="learning-student-select">切换当前学员</label><select id="learning-student-select">${state.students.map(student => `<option value="${student.id}" ${student.id === state.currentStudentId ? 'selected' : ''}>${esc(student.name)}</option>`).join('')}</select></div></div><div class="mp-section-head mp-learning-summary-head"><h2>学习进度总览</h2></div><div class="mp-metric-grid mp-learning-metrics"><div class="mp-metric"><strong>${activeCount}</strong><span>在读课程</span></div><div class="mp-metric"><strong>${attendanceRates[state.currentStudentId] || 0}%</strong><span>总出勤率</span></div><div class="mp-metric"><strong>${tasks.length}</strong><span>待办事项</span></div><div class="mp-metric"><strong>${certificates}</strong><span>已获证书</span></div></div>`),
-      card(`<div class="mp-section-head"><h2>待办任务</h2><span class="mp-muted">${tasks.length}项</span></div>${tasks.length ? `<div class="mp-learning-task-list">${tasks.map(task => `<a class="mp-learning-task" href="${task.href}"><div><strong>${esc(task.title)}</strong><small>${esc(task.detail)}</small></div>${pill(task.label, task.tone)}</a>`).join('')}</div>` : '<div class="mp-empty mp-learning-empty">暂无待办任务</div>'}`),
-      `<section class="mp-learning-section"><div class="mp-section-head"><h2>我的课程</h2><span class="mp-muted">${records.length}门</span></div><div class="mp-tabs mp-learning-tabs" role="tablist">${Object.entries(statusLabels).map(([status, label]) => `<button class="mp-tab ${status === activeStatus ? 'active' : ''}" type="button" role="tab" aria-selected="${status === activeStatus}" data-learning-status="${status}">${label}<span>${records.filter(item => item.status === status).length}</span></button>`).join('')}</div><div class="mp-learning-type-groups">${courseGroups}</div></section>`
+      card(`<div class="mp-learning-student"><div><span class="mp-muted">当前学员</span><strong>${esc(currentStudent().name)}</strong></div><div class="mp-field"><label class="mp-sr-only" for="learning-student-select">切换当前学员</label><select id="learning-student-select">${state.students.map(student => `<option value="${student.id}" ${student.id === state.currentStudentId ? 'selected' : ''}>${esc(student.name)}</option>`).join('')}</select></div></div><div class="mp-section-head mp-learning-summary-head"><h2>学习概况</h2></div><div class="mp-metric-grid mp-learning-metrics"><div class="mp-metric"><strong>${activeCount}</strong><span>在读课程</span></div><div class="mp-metric"><strong>${attendanceRates[state.currentStudentId] || 0}%</strong><span>总出勤率</span></div><div class="mp-metric"><strong>${tasks.length}</strong><span>待办</span></div><div class="mp-metric"><strong>${certificates}</strong><span>已获证书</span></div></div>${taskSummary}`, 'mp-learning-summary-card'),
+      `<section class="mp-learning-section"><div class="mp-section-head"><h2>我的课程</h2><span class="mp-muted">${records.length}门</span></div><div class="mp-tabs mp-learning-tabs" role="tablist">${Object.entries(statusLabels).map(([status, label]) => `<button class="mp-tab ${status === activeStatus ? 'active' : ''}" type="button" role="tab" aria-selected="${status === activeStatus}" data-learning-status="${status}">${label}<span>${records.filter(item => item.status === status).length}</span></button>`).join('')}</div>${courseList}</section>`
     ));
     document.querySelector('#learning-student-select').addEventListener('change', event => { state.currentStudentId = event.target.value; saveState(); activeStatus = 'ongoing'; draw(); });
     document.querySelectorAll('[data-learning-status]').forEach(tab => tab.addEventListener('click', () => { activeStatus = tab.dataset.learningStatus; draw(); }));

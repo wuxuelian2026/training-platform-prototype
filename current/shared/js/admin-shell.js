@@ -50,7 +50,6 @@ const navGroups = [
   {
     icon: '商', label: '商城运营', items: [
       ['商', '视频课程商品', '/admin/pages/mall/products.html', 'mall'],
-      ['单', '统一订单管理', '/admin/pages/mall/orders.html', 'mall'],
       ['轮', '轮播图管理', '/admin/pages/mall/banners.html', 'mall'],
       ['协', '协议管理', '/admin/pages/mall/agreements.html', 'mall']
     ]
@@ -89,10 +88,16 @@ const navGroups = [
     ]
   },
   {
+    // CR-2026-085：订单与退款单归交易中心（管单），收款与工资归财务中心（管钱）。
+    icon: '易', label: '交易中心', items: [
+      ['单', '统一订单管理', '/admin/pages/mall/orders.html', 'trade'],
+      ['退', '退款记录', '/admin/pages/finance/refunds.html', 'trade']
+    ]
+  },
+  {
     icon: '财', label: '财务中心', items: [
       ['薪', '教师工资管理', '/admin/pages/finance/salary.html', 'finance'],
-      ['收', '收款记录', '/admin/pages/finance/payments.html', 'finance'],
-      ['退', '退款记录', '/admin/pages/finance/refunds.html', 'finance']
+      ['收', '收款记录', '/admin/pages/finance/payments.html', 'finance']
     ]
   },
   {
@@ -100,6 +105,7 @@ const navGroups = [
       ['用', '后台用户管理', '/admin/pages/system/users.html', 'system'],
       ['学', '学员用户管理', '/admin/pages/system/student-users.html', 'system'],
       ['权', '角色权限管理', '/admin/pages/system/roles.html', 'system'],
+      ['典', '数据字典', '/admin/pages/system/dictionaries.html', 'system'],
       ['参', '参数配置', '/admin/pages/system/settings.html', 'system']
     ]
   }
@@ -198,7 +204,9 @@ const createPageHelp = () => {
     const statusHeading = type === 'detail' ? '状态' : '状态与流转';
     const rows = template
       .filter((heading) => heading !== statusHeading || statusItems.length)
-      .map((heading) => [heading, heading === statusHeading ? statusItems : (authored?.[heading]?.length ? authored[heading] : (fallback[heading] || []))]);
+      .map((heading) => [heading, heading === statusHeading ? statusItems : (authored?.[heading]?.length ? authored[heading] : (fallback[heading] || []))])
+      // 固定小节只在确实有内容时输出，避免出现「当前页面暂无补充说明」的空节。
+      .filter(([, items]) => items.length);
     // 看板页 / 配置页 / 表单页模板没有状态小节：本页命中状态机时在末尾补出状态段，未命中则不出现。
     if (statusItems.length && !template.includes(statusHeading)) rows.push([statusHeading, statusItems]);
     return rows;
@@ -235,7 +243,9 @@ const ensurePageHelp = () => {
   createPageHelp();
   // 页面说明与输入约束同源：规格里声明的长度/格式在这里落到实际控件上。
   // 与小程序两端一致使用带 DOM 监听的挂载入口，保证运行时弹出的表单（新增/编辑/导入）同样受约束。
-  mountFieldConstraints(currentPath.replace(/^\/admin\/pages\//, '').replace(/\.html$/, ''), root);
+  // 弹层统一挂到 document.body，观察范围必须覆盖 body；只盯壳层会让运行时弹窗
+  // （课程中心的新增／编辑／上传表单）拿不到规格里的长度约束。
+  mountFieldConstraints(currentPath.replace(/^\/admin\/pages\//, '').replace(/\.html$/, ''));
   const trigger = root.querySelector('[data-page-help-trigger]');
   if (!trigger) {
     const button = document.createElement('button');

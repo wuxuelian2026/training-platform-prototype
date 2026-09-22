@@ -18,12 +18,19 @@ const normalizeLabel = (value) => String(value || '')
   .replace(/\s*\*\s*$/, '')
   .replace(/[：:]\s*$/, '')
   .replace(/[（(][^（()）]*[)）]\s*$/, '')
+  // 徽标不是字段名的一部分：兜底剥掉结尾的「必填／选填」。
+  .replace(/(必填|选填)$/, '')
   .replace(/\s+/g, '')
   .trim();
 
 const labelTextOf = (wrapper) => {
   const label = wrapper.querySelector('span, label');
-  return label ? label.textContent : '';
+  if (!label) return '';
+  // 「必填」「*」是标签里的展示徽标，不属于字段名；带进比对会让规格永远匹配不上，
+  // 课程中心表单因此拿不到任何长度约束。复制后剔除徽标再取文本。
+  const clone = label.cloneNode(true);
+  clone.querySelectorAll('.sub-cell, .required-mark, small').forEach((badge) => badge.remove());
+  return clone.textContent;
 };
 
 export const applyFieldConstraints = (root, pageKey) => {

@@ -31,11 +31,12 @@ export const TEACHER_FACTS = [
     ],
     contracts: [
       { number: 'CT2026090021', status: '待教师签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['舞蹈基本功'], majors: ['中国舞'] },
-      { number: 'CT2026010008', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['舞蹈基本功'], majors: ['中国舞'] }
+      { number: 'CT2026010008', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['舞蹈基本功'], majors: ['中国舞'] },
+      { number: 'CT2026090031', status: '已签署', startAt: '2026-09-01', endAt: '2027-08-31', courses: ['中国舞进阶训练'], majors: ['中国舞'] }
     ]
   },
   {
-    id: 'teacher-chen', name: '陈晨', profileStatus: '已建档', accountStatus: 'inactive',
+    id: 'teacher-chen', name: '陈晨', profileStatus: '已建档', accountStatus: 'active',
     majors: ['声乐演唱', '音乐表演'],
     teachingYears: 5, professionalTitle: '讲师',
     archive: {
@@ -58,7 +59,7 @@ export const TEACHER_FACTS = [
     ]
   },
   {
-    id: 'teacher-liu', name: '刘佳', profileStatus: '待完善', accountStatus: 'inactive',
+    id: 'teacher-liu', name: '刘佳', profileStatus: '待完善', accountStatus: 'active',
     majors: ['绘画', '少儿绘画'],
     teachingYears: 6, professionalTitle: '讲师',
     tagline: '先让孩子喜欢画画，再谈技法。',
@@ -117,11 +118,12 @@ export const TEACHER_FACTS = [
       { id: 'cert-linyue', name: '钢琴教师资格证', type: '教师资格证', status: '已通过', expiresAt: '2029-06-30', majors: ['钢琴'] }
     ],
     contracts: [
-      { number: 'CT2026010022', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['钢琴基础'], majors: ['钢琴'] }
+      { number: 'CT2026010022', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['钢琴基础'], majors: ['钢琴'] },
+      { number: 'CT2026090032', status: '已签署', startAt: '2026-09-01', endAt: '2027-08-31', courses: ['钢琴进阶训练'], majors: ['钢琴'] }
     ]
   },
   {
-    id: 'teacher-sunning', name: '孙宁', profileStatus: '已建档', accountStatus: 'inactive',
+    id: 'teacher-sunning', name: '孙宁', profileStatus: '已建档', accountStatus: 'active',
     majors: ['古筝'],
     teachingYears: 4, professionalTitle: '助教',
     tagline: '从指法与节奏开始，逐步建立乐曲表达。',
@@ -195,7 +197,8 @@ export const TEACHER_FACTS = [
       { id: 'cert-tangwen', name: '美术教师资格证', type: '教师资格证', status: '已撤销', expiresAt: '2030-06-30', majors: ['少儿绘画'] }
     ],
     contracts: [
-      { number: 'CT2026090028', status: '待学校签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['少儿创意绘画'], majors: ['少儿绘画'] }
+      { number: 'CT2026090028', status: '待学校签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['少儿创意绘画'], majors: ['少儿绘画'] },
+      { number: 'CT2026090033', status: '已签署', startAt: '2026-09-01', endAt: '2027-08-31', courses: ['少儿绘画进阶训练'], majors: ['少儿绘画'] }
     ]
   },
   {
@@ -208,11 +211,12 @@ export const TEACHER_FACTS = [
       { id: 'cert-xufan', name: '芭蕾舞教师资格证', type: '艺术等级证', status: '已通过', expiresAt: '2026-10-10', majors: ['芭蕾舞'] }
     ],
     contracts: [
-      { number: 'CT2026010029', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['芭蕾形体基础'], majors: ['芭蕾舞'] }
+      { number: 'CT2026010029', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['芭蕾形体基础'], majors: ['芭蕾舞'] },
+      { number: 'CT2026090034', status: '已签署', startAt: '2026-09-01', endAt: '2027-08-31', courses: ['芭蕾舞进阶训练'], majors: ['芭蕾舞'] }
     ]
   },
   {
-    id: 'teacher-penglu', name: '彭露', profileStatus: '待完善', accountStatus: 'inactive',
+    id: 'teacher-penglu', name: '彭露', profileStatus: '待完善', accountStatus: 'active',
     majors: ['书法'],
     teachingYears: 2, professionalTitle: '助教',
     tagline: '从基本笔画开始建立书写秩序。',

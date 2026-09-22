@@ -2,8 +2,7 @@
 // export. Columns come from enabled venues; matrix rows come from the fixed time axis (see
 // timetable-settings.js), not from a hand-maintained slot scheme.
 
-export const SEMESTERS = ['2026秋季', '2026暑期'];
-
+// 学期字典与起止日期统一由批次种子提供（batch-seed.js），场地档案不再自带一份学期口径。
 export const venueSeed = [
   { id: 'venue-302', name: '综合楼302', campus: '龙泉校区', building: '综合楼', type: '舞蹈房', capacity: 30, tags: '镜面墙 / 音响', status: '启用' },
   { id: 'venue-201', name: '音乐楼201', campus: '南湖校区', building: '音乐楼', type: '琴房', capacity: 20, tags: '钢琴 / 谱架', status: '启用' },

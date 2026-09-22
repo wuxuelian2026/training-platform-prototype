@@ -38,22 +38,6 @@ export const ACADEMIC_FIELD_SPEC = {
         '选择文件时按文件内容导入，未选择文件则使用粘贴内容。'
       ]
     },
-    // 迭代1页面说明规格：本页为只读口径展示，不提供编辑入口。
-    'academic/periods': {
-      groups: [
-        { heading: '时间轴与课时口径（只读）', fields: [
-          { id: 'FD-ACADEMIC-040', label: '时间轴范围', type: '只读', length: '08:00–21:00', required: '系统固定', note: '固定不可修改，超出范围的课次归入“其他时段”兜底行', constraints: { readOnly: true, system: true } },
-          { id: 'FD-ACADEMIC-041', label: '刻度粒度', type: '只读', length: '15 分钟/格', required: '系统固定', note: '开始时间按最近刻度吸附', constraints: { readOnly: true, system: true } },
-          { id: 'FD-ACADEMIC-042', label: '课时时长字典', type: '只读', length: '45 / 60 / 90 / 120 / 150 分钟', required: '系统固定', note: '默认 45 分钟；一个课时对应一个课次', constraints: { readOnly: true, system: true } },
-          { id: 'FD-ACADEMIC-043', label: '时段划分', type: '只读', length: '上午 / 下午 / 晚上', required: '系统固定', note: '用于课表半天段与自动聚合行', constraints: { readOnly: true, system: true } },
-          { id: 'FD-ACADEMIC-044', label: '超出时间轴课次', type: '只读', length: '其他时段', required: '系统计算', note: '只做兜底展示，不参与时段统计', constraints: { readOnly: true, system: true } }
-        ] }
-      ],
-      notes: [
-        '时间轴与课时时长是全平台排课与课表的统一口径，排班、矩阵视图与 A4 导出共用。',
-        '口径固定，页面只展示刻度与说明，不提供配置入口。'
-      ]
-    },
 
     'academic/messages': {
       groups: [
@@ -75,47 +59,6 @@ export const ACADEMIC_FIELD_SPEC = {
       ]
     },
     // CR-2026-043：排课只引用已有 class_id，班级和招生字段只读带入。
-    'academic/scheduling': {
-      layout: 'steps',
-      groups: [
-        { heading: '第 1 步 选择已有班级', fields: [
-          { id: 'FD-ACADEMIC-014', label: '已有班级', type: '下拉', length: '必选 1 个 class_id', required: '是', note: '从面授班级选择，不在排课页新建班级' },
-          { id: 'FD-ACADEMIC-031', label: '课程与版本', type: '文本（只读）', length: '—', required: '系统继承', note: '由班级锁定的 course_id + course_version 带入', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-ACADEMIC-015', label: '班级名称', type: '文本（只读）', length: '≤ 50 字', required: '系统继承', note: '由 class_id 带入，不可在排课页修改', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-ACADEMIC-016', label: '批次与容量', type: '文本（只读）', length: '—', required: '系统继承', note: '由班级招生配置带入', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-ACADEMIC-033', label: '总课时', type: '只读', length: '正整数', required: '系统继承', note: '从班级引用课程版本继承，等于课次数', constraints: { readOnly: true, min: 1, integer: true } }
-        ] },
-        { heading: '第 2 步 教师与场地', fields: [
-          { id: 'FD-ACADEMIC-017', label: '授课教师', type: '下拉', length: '可选教师', required: '是', note: '需满足该专业可排课条件' },
-          { id: 'FD-ACADEMIC-018', label: '授课校区', type: '下拉', length: '预置校区', required: '是', note: '与教室需匹配' },
-          { id: 'FD-ACADEMIC-034', label: '授课教学楼', type: '下拉', length: '预置楼栋', required: '是', note: '关联该校区下的教学楼' },
-          { id: 'FD-ACADEMIC-019', label: '授课教室', type: '下拉', length: '预置教室', required: '是', note: '关联该教学楼下的教室，需满足容量与时间无冲突' },
-          { id: 'FD-ACADEMIC-025', label: '招生容量', type: '只读', length: '正整数', required: '系统继承', note: '来自班级；发布时校验教室容量不得小于该值', constraints: { readOnly: true, derived: true } }
-        ] },
-        { heading: '第 3 步 排课配置', fields: [
-          { id: 'FD-ACADEMIC-020', label: '每周上课日', type: '复选框组', length: '至少 1 天', required: '是', note: '决定课次重复规则；多选后每个上课日生成独立时间组' },
-          { id: 'FD-ACADEMIC-022', label: '上课开始时间', type: '按上课日重复的时间', length: 'HH:mm', required: '每个已选上课日必填', note: '每个上课日独立维护；按 15 分钟刻度吸附，范围 08:00–21:00', constraints: { format: 'HH:mm' } },
-          { id: 'FD-ACADEMIC-023', label: '单次课时长', type: '下拉', length: '45 / 60 / 90 / 120 / 150 分钟', required: '是', note: '所有上课日公用；默认 45 分钟；一个课时对应一个课次' },
-          { id: 'FD-ACADEMIC-024', label: '上课结束时间', type: '按上课日重复的时间（自动计算）', length: 'HH:mm', required: '系统计算', note: '每个上课日均由该日开始时间加公用单次课时长计算，只读', constraints: { format: 'HH:mm', system: true, readOnly: true } },
-          { id: 'FD-ACADEMIC-021', label: '首次上课日期', type: '日期', length: 'YYYY-MM-DD', required: '是', note: '决定首次课次日期', constraints: { format: 'YYYY-MM-DD' } },
-          { id: 'FD-ACADEMIC-036', label: '末次上课日期', type: '只读', length: 'YYYY-MM-DD', required: '系统计算', note: '取未取消、未停课课次中最晚的日期；停课、恢复、调课、补课和增删课次后自动重算，不是发布时锁定的快照；结业后不再变化', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD' } }
-        ] },
-        { heading: '第 4 步 冲突校验', fields: [
-          { id: 'FD-ACADEMIC-037', label: '教师时间冲突', type: '只读', length: '无冲突 / 冲突', required: '系统计算', note: '校验所选教师在全部课次上是否已有排课', constraints: { readOnly: true, system: true } },
-          { id: 'FD-ACADEMIC-038', label: '教室时间冲突', type: '只读', length: '无冲突 / 冲突', required: '系统计算', note: '校验所选教室在全部课次上是否已被占用', constraints: { readOnly: true, system: true } }
-        ] }
-      ],
-      notes: [
-        '面授班级是唯一建班入口；班级排课必须引用已有 class_id，不得生成新的班级主体。',
-        '保存草稿后状态为“排班草稿”，不生成正式课次且学员端不可见；确认并发布后一次生成全部课次。',
-        '排班页实时预览课次与资源冲突；矩阵空位只能带入场地与时段，仍须选择已有待排班班级。',
-        '时间默认吸附到最近的 15 分钟刻度；偏离刻度时强制提示修正后再保存。',
-        '教师、教室或时段存在冲突时必须先修正，修正后才允许发布。',
-        '一次课就是一个课次，课时费按课次数计算。',
-        '末次上课日期取未取消、未停课课次中最晚的日期，随课次变动重算，结业后不再变化。',
-        '同一班级的多个上课日共用同一开始时间、课时时长与教室。'
-      ]
-    },
     'academic/attendance': {
       groups: [
         { heading: '考勤补录字段', fields: [

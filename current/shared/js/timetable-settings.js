@@ -2,14 +2,23 @@
 // tick (52 ticks). Lesson duration is a dictionary value (45/60/90/120/150, default 45) and one
 // 课时 equals exactly one 课次, so a session's end time is start + lesson duration.
 
+import { lessonDurationSettings } from './demo-store.js';
+
 export const TIMELINE_START = '08:00';
 export const TIMELINE_END = '21:00';
 export const TIMELINE_STEP_MINUTES = 15;
 export const TIMELINE_TICK_COUNT = (toMinutes(TIMELINE_END) - toMinutes(TIMELINE_START)) / TIMELINE_STEP_MINUTES; // 52
 export const HALF_DAY_BOUNDARIES = ['08:00', '12:00', '18:00', '21:00'];
 export const HALF_DAY_LABELS = ['上午', '下午', '晚上'];
-export const LESSON_DURATIONS = [45, 60, 90, 120, 150];
-export const DEFAULT_LESSON_DURATION = 45;
+/** 课时时长字典：由「系统管理 → 数据字典」维护，页面不得写死选项（CR-2026-103）。 */
+export function lessonDurationValues() {
+  return lessonDurationSettings().options;
+}
+
+/** 字典默认课时时长，未配置时回落到字典首项。 */
+export function defaultLessonDuration() {
+  return lessonDurationSettings().defaultMinutes;
+}
 
 export function toMinutes(value) {
   const [hour, minute] = String(value || '00:00').split(':').map(Number);
@@ -27,13 +36,13 @@ export function snapToStep(value, step = TIMELINE_STEP_MINUTES) {
   return toTime(Math.round(minutes / step) * step);
 }
 
-export function lessonEndTime(start, duration = DEFAULT_LESSON_DURATION) {
-  return toTime(toMinutes(start) + (Number(duration) || DEFAULT_LESSON_DURATION));
+export function lessonEndTime(start, duration = defaultLessonDuration()) {
+  return toTime(toMinutes(start) + (Number(duration) || defaultLessonDuration()));
 }
 
-export function isWithinTimeline(start, duration = DEFAULT_LESSON_DURATION) {
+export function isWithinTimeline(start, duration = defaultLessonDuration()) {
   const startMinutes = toMinutes(start);
-  const endMinutes = startMinutes + (Number(duration) || DEFAULT_LESSON_DURATION);
+  const endMinutes = startMinutes + (Number(duration) || defaultLessonDuration());
   return startMinutes >= toMinutes(TIMELINE_START) && endMinutes <= toMinutes(TIMELINE_END);
 }
 
@@ -62,6 +71,11 @@ export function mergeBusyRanges(weekday, sessions) {
   return merged;
 }
 
-export function lessonDurationOptions(selected = DEFAULT_LESSON_DURATION) {
-  return LESSON_DURATIONS.map(value => ({ value: String(value), label: `${value} 分钟`, selected: Number(value) === Number(selected) }));
+export function lessonDurationOptions(selected = defaultLessonDuration()) {
+  // The classroom grid can hand over a duration picked by dragging 15-minute ticks; keep that exact
+  // value selectable instead of silently falling back to the first dictionary entry.
+  const chosen = Number(selected);
+  const dict = lessonDurationValues();
+  const values = dict.includes(chosen) || !(chosen > 0) ? dict : [...dict, chosen].sort((a, b) => a - b);
+  return values.map(value => ({ value: String(value), label: `${value} 分钟`, selected: value === chosen }));
 }

@@ -64,6 +64,10 @@ export const TEACHER_APP_FIELD_SPEC = {
     },
     'teacher/application-create': {
       groups: [
+        // 页面渲染顺序为先只读教师信息、再填申报内容，字段表按同一顺序登记。
+        { heading: '教师信息（只读）', fields: [
+          { id: 'FD-TAPP-055', label: '教师信息', type: '只读子表', length: '5 项', required: '系统展示', note: '姓名、工号、教学单位、专业方向与职称取当前登录教师档案，页面只读且不随申报内容编辑；与后台申报审批页的教师信息同源', constraints: { readOnly: true, system: true } }
+        ] },
         { heading: '课程申报字段', fields: [
           { id: 'FD-TAPP-014', label: '课程名称', type: '文本', length: '≤ 100 字', required: '是', note: '课程对外名称，申报通过后进入课程库', constraints: { maxLength: 100 } },
           { id: 'FD-TAPP-015', label: '所属专业', type: '三级级联', length: '必选 1 个', required: '是', note: '按门类 → 分类 → 专业逐级选择，需属于本人授课专业', constraints: { dictionary: '专业目录' } },

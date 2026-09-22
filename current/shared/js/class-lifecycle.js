@@ -1,5 +1,8 @@
 // CR-2026-043: one shared projection for class visibility, enrollment and status.
-const DEMO_NOW = new Date('2026-09-17T12:00:00+08:00');
+import { DEMO_NOW as DEMO_NOW_TEXT, demoDateTime } from './demo-clock.js';
+
+// 演示「当前时间」统一取 demo-clock 一处，避免班级阶段派生、课表与学员端各用一套今天。
+const DEMO_NOW = demoDateTime(DEMO_NOW_TEXT);
 
 function asDate(value) {
   if (!value) return null;

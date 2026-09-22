@@ -113,6 +113,9 @@
 .academic-view-switch { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 6px; background: #f2f2f2; }
 .academic-view-switch button { padding: 6px 12px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); }
 .academic-view-switch button.active { background: var(--card); color: var(--ink); box-shadow: 0 1px 4px rgba(31, 31, 31, .12); }
+ .academic-date-nav { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); }
+ .academic-date-nav strong { min-width: 168px; text-align: center; font-size: 13px; font-weight: 600; white-space: nowrap; }
+ .academic-date-nav .icon-button { width: 28px; height: 28px; padding: 0; border: 0; font-size: 20px; line-height: 1; }
 .academic-matrix-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .academic-matrix-toolbar .toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .academic-inline-select { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); color: var(--ink); }
@@ -195,3 +198,102 @@
   .export-empty { text-align: center; color: #aaa; }
   .academic-print-sheet footer { display: flex; justify-content: space-between; margin-top: 6px; color: var(--muted); font-size: 10px; }
 }
+
+/* Classroom view: literal 15-minute ticks with a frozen date column next to the time column. */
+[data-matrix-grid] { max-height: 72vh; }
+.academic-matrix-ticks { table-layout: fixed; }
+.academic-matrix-ticks thead th { min-width: 150px; padding: 8px 10px; }
+.academic-matrix-ticks thead th.matrix-day-column,
+.academic-matrix-ticks thead th.matrix-time-column { position: sticky; z-index: 3; min-width: 0; background: #f5f7fa; color: var(--muted); font-size: 12px; }
+.academic-matrix-ticks thead th.matrix-day-column { left: 0; width: 68px; }
+.academic-matrix-ticks thead th.matrix-time-column { left: 68px; width: 62px; }
+.academic-matrix-ticks tbody th.matrix-day { position: sticky; left: 0; z-index: 1; width: 68px; min-width: 68px; padding: 6px 4px; background: #f5f7fa; border-right: 1px solid var(--line); color: var(--ink); font-size: 12px; font-weight: 600; text-align: center; vertical-align: top; }
+.academic-matrix-ticks tbody th.matrix-slot { position: sticky; left: 68px; z-index: 1; width: 62px; min-width: 62px; height: 18px; padding: 0 8px; background: #fafafa; border-right: 1px solid var(--line); color: var(--ink); font-size: 11px; font-weight: 600; text-align: right; vertical-align: middle; }
+.academic-matrix-ticks tbody th.matrix-slot.is-minor { color: #c8c8c8; font-weight: 400; }
+.academic-matrix-ticks td { width: 150px; min-width: 150px; height: 18px; padding: 0; background: var(--card); }
+.academic-matrix-ticks tbody tr:nth-child(even) td.matrix-slot-cell { background: #fdfdfe; }
+.academic-matrix-ticks td.matrix-slot-cell { position: relative; cursor: cell; }
+.academic-matrix-ticks td.matrix-slot-cell:hover { box-shadow: inset 0 0 0 1px var(--brand); }
+.academic-matrix-ticks td.matrix-slot-cell:focus-within { box-shadow: inset 0 0 0 1px var(--brand); }
+.academic-matrix-ticks td.matrix-slot-cell.is-selected { background: #dcebff; box-shadow: inset 0 0 0 1px #7aa7e0; }
+.academic-matrix-ticks td.matrix-block-cell { padding: 0; vertical-align: top; }
+.matrix-slot-create { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 18px; padding: 0; border: 0; background: transparent; color: transparent; font-family: inherit; font-size: 11px; cursor: pointer; transition: color .12s ease, background .12s ease; }
+.academic-matrix-ticks td.matrix-slot-cell:hover .matrix-slot-create,
+.academic-matrix-ticks td.matrix-slot-cell:focus-within .matrix-slot-create,
+.academic-matrix-ticks td.matrix-slot-cell.is-selected .matrix-slot-create { color: var(--brand); background: #eef5ff; }
+@media (hover: none) {
+  .academic-matrix-ticks td.matrix-slot-cell .matrix-slot-create { color: #9fb6cd; }
+  .academic-matrix-ticks td.matrix-slot-cell .matrix-slot-create span { display: none; }
+  .academic-matrix-ticks td.matrix-slot-cell .matrix-slot-create::before { content: '+'; font-size: 12px; }
+}
+.matrix-quarter-cell { display: grid; gap: 3px; padding: 3px; align-content: start; }
+.matrix-quarter-cell .matrix-entry { padding: 3px 6px; }
+.matrix-quarter-cell .matrix-entry strong { font-size: 11px; }
+.matrix-quarter-cell .matrix-entry span { font-size: 10px; }
+html.is-matrix-dragging, html.is-matrix-dragging * { user-select: none; }
+/* 已停课课次：列表视图的状态标签加删除线并置灰，与教室视图卡片口径一致。 */
+.tag.is-stopped { text-decoration: line-through; opacity: .75; }
+
+/* 课表管理：日期窗口、学期、密度开关、教学楼切换与触摸点选。 */
+.academic-building-switch { margin: 0 0 12px; }
+.academic-density-switch { margin: 0 0 12px; }
+.matrix-touch-hint { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--brand); border-radius: 6px; background: #f2f7ff; }
+.matrix-touch-hint[hidden] { display: none; }
+.matrix-touch-hint-text strong { color: var(--brand); }
+.matrix-touch-hint-text small { display: block; margin-top: 2px; color: var(--muted); }
+.matrix-touch-hint-actions { display: flex; gap: 8px; }
+.academic-matrix-ticks tbody th.matrix-day.is-today { background: #eef5ff; color: var(--brand); }
+.academic-matrix-ticks .matrix-today-flag { display: block; margin: 2px auto 0; padding: 1px 4px; width: max-content; border-radius: 3px; background: var(--brand); color: #fff; font-size: 10px; font-style: normal; font-weight: 400; }
+.academic-matrix-ticks tbody th.matrix-slot.is-now { background: #fff4e6; }
+.academic-matrix-ticks .matrix-now-flag { display: block; color: #d46b08; font-size: 10px; font-weight: 600; }
+.academic-matrix-ticks tr.is-day-start > th,
+.academic-matrix-ticks tr.is-day-start > td { border-top: 2px solid #b9c6d4; }
+.academic-matrix-ticks td.matrix-empty-day { padding: 8px 10px; color: var(--muted); font-size: 12px; }
+.academic-matrix-legend i.legend-today { background: #fff4e6; border: 1px solid #d46b08; }
+
+/* 课表工具栏收敛：日期范围与学期成组，导出／打印／键盘创建收进「更多」。 */
+.academic-range-group { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fafafa; }
+.academic-range-group .form-field { margin: 0; }
+.academic-range-label { color: var(--muted); font-size: 12px; }
+.academic-more { position: relative; }
+.academic-more > summary { list-style: none; cursor: pointer; }
+.academic-more > summary::-webkit-details-marker { display: none; }
+.academic-more-menu { position: absolute; right: 0; z-index: 6; display: grid; gap: 4px; min-width: 176px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); box-shadow: 0 8px 20px rgba(15, 23, 42, .12); }
+.academic-more:not([open]) .academic-more-menu { display: none; }
+.academic-more-menu .text-button { text-align: left; }
+/* 触摸点选提示条吸顶：矩阵很长时也能看到已选时间窗与确认按钮。 */
+.matrix-touch-hint { position: sticky; top: 8px; z-index: 4; }
+/* 密度开关隐藏无课次刻度时，用省略标记提示时间不连续。 */
+.academic-matrix-ticks .matrix-gap-flag { display: block; color: #d46b08; font-size: 12px; line-height: 1; }
+.academic-matrix-ticks tr.is-gap > th,
+.academic-matrix-ticks tr.is-gap > td { border-top: 1px dashed #d8b98f; }
+/* 月视图：日期 × 教室聚合。 */
+.academic-matrix-aggregate thead th.matrix-room-column { text-align: left; }
+.academic-matrix-aggregate tbody th.matrix-day { width: 96px; min-width: 96px; text-align: center; vertical-align: middle; }
+.academic-matrix-aggregate tbody tr.is-today-row td { background: #fbfdff; }
+.matrix-aggregate-cell { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+.matrix-aggregate-entry { display: grid; gap: 2px; min-width: 200px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fbfbfb; text-align: left; cursor: pointer; }
+.matrix-aggregate-entry:hover, .matrix-aggregate-entry:focus-visible { border-color: var(--brand); outline: none; }
+.matrix-aggregate-entry strong { font-size: 12px; }
+.matrix-aggregate-entry span { color: var(--muted); font-size: 11px; }
+.matrix-aggregate-entry small { color: var(--muted); font-size: 11px; }
+.matrix-aggregate-entry em { color: var(--danger); font-size: 11px; font-style: normal; }
+.matrix-aggregate-entry.is-conflict { border-color: #ff7875; background: #fff1f0; }
+/* 班级视图：一个班级一张只读课表卡，可单独打印。 */
+.academic-class-sheet { margin: 0 0 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); overflow: hidden; }
+.academic-class-sheet > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--line); background: #fafafa; }
+.academic-class-sheet > header strong { display: block; font-size: 14px; }
+.academic-class-sheet > header span { color: var(--muted); font-size: 12px; }
+.academic-class-sheet-actions { display: flex; align-items: center; gap: 8px; }
+.academic-class-sheet table { width: 100%; border-collapse: collapse; }
+.academic-class-sheet th, .academic-class-sheet td { padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12px; text-align: left; }
+.academic-class-sheet thead th { background: #fdfdfe; color: var(--muted); font-weight: 500; }
+.academic-class-sheet tbody tr:last-child td { border-bottom: 0; }
+/* 课次详情：风险提示与最近调整记录。 */
+.academic-session-block { margin-top: 12px; }
+.academic-session-block > strong { display: block; margin-bottom: 6px; font-size: 13px; }
+.academic-session-risks { display: flex; flex-wrap: wrap; gap: 6px; }
+.academic-adjustment-log { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.academic-adjustment-log li { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fbfbfb; }
+.academic-adjustment-log li span { color: var(--muted); font-size: 12px; }
+.academic-adjustment-log li small { color: var(--muted); font-size: 11px; }

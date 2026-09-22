@@ -34,7 +34,7 @@ export const COURSE_FIELD_SPEC = {
     'courses/catalog': {
       groups: [
         { heading: '目录字段', fields: [
-          { id: 'FD-COURSE-026', label: '目录层级', type: '单选', length: '门类 / 分类 / 专业', required: '是', note: '由入口决定：新增门类、新增分类、新增专业分别对应三级', constraints: { options: ['门类', '分类', '专业'] } },
+          { id: 'FD-COURSE-026', label: '目录层级', type: '下拉', length: '门类 / 分类 / 专业', required: '是', note: '新增时默认按入口预置，可在同一抽屉内切换，上级节点随层级联动；编辑既有目录时层级只读', constraints: { options: ['门类', '分类', '专业'] } },
           { id: 'FD-COURSE-027', label: '名称', type: '文本', length: '2–30 字', required: '是', note: '门类如“音乐类”、分类如“键盘乐器”、专业如“钢琴”', constraints: { minLength: 2, maxLength: 30 } },
           { id: 'FD-COURSE-028', label: '上级节点', type: '下拉', length: '按层级选择门类或分类', required: '门类外必填', note: '分类挂到门类，专业挂到分类；门类没有上级', constraints: { dictionary: '目录树' } },
           { id: 'FD-COURSE-002', label: '图标', type: '文本', length: '≤ 20 字', required: '否', note: '仅门类使用，小程序端展示', constraints: { maxLength: 20 } },
@@ -49,7 +49,7 @@ export const COURSE_FIELD_SPEC = {
         ] }
       ],
       notes: [
-        '目录为门类 → 分类 → 专业三级，三级共用一张表单，按当前层级显示上级节点。',
+        '目录为门类 → 分类 → 专业三级，三个新增入口共用一张抽屉表单；新增时可在抽屉内切换层级，上级节点随层级变化，编辑时层级只读。',
         '后台列表按目录树展示，可逐级展开查看分类与专业。',
         '专业是全系统课程、资源和排课的引用来源。',
         '已被课程或教师引用的目录不允许直接删除，需先停用；停用与删除的判定与专业节点展示的引用统计使用同一份派生结果。',
@@ -68,9 +68,8 @@ export const COURSE_FIELD_SPEC = {
         { heading: '审批字段', fields: [
           { id: 'FD-COURSE-032', label: '审批结果', type: '单选', length: '通过 / 驳回', required: '是', note: '决定课程是否进入课程库', constraints: { options: ['通过', '驳回'] } },
           { id: 'FD-COURSE-006', label: '审批意见', type: '多行文本', length: '≤ 500 字', required: '驳回时必填', note: '填写后同步给申报人', constraints: { maxLength: 500 } },
-          { id: 'FD-COURSE-051', label: '审批人', type: '只读', length: '—', required: '系统记录', note: '提交审批结论时写入当前操作人，展示在「最近一次审核意见」', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-051', label: '审批人', type: '只读', length: '—', required: '系统记录', note: '提交审批结论时写入当前操作人，展示在「审核意见」区', constraints: { readOnly: true, system: true } },
           { id: 'FD-COURSE-052', label: '审批时间', type: '只读', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '提交审批结论时写入，与审批人同源展示', constraints: { readOnly: true, system: true } },
-          { id: 'FD-COURSE-071', label: '上一轮审核意见', type: '只读', length: '≤ 500 字', required: '重提且存在上一轮意见时展示', note: '展示最近一轮审批意见、审批人与审批时间；重提后仍保留，不提供历史意见时间线', constraints: { readOnly: true, maxLength: 500 } },
           { id: 'FD-COURSE-072', label: '附件预览', type: '按钮', length: '—', required: '存在附件时展示', note: '展示文件名并打开原型预览说明；原型阶段不上传真实文件', constraints: { action: true } },
           { id: 'FD-COURSE-070', label: '提交与返回操作条', type: '按钮组', length: '—', required: '是', note: '页面底部常驻操作条，滚动时保持可见；只读模式只保留「返回列表」，审批模式提供「提交审批」与「返回列表」', constraints: { action: true } }
         ] }
@@ -84,27 +83,25 @@ export const COURSE_FIELD_SPEC = {
         'CR-2026-049：查看与审批合并为本页唯一入口，列表「查看／审批」按钮取值由申报状态与权限决定，两者指向同一地址；原「课程申报详情」弹窗与列表内审批分支已下线。',
         'CR-2026-049：页面模式由申报状态与权限决定，不由 URL 参数决定，不新增 mode 一类展示开关；深链参数 application_id、id、return 保持不变。',
         'CR-2026-049：审批结论区排在内容区之后；只读模式说明不可审批原因。不提供历史审核意见时间线与批量审批。',
-        'CR-2026-051：重提后存在上一轮意见时显示「上一轮审核意见」；附件存在时提供预览说明，原型仅记录文件名。'
+        'CR-2026-084：重提后不展示上一轮审核意见、审批人与审批时间，审核意见区只呈现本次审批结果；附件存在时提供预览说明，原型仅记录文件名。'
       ]
     },
     'courses/resources': {
       groups: [
         { heading: '上传资源字段', fields: [
-          { id: 'FD-COURSE-007', label: '资源文件', type: '文件上传', length: '单个文件', required: '是', note: '支持图片、音频、视频或文档' },
           { id: 'FD-COURSE-008', label: '资源名称', type: '文本', length: '≤ 50 字', required: '是', note: '填写资源名称', constraints: { maxLength: 50 } },
           { id: 'FD-COURSE-009', label: '资源类型', type: '下拉', length: '预置类型', required: '是', note: '决定资源在课程编排中的用途' },
           { id: 'FD-COURSE-010', label: '所属专业', type: '下拉', length: '专业目录', required: '是', note: '按专业目录引用' },
           { id: 'FD-COURSE-011', label: '适用等级', type: '下拉', length: '预置等级', required: '是', note: '用于筛选与编排' },
+          { id: 'FD-COURSE-007', label: '资源文件', type: '文件上传', length: '单个文件，≤ 100GB', required: '是', note: '支持图片、音频、视频或文档；单文件上限 100GB（CR-2026-091），尺寸按 MB／GB 自适应展示' },
           { id: 'FD-COURSE-012', label: '资源简介', type: '多行文本', length: '≤ 500 字', required: '否', note: '填写资源简介', constraints: { maxLength: 500 } },
           { id: 'FD-COURSE-013', label: '标签', type: '文本', length: '≤ 50 字', required: '否', note: '多个标签用逗号分隔', constraints: { maxLength: 50 } },
-          { id: 'FD-COURSE-014', label: '允许下载', type: '开关', length: '是 / 否', required: '否', note: '决定学员端是否可下载' },
-          { id: 'FD-COURSE-015', label: '可见范围', type: '下拉', length: '预置范围', required: '是', note: '决定哪些端可见' }
         ] }
       ],
       notes: [
         '资源按专业目录引用，专业变更后需重新校验适用性。',
         '资源被课程引用后需先解除引用才能删除。',
-        '上传后的文件版本独立留存，替换不覆盖历史版本。'
+        '编辑直接覆盖当前资源文件记录；替换留存历史版本属真实系统能力。'
       ]
     },
     // 课程内容编排：章节 → 课时两层结构。两层的字段分属不同表单，分开成组呈现。
@@ -130,8 +127,8 @@ export const COURSE_FIELD_SPEC = {
         { heading: '查看与编辑字段', fields: [
           { id: 'FD-COURSE-046', label: '查看', type: '按钮', length: '—', required: '是', note: '打开基本信息／课程大纲两个只读页签，不提供写入控件', constraints: { action: true } },
           { id: 'FD-COURSE-047', label: '编辑', type: '按钮', length: '—', required: '条件可用', note: '未被业务使用的课程打开基本信息／课程大纲两个可编辑页签；保存前后均实时校验编辑锁定', constraints: { action: true } },
-          { id: 'FD-COURSE-062', label: '编辑状态', type: '只读', length: '可编辑 / 暂时锁定 / 永久锁定', required: '系统派生', note: '由已上架商品、正式课表和订单实时计算，并展示锁定原因', constraints: { readOnly: true, system: true } },
-          { id: 'FD-COURSE-063', label: '复制新建', type: '按钮', length: '—', required: '锁定时提供', note: '锁定课程生成新课程编号，复制基本信息、章节与课时，进入内容编排；原课程及其业务关联不变', constraints: { action: true } }
+          { id: 'FD-COURSE-073', label: '编辑状态', type: '只读', length: '可编辑 / 暂时锁定 / 永久锁定', required: '系统派生', note: '由已上架商品、正式课表和订单实时计算，并展示锁定原因', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-074', label: '复制新建', type: '按钮', length: '—', required: '锁定时提供', note: '锁定课程生成新课程编号，复制基本信息、章节与课时，进入内容编排；原课程及其业务关联不变', constraints: { action: true } }
         ] },
         // CR-2026-034 §4：课程档案采用停用开关（不新增状态机），停用只拦新的发布动作。
         { heading: '课程档案启用与退出字段', fields: [
