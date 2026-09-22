@@ -1,7 +1,7 @@
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 import { sessionsFrom, teacherFactsById, teacherFactsByName } from './teacher-facts.js';
 import { certificateDedupKey, certificateSourceLabel } from './certificate-source.js';
-import { readDemoState } from './demo-store.js';
+import { certificateExpirySettings, readDemoState } from './demo-store.js';
 import { DEMO_TODAY, demoDateTime } from './demo-clock.js';
 import { toLocalDateString } from './date-utils.js';
 
@@ -35,13 +35,13 @@ const statusClass = (value) => ({
 
 const validityClass = (value) => ({有效: 'green', 即将过期: 'amber', 已过期: 'red'}[value] || 'gray');
 
-// 证书有效性只按「演示基准日 + 30 天窗口」派生：静态行与渲染期补行共用这一处口径，
+// 证书有效性只按「演示基准日 + 参数配置的到期提醒窗口」派生：静态行与渲染期补行共用这一处口径，
 // 避免静态 HTML 写死的有效性随基准日推移与窗口判定分叉（R57-UI-01）。
-const CERTIFICATE_VALIDITY_WINDOW_DAYS = 30;
+// CR-2026-112：窗口不再硬编码，改读后台「参数配置 → 证书到期提醒窗口（天）」，默认 30 天。
 function certificateValidityOf(expiry) {
   if (!expiry) return '有效';
   const soon = demoDateTime(DEMO_TODAY);
-  soon.setDate(soon.getDate() + CERTIFICATE_VALIDITY_WINDOW_DAYS);
+  soon.setDate(soon.getDate() + certificateExpirySettings().expiryReminderDays);
   const soonDate = toLocalDateString(soon);
   return expiry > soonDate ? '有效' : expiry < DEMO_TODAY ? '已过期' : '即将过期';
 }

@@ -1,5 +1,5 @@
 import { DATA_SCOPES, PERMISSION_POINTS, permissionById, permissionPointsByModule, permissionsOfRole } from './permissions.js';
-import { contractSettings, dataDictionary, fileSpecSettings, messageRetrySettings, paymentTimeoutSettings, readDemoState, videoRefundSettings, writeDemoState, writeDictionary } from './demo-store.js';
+import { CERTIFICATE_EXPIRY_WINDOW_OPTIONS, certificateExpirySettings, contractSettings, dataDictionary, fileSpecSettings, messageRetrySettings, paymentTimeoutSettings, readDemoState, videoRefundSettings, writeDemoState, writeDictionary } from './demo-store.js';
 
 const systemRoot = document.querySelector('[data-system-page]');
 const systemPage = systemRoot?.dataset.systemPage;
@@ -41,6 +41,8 @@ const sharedRetry = messageRetrySettings();
 const settings = { platform: '湖北艺术职业学院继续教育', timezone: 'Asia/Shanghai（UTC+8）', defaultLessonMinutes: 90, homeworkDeadlineHours: 72, attendanceThreshold: 80, homeworkThreshold: 80, videoRefundMaxLessons: sharedRefund.maxLessons, switches: { teacherApplication: true, anonymousConsultation: true, messageRetry: true, consultantTrial: true } };
 // CR-2026-083：合同签署截止期限默认 7 天，由「参数配置」维护，合同列表与教师端同源读取。
 settings.contractSignDeadlineDays = contractSettings().signDeadlineDays;
+// CR-2026-112：证书到期提醒窗口默认 30 天，由「参数配置」维护，后台证书列表与教师端同源读取。
+settings.certificateExpiryDays = certificateExpirySettings().expiryReminderDays;
 // CR-2026-104：待支付支付时限、视频退款申请窗口、文件上传规格与消息重试策略均由「参数配置」维护。
 settings.refundWindowDays = sharedRefund.windowDays;
 settings.paymentTimeoutMinutes = paymentTimeoutSettings().paymentTimeoutMinutes;
@@ -124,6 +126,28 @@ function mountContractSettingsCard() {
     if (!Number.isFinite(value) || value < 1 || value > 30) { showToast('合同签署截止期限需为 1–30 天。'); return; }
     settings.contractSignDeadlineDays = Math.round(value);
     writeDemoState((next) => ({ ...next, contractSettings: { signDeadlineDays: settings.contractSignDeadlineDays } }));
+  });
+}
+// CR-2026-112：证书到期提醒窗口卡片。只允许 7／15／30／60 四选一（默认 30），
+// 后台证书列表与教师端「我的证书」读取同一份配置；非法注入值在读取与保存两侧都会被拦回 30。
+function mountCertificateSettingsCard() {
+  const form = document.querySelector('#settings-form');
+  const layout = form?.querySelector('.settings-layout');
+  if (!form || !layout || layout.querySelector('[data-certificate-settings]')) return;
+  const current = certificateExpirySettings().expiryReminderDays;
+  const options = CERTIFICATE_EXPIRY_WINDOW_OPTIONS
+    .map((days) => `<option value="${days}" ${days === current ? 'selected' : ''}>${days} 天</option>`)
+    .join('');
+  const card = document.createElement('section');
+  card.className = 'card settings-card';
+  card.dataset.certificateSettings = 'true';
+  card.innerHTML = `<h2>证书有效期参数</h2><div class="form-grid"><label class="form-field"><span>证书到期提醒窗口（天）</span><select name="certificateExpiryDays">${options}</select></label></div><p class="ops-form-help">只允许 7／15／30／60 四个取值，默认 30 天；后台证书列表与教师端「我的证书」按同一窗口判定「即将过期」，修改后两端同步生效，永久有效证书恒为有效。</p>`;
+  layout.append(card);
+  form.addEventListener('submit', () => {
+    const value = Number(new FormData(form).get('certificateExpiryDays'));
+    if (!CERTIFICATE_EXPIRY_WINDOW_OPTIONS.includes(value)) { showToast('证书到期提醒窗口只能取 7／15／30／60 天。'); return; }
+    settings.certificateExpiryDays = value;
+    writeDemoState((next) => ({ ...next, certificateSettings: { expiryReminderDays: value } }));
   });
 }
 // CR-2026-101：固定规则不进参数配置——课表时间轴等由业务口径直接冻结，
@@ -356,5 +380,5 @@ function mountTimetableSettingsCard() {
     writeDemoState((next) => ({ ...next, timetableSettings: { transferGapMinutes: Math.round(gap), crossCampusExtraMinutes: Math.round(extra) } }));
   });
 }
-if (systemPage === 'settings') { renderSettings(); mountContractSettingsCard(); mountTimetableSettingsCard(); mountConfigurableLimitCards(); mountFixedRulesCard(); }
+if (systemPage === 'settings') { renderSettings(); mountContractSettingsCard(); mountCertificateSettingsCard(); mountTimetableSettingsCard(); mountConfigurableLimitCards(); mountFixedRulesCard(); }
 if (systemPage === 'dictionaries') renderDictionaries();

@@ -525,12 +525,12 @@ function isOutsideTimeline(session) { return toMinutes(session.start) < toMinute
 const timetableSeedTemplates = [
   { key: 'dance-basic', className: '少儿舞蹈基础班', course: '舞蹈基本功', teacher: '王玥', campus: '龙泉校区', building: '综合楼', roomId: 'venue-302', weekday: '周六', start: '09:00', end: '10:30' },
   { key: 'dance-adult', className: '成人形体班', course: '形体训练', teacher: '王玥', campus: '龙泉校区', building: '综合楼', roomId: 'venue-302', weekday: '周六', start: '09:30', end: '11:00' },
-  { key: 'dance-adv', className: '少儿舞蹈提高班', course: '舞蹈基本功', teacher: '王玥', campus: '南湖校区', building: '艺术楼', roomId: 'venue-art201', weekday: '周六', start: '11:30', end: '13:00', statusOverrides: { '2026-09-19': { status: '已停课', stopped: true } } },
+  { key: 'dance-adv', className: '少儿舞蹈提高班', course: '舞蹈基本功', teacher: '王玥', campus: '南湖校区', building: '艺术楼', roomId: 'venue-art201', weekday: '周六', start: '11:30', end: '13:00' },
   { key: 'vocal-adult', className: '成人声乐班', course: '声乐基础', teacher: '陈晨', campus: '南湖校区', building: '音乐楼', roomId: 'venue-201', weekday: '周日', start: '14:00', end: '15:30' },
   { key: 'chorus', className: '合唱基础训练', course: '合唱', teacher: '陈晨', campus: '南湖校区', building: '音乐楼', roomId: 'venue-201', weekday: '周日', start: '15:30', end: '17:00' },
   { key: 'vocal-adv', className: '声乐演唱提高班', course: '声乐演唱技巧', teacher: '陈晨', campus: '龙泉校区', building: '艺术楼', roomId: 'venue-105', weekday: '周日', start: '17:00', end: '18:30' },
   { key: 'vocal-workshop', className: '声乐表演工作坊', course: '声乐演唱技巧', teacher: '陈晨', campus: '南湖校区', building: '音乐楼', roomId: 'venue-201', weekday: '周日', start: '18:30', end: '20:00' },
-  { key: 'painting', className: '国画入门工作坊', course: '中国画基础', teacher: '李青', campus: '南湖校区', building: '艺术楼', roomId: 'venue-art103', weekday: '周三', start: '18:30', end: '20:00', statusOverrides: { '2026-09-16': { status: '已停课' } } },
+  { key: 'painting', className: '国画入门工作坊', course: '中国画基础', teacher: '李青', campus: '南湖校区', building: '艺术楼', roomId: 'venue-art103', weekday: '周三', start: '18:30', end: '20:00' },
   { key: 'calligraphy', className: '书法基础班', course: '书法基础', teacher: '赵老师', campus: '龙泉校区', building: '艺术楼', roomId: 'venue-105', weekday: '周一', start: '07:30', end: '08:15' }
 ];
 function firstWeekdayOnOrAfter(date, weekdayLabel) {

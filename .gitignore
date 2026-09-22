@@ -3,6 +3,8 @@ current/node_modules/
 current/dist/
 current/.vite/
 current/legacy/
+# 本地一次性排查脚本（如乱码扫描/修复）不入版本，避免临时工具混进交付物
+current/.codex-tmpfix/
 .env
 .env.*
 !.env.example

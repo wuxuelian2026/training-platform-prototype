@@ -15,6 +15,7 @@ export const SYSTEM_FIELD_SPEC = {
           { id: 'FD-SYSTEM-006', label: '最低作业提交率（%）', type: '数字', length: '0–100', required: '否', note: '结业判定使用', constraints: { min: 0, max: 100 } },
           { id: 'FD-SYSTEM-033', label: '视频退款最多观看课时数', type: '数字', length: '0–999', required: '否', note: '视频订单退款资格的观看课时上限，默认 3 课时；按账号与课程去重计数', constraints: { min: 0, max: 999 } },
           { id: 'FD-SYSTEM-034', label: '合同签署截止期限（天）', type: '数字', length: '1–30', required: '否', note: '合同推送后按该天数生成签署截止日期，默认 7 天；后台合同列表与教师端我的合同读取同一份配置，修改后对新推送的合同生效', constraints: { min: 1, max: 30 } },
+          { id: 'FD-SYSTEM-055', label: '证书到期提醒窗口（天）', type: '下拉', length: '7 / 15 / 30 / 60', required: '否', note: '后台证书列表与教师端我的证书按该窗口判定「即将过期」，默认 30 天；只允许四选一，不支持任意整数，修改后两端同步生效', constraints: { options: ['7', '15', '30', '60'] } },
           { id: 'FD-SYSTEM-047', label: '待支付订单支付时限（分钟）', type: '数字', length: '1–1440', required: '否', note: '待支付订单创建后按该时限关闭为「已取消（超时）」，默认 30 分钟；学员端支付页与统一订单管理同源展示', constraints: { min: 1, max: 1440 } },
           { id: 'FD-SYSTEM-048', label: '退款申请窗口（自然日）', type: '数字', length: '1–30', required: '否', note: '视频订单支付后按该窗口判断退款资格，默认 7 个自然日；与该页的观看课时上限共同决定资格', constraints: { min: 1, max: 30 } },
           { id: 'FD-SYSTEM-049', label: '图片上传上限（MB）', type: '数字', length: '1–1024', required: '否', note: '封面、证书与成果等图片类上传的统一上限，默认 10MB', constraints: { min: 1, max: 1024 } },

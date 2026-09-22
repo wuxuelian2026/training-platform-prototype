@@ -8,7 +8,8 @@
 //   1. 每张新变更单必须写明「对应验收项编号」，且编号要能在 12-测试与验收实施基线.md 中找到；
 //   2. 历史变更单（本脚本首次运行时的存量）登记在 .legacy-no-tc.txt 中，不再要求补写，
 //      它们的映射已由 12-测试与验收实施基线.md 第 9 节集中登记；
-//   3. 只删不改：缺编号时直接失败并提示补写位置。
+//   3. 缺编号时提示，不拦截（CR-2026-113 / 客户 2026-09-22 确认）：输出文件名＋问题＋补写指引，
+//      退出码保持 0，避免并发新建变更单阻断整条 check:spec 与构建。
 //
 // 用法：npm run check:changes
 
@@ -61,8 +62,10 @@ for (const name of changeOrders) {
 
 process.stdout.write(`变更单覆盖检查（存量 ${changeOrders.filter((n) => legacy.has(n)).length} 张豁免，本次校验 ${changeOrders.length - changeOrders.filter((n) => legacy.has(n)).length} 张）\n`);
 if (problems.length) {
-  process.stdout.write(`\n未通过 ${problems.length} 处：\n`);
+  // CR-2026-113：并发新建变更单缺编号时只提示，不再阻断 check:spec 与构建（退出码保持 0）。
+  process.stdout.write(`\n待补登记 ${problems.length} 处（提示，不拦截）：\n`);
   problems.forEach((problem) => process.stdout.write(`  - ${problem}\n`));
-  process.exit(1);
+  process.stdout.write('提示：以上变更单在补写有效验收项编号前不作为发布门禁对象；补齐后本提示自动消失。\n');
+  process.exit(0);
 }
 process.stdout.write('检查通过：新增变更单均已声明有效验收项编号。\n');

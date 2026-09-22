@@ -4,7 +4,7 @@ import { mountPageHelp } from './page-help.js';
 import { toLocalDateString } from './date-utils.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
-import { demoId, demoTime, dictionaryItems, fileSpecSettings, getCurrentAccountId, readDemoState, upsertDemoRecord, writeDemoState } from './demo-store.js';
+import { certificateExpirySettings, demoId, demoTime, dictionaryItems, fileSpecSettings, getCurrentAccountId, readDemoState, upsertDemoRecord, writeDemoState } from './demo-store.js';
 import { DEMO_TODAY } from './demo-clock.js';
 import { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } from './course-seed.js';
 import { courseAgesText } from './course-display.js';
@@ -886,7 +886,8 @@ function calculateCertificateValidity(expiresAt) {
   if (!expiresAt) return '有效';
   const remainingDays = Math.ceil((new Date(`${expiresAt}T00:00:00`) - new Date(`${DEMO_TODAY}T00:00:00`)) / 86400000);
   if (remainingDays < 0) return '已过期';
-  return remainingDays <= 60 ? '即将过期' : '有效';
+  // CR-2026-112：窗口改读后台「参数配置 → 证书到期提醒窗口（天）」，与后台证书列表同源，默认 30 天。
+  return remainingDays <= certificateExpirySettings().expiryReminderDays ? '即将过期' : '有效';
 }
 function certificateNeedsAction(item) { return item.status === '已驳回' || item.validity === '即将过期' || item.validity === '已过期'; }
 const CERTIFICATE_STATUS_TABS = ['全部', '待审核', '已通过', '已驳回', '已撤销'];

@@ -191,6 +191,9 @@ const defaultState = () => ({
   messageRetrySettings: { maxAttempts: 3, intervalsMinutes: [5, 30, 120] },
   // CR-2026-083：合同签署截止期限由后台参数配置，默认推送后 7 天，两端读取同一份配置。
   contractSettings: { signDeadlineDays: 7 },
+  // CR-2026-112：证书到期提醒窗口由后台参数配置，只允许 7／15／30／60，默认 30 天；
+  // 后台证书列表与教师端证书提醒读取同一份配置，避免两端分叉。
+  certificateSettings: { expiryReminderDays: 30 },
   // CR-2026-102：排课策略参数（教师转场最小间隔、跨校区额外预留）由「参数配置」维护。
   timetableSettings: { transferGapMinutes: 30, crossCampusExtraMinutes: 15 },
   // CR-2026-103：业务枚举统一由「系统管理 → 数据字典」按字典类型维护；
@@ -305,6 +308,15 @@ export function contractSettings() {
   const settings = readStored().contractSettings || {};
   const days = Math.round(Number(settings.signDeadlineDays ?? 7));
   return { signDeadlineDays: Number.isFinite(days) ? Math.min(30, Math.max(1, days)) : 7 };
+}
+
+// CR-2026-112：证书到期提醒窗口由后台「参数配置」维护，只允许 7／15／30／60 四个取值，默认 30 天。
+// 非法值（任意整数注入、旧数据脏值）一律回落到 30，后台证书列表与教师端证书提醒读取同一份配置。
+export const CERTIFICATE_EXPIRY_WINDOW_OPTIONS = [7, 15, 30, 60];
+export function certificateExpirySettings() {
+  const settings = readStored().certificateSettings || {};
+  const days = Math.round(Number(settings.expiryReminderDays ?? 30));
+  return { expiryReminderDays: CERTIFICATE_EXPIRY_WINDOW_OPTIONS.includes(days) ? days : 30 };
 }
 
 // CR-2026-100：课时时长字典由「系统管理 → 参数配置」维护，读取时按正整数去重升序兜底。
