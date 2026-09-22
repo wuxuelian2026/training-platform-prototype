@@ -116,6 +116,18 @@ const preflightFailures = preflight.filter((item) => item.problem);
 if (preflightFailures.length) {
   process.stderr.write(`[sweep] 响应自检失败 ${preflightFailures.length} 页（防止地址写错也返回 200 造成假通过）：\n${preflightFailures.map((item) => `  - ${item.key} ${item.url}：${item.problem}`).join('\n')}\n`);
 }
+// D50-2 入口页自检：入口页不得再用 meta refresh（相对写法会被 SPA 回退按深路径无限追加，
+// 绝对写法在 GitHub Pages 项目子路径与 file:// 下失效），跳转脚本必须带「真实入口地址」守卫。
+for (const url of ['/index.html', '/培训后台.html']) {
+  const file = join(root, url);
+  if (!existsSync(file)) continue;
+  const html = readFileSync(file, 'utf8');
+  if (/http-equiv="refresh"/i.test(html)) preflightFailures.push({ key: url, url, problem: '入口页仍含 meta refresh（会被 SPA 回退无限追加）' });
+  else if (!/location\.pathname === '\/'/.test(html) || !/location\.replace\(/.test(html)) preflightFailures.push({ key: url, url, problem: '入口页跳转缺少「真实入口地址」守卫' });
+}
+if (preflightFailures.length) {
+  process.stderr.write(`[sweep] 入口页自检失败：\n${preflightFailures.filter((item) => item.url.startsWith('/index') || item.url.includes('培训后台')).map((item) => `  - ${item.url}：${item.problem}`).join('\n')}\n`);
+}
 
 const child = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'sweep-'))}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', 'about:blank'], { stdio: 'ignore' });
 let up = false;

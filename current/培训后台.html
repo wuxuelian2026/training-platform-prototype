@@ -2,10 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <!-- ZK-D-50 D50-2：同 index.html，跳转目标改绝对路径，file:// 下退回相对路径。 -->
-  <meta http-equiv="refresh" content="0; url=/admin/index.html" />
+  <!-- ZK-D-50 D50-2：与 index.html 同口径——不用 meta refresh，只在真实入口地址执行相对跳转，
+       兼容根部署、GitHub Pages 项目子路径与 file://，且深路径回退时不会无限追加。 -->
   <script>
-    if (location.protocol === 'file:') location.replace('admin/index.html');
+    if (location.pathname === '/' || /\/(?:index\.html)?$/.test(location.pathname)) location.replace('admin/index.html');
   </script>
   <title>培训后台原型入口</title>
 </head>
