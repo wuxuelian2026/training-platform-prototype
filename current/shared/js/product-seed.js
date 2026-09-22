@@ -22,6 +22,15 @@ export const productSeed = [
     ['004', 'COURSE-VIDEO-DEMO-004', '朗诵表达进阶', '598.00', '朗诵与主持'],
     ['005', 'COURSE-VIDEO-DEMO-005', '古筝经典小曲演奏', '768.00', '古筝']
   ].map(([suffix, courseId, name, price, tag]) => ({ id: `product-video-demo-${suffix}`, courseId, name, course: name, price, sales: '0', status: '已上架', updated: '2026-09-21', preview: '允许试看', previewHours: '第1课时', recommend: `系统学习${name}的核心方法与实战技巧。`, recommended: false, cover: '已配置', coverFile: `${name}-封面.png`, displayDetail: `围绕${name}的核心内容设计分段视频课程，支持按章节学习。`, tags: [tag, '视频课程'], shelfAt: '2026-09-21 10:00', priceChanges: [], courseVersion: 1 }))
+  ,
+  // R59-UI 观察项 O-2：在售商品关联一条已停用课程，用于演示商品列表的「关联课程已停用」提示
+  // 与「不可上架／不可设首页推荐」拦截；学员端因课程停用不展示该商品。
+  {
+    id: 'product-video-demo-006', courseId: 'COURSE-VIDEO-DEMO-006', name: '琵琶基础入门', course: '琵琶基础入门',
+    price: '520.00', sales: '0', status: '已上架', updated: '2026-09-20', preview: '允许试看', previewHours: '第1课时',
+    recommend: '从零开始学习琵琶基础指法。', recommended: false, cover: '已配置', coverFile: '琵琶基础入门-封面.png',
+    displayDetail: '围绕琵琶基础指法与简单乐曲设计的分段视频课程。', tags: ['民乐', '视频课程'], shelfAt: '2026-09-20 10:00', priceChanges: [], courseVersion: 1
+  }
 ];
 
 export function cloneProductSeed() {

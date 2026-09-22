@@ -30,8 +30,9 @@
 .sales-switch-control { display: flex; min-height: 36px; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .sales-switch-control input { width: 18px; height: 18px; accent-color: var(--brand); }
 .sales-switch-control em { font-style: normal; }
-.sales-table-switch { display: inline-flex; min-width: 66px; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; cursor: pointer; }
-.sales-table-switch input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.sales-table-switch { position: relative; display: inline-flex; min-width: 66px; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; cursor: pointer; }
+/* 视觉隐藏的开关 input 必须锚在 label 内，否则会以静态位置撑宽文档（R59-UI-02 同源问题）。 */
+.sales-table-switch input { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
 .sales-table-switch span { position: relative; width: 30px; height: 18px; flex: 0 0 auto; border: 1px solid #bfbfbf; border-radius: 9px; background: #bfbfbf; transition: background-color .16s ease, border-color .16s ease; }
 .sales-table-switch span::after { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.18); content: ''; transition: transform .16s ease; }
 .sales-table-switch input:checked + span { border-color: var(--brand); background: var(--brand); }

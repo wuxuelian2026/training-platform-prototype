@@ -27,7 +27,6 @@ export const CRM_FIELD_SPEC = {
           { id: 'FD-CRM-071', label: '试听说明', type: '多行文本', length: '≤ 200 字', required: '否', note: '说明适用人群与注意事项', constraints: { maxLength: 200 } },
           { id: 'FD-CRM-037', label: '报名开始时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '开始时间之前不可报名', constraints: { format: 'YYYY-MM-DD HH:mm' } },
           { id: 'FD-CRM-014', label: '报名截止时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '截止后不再接受报名；需晚于报名开始时间', constraints: { format: 'YYYY-MM-DD HH:mm' } },
-          { id: 'FD-CRM-015', label: '快速报名入口', type: '开关', length: '是 / 否', required: '是', note: '决定前台展示入口：是→快速报名 Tab，否→课表入口；不改变课程关联' },
           { id: 'FD-CRM-074', label: '是否推荐', type: '开关', length: '是 / 否', required: '否', note: '仅展示状态为“显示”时生效；控制班级是否进入学员端首页“面授课程招生”，不改变招生、展示或快速报名状态', constraints: { default: false } },
           // CR-2026-020：教学属性只读带入；运营四字段写在该班级记录自身。
           ...courseFieldRows('CRM', 46, COURSE_TEACHING_FIELDS, { type: '文本（只读）', required: '系统继承', note: '课程基本信息与课程大纲取自关联课程，发布班级时只读，不在班级表单内编辑', constraints: { readOnly: true, derived: true } }),
@@ -70,7 +69,7 @@ export const CRM_FIELD_SPEC = {
         '名额以支付成功为占用时点，不以进入支付页或创建订单为准。',
         '支付成功后自动分配所选班级，不设置人工待分班。',
         '报名截止时间之后不再接受新的报名或支付。',
-        '是否推荐是独立展示属性：关闭后仅移出学员端首页栏目；班级列表、快速报名列表和报名能力不受影响。班级隐藏时首页自动不展示，但保留推荐值。',
+        '是否推荐是独立展示属性：关闭后仅移出学员端首页栏目；课程列表、快速报名列表和报名能力不受影响。班级展示状态为隐藏时，首页、快速报名列表与可报班级数均不展示该班级，但保留推荐值。',
         '课程封面、图文详情、课程标签与 C 端推荐语写在该班级记录自身（售卖单元级存储），不写入课程档案；字段定义与发布商品共用同一份规格。',
         '创建班级时可保存展示信息；确认并发布排班前必须具备封面。展示信息修改只影响本班级。',
         '班级详情使用“班级与招生／关联课程／展示信息／状态与教学／学员与记录”五个只读页签；编辑使用同源三段式工作台（关联课程／班级与招生／展示信息）。',

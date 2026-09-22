@@ -109,6 +109,9 @@
 @media (max-width: 900px) { .academic-planner-dialog { width: min(820px, calc(100vw - 32px)); } .academic-planner-dialog .academic-form-grid { grid-template-columns: 1fr; } .planner-preview-wrap { padding-top: 18px; padding-left: 0; border-top: 1px solid var(--line); border-left: 0; } }
 @media (max-width: 900px) { .academic-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .academic-filter-grid .wide { grid-column: span 2; } }
 @media (max-width: 640px) { .academic-filter-grid, .academic-dialog-grid, .academic-readonly-grid { grid-template-columns: 1fr; } .academic-filter-grid .wide, .academic-dialog-grid .wide { grid-column: auto; } .academic-calendar-toolbar { align-items: flex-start; flex-direction: column; } .academic-dialog-card { padding: 18px; } .planner-weekday-time-head { align-items: flex-start; flex-direction: column; } .planner-weekday-time-head span { text-align: left; } .planner-weekday-time-row { grid-template-columns: 1fr; } }
+/* 课表工具栏窄屏换行：视图切换、日周月切换、日期范围与学期各自成行，避免控件被视口裁切（R59-UI-02）。 */
+@media (max-width: 900px) { .academic-page .page-head { flex-wrap: wrap; } .academic-page .page-head > div:last-child { width: 100%; } }
+@media (max-width: 640px) { .academic-page .toolbar-actions { width: 100%; min-width: 0; } .academic-page .academic-view-switch { flex-wrap: wrap; } .academic-page .academic-range-group { flex-wrap: wrap; max-width: 100%; } .academic-page .academic-date-nav { flex-wrap: wrap; } .academic-page .academic-date-nav strong { min-width: 0; } }
 
 .academic-view-switch { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 6px; background: #f2f2f2; }
 .academic-view-switch button { padding: 6px 12px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); }

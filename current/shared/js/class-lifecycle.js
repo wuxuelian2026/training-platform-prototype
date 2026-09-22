@@ -84,14 +84,12 @@ function unavailable(code, message) {
   return { code, message };
 }
 
-// CR-2026-044: one learner-facing projection is shared by course selection,
-// the fast-registration channel and the registration detail. Channel exposure
-// is deliberately independent from bookability.
+// 学员端可见性只由班级展示状态（显示／隐藏）决定：一份投影同时服务课程选班、快速报名列表与报名详情。
+// 2026-09-22 裁定：移除「快速报名入口／快速频道开关」，班级可见不再有第二个开关。
 export function classSalesProjection(record, now = DEMO_NOW) {
   const published = isSchedulePublished(record);
   const cancelled = record?.status === '已取消' || record?.canceledAt;
   const visible = Boolean(record && published && !cancelled && classDisplayStatus(record) === '显示');
-  const visibleInFastChannel = visible && (record.visibleInFastChannel === true || record.fast === '是');
   const capacity = Number(record?.capacity || 0);
   const enrolled = Number(record?.enrolled || 0);
   const remainingSeats = Math.max(0, capacity - enrolled);
@@ -123,7 +121,6 @@ export function classSalesProjection(record, now = DEMO_NOW) {
   return {
     visible,
     bookable: visible && learnerStatus === '可报名',
-    visibleInFastChannel,
     learnerStatus,
     unavailableReason,
     remainingSeats

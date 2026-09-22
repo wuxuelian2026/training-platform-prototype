@@ -1,6 +1,6 @@
 // Canonical offline-class seed shared by the admin CRM and the learner app.
 // P0-1: one class entity keeps one primary key, one name and one enrollment count on both ends.
-// CR-2026-044: legacy `fast` maps only to visibleInFastChannel; it never changes bookability.
+// 2026-09-22 裁定：移除「快速报名入口／快速频道开关」，学员端可见性只由展示状态决定。
 
 import { venueSeed } from './venue-seed.js';
 
@@ -51,8 +51,6 @@ const classRecord = ({ id, name, courseId = 'COURSE-CR-2026-0001', course = '舞
   sessions,
   displayStatus: scheduleStatus === '已发布' ? '显示' : '隐藏',
   display: scheduleStatus === '已发布' ? '已展示' : '未发布',
-  visibleInFastChannel: scheduleStatus === '已发布',
-  fast: scheduleStatus === '已发布' ? '是' : '否',
   recommended,
   enrollStart,
   deadline,

@@ -45,24 +45,25 @@ export const LEARNER_APP_FIELD_SPEC = {
     'learner/fast-registration-detail': {
       groups: [
         { heading: '快速报名字段', fields: [
-          { id: 'FD-LAPP-014', label: '报名学员', type: '单选', length: '账号下关联学员', required: '是', note: '面授报名必须选择具体学员；默认当前学员', constraints: { required: true } },
           { id: 'FD-LAPP-015', label: '班级快照', type: '只读', length: '—', required: '系统展示', note: '按 classId 展示班级、课程、教师、首课日期、时间、校区、教室、课次、价格、余位与招生状态', constraints: { readOnly: true, system: true } },
-          { id: 'FD-LAPP-016', label: '追溯版本', type: '只读', length: 'courseVersion + scheduleVersion', required: '系统展示', note: '内部锁定课程版本与已发布排班版本，MVP 不强制显示版本号', constraints: { readOnly: true, system: true } },
-          { id: 'FD-LAPP-017', label: '试听政策', type: '只读', length: '支持与否 + 收费方式 + 说明', required: '是', note: '只展示政策并联系课程顾问，不提供自助试听预约', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-016', label: '快照与排班版本', type: '只读', length: '课程与大纲快照 + scheduleVersion', required: '系统展示', note: '读取班级发布时固化的课程与大纲快照以及已发布排班版本，不拼接当前最新课程或未发布排班；MVP 不显示版本号', constraints: { readOnly: true, system: true } },
           { id: 'FD-LAPP-034', label: '报名动作', type: '按钮', length: '立即报名 / 继续支付 / 已报名 / 退款处理中', required: '是', note: '按登录、学员档案、订单与 bookable 结果决定唯一主动作', constraints: { action: true } }
         ] }
       ],
       notes: [
         '路由显式使用 classId，不得用 courseId 代替班级主键。',
-        '班级可见、可报、快速频道曝光三项独立；学员可见状态只使用即将开放、可报名、已满员、报名结束。',
+        '班级可见与可报两项：可见只由排班是否已发布、是否取消与展示状态（显示／隐藏）派生，是学员端唯一可见开关；可报在可见基础上叠加报名窗口、余位与人工关闭。学员可见状态只使用即将开放、可报名、已满员、报名结束。',
         '同一 account_id + student_id + class_id 不得产生重复有效报名或重复待支付订单。',
-        '名额以支付成功为准。提交订单不占用名额。'
+        '名额以支付成功为准。提交订单不占用名额。',
+        '本页不选择报名学员：点击「立即报名」后进入报名（支付）页选择学员，防重与名额判定按所选学员执行。',
+        '本页不展示试听政策；试听由课程顾问在后台登记，学员端不提供自助试听入口。'
       ]
     },
 
     'learner/payment': {
       groups: [
         { heading: '支付确认字段', fields: [
+          { id: 'FD-LAPP-014', label: '报名学员', type: '单选', length: '账号下关联学员', required: '面授订单必选', note: '面授订单在报名页选择具体学员，默认当前学员；切换后按所选学员重新解析待支付订单；视频订单不展示该字段', constraints: { requiredWhen: 'order.objectType=class' } },
           { id: 'FD-LAPP-012', label: '协议同意', type: '开关', length: '同意 / 未同意', required: '是', note: '未勾选不可支付；同意时间需记录', constraints: { boolean: true } },
           { id: 'FD-LAPP-013', label: '支付操作', type: '按钮', length: '—', required: '是', note: '待支付订单复用原订单号；已支付订单禁止重复购买或报名', constraints: { action: true } }
         ] }

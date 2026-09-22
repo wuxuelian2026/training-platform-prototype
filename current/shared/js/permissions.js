@@ -72,10 +72,14 @@ const ALL_PERMISSIONS = PERMISSION_POINTS.map((item) => item.id);
 // 学员用户管理、教师导入、名师推荐三项在当前实现里只对平台管理员与教务主管开放。
 const RESTRICTED_POINTS = ['PERM-SYSTEM-002', 'PERM-SYSTEM-005', 'PERM-TEACHER-003', 'PERM-TEACHER-007'];
 const BASELINE_ROLE = ALL_PERMISSIONS.filter((id) => !RESTRICTED_POINTS.includes(id));
+// CR-2026-117：教务主管预置按权限矩阵收敛——系统管理只保留「查看学员用户」，其余权限点不变。
+const ACADEMIC_LEAD_POINTS = ALL_PERMISSIONS.filter((id) => !['PERM-SYSTEM-001', 'PERM-SYSTEM-003', 'PERM-SYSTEM-004', 'PERM-SYSTEM-005'].includes(id));
+
 export const ROLE_PRESETS = [
   { key: 'super_admin', name: '超级管理员', description: '全局配置、系统运维（预置初始数据）', permissions: ALL_PERMISSIONS },
   { key: 'research_lead', name: '教研主管', description: '课程质量、教师资质审核（预置初始数据）', permissions: BASELINE_ROLE },
-  { key: 'academic_lead', name: '教务主管', description: '教学调度、教务执行、物资管理（预置初始数据）', permissions: ALL_PERMISSIONS },
+  // CR-2026-117：教务主管预置按权限矩阵收敛——系统管理只保留「查看学员用户」，其余权限点不变。
+{ key: 'academic_lead', name: '教务主管', description: '教学调度、教务执行、物资管理（预置初始数据）', permissions: ACADEMIC_LEAD_POINTS },
   { key: 'course_consultant', name: '课程顾问', description: '客户跟进与销售转化（预置初始数据）', permissions: BASELINE_ROLE },
   { key: 'finance', name: '财务', description: '财务核算与对账（预置初始数据）', permissions: BASELINE_ROLE }
 ];
