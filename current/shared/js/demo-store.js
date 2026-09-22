@@ -4,6 +4,22 @@ import { DEMO_NOW } from './demo-clock.js';
 const STORAGE_KEY = 'hbyx-iteration1-demo-v1';
 // v2 (CR-2026-003 / I1-DEC-19): retire the legacy parallel course numbering; demo data restarts from seed.
 const SCHEMA_VERSION = 2;
+// CR-2026-054：仅清理本轮已经废弃的固定班级演示记录，不重置用户后来新建的班级。
+const LEGACY_CLASS_DEMO_IDS = new Set(['class-001', 'class-002', 'class-003', 'class-004']);
+const TEACHING_DEMO_CLASS_IDS = ['pending', 'teaching', 'finished'].flatMap(stage =>
+  [1, 2, 3].map(index => `class-mock-ended-${stage}-${String(index).padStart(2, '0')}`)
+);
+const teachingDemoOrders = () => TEACHING_DEMO_CLASS_IDS.map((classId, index) => ({
+  id: `OD20260921${String(index + 1).padStart(4, '0')}`,
+  accountId: 'account-001', studentId: 'student-001', courseId: 'COURSE-CR-2026-0001', classId,
+  courseName: '舞蹈基本功', amount: 1680, status: '已支付',
+  createdAt: `2026-09-${String(1 + index).padStart(2, '0')} 10:00`
+}));
+const teachingDemoEnrollments = () => TEACHING_DEMO_CLASS_IDS.map((classId, index) => ({
+  id: `account-001-student-001-${classId}`,
+  accountId: 'account-001', studentId: 'student-001', classId, status: '已分班',
+  enrolledAt: `2026-09-${String(1 + index).padStart(2, '0')} 10:01`
+}));
 
 // I1-DEF-008: data written before I1-DEC-19 still points at the retired course numbering, which made
 // products unresolvable (学员端视频课程 0 门、后台关联课程为空) on any browser with history. Rewriting the
@@ -71,6 +87,36 @@ function migrateCourseApplicationStatusLabel(state) {
   return changed;
 }
 
+function migrateLegacyClassDemoData(state) {
+  let changed = false;
+  const hasLegacyClassId = (record) => LEGACY_CLASS_DEMO_IDS.has(record?.classId) || LEGACY_CLASS_DEMO_IDS.has(record?.id);
+  ['classes', 'enrollments'].forEach(collection => {
+    if (!Array.isArray(state[collection])) return;
+    const filtered = state[collection].filter(record => !hasLegacyClassId(record));
+    if (filtered.length !== state[collection].length) {
+      state[collection] = filtered;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function migrateTeachingDemoLinks(state) {
+  let changed = false;
+  const appendMissing = (collection, records) => {
+    const rows = Array.isArray(state[collection]) ? state[collection] : [];
+    records.forEach(record => {
+      if (rows.some(item => item.id === record.id)) return;
+      rows.push(record);
+      changed = true;
+    });
+    state[collection] = rows;
+  };
+  appendMissing('orders', teachingDemoOrders());
+  appendMissing('enrollments', teachingDemoEnrollments());
+  return changed;
+}
+
 const clone = value => JSON.parse(JSON.stringify(value));
 const defaultState = () => ({
   schemaVersion: SCHEMA_VERSION,
@@ -93,12 +139,12 @@ const defaultState = () => ({
   // CR-2026-022：教师本人在教师端维护的档案字段与变更审计（后台教师详情页读取展示）。
   teacherProfiles: {},
   teacherProfileAudit: [],
+  campuses: [],
+  buildings: [],
+  venues: [],
   classes: [],
-  orders: [],
-  // P0-1: one demo enrollment record so the admin class roster has a real detail row to show.
-  enrollments: [
-    { id: 'account-002-student-101-class-001', accountId: 'account-002', studentId: 'student-101', classId: 'class-001', status: '已分班', enrolledAt: '2026-08-22 10:05' }
-  ],
+  orders: teachingDemoOrders(),
+  enrollments: teachingDemoEnrollments(),
   videoEntitlements: [],
   progress: {},
   // CR-2026-052：视频退款规则由后台参数配置，客户端与财务端读取同一份演示状态。
@@ -120,7 +166,9 @@ function readStored() {
     const arrangeStatusMigrated = migrateLightweightCourseArrangeStatus(merged);
     const applicationStatusMigrated = migrateCourseApplicationStatusLabel(merged);
     const displayMigrated = migrateCourseDisplayToSaleUnits(merged);
-    if (courseReferencesMigrated || arrangeStatusMigrated || applicationStatusMigrated || displayMigrated) {
+    const legacyClassDemoMigrated = migrateLegacyClassDemoData(merged);
+    const teachingDemoLinksMigrated = migrateTeachingDemoLinks(merged);
+    if (courseReferencesMigrated || arrangeStatusMigrated || applicationStatusMigrated || displayMigrated || legacyClassDemoMigrated || teachingDemoLinksMigrated) {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* private mode: in-memory migration still applies. */ }
     }
     return merged;

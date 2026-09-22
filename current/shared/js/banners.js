@@ -99,7 +99,7 @@ function render() {
   const items = currentBanners();
   const enabled = items.filter((item) => item.status === '启用').length;
   const inactive = items.length - enabled;
-  root.innerHTML = `<div class="page-head"><div><h1>轮播图管理</h1></div><button type="button" class="button primary" data-banner-action="create">新增轮播图</button></div><div class="toolbar"><span data-banner-summary>启用 ${enabled} 张 · 停用 ${inactive} 张</span><div class="toolbar-actions"><button type="button" class="button" data-banner-filter="all">全部</button><button type="button" class="button" data-banner-filter="启用">启用</button><button type="button" class="button" data-banner-filter="停用">停用</button></div></div><div class="table-wrap"><table><thead><tr><th>轮播图名称</th><th>图片</th><th>跳转类型</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>${items.map(rowMarkup).join('') || '<tr><td colspan="6"><div class="empty">暂无轮播图，请新增。</div></td></tr>'}</tbody></table></div><dialog id="banner-form-dialog" class="modal-dialog small-dialog"><form class="modal-card" id="banner-form"><div class="modal-header"><div><h2 id="banner-form-title">新增轮播图</h2><p>轮播图状态与排序直接决定学员端首页展示顺序。</p></div><button type="button" class="icon-button modal-close" data-banner-close title="关闭" aria-label="关闭">×</button></div><label class="form-field"><span>轮播图名称 *</span><input id="banner-name" required placeholder="请输入轮播图名称"></label><label class="form-field"><span>图片 *</span><input id="banner-image" type="file" accept="image/*" data-banner-image><small>单张图片；停用状态可先保存，启用前必须上传。</small><span class="sub-cell" id="banner-image-name">未选择文件</span></label><label class="form-field"><span>主标题 *</span><input id="banner-title" required maxlength="20" placeholder="学员端第一行文案，≤20 字"></label><label class="form-field"><span>描述</span><input id="banner-desc" maxlength="40" placeholder="学员端说明文案，≤40 字"></label><label class="form-field"><span>跳转类型 *</span><select id="banner-jump"><option>无跳转</option><option>课程详情</option><option>商品详情</option><option>课程列表</option><option>名师列表</option><option>教师详情</option></select></label><label class="form-field" id="banner-target-field" hidden><span id="banner-target-label">具体对象 *</span><select id="banner-target"></select><small>目标地址由系统生成，无需手工填写 ID。</small></label><label class="form-field"><span>排序 *</span><input id="banner-sort" type="number" min="1" required value="1"></label><label class="form-field"><span>状态 *</span><select id="banner-status"><option>启用</option><option>停用</option></select></label><p class="form-error" id="banner-form-error" role="alert" hidden></p><div class="modal-actions"><button type="button" class="button" data-banner-close>取消</button><button type="submit" class="button primary" id="banner-form-submit" data-confirm-action="banner-save">保存</button></div></form></dialog><div class="toast" data-banner-toast role="status" aria-live="polite" hidden></div>`;
+  root.innerHTML = `<div class="page-head"><div><h1>轮播图管理</h1></div><button type="button" class="button primary" data-banner-action="create">新增轮播图</button></div><div class="toolbar"><span data-banner-summary>启用 ${enabled} 张 · 停用 ${inactive} 张</span><div class="toolbar-actions"><button type="button" class="button" data-banner-filter="all">全部</button><button type="button" class="button" data-banner-filter="启用">启用</button><button type="button" class="button" data-banner-filter="停用">停用</button></div></div><div class="table-wrap"><table><thead><tr><th>轮播图名称</th><th>图片</th><th>跳转类型</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>${items.map(rowMarkup).join('') || '<tr><td colspan="6"><div class="empty">暂无轮播图，请新增。</div></td></tr>'}</tbody></table></div><dialog id="banner-form-dialog" class="modal-dialog small-dialog"><form class="modal-card" id="banner-form"><div class="modal-header"><div><h2 id="banner-form-title">新增轮播图</h2><p>轮播图状态与排序直接决定学员端首页展示顺序。</p></div><button type="button" class="icon-button modal-close" data-banner-close title="关闭" aria-label="关闭">×</button></div><label class="form-field"><span>轮播图名称 *</span><input id="banner-name" required placeholder="请输入轮播图名称"></label><label class="form-field"><span>图片 *</span><input id="banner-image" type="file" accept="image/*" data-banner-image><small>单张图片；停用状态可先保存，启用前必须上传。</small><span class="sub-cell" id="banner-image-name">未选择文件</span></label><label class="form-field"><span>跳转类型 *</span><select id="banner-jump"><option>无跳转</option><option>课程详情</option><option>商品详情</option><option>课程列表</option><option>名师列表</option><option>教师详情</option></select></label><label class="form-field" id="banner-target-field" hidden><span id="banner-target-label">具体对象 *</span><select id="banner-target"></select><small>目标地址由系统生成，无需手工填写 ID。</small></label><label class="form-field"><span>排序 *</span><input id="banner-sort" type="number" min="1" required value="1"></label><label class="form-field"><span>状态 *</span><select id="banner-status"><option>启用</option><option>停用</option></select></label><p class="form-error" id="banner-form-error" role="alert" hidden></p><div class="modal-actions"><button type="button" class="button" data-banner-close>取消</button><button type="submit" class="button primary" id="banner-form-submit" data-confirm-action="banner-save">保存</button></div></form></dialog><div class="toast" data-banner-toast role="status" aria-live="polite" hidden></div>`;
 }
 
 function openForm(item) {
@@ -111,8 +111,6 @@ function openForm(item) {
   set('#banner-name', item?.name || '');
   const jumpType = item?.jumpType === '课程库' ? '课程列表' : item?.jumpType || '无跳转';
   set('#banner-jump', jumpType);
-  set('#banner-title', item?.title || item?.copy?.title || '');
-  set('#banner-desc', item?.desc || item?.copy?.text || '');
   set('#banner-sort', item?.sort || currentBanners().length + 1);
   set('#banner-status', item?.status === '停用' ? '停用' : item?.status === '启用' ? '启用' : '启用');
   const imageInput = document.querySelector('#banner-image');
@@ -132,13 +130,9 @@ function saveForm(event) {
     if (error) { error.textContent = '轮播图名称不能为空。'; error.hidden = false; }
     return;
   }
-  // CR-2026-037 §2.3：主标题必填，描述选填；角标字自动取主标题首字。
-  const title = document.querySelector('#banner-title')?.value.trim() || '';
-  if (!title) {
-    if (error) { error.textContent = '主标题不能为空，学员端轮播第一行文案取自主标题。'; error.hidden = false; }
-    return;
-  }
-  const desc = document.querySelector('#banner-desc')?.value.trim() || '';
+  // CR-2026-073：表单不再单独维护展示文案；旧记录保留既有文案，新记录以名称兼容首页标题。
+  const title = activeBanner?.title || activeBanner?.copy?.title || name;
+  const desc = activeBanner?.desc || activeBanner?.copy?.text || '';
   const nextStatus = document.querySelector('#banner-status')?.value || '启用';
   const imageFile = document.querySelector('#banner-image')?.files?.[0]?.name || activeBanner?.imageFile || '';
   // §2.1.1：图片必填；未启用的记录可先保存，启用前必须已上传图片。

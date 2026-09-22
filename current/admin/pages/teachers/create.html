@@ -82,7 +82,7 @@
 
         <div class="teacher-build-result" data-build-result hidden role="status"><div><strong>已建档，邀请发送失败</strong><p>教师资料已保存为“已建档”，账号保持“未激活”。请复用当前教师记录重新发送邀请。</p></div><button type="button" class="button" data-action="retry-invite" data-api="API-TEACHER-14">重新发送邀请</button></div>
         <!-- 操作条固定在页签内容之外；提交按钮旁展示必填项完成度。 -->
-        <div class="form-actions teacher-form-actions"><a class="button" href="list.html">取消</a><span class="teacher-required-hint" data-required-hint>必填项还差 0 项</span><button type="button" class="button" data-action="save-draft" data-api-action="save_draft">保存草稿</button><button type="submit" class="button primary" data-api-action="complete_and_invite">完成建档并发送邀请</button></div>
+        <div class="form-actions teacher-form-actions"><a class="button" href="list.html">取消</a><span class="teacher-required-hint" data-required-hint>必填项还差 0 项</span><button type="button" class="button" data-action="save-draft" data-api-action="save_draft">保存草稿</button><button type="submit" class="button primary" data-api-action="complete_and_invite">完成建档</button></div>
       </form>
       <!-- CR-2026-048 §3.2：第二步证书录入与第一步共用同一路由，通过 ?mode=wizard&step=certificate&teacher_id=<id> 进入；可跳过、可中断、可再次进入。 -->
       <section class="card teacher-wizard-step" id="teacher-wizard-certificate" data-wizard-step="certificate" hidden>

@@ -1,19 +1,14 @@
-// CR-2026-025：课程档案版本号与历史版本（唯一事实源）。
-//
-// 规则（变更单 §3）：
-//   1. 课程档案自建档起为 v1；
-//   2. 已被在售商品或已展示班级引用的课程，修改承诺类字段（含编排结构）时生成 v(n+1)；
-//   3. 未被引用的课程直接更新当前版本，不产生新版本；
-//   4. 历史版本整体快照只读，字段值、编排结构摘要、操作人与时间均可查；
-//   5. 版本号在同一课程内单调递增，不因下架、归档或重命名重置；
-//      历史版本不做字段级差异对比，也不提供版本回退。
+// 课程档案引用与兼容快照工具。
+// CR-2026-081 起，MVP 不再向用户提供课程版本、同步与回退能力；旧版本字段只为兼容
+// 已有演示数据和订单快照保留。课程能否编辑统一由 courseEditLock() 实时派生。
+// 旧 records 中的 version/versions 字段只作为兼容数据读取，不再生成或展示新版本。
 import { demoTime, readDemoState, upsertDemoRecord } from './demo-store.js';
 import { courseArchiveSeed } from './course-display.js';
 import { toCanonicalCourseId } from './course-seed.js';
 import { classSeed } from './class-seed.js';
 import { allProducts } from './product-seed.js';
 
-// 承诺类字段：变更这些字段才会触发版本升级（编排结构单列，后以结构签名比较）。
+// 旧版本快照字段仍保留给历史订单兼容读取，新 MVP 不再使用其变更判定。
 export const COURSE_PROMISE_FIELDS = [
   ['name', '课程名称'],
   ['type', '课程类型'],
@@ -39,7 +34,7 @@ export function mergedClasses() {
   ];
 }
 
-// 课程档案：种子基线 + 存储覆盖，供版本号、引用数量与历史版本统一读取。
+// 课程档案：种子基线 + 存储覆盖，供课程引用判断与旧数据兼容读取。
 export function libraryRecords() {
   const stored = (readDemoState().library || []).filter((item) => item && typeof item === 'object');
   const merged = courseArchiveSeed().map((seed) => ({
@@ -56,6 +51,59 @@ export function courseRecordFor(courseId) {
   return libraryRecords().find((record) => courseArchiveKey(record) === key) || null;
 }
 
+// CR-2026-081：课程核心内容锁定规则。
+// - 已上架商品仅在上架期间锁定；无订单时下架后可继续编辑；
+// - 班级已生成/发布课表后永久锁定；
+// - 任意订单（含待支付、已取消、已退款）永久锁定；
+// - 草稿商品、尚未生成课次的班级不阻止编辑，但仍属于“已被引用”，不可物理删除。
+export function courseEditLock(recordOrId) {
+  const key = typeof recordOrId === 'string' ? toCanonicalCourseId(recordOrId) : courseArchiveKey(recordOrId);
+  const shared = readDemoState();
+  const products = allProducts(shared).filter((item) => toCanonicalCourseId(item.courseId) === key);
+  const classes = mergedClasses().filter((item) => toCanonicalCourseId(item.courseId) === key);
+  const productIds = new Set(products.map((item) => item.id));
+  const classIds = new Set(classes.map((item) => item.id));
+  const orders = (shared.orders || []).filter((item) => (
+    toCanonicalCourseId(item.courseId) === key
+    || productIds.has(item.productId)
+    || classIds.has(item.classId)
+  ));
+  // 部分固定演示商品只保留累计销量，没有逐笔订单；销量大于 0 同样代表已有历史订单。
+  const productsWithSales = products.filter((item) => Number(item.sales || 0) > 0);
+  const listedProducts = products.filter((item) => item.status === '已上架');
+  const scheduledClasses = classes.filter((item) => (
+    (Array.isArray(item.sessions) && item.sessions.length > 0)
+    || Number(item.scheduleVersion || 0) > 0
+    || item.scheduleStatus === '已发布'
+    || item.scheduleStatus === '已完成'
+  ));
+  const hasOrders = orders.length > 0 || productsWithSales.length > 0;
+  const reasons = [
+    hasOrders ? '已有订单（含历史订单）' : '',
+    scheduledClasses.length ? '班级已生成或发布课表' : '',
+    listedProducts.length ? '存在已上架视频商品' : ''
+  ].filter(Boolean);
+  const permanent = hasOrders || scheduledClasses.length > 0;
+  return {
+    key,
+    locked: reasons.length > 0,
+    permanent,
+    reasons,
+    listedProducts,
+    scheduledClasses,
+    orders,
+    products,
+    classes,
+    referenced: products.length > 0 || classes.length > 0 || orders.length > 0,
+    referenceCount: products.length + classes.length + orders.length,
+    actionHint: permanent ? '请复制新建课程后调整内容' : listedProducts.length ? '请先下架关联商品后再编辑' : ''
+  };
+}
+
+export const courseEditLockLabel = (usage) => usage?.locked
+  ? `${usage.permanent ? '永久锁定' : '暂时锁定'}：${usage.reasons.join('、')}`
+  : '可编辑';
+
 export const courseVersionOf = (record) => Number(record?.version) || Number(record?.versions?.[record.versions.length - 1]?.version) || 1;
 
 export const versionForCourseId = (courseId) => {
@@ -63,7 +111,7 @@ export const versionForCourseId = (courseId) => {
   return record ? courseVersionOf(record) : 1;
 };
 
-// 编排结构签名与摘要：章节与课时的组成同等参与承诺类变更判定。
+// 编排结构签名与摘要：保留给旧快照读取，不再触发版本升级。
 export function courseStructure(chapters) {
   const list = Array.isArray(chapters) ? chapters : [];
   const lessons = list.reduce((sum, chapter) => sum + ((chapter.lessons || []).length), 0);

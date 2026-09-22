@@ -80,8 +80,8 @@
 .teacher-import-result-download { margin-top: 10px; }
 .success-text { color: var(--success); }
 .danger-text { color: var(--danger); }
-.contract-filter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.contract-table-wrap table { min-width: 1180px; }
+.contract-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.contract-table-wrap table { min-width: 1080px; }
 .contract-status { min-width: 72px; justify-content: center; }
 .contract-document { min-height: 250px; padding: 24px; border: 1px solid #eadfb7; border-radius: 4px; background: #fffdf5; }
 .contract-document h3 { margin: 16px 0 8px; text-align: center; font-size: 18px; }

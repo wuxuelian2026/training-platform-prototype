@@ -1,15 +1,25 @@
-// 教务执行监管字段规格 · 唯一事实源
+// 面授运营 / 教务执行监管字段规格 · 唯一事实源
 // 由 scripts/migrate-literal-fields.mjs 从页面说明字面量迁移生成，迁移后请只维护本文件。
 // 字段口径变更后运行 `npm run check:spec` 校验一致性。
 
 export const ACADEMIC_FIELD_SPEC = {
-  module: '教务执行监管',
+  module: '面授运营 / 教务执行监管',
   pages: {
     'academic/venues': {
       groups: [
-        { heading: '新增场地字段', fields: [
-          { id: 'FD-ACADEMIC-001', label: '所属校区', type: '下拉', length: '预置校区', required: '是', note: '场地归属校区' },
-          { id: 'FD-ACADEMIC-002', label: '教学楼', type: '下拉', length: '预置楼栋', required: '是', note: '场地所在楼栋' },
+        { heading: '校区档案字段', fields: [
+          { id: 'FD-ACADEMIC-045', label: '校区名称', type: '文本', length: '≤ 30 字', required: '是', note: '全局唯一；教学楼必须归属校区', constraints: { maxLength: 30 } },
+          { id: 'FD-ACADEMIC-046', label: '校区地址', type: '文本', length: '≤ 100 字', required: '否', note: '校区联系地址', constraints: { maxLength: 100 } },
+          { id: 'FD-ACADEMIC-047', label: '校区状态', type: '单选', length: '启用 / 停用', required: '是', note: '停用后下级教学楼和教室不可用于新排课' }
+        ] },
+        { heading: '教学楼档案字段', fields: [
+          { id: 'FD-ACADEMIC-048', label: '所属校区', type: '下拉', length: '已启用校区', required: '是', note: '教学楼必须归属一个校区' },
+          { id: 'FD-ACADEMIC-049', label: '教学楼名称', type: '文本', length: '≤ 30 字', required: '是', note: '同一校区内唯一', constraints: { maxLength: 30 } },
+          { id: 'FD-ACADEMIC-050', label: '教学楼状态', type: '单选', length: '启用 / 停用', required: '是', note: '停用后下级教室不可用于新排课' }
+        ] },
+        { heading: '教室档案字段', fields: [
+          { id: 'FD-ACADEMIC-001', label: '所属校区', type: '下拉', length: '已启用校区', required: '是', note: '教室归属校区' },
+          { id: 'FD-ACADEMIC-002', label: '教学楼', type: '下拉', length: '所选校区下已启用教学楼', required: '是', note: '教室所在教学楼' },
           { id: 'FD-ACADEMIC-003', label: '教室名称', type: '文本', length: '≤ 30 字', required: '是', note: '如 综合楼302', constraints: { maxLength: 30 } },
           { id: 'FD-ACADEMIC-004', label: '场地类型', type: '下拉', length: '预置类型', required: '是', note: '决定可排课的课程类型' },
           { id: 'FD-ACADEMIC-005', label: '容量', type: '数字', length: '≥ 1 的整数', required: '是', note: '可容纳人数，用于排课容量校验' },
@@ -18,6 +28,8 @@ export const ACADEMIC_FIELD_SPEC = {
         ] }
       ],
       notes: [
+        '场地管理按校区、教学楼、教室三级档案维护，下级必须引用有效上级。',
+        '校区下存在教学楼或教室时不可删除；教学楼下存在教室时不可删除，只能停用。',
         '容量用于排课时的教室推荐与容量提示。',
         '停用场地不影响已发布课次，仅阻止新增排课。',
         '排课时只使用状态为启用的场地；停用教室的历史课次仍可查询。',
@@ -81,10 +93,10 @@ export const ACADEMIC_FIELD_SPEC = {
           { id: 'FD-ACADEMIC-025', label: '招生容量', type: '只读', length: '正整数', required: '系统继承', note: '来自班级；发布时校验教室容量不得小于该值', constraints: { readOnly: true, derived: true } }
         ] },
         { heading: '第 3 步 排课配置', fields: [
-          { id: 'FD-ACADEMIC-020', label: '每周上课日', type: '复选框组', length: '至少 1 天', required: '是', note: '决定课次重复规则' },
-          { id: 'FD-ACADEMIC-022', label: '上课开始时间', type: '时间', length: 'HH:mm', required: '是', note: '按 15 分钟刻度吸附，范围 08:00–21:00', constraints: { format: 'HH:mm' } },
-          { id: 'FD-ACADEMIC-023', label: '单次课时长', type: '下拉', length: '45 / 60 / 90 / 120 / 150 分钟', required: '是', note: '默认 45 分钟；一个课时对应一个课次' },
-          { id: 'FD-ACADEMIC-024', label: '上课结束时间', type: '时间（自动计算）', length: 'HH:mm', required: '系统计算', note: '由开始时间加单次课时长自动计算，只读', constraints: { format: 'HH:mm', system: true, readOnly: true } },
+          { id: 'FD-ACADEMIC-020', label: '每周上课日', type: '复选框组', length: '至少 1 天', required: '是', note: '决定课次重复规则；多选后每个上课日生成独立时间组' },
+          { id: 'FD-ACADEMIC-022', label: '上课开始时间', type: '按上课日重复的时间', length: 'HH:mm', required: '每个已选上课日必填', note: '每个上课日独立维护；按 15 分钟刻度吸附，范围 08:00–21:00', constraints: { format: 'HH:mm' } },
+          { id: 'FD-ACADEMIC-023', label: '单次课时长', type: '下拉', length: '45 / 60 / 90 / 120 / 150 分钟', required: '是', note: '所有上课日公用；默认 45 分钟；一个课时对应一个课次' },
+          { id: 'FD-ACADEMIC-024', label: '上课结束时间', type: '按上课日重复的时间（自动计算）', length: 'HH:mm', required: '系统计算', note: '每个上课日均由该日开始时间加公用单次课时长计算，只读', constraints: { format: 'HH:mm', system: true, readOnly: true } },
           { id: 'FD-ACADEMIC-021', label: '首次上课日期', type: '日期', length: 'YYYY-MM-DD', required: '是', note: '决定首次课次日期', constraints: { format: 'YYYY-MM-DD' } },
           { id: 'FD-ACADEMIC-036', label: '末次上课日期', type: '只读', length: 'YYYY-MM-DD', required: '系统计算', note: '取未取消、未停课课次中最晚的日期；停课、恢复、调课、补课和增删课次后自动重算，不是发布时锁定的快照；结业后不再变化', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD' } }
         ] },

@@ -126,21 +126,19 @@ export const COURSE_FIELD_SPEC = {
           { id: 'FD-COURSE-053', label: '难度等级', type: '下拉', length: '启蒙 / 初级 / 中级 / 高级 / 考级冲刺', required: '是', note: '作为课程教学属性' },
           { id: 'FD-COURSE-054', label: '适合年龄', type: '多选', length: '全年龄段 / 少儿 / 青少年 / 成人', required: '是', note: '至少选择一项' }
         ] },
-        // CR-2026-025：全部课程页签的行内查看／编辑拆分与版本号、历史版本入口。
-        { heading: '查看与版本字段', fields: [
+        // CR-2026-081：MVP 不提供课程版本能力，锁定课程通过复制新建处理。
+        { heading: '查看与编辑字段', fields: [
           { id: 'FD-COURSE-046', label: '查看', type: '按钮', length: '—', required: '是', note: '打开基本信息／课程大纲两个只读页签，不提供写入控件', constraints: { action: true } },
-          { id: 'FD-COURSE-047', label: '编辑', type: '按钮', length: '—', required: '是', note: '打开基本信息／课程大纲两个可编辑页签；基本字段或章节课时保存时统一执行版本规则', constraints: { action: true } },
-          { id: 'FD-COURSE-048', label: '版本号', type: '只读', length: 'v1 起单调递增', required: '系统生成', note: '当前版本；存在历史版本时点击进入该课程的历史版本列表', constraints: { readOnly: true, system: true } },
-          { id: 'FD-COURSE-049', label: '历史版本', type: '按钮', length: '—', required: '是', note: '打开版本历史列表，历史版本整体快照只读且可回溯', constraints: { action: true } },
-          { id: 'FD-COURSE-050', label: '变更摘要', type: '只读', length: '变更字段清单', required: '系统生成', note: '历史版本列表中的本版本变更字段与操作人、生成时间并列展示', constraints: { readOnly: true, system: true } },
-          { id: 'FD-COURSE-066', label: '版本详情页签', type: '只读', length: '基本信息 / 课程大纲', required: '是', note: '历史版本详情的只读视图与当前版本详情同构，均为基本信息与课程大纲两个页签；大纲取该版本快照留存的内容，快照未留存大纲时给出说明与结构摘要，不拼接当前最新大纲', constraints: { readOnly: true, system: true } }
+          { id: 'FD-COURSE-047', label: '编辑', type: '按钮', length: '—', required: '条件可用', note: '未被业务使用的课程打开基本信息／课程大纲两个可编辑页签；保存前后均实时校验编辑锁定', constraints: { action: true } },
+          { id: 'FD-COURSE-062', label: '编辑状态', type: '只读', length: '可编辑 / 暂时锁定 / 永久锁定', required: '系统派生', note: '由已上架商品、正式课表和订单实时计算，并展示锁定原因', constraints: { readOnly: true, system: true } },
+          { id: 'FD-COURSE-063', label: '复制新建', type: '按钮', length: '—', required: '锁定时提供', note: '锁定课程生成新课程编号，复制基本信息、章节与课时，进入内容编排；原课程及其业务关联不变', constraints: { action: true } }
         ] },
         // CR-2026-034 §4：课程档案采用停用开关（不新增状态机），停用只拦新的发布动作。
         { heading: '课程档案启用与退出字段', fields: [
           { id: 'FD-COURSE-057', label: '启用状态', type: '只读', length: '启用 / 已停用', required: '系统派生', note: '由停用日期派生：停用日期为空即启用，非空展示“已停用”并附停用时间、操作人与原因', constraints: { readOnly: true, system: true } },
           { id: 'FD-COURSE-058', label: '启用状态筛选', type: '下拉', length: '全部 / 启用 / 已停用', required: '否', note: '仅在“全部课程”页签展示，默认全部', constraints: { options: ['全部', '启用', '已停用'] } },
           { id: 'FD-COURSE-059', label: '停用', type: '按钮', length: '—', required: '是', note: '弹出停用确认并填写停用原因（必填，≤200 字）；停用后不再出现在发布商品与发布班级的候选课程中，不自动下架在售商品、不关停已发布班级、不回收已购学习权限', constraints: { action: true } },
-          { id: 'FD-COURSE-060', label: '启用', type: '按钮', length: '—', required: '是', note: '清空停用日期后恢复发布准入；版本号继续递增，不重置', constraints: { action: true } },
+          { id: 'FD-COURSE-060', label: '启用', type: '按钮', length: '—', required: '是', note: '清空停用日期后恢复发布准入；不改变课程编辑锁定结果', constraints: { action: true } },
           { id: 'FD-COURSE-061', label: '删除', type: '按钮', length: '—', required: '条件可用', note: '仅“后台新增”来源且未被任何售卖单元引用的课程可删除，删除前二次确认并写明名称与编号；教师申报课程有来源追溯要求，只能停用', constraints: { action: true } }
         ] },
         // CR-2026-021：课程内容编排并入课程库，编排工作台字段随页面并入。
@@ -167,7 +165,7 @@ export const COURSE_FIELD_SPEC = {
         '视频课程完成编排前强制校验每个课时都关联了视频资源；面授课程的资源关联为可选。',
         '面授课程完成编排时校验课时总数等于申报总课时，不一致时阻止完成并提示补齐或删除。',
         '全部课程的查看与编辑均分为基本信息、课程大纲两个页签；查看全部只读，编辑可修改基本字段及章节课时。',
-        '版本快照保存完整大纲（章节与课时的名称、教学目标、时长、类型、内容描述与关联资源），历史版本详情与当前版本详情同构，均含基本信息与课程大纲两个只读页签。',
+        '课程被业务使用后不再原地编辑；需要调整时复制新建课程，复制基本信息、章节与课时，原课程及业务关联保持不变。',
         '课程展示信息在视频商品或面授班级上维护，不写入课程基本信息或课程大纲。',
         'CR-2026-034：课程档案用停用日期表达“能否再发布”，不新增课程生命周期状态；停用只拦新的发布动作，不自动下架在售商品、不关停已发布班级、不回收已购学习权限、不改写历史订单与计薪。',
         'CR-2026-034：仅“后台新增”来源且未被任何售卖单元引用的课程可物理删除；教师申报课程有来源追溯要求，只能停用。'

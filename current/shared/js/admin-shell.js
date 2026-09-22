@@ -56,9 +56,15 @@ const navGroups = [
     ]
   },
   {
-    icon: '招', label: '面授招生与CRM', items: [
+    icon: '运', label: '面授运营', items: [
       ['批', '批次管理', '/admin/pages/crm/batches.html', 'crm'],
       ['班', '面授班级', '/admin/pages/crm/classes.html', 'crm'],
+      ['场', '场地管理', '/admin/pages/academic/venues.html', 'academic'],
+      ['表', '课表管理', '/admin/pages/academic/timetable.html', 'academic']
+    ]
+  },
+  {
+    icon: '客', label: 'CRM管理', items: [
       ['索', '线索跟进', '/admin/pages/crm/leads.html', 'crm'],
       ['听', '后台登记试听', '/admin/pages/crm/trials.html', 'crm'],
       ['转', '报名转化', '/admin/pages/crm/conversions.html', 'crm']
@@ -75,9 +81,6 @@ const navGroups = [
   },
   {
     icon: '务', label: '教务执行监管', items: [
-      ['场', '场地管理', '/admin/pages/academic/venues.html', 'academic'],
-      ['排', '班级排课', '/admin/pages/academic/scheduling.html', 'academic'],
-      ['表', '课表管理', '/admin/pages/academic/timetable.html', 'academic'],
       ['勤', '考勤监控', '/admin/pages/academic/attendance.html', 'academic'],
       ['作', '作业批阅监管', '/admin/pages/academic/homework.html', 'academic'],
       ['消', '消息推送', '/admin/pages/academic/messages.html', 'academic'],

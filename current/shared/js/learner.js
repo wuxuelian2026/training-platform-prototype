@@ -11,7 +11,7 @@ import { resolveHomeBanners } from './banner-seed.js';
 import { isLearnerPublicPage, isMiniLoggedIn, miniPageName, redirectMiniLogin } from './mobile-guard.js';
 import { toCanonicalCourseId } from './course-seed.js';
 import { allProducts, productForCourse } from './product-seed.js';
-import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseArchiveVersionFor, saleUnitDisplay } from './course-display.js';
+import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseArchiveSeed, courseArchiveVersionFor, saleUnitDisplay, VIDEO_DEMO_COURSES } from './course-display.js';
 import { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } from './teacher-facts.js';
 import { isRichMarkup, richTextToHtml, sanitizeRichText } from './rich-editor.js';
 import { classSalesProjection } from './class-lifecycle.js';
@@ -19,6 +19,9 @@ import { classSalesProjection } from './class-lifecycle.js';
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
 const params = new URLSearchParams(location.search);
+// CR-2026-054：固定班级演示记录已下线；视频课程与用户后来新建的班级不受影响。
+const LEGACY_CLASS_DEMO_IDS = new Set(['class-001', 'class-002', 'class-003', 'class-004']);
+const isLegacyClassRecord = (record) => LEGACY_CLASS_DEMO_IDS.has(record?.classId) || LEGACY_CLASS_DEMO_IDS.has(record?.courseId);
 
 // CR-2026-026 §3.3：订单金额一律两位小数，禁止硬编码 .00 拼接。
 const money2 = (value) => '¥' + Number(value || 0).toFixed(2).replace(/B(?=(d{3})+(?!d))/g, ',');
@@ -49,9 +52,10 @@ function classToLearnerItem(item) {
     season: item.season, campus: item.campus, classroom: item.classroom, schedule: item.schedule,
     seats: `${projection.remainingSeats}/${item.capacity}`, remainingSeats: projection.remainingSeats, classStatus: projection.learnerStatus, learnerStatus: projection.learnerStatus,
     deadline: String(item.deadline || '').slice(0, 10), fast: item.fast, capacity: Number(item.capacity || 0), enrolled: Number(item.enrolled || 0),
-    status: projection.learnerStatus, enrollable: projection.bookable, bookable: projection.bookable, visible: projection.visible,
+    status: projection.learnerStatus, enrollable: projection.bookable, bookable: projection.bookable, visible: projection.visible, recommended: item.recommended === true,
     visibleInFastChannel: projection.visibleInFastChannel, unavailableReason: projection.unavailableReason?.message || '', unavailableReasonCode: projection.unavailableReason?.code || '',
     courseVersion: Number(item.courseVersion || 1), scheduleVersion: Number(item.scheduleVersion || 1), firstLessonDate: item.firstLessonDate || item.sessions?.[0]?.date || '',
+    created: item.created || '', updatedAt: item.updatedAt || '', sortAt: item.created || item.updatedAt || item.firstLessonDate || item.sessions?.[0]?.date || '', sales: Number(item.enrolled || 0),
     trialEnabled: item.trialEnabled || '是', trialFee: item.trialFee || '否', trialPrice: item.trialPrice || '', trialNote: item.trialNote || '请联系课程顾问了解试听安排。',
     ...courseCopy
   };
@@ -64,7 +68,8 @@ const demo = {
   wechatAuthorized: true,
   students: [{ id: 'student-001', name: '林知夏', gender: '女', birthMonth: '2017-05', relation: '女儿' }, { id: 'student-002', name: '林知远', gender: '男', birthMonth: '2015-10', relation: '儿子' }],
   courses: [
-    { id: 'COURSE-CR-2026-0002', type: 'video', objectType: 'course', name: '声乐演唱技巧', teacher: '陈晨', category: '音乐表演', discipline: '音乐', field: '音乐表演', professional: '声乐演唱', level: '中级', age: '成人', hours: 12, price: 1280, progress: 45, chapter: '第3章 · 作品演唱', status: '可购买', intro: '从发声、气息、共鸣到作品演唱，建立清晰、可反复练习的声乐训练路径。', detail: ['课程从呼吸与发声基础开始，逐步进入共鸣位置、咬字处理和作品表达，适合已有基础、希望系统提升演唱能力的学员。', '每节课包含教师示范、训练重点和课后练习建议，可按自己的节奏重复观看。'], outline: [{ title: '第1章 · 发声基础', note: '4课时' }, { title: '第2章 · 气息与共鸣', note: '4课时' }, { title: '第3章 · 作品演唱', note: '4课时' }] }
+    { id: 'COURSE-CR-2026-0002', type: 'video', objectType: 'course', name: '声乐演唱技巧', teacher: '陈晨', category: '音乐表演', discipline: '音乐', field: '音乐表演', professional: '声乐演唱', level: '中级', age: '成人', hours: 12, price: 1280, progress: 45, chapter: '第3章 · 作品演唱', status: '可购买', intro: '从发声、气息、共鸣到作品演唱，建立清晰、可反复练习的声乐训练路径。', detail: ['课程从呼吸与发声基础开始，逐步进入共鸣位置、咬字处理和作品表达，适合已有基础、希望系统提升演唱能力的学员。', '每节课包含教师示范、训练重点和课后练习建议，可按自己的节奏重复观看。'], outline: [{ title: '第1章 · 发声基础', note: '4课时' }, { title: '第2章 · 气息与共鸣', note: '4课时' }, { title: '第3章 · 作品演唱', note: '4课时' }] },
+    ...VIDEO_DEMO_COURSES.map((course) => ({ id: course.id, type: 'video', objectType: 'course', name: course.name, teacher: course.teacher, category: course.major, discipline: course.major, field: course.major, professional: course.major, level: course.difficulty, age: course.ages.join('、'), hours: course.hours, price: Number(course.price), progress: 0, status: '可购买', intro: `围绕${course.name}的核心内容设计分段视频课程。`, detail: [`课程包含教师示范、重点讲解与课后练习，适合按自己的节奏反复学习。`], outline: course.outline.map((chapter) => ({ title: chapter.name, note: `${chapter.lessons.length}课时` })) }))
   ],
   classOptions: learnerClassCourses,
   // CR-2026-022 §2.3：名师数据只保留展示字段，取值来自教师档案
@@ -152,13 +157,28 @@ function applyCourseDisplay(item) {
 }
 function sharedLearnerCatalog(shared) {
   const validRows = (rows) => (Array.isArray(rows) ? rows : []).filter(item => item && typeof item === 'object');
-  const courseRows = validRows(shared.courses).filter(item => item.status === '已完成').map(item => ({
-    id: toCanonicalCourseId(item.id), type: item.type === '视频课程' ? 'video' : 'class', objectType: 'course', name: item.name, courseName: item.name, teacher: item.teacher, category: item.major, discipline: item.discipline || item.major, field: item.field || item.major, professional: item.professional || item.major, level: item.level || item.difficulty || '初级', age: item.age || (Array.isArray(item.ages) ? item.ages.join('、') : '') || '全年龄', hours: Number(item.hours) || 0, lessons: Number(item.hours) || 0, progress: 0, status: '待售', price: 0, intro: item.intro || '', outline: (item.chapters || []).map(chapter => ({ title: chapter.name, note: `${chapter.lessons?.length || 0}课时` }))
-  }));
+  // CR-2026-070：学员端课程目录直接投影后台已完成课程档案，不再依赖 shared.courses
+  // 是否恰好有班级记录。共享课程与档案修改覆盖种子，用户新增记录继续追加。
+  const storedCourses = validRows(shared.courses);
+  const storedLibrary = validRows(shared.library);
+  // 该旧档案在后台课程主体中仍为“编排中”，后台全部课程不会展示；共享课程完成后即可覆盖此状态。
+  const legacyInProgressCourseIds = new Set(['COURSE-CR-2026-0001']);
+  const archives = courseArchiveSeed().map(seed => ({ ...seed, ...(storedLibrary.find(row => row.id === seed.id || toCanonicalCourseId(row.sourceCourseId) === toCanonicalCourseId(seed.sourceCourseId)) || {}) }));
+  storedLibrary.filter(row => !archives.some(seed => seed.id === row.id || toCanonicalCourseId(seed.sourceCourseId) === toCanonicalCourseId(row.sourceCourseId))).forEach(row => archives.push(row));
+  const representedIds = new Set(archives.map(item => toCanonicalCourseId(item.sourceCourseId || item.id)));
+  const archiveCourses = archives.map(archive => {
+    const id = toCanonicalCourseId(archive.sourceCourseId || archive.id);
+    return { ...archive, ...(storedCourses.find(row => toCanonicalCourseId(row.id) === id) || {}), id, chapters: archive.chapters || [] };
+  });
+  const courseRows = [...archiveCourses, ...storedCourses.filter(item => !representedIds.has(toCanonicalCourseId(item.id)))]
+    .filter(item => item.status === '已完成' && !item.disabledAt && (!legacyInProgressCourseIds.has(toCanonicalCourseId(item.id)) || storedCourses.some(row => toCanonicalCourseId(row.id) === toCanonicalCourseId(item.id) && row.status === '已完成')))
+    .map(item => ({
+      id: toCanonicalCourseId(item.id), type: item.type === '视频课程' ? 'video' : 'class', objectType: 'course', name: item.name, courseName: item.name, teacher: item.teacher, category: item.major, discipline: item.discipline || item.major, field: item.field || item.major, professional: item.professional || item.major, level: item.level || item.difficulty || '初级', age: item.age || (Array.isArray(item.ages) ? item.ages.join('、') : '') || '全年龄', hours: Number(item.hours) || 0, lessons: Number(item.hours) || 0, progress: 0, status: '待售', price: 0, intro: item.intro || '', updatedAt: item.updatedAt || '', chapters: item.chapters || [], outline: (item.chapters || []).map(chapter => ({ title: chapter.name, note: `${chapter.lessons?.length || 0}课时` }))
+    }));
   const products = allProducts(shared).filter(item => item.status === '已上架');
   const videos = courseRows.filter(item => item.type === 'video' && products.some(product => toCanonicalCourseId(product.courseId) === item.id)).map(item => {
     const product = products.find(row => row.courseId === item.id);
-    return applyCourseDisplay(product ? { ...item, price: Number(product.price || 0), status: '可购买', preview: product.preview, previewHours: product.previewHours, productId: product.id, courseVersion: Number(product.courseVersion || item.courseVersion || 1), product } : item);
+    return applyCourseDisplay(product ? { ...item, price: Number(product.price || 0), status: '可购买', preview: product.preview, previewHours: product.previewHours, productId: product.id, courseVersion: Number(product.courseVersion || item.courseVersion || 1), sales: Number(product.sales || 0), sortAt: product.shelfAt || product.updated || item.updatedAt || '', product } : item);
   });
 
   const storedClasses = validRows(shared.classes);
@@ -178,6 +198,7 @@ function sharedLearnerCatalog(shared) {
     const sample = related[0] || {};
     const copy = learnerCourseCopy[courseId] || {};
     const minimumPrice = bookableClasses.length ? Math.min(...bookableClasses.map(item => Number(item.price || 0))) : 0;
+    const sortAt = related.map(item => item.created || item.updatedAt || item.firstLessonDate || '').filter(Boolean).sort().at(-1) || source.updatedAt || archive?.updatedAt || '';
     return {
       ...source,
       ...copy,
@@ -200,11 +221,29 @@ function sharedLearnerCatalog(shared) {
       bookableClassCount: bookableClasses.length,
       minimumPrice,
       price: minimumPrice,
+      sales: visibleClasses.reduce((total, item) => total + Number(item.enrolled || 0), 0),
+      sortAt,
       status: bookableClasses.length ? `${bookableClasses.length}个班可报` : '暂无可报班级',
       bookable: bookableClasses.length > 0
     };
   });
   return { courses: [...videos, ...offlineCourses], classes };
+}
+
+function sortedLearnerItems(items, sortMode) {
+  const timestamp = item => {
+    const value = item.sortAt || item.created || item.updatedAt || item.firstLessonDate || '';
+    const parsed = Date.parse(String(value).replace(' ', 'T'));
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+  const sales = item => Number(item.sales ?? item.enrolled ?? 0) || 0;
+  return [...items].sort((a, b) => {
+    const primary = sortMode === 'sales' ? sales(b) - sales(a) : timestamp(b) - timestamp(a);
+    if (primary) return primary;
+    const secondary = sortMode === 'sales' ? timestamp(b) - timestamp(a) : sales(b) - sales(a);
+    if (secondary) return secondary;
+    return String(a.name || a.id || '').localeCompare(String(b.name || b.id || ''), 'zh-CN');
+  });
 }
 
 function readState() {
@@ -227,14 +266,14 @@ function readState() {
       .map(item => ({ ...(teacherPublicProfileById(item.id) || { id: item.id }), ...publicTeacherPatch(item) }))
       .filter(item => item.name && item.professionalTitle);
     const storedOrders = (Array.isArray(stored.orders) ? stored.orders : []).filter(item => item && typeof item === 'object').map(item => legacyVideoOrderSnapshot({ ...item, courseId: toCanonicalCourseId(item.courseId) }));
-    const knownOrders = demo.orders.map(item => legacyVideoOrderSnapshot({ ...item, ...(storedOrders.find(row => row.id === item.id) || {}) }));
-    const additionalOrders = storedOrders.filter(item => !demo.orders.some(row => row.id === item.id));
+    const knownOrders = demo.orders.filter(item => !isLegacyClassRecord(item)).map(item => legacyVideoOrderSnapshot({ ...item, ...(storedOrders.find(row => row.id === item.id) || {}) }));
+    const additionalOrders = storedOrders.filter(item => !isLegacyClassRecord(item) && !demo.orders.some(row => row.id === item.id));
     const storedConsultations = Array.isArray(stored.consultations) ? stored.consultations : [];
-    const knownConsultations = demo.consultations.map(item => ({ ...item, ...(storedConsultations.find(row => row.id === item.id) || {}) }));
-    const additionalConsultations = storedConsultations.filter(item => !demo.consultations.some(row => row.id === item.id));
+    const knownConsultations = demo.consultations.filter(item => !isLegacyClassRecord(item)).map(item => ({ ...item, ...(storedConsultations.find(row => row.id === item.id) || {}) }));
+    const additionalConsultations = storedConsultations.filter(item => !isLegacyClassRecord(item) && !demo.consultations.some(row => row.id === item.id));
     const storedMessages = Array.isArray(stored.messages) ? stored.messages : [];
-    const knownMessages = demo.messages.map(item => ({ ...item, read: storedMessages.find(row => row.id === item.id)?.read ?? item.read }));
-    const additionalMessages = storedMessages.filter(item => !demo.messages.some(row => row.id === item.id));
+    const knownMessages = demo.messages.filter(item => !isLegacyClassRecord(item)).map(item => ({ ...item, read: storedMessages.find(row => row.id === item.id)?.read ?? item.read }));
+    const additionalMessages = storedMessages.filter(item => !isLegacyClassRecord(item) && !demo.messages.some(row => row.id === item.id));
     const shared = readDemoState();
     const accountId = shared.currentAccountId || 'account-001';
     const learners = [...accountStudents(accountId)];
@@ -253,6 +292,7 @@ function readState() {
       item.product = product || null;
       item.courseDisabled = Boolean(item.disabledAt || courseArchiveFor(item.id)?.disabledAt);
       item.sellable = Boolean(product && product.status === '已上架' && !item.courseDisabled);
+      item.recommended = product?.recommended === true;
       if (product) {
         item.price = Number(product.price || item.price || 0);
         item.preview = product.preview;
@@ -280,7 +320,10 @@ function readState() {
     const featuredTeacherIds = new Set(shared.featuredTeacherIds || []);
     const featuredTeachers = [...knownTeachers, ...additionalTeachers].filter(item => featuredTeacherIds.has(item.id));
     return { ...demo, ...stored, accountId, students: learners, currentStudentId: learners.some(item => item.id === stored.currentStudentId) ? stored.currentStudentId : learners[0]?.id || '', courses: sellableCourses, allCourses: displayCourses, classOptions: sharedCatalog.classes, teachers: featuredTeachers, allTeachers: [...knownTeachers, ...additionalTeachers], orders: mergedOrders, consultations: [...knownConsultations, ...additionalConsultations], messages: [...knownMessages, ...additionalMessages] };
-  } catch (error) { console.warn('学员端演示数据合并失败，回退到内置演示数据。', error); return { ...demo }; }
+  } catch (error) {
+    console.warn('学员端演示数据合并失败，回退到内置演示数据。', error);
+    return { ...demo, orders: demo.orders.filter(item => !isLegacyClassRecord(item)), consultations: demo.consultations.filter(item => !isLegacyClassRecord(item)), messages: demo.messages.filter(item => !isLegacyClassRecord(item)) };
+  }
 }
 let state = readState();
 function saveState() { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -329,6 +372,12 @@ function courseLink(item) { return item.objectType === 'class' ? `/learner/pages
 function listItem(item, action = '') { return `<a class="mp-item" href="${courseLink(item)}"><div><strong>${esc(item.name)}</strong><small>${esc(courseMeta(item))}</small>${item.type === 'class' ? `<p>${esc(item.campus)} · ${esc(item.schedule)} · 剩余${esc(item.seats.split('/')[0])}名额</p>` : `<p>共${item.hours}课时 · 已学习${item.progress}%</p>`}</div><div>${action || `<span class="mp-link">查看</span>`}</div></a>`; }
 function courseCard(item) {
   const isClass = item.type === 'class';
+  if (isClass && item.objectType === 'class') {
+    const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
+    const statusTone = item.bookable ? 'green' : 'gray';
+    const priceText = item.bookable ? money2(item.price) : '暂不可报';
+    return `<a class="mp-course-card" href="/learner/pages/fast-registration-detail.html?classId=${encodeURIComponent(item.id)}"><div class="mp-course-cover class-cover" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>面授班级</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.className || item.name)}</h3><strong class="mp-course-price">${priceText}</strong></div><div class="mp-course-tags">${pill(item.professional || item.category)}${item.campus ? pill(item.campus, 'gray') : ''}${pill(item.learnerStatus || item.status, statusTone)}</div><div class="mp-course-teacher-row"><div class="mp-course-teacher"><span class="mp-avatar mp-course-avatar" aria-hidden="true">${esc((item.teacher || '教').slice(0, 1))}</span><span class="mp-course-teacher-name">${esc(item.teacher || '待定')}老师</span></div><span class="mp-course-hours">剩余${esc(item.remainingSeats)}名额</span></div></div></a>`;
+  }
   if (isClass) {
     const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
     const statusTone = item.bookableClassCount > 0 ? 'green' : 'gray';
@@ -342,10 +391,9 @@ function courseCard(item) {
   const detailTags = [item.level, isClass ? item.age : ''].filter(Boolean).map(tag => pill(tag, 'gray')).join('');
   const status = '';
   const statusTag = status ? `<span class="mp-course-status">${pill(status, status.includes('满') ? 'gray' : 'green')}</span>` : '';
-  // CR-2026-012：卡片读取课程档案的课程标签与 C 端推荐语。
+  // CR-2026-012：卡片读取课程档案的课程标签。
   const archiveTags = (item.tags || []).slice(0, 2).map(value => pill(value, 'gray')).join('');
-  const recommendLine = item.recommendation ? `<p class="mp-course-recommend">${esc(item.recommendation)}</p>` : '';
-  return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${item.id}"><div class="mp-course-cover video-cover" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>视频课程</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">${money2(item.price)}</strong></div><div class="mp-course-tags">${professionalTag}${detailTags}${archiveTags}${statusTag}</div><div class="mp-course-teacher-row"><div class="mp-course-teacher"><span class="mp-avatar mp-course-avatar" aria-hidden="true">${esc(teacherName.slice(0, 1))}</span><span class="mp-course-teacher-name">${esc(teacherName)}</span></div><span class="mp-course-hours">共${esc(item.hours)}课时</span></div>${recommendLine}</div></a>`;
+  return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${item.id}"><div class="mp-course-cover video-cover" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>视频课程</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">${money2(item.price)}</strong></div><div class="mp-course-tags">${professionalTag}${detailTags}${archiveTags}${statusTag}</div><div class="mp-course-teacher-row"><div class="mp-course-teacher"><span class="mp-avatar mp-course-avatar" aria-hidden="true">${esc(teacherName.slice(0, 1))}</span><span class="mp-course-teacher-name">${esc(teacherName)}</span></div><span class="mp-course-hours">共${esc(item.hours)}课时</span></div></div></a>`;
 }
 function teacherLink(item) { return `/learner/pages/teacher-detail.html?teacherId=${item.id}`; }
 function isLoggedIn() { return sessionStorage.getItem('hbyx-mini-logged-in') === '1'; }
@@ -361,13 +409,11 @@ function teacherIntroduction(item) {
 function layout(content) { main.innerHTML = content; }
 function renderHome() {
   const categoryItems = [['音乐', '乐', '音乐'], ['美术', '绘', '美术'], ['舞蹈', '舞', '舞蹈'], ['戏剧', '剧', '戏剧'], ['更多', '＋', '']];
-  const classCourse = state.courses.find(item => item.type === 'class' && !item.isFastRegistration) || state.courses[1];
-  // RM-F-02: the home "视频课程推荐" slot follows the product shelf state as well.
-  const homeVideoCourse = state.courses.find(item => item.type === 'video' && item.sellable !== false);
-  // I1-DEF-010: the slot renders the resolved sellable video course, and falls back to an empty state
-  // instead of borrowing a 面授课程 when no video course is on sale.
-  const videoSpotlight = homeVideoCourse ? courseCard(homeVideoCourse) : '<div class="mp-empty">暂无在售视频课程</div>';
-  layout(stack(`<form id="home-search-form" class="mp-home-search" role="search"><input id="home-search" aria-label="搜索课程或老师" placeholder="搜索课程或老师"><button class="mp-search-submit" type="submit" aria-label="搜索">⌕</button></form><section id="home-carousel" class="mp-carousel">${homeBanners.map((banner, index) => { const tag = banner.jumpTarget ? 'a' : 'article'; const href = banner.jumpTarget ? ` href="${esc(banner.jumpTarget)}"` : ''; return `<${tag} class="mp-banner ${index === 0 ? 'active' : ''}" data-banner-index="${index}"${href}><div class="mp-banner-copy"><span class="mp-eyebrow">${banner.kicker}</span><h2>${banner.title}</h2><p>${banner.text}</p></div><span class="mp-banner-mark">${banner.mark}</span></${tag}>`; }).join('')}<div class="mp-carousel-dots">${homeBanners.map((_, index) => `<button class="mp-carousel-dot ${index === 0 ? 'active' : ''}" data-banner-dot="${index}" aria-label="第${index + 1}张轮播图"></button>`).join('')}</div></section>${card(`<div class="mp-section-head"><h2>分类入口</h2><span class="mp-muted">探索艺术方向</span></div><div class="mp-category-row">${categoryItems.map(([label, icon, category]) => `<a class="mp-category" href="${category ? `/learner/pages/courses.html?category=${encodeURIComponent(category)}` : '/learner/pages/courses.html'}"><span class="mp-category-icon">${icon}</span><span>${label}</span></a>`).join('')}</div>`)}${card(`<div class="mp-section-head"><h2>面授课程招生</h2><a class="mp-link" href="/learner/pages/fast-registration.html">查看全部</a></div>${courseCard(classCourse)}`)}${card(`<div class="mp-section-head"><h2>视频课程推荐</h2><a class="mp-link" href="/learner/pages/courses.html">课程库</a></div>${videoSpotlight}`)}${card(`<div class="mp-section-head"><h2>名师推荐</h2><a class="mp-link" href="/learner/pages/teachers.html">更多名师</a></div><div class="mp-scroll-row">${state.teachers.map(teacherCard).join('')}</div>`)}`));
+  const recommendedClasses = (state.classOptions || []).filter(item => item.recommended === true && item.visible);
+  const recommendedVideos = state.courses.filter(item => item.type === 'video' && item.sellable !== false && item.recommended === true);
+  const classSpotlight = recommendedClasses.length ? `<div class="mp-list">${recommendedClasses.map(courseCard).join('')}</div>` : '<div class="mp-empty">暂无推荐面授班级</div>';
+  const videoSpotlight = recommendedVideos.length ? `<div class="mp-list">${recommendedVideos.map(courseCard).join('')}</div>` : '<div class="mp-empty">暂无推荐视频课程</div>';
+  layout(stack(`<form id="home-search-form" class="mp-home-search" role="search"><input id="home-search" aria-label="搜索课程或老师" placeholder="搜索课程或老师"><button class="mp-search-submit" type="submit" aria-label="搜索">⌕</button></form><section id="home-carousel" class="mp-carousel">${homeBanners.map((banner, index) => { const tag = banner.jumpTarget ? 'a' : 'article'; const href = banner.jumpTarget ? ` href="${esc(banner.jumpTarget)}"` : ''; return `<${tag} class="mp-banner ${index === 0 ? 'active' : ''}" data-banner-index="${index}"${href}><div class="mp-banner-copy"><span class="mp-eyebrow">${banner.kicker}</span><h2>${banner.title}</h2><p>${banner.text}</p></div><span class="mp-banner-mark">${banner.mark}</span></${tag}>`; }).join('')}<div class="mp-carousel-dots">${homeBanners.map((_, index) => `<button class="mp-carousel-dot ${index === 0 ? 'active' : ''}" data-banner-dot="${index}" aria-label="第${index + 1}张轮播图"></button>`).join('')}</div></section>${card(`<div class="mp-section-head"><h2>分类入口</h2><span class="mp-muted">探索艺术方向</span></div><div class="mp-category-row">${categoryItems.map(([label, icon, category]) => `<a class="mp-category" href="${category ? `/learner/pages/courses.html?category=${encodeURIComponent(category)}` : '/learner/pages/courses.html'}"><span class="mp-category-icon">${icon}</span><span>${label}</span></a>`).join('')}</div>`)}${card(`<div class="mp-section-head"><h2>面授课程招生</h2><a class="mp-link" href="/learner/pages/fast-registration.html">查看全部</a></div>${classSpotlight}`)}${card(`<div class="mp-section-head"><h2>视频课程推荐</h2><a class="mp-link" href="/learner/pages/courses.html?type=video">课程库</a></div>${videoSpotlight}`)}${card(`<div class="mp-section-head"><h2>名师推荐</h2><a class="mp-link" href="/learner/pages/teachers.html">更多名师</a></div><div class="mp-scroll-row">${state.teachers.map(teacherCard).join('')}</div>`)}`));
   const searchForm = document.querySelector('#home-search-form');
   searchForm.addEventListener('submit', event => { event.preventDefault(); const keyword = document.querySelector('#home-search').value.trim(); go(`/learner/pages/courses.html${keyword ? `?q=${encodeURIComponent(keyword)}` : ''}`); });
   const setBanner = index => { document.querySelectorAll('[data-banner-index]').forEach(item => item.classList.toggle('active', Number(item.dataset.bannerIndex) === index)); document.querySelectorAll('[data-banner-dot]').forEach(item => item.classList.toggle('active', Number(item.dataset.bannerDot) === index)); };
@@ -398,6 +444,7 @@ function renderCourses() {
   const levels = ['启蒙', '初级', '中级', '高级'];
   const ages = ['少儿', '青少年', '成人'];
   const campuses = [...new Set((state.classOptions || []).filter(item => item.visible).map(item => item.campus).filter(Boolean))];
+  const initialCourseTab = params.get('type') === 'video' ? 'video' : 'class';
   const optionList = (options, selected, emptyText) => `<option value="">${emptyText}</option>${options.map(option => `<option value="${esc(option)}" ${option === selected ? 'selected' : ''}>${esc(option)}</option>`).join('')}`;
   const initialMatch = state.courses.find(item => (initialProfessional && item.professional === initialProfessional) || (initialField && item.field === initialField));
   const selectedMajor = {
@@ -412,7 +459,7 @@ function renderCourses() {
       children: [...new Set(state.courses.filter(item => item.discipline === discipline && item.field === field).map(item => item.professional).filter(Boolean))]
     }))
   }));
-  layout(stack(`<form id="course-search-form" class="mp-course-search" role="search"><input id="course-search" aria-label="搜索课程或老师" placeholder="搜索课程或老师" value="${esc(params.get('q') || '')}"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form>`, `<section class="mp-course-browser" aria-label="课程浏览"><div class="mp-tabs mp-course-type-tabs" role="tablist"><button class="mp-tab active" type="button" data-course-tab="all" role="tab" aria-selected="true">全部</button><button class="mp-tab" type="button" data-course-tab="class" role="tab" aria-selected="false">面授课程</button><button class="mp-tab" type="button" data-course-tab="video" role="tab" aria-selected="false">视频课程</button></div><div class="mp-course-filter-row" aria-label="课程筛选条件"><button id="course-profession-trigger" class="mp-course-filter-chip" type="button" aria-haspopup="dialog" aria-controls="course-profession-dialog" aria-expanded="false"><span id="course-profession-value">专业</span><i aria-hidden="true">⌄</i></button><button id="course-level-trigger" class="mp-course-filter-chip" type="button"><span>难度</span><i aria-hidden="true">⌄</i></button><button id="course-age-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>适合年龄</span><i aria-hidden="true">⌄</i></button><button id="course-campus-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>校区</span><i aria-hidden="true">⌄</i></button><button id="course-more-filter" class="mp-course-filter-chip mp-course-filter-more" type="button"><span>筛选</span><i aria-hidden="true">☷</i></button></div></section>`, `<section class="mp-course-list-section"><div class="mp-course-list-head"><h2>课程列表</h2><span id="course-result-count" class="mp-muted"></span></div><div id="course-list" class="mp-list"></div></section>`, `<dialog id="course-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="course-cascade-title"><header class="mp-cascade-head"><div><h2 id="course-cascade-title">选择专业</h2><p id="course-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="course-cascade-path" class="mp-cascade-path"></div><div id="course-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="course-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="course-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`, `<dialog id="course-choice-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-choice-title"><header class="mp-cascade-head"><div><h2 id="course-choice-title">选择筛选条件</h2><p>点击选项后立即生效</p></div><button class="mp-cascade-close" type="button" data-choice-close aria-label="关闭筛选">×</button></header><div id="course-choice-options" class="mp-cascade-options" role="listbox"></div></section></dialog>`, `<dialog id="course-more-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-more-title"><header class="mp-cascade-head"><div><h2 id="course-more-title">更多筛选</h2><p>按招生状态缩小课程范围</p></div><button class="mp-cascade-close" type="button" data-more-close aria-label="关闭更多筛选">×</button></header><label class="mp-course-toggle"><span><strong>仅看可报名课程</strong><small>只展示至少有一个可报班级的面授课程</small></span><input id="course-open-only" type="checkbox" role="switch"></label><footer class="mp-cascade-actions"><button id="course-filter-reset" class="mp-button secondary" type="button">重置</button><button id="course-more-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`));
+  layout(stack(`<form id="course-search-form" class="mp-course-search" role="search"><input id="course-search" aria-label="搜索课程或老师" placeholder="搜索课程或老师" value="${esc(params.get('q') || '')}"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form>`, `<section class="mp-course-browser" aria-label="课程浏览"><div class="mp-tabs mp-course-type-tabs" role="tablist"><button class="mp-tab ${initialCourseTab === 'class' ? 'active' : ''}" type="button" data-course-tab="class" role="tab" aria-selected="${initialCourseTab === 'class'}">面授课程</button><button class="mp-tab ${initialCourseTab === 'video' ? 'active' : ''}" type="button" data-course-tab="video" role="tab" aria-selected="${initialCourseTab === 'video'}">视频课程</button></div><div class="mp-course-filter-row" aria-label="课程筛选条件"><button id="course-profession-trigger" class="mp-course-filter-chip" type="button" aria-haspopup="dialog" aria-controls="course-profession-dialog" aria-expanded="false"><span id="course-profession-value">专业</span><i aria-hidden="true">⌄</i></button><button id="course-level-trigger" class="mp-course-filter-chip" type="button"><span>难度</span><i aria-hidden="true">⌄</i></button><button id="course-age-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>适合年龄</span><i aria-hidden="true">⌄</i></button><button id="course-campus-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>校区</span><i aria-hidden="true">⌄</i></button><button id="course-open-only" class="mp-course-filter-chip" type="button" data-course-class-filter aria-pressed="false"><span>仅看可报名</span></button></div></section>`, `<section class="mp-course-list-section"><div class="mp-course-list-head"><div class="mp-list-summary"><h2>课程列表</h2><span id="course-result-count" class="mp-muted"></span></div><div class="mp-sort-switch" role="group" aria-label="课程排序"><button class="active" type="button" data-course-sort="latest" aria-pressed="true">最新</button><button type="button" data-course-sort="sales" aria-pressed="false">销量</button></div></div><div id="course-list" class="mp-list"></div></section>`, `<dialog id="course-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="course-cascade-title"><header class="mp-cascade-head"><div><h2 id="course-cascade-title">选择专业</h2><p id="course-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="course-cascade-path" class="mp-cascade-path"></div><div id="course-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="course-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="course-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`, `<dialog id="course-choice-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-choice-title"><header class="mp-cascade-head"><div><h2 id="course-choice-title">选择筛选条件</h2><p>点击选项后立即生效</p></div><button class="mp-cascade-close" type="button" data-choice-close aria-label="关闭筛选">×</button></header><div id="course-choice-options" class="mp-cascade-options" role="listbox"></div></section></dialog>`));
   const professionTrigger = document.querySelector('#course-profession-trigger');
   const professionValue = document.querySelector('#course-profession-value');
   const cascadeDialog = document.querySelector('#course-profession-dialog');
@@ -423,17 +470,16 @@ function renderCourses() {
   const choiceDialog = document.querySelector('#course-choice-dialog');
   const choiceTitle = document.querySelector('#course-choice-title');
   const choiceOptions = document.querySelector('#course-choice-options');
-  const moreDialog = document.querySelector('#course-more-dialog');
-  const openOnlyInput = document.querySelector('#course-open-only');
+  const openOnlyTrigger = document.querySelector('#course-open-only');
   const levelTrigger = document.querySelector('#course-level-trigger');
   const ageTrigger = document.querySelector('#course-age-trigger');
   const campusTrigger = document.querySelector('#course-campus-trigger');
-  const moreTrigger = document.querySelector('#course-more-filter');
   let level = params.get('level') || '';
   let age = params.get('age') || '';
   let campus = params.get('campus') || '';
   let openOnly = false;
-  let activeCourseTab = 'all';
+  let activeCourseTab = initialCourseTab;
+  let activeSort = params.get('sort') === 'sales' ? 'sales' : 'latest';
   const cascadeSteps = [
     { key: 'discipline', label: '专业门类' },
     { key: 'field', label: '专业分类' },
@@ -448,17 +494,14 @@ function renderCourses() {
   };
   const updateFilterControls = () => {
     const isClass = activeCourseTab === 'class';
-    const classFilterVisible = isClass || activeCourseTab === 'all';
-    // CR-2026-035 §5：全部页签展示全部筛选、面授页签保留校区与适合年龄、视频页签隐藏对面授才有意义的筛选项。
+    const classFilterVisible = isClass;
+    // 面授页签保留校区与适合年龄，视频页签隐藏只对面授有意义的筛选项。
     document.querySelectorAll('[data-course-class-filter]').forEach(item => { item.hidden = !classFilterVisible; });
-    const openOnlyToggle = document.querySelector('#course-open-only')?.closest('.mp-course-toggle');
-    if (openOnlyToggle) openOnlyToggle.hidden = activeCourseTab === 'video';
     levelTrigger.querySelector('span').textContent = level || '难度';
     ageTrigger.querySelector('span').textContent = age || '适合年龄';
     campusTrigger.querySelector('span').textContent = campus || '校区';
-    const filterCount = [selectedMajor.professional || selectedMajor.field || selectedMajor.discipline, level, isClass ? age : '', isClass ? campus : '', openOnly].filter(Boolean).length;
-    moreTrigger.querySelector('span').textContent = filterCount ? `筛选 ${filterCount}` : '筛选';
-    moreTrigger.classList.toggle('has-value', filterCount > 0);
+    openOnlyTrigger.classList.toggle('has-value', openOnly);
+    openOnlyTrigger.setAttribute('aria-pressed', String(openOnly));
   };
   const openChoiceDialog = (title, values, selected, onSelect) => {
     choiceTitle.textContent = title;
@@ -498,12 +541,12 @@ function renderCourses() {
   const draw = () => {
     const keyword = document.querySelector('#course-search').value.trim().toLowerCase();
     const { discipline, field, professional } = selectedMajor;
-    const items = state.courses.filter(item => {
+    const items = sortedLearnerItems(state.courses.filter(item => {
       const searchable = `${item.name}${item.type === 'video' ? item.teacher : ''}${item.category}${item.discipline || ''}${item.field || ''}${item.professional || ''}`.toLowerCase();
       const categoryMatch = !categoryFilter || [item.discipline, item.field, item.professional, item.category].filter(Boolean).some(value => value.includes(categoryFilter));
       const campusMatch = !campus || (item.classOptions || []).some(option => option.campus === campus);
-      return (activeCourseTab === 'all' || item.type === activeCourseTab) && categoryMatch && (!discipline || item.discipline === discipline) && (!field || item.field === field) && (!professional || item.professional === professional) && (!level || item.level === level) && (item.type !== 'class' || ((!age || String(item.age).includes(age)) && campusMatch)) && (!openOnly || item.type !== 'class' || item.bookable) && searchable.includes(keyword);
-    });
+      return item.type === activeCourseTab && categoryMatch && (!discipline || item.discipline === discipline) && (!field || item.field === field) && (!professional || item.professional === professional) && (!level || item.level === level) && (item.type !== 'class' || ((!age || String(item.age).includes(age)) && campusMatch)) && (!openOnly || item.type !== 'class' || item.bookable) && searchable.includes(keyword);
+    }), activeSort);
     document.querySelector('#course-list').innerHTML = items.length ? items.map(item => courseCard(item)).join('') : `<div class="mp-empty">暂无符合条件的课程</div>`;
     document.querySelector('#course-result-count').textContent = `${items.length}门课程`;
   };
@@ -555,13 +598,20 @@ function renderCourses() {
   ageTrigger.addEventListener('click', () => openChoiceDialog('选择适合年龄', ages, age, value => { age = value; }));
   campusTrigger.addEventListener('click', () => openChoiceDialog('选择校区', campuses, campus, value => { campus = value; }));
   document.querySelector('[data-choice-close]').addEventListener('click', () => choiceDialog.close());
-  moreTrigger.addEventListener('click', () => { openOnlyInput.checked = openOnly; moreDialog.showModal(); });
-  document.querySelector('[data-more-close]').addEventListener('click', () => moreDialog.close());
-  document.querySelector('#course-more-confirm').addEventListener('click', () => { openOnly = openOnlyInput.checked; moreDialog.close(); updateFilterControls(); draw(); });
-  document.querySelectorAll('[data-course-tab]').forEach(tab => tab.addEventListener('click', () => { activeCourseTab = tab.dataset.courseTab; if (activeCourseTab === 'video') { age = ''; campus = ''; openOnly = false; } document.querySelectorAll('[data-course-tab]').forEach(item => { const active = item === tab; item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active)); }); updateFilterControls(); draw(); }));
+  openOnlyTrigger.addEventListener('click', () => { openOnly = !openOnly; updateFilterControls(); draw(); });
+  document.querySelectorAll('[data-course-tab]').forEach(tab => tab.addEventListener('click', () => { activeCourseTab = tab.dataset.courseTab; if (activeCourseTab === 'video') { age = ''; campus = ''; openOnly = false; } const url = new URL(window.location.href); url.searchParams.set('type', activeCourseTab); window.history.replaceState({}, '', url); document.querySelectorAll('[data-course-tab]').forEach(item => { const active = item === tab; item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active)); }); updateFilterControls(); draw(); }));
   document.querySelector('#course-search-form').addEventListener('submit', event => { event.preventDefault(); draw(); });
   document.querySelector('#course-search').addEventListener('input', draw);
-  document.querySelector('#course-filter-reset').addEventListener('click', () => { categoryFilter = ''; Object.assign(selectedMajor, { discipline: '', field: '', professional: '' }); level = ''; age = ''; campus = ''; openOnly = false; document.querySelector('#course-search').value = ''; updateProfessionValue(); moreDialog.close(); updateFilterControls(); draw(); });
+  document.querySelectorAll('[data-course-sort]').forEach(control => control.addEventListener('click', () => {
+    activeSort = control.dataset.courseSort;
+    document.querySelectorAll('[data-course-sort]').forEach(item => { const active = item === control; item.classList.toggle('active', active); item.setAttribute('aria-pressed', String(active)); });
+    const url = new URL(window.location.href);
+    if (activeSort === 'latest') url.searchParams.delete('sort');
+    else url.searchParams.set('sort', activeSort);
+    window.history.replaceState({}, '', url);
+    draw();
+  }));
+  document.querySelectorAll('[data-course-sort]').forEach(item => { const active = item.dataset.courseSort === activeSort; item.classList.toggle('active', active); item.setAttribute('aria-pressed', String(active)); });
   updateProfessionValue();
   updateFilterControls();
   draw();
@@ -587,30 +637,35 @@ function hasPurchasedVideo(item) {
   return (shared.videoEntitlements || []).some(entitlement => entitlement.accountId === state.accountId && entitlement.courseId === item.id && entitlement.status === '生效') || state.orders.some(order => order.accountId === state.accountId && order.courseId === item.id && order.status === '已支付');
 }
 function videoLessonLink(item, index, preview = false) { return `/learner/pages/video.html?courseId=${encodeURIComponent(item.id)}&chapter=${index}${preview ? '&preview=1' : ''}`; }
-function offlineClassSummary(item) {
-  const action = item.bookable
-    ? `<a class="mp-button" href="/learner/pages/fast-registration-detail.html?classId=${encodeURIComponent(item.id)}">选择此班</a>`
-    : `<button class="mp-button secondary" type="button" disabled>${esc(item.learnerStatus)}</button>`;
-  return `<article class="mp-registration-card"><header class="mp-registration-head"><div class="mp-registration-title"><small>班级</small><h3>${esc(item.className || item.name)}</h3></div><div class="mp-registration-status">${pill(item.learnerStatus, item.bookable ? 'green' : 'gray')}<span>${esc(item.bookable ? `剩余 ${item.remainingSeats} 名` : item.unavailableReason)}</span></div></header><dl class="mp-registration-facts"><div><dt>授课教师</dt><dd>${esc(item.teacher)}</dd></div><div><dt>首课日期</dt><dd>${esc(item.firstLessonDate || '待定')}</dd></div><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule || '以开课通知为准')}</dd></div><div class="wide"><dt>校区与教室</dt><dd>${esc(item.campus || '待定')} · ${esc(item.classroom || '待定')}</dd></div><div><dt>课程定价</dt><dd>${money2(item.price)}</dd></div><div><dt>剩余名额</dt><dd>${esc(item.remainingSeats)} / ${esc(item.capacity)}</dd></div></dl><footer class="mp-registration-footer"><span class="mp-muted">${esc(item.unavailableReason || '报名开放中')}</span>${action}</footer></article>`;
+function courseTeacherSection(item) {
+  const teacher = (state.allTeachers || state.teachers).find(row => row.name === item.teacher);
+  return teacher ? `<section class="mp-course-detail-teacher-section"><div class="mp-section-head"><h3>授课教师</h3><a class="mp-link" href="${teacherLink(teacher)}">查看详情</a></div>${teacherCard(teacher, 'list')}</section>` : '';
+}
+function courseCoverTags(item, typeLabel, status, statusTone) {
+  return `${pill(typeLabel, 'light')}${pill(status, statusTone)}${(item.tags || []).slice(0, 2).map(tag => pill(tag, 'light')).join('')}`;
 }
 function renderOfflineCourseDetail(item) {
   const detailTab = params.get('tab') === 'outline' ? 'outline' : 'intro';
-  const classes = item.classOptions || [];
   const detailParagraphs = (item.detail || [item.intro]).filter(Boolean).map(text => `<p>${esc(text)}</p>`).join('') || '<p class="mp-muted">课程介绍暂未维护。</p>';
   const outline = Array.isArray(item.outline) ? item.outline : [];
   const outlineContent = outline.length ? `<div class="mp-course-detail-outline">${outline.map((chapter, index) => `<div class="mp-course-detail-chapter"><span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></div>`).join('')}</div>` : '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
   const coverMark = (item.professional || item.name).slice(0, 1);
+  const recommendation = item.recommendation ? `<p class="mp-course-detail-subtitle">${esc(item.recommendation)}</p>` : '';
   layout(stack(
-    `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${pill('面授课程', 'light')}${pill(item.status, item.bookable ? 'green' : 'gray')}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">课程档案</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2></div><dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div><div><dt>适合年龄</dt><dd>${esc(item.age)}</dd></div><div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div><dt>可报班级</dt><dd>${esc(item.bookableClassCount)}个</dd></div></dl></div></section>`,
+    `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${courseCoverTags(item, '面授课程', item.status, item.bookable ? 'green' : 'gray')}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">课程档案</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2></div>${recommendation}<dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div><div><dt>适合年龄</dt><dd>${esc(item.age)}</dd></div><div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div><dt>可报班级</dt><dd>${esc(item.bookableClassCount)}个</dd></div></dl></div></section>`,
+    courseTeacherSection(item),
     `<section class="mp-course-detail-tab-section"><div class="mp-tabs mp-course-detail-tabs" role="tablist"><button class="mp-tab ${detailTab === 'intro' ? 'active' : ''}" type="button" data-course-detail-tab="intro">课程介绍</button><button class="mp-tab ${detailTab === 'outline' ? 'active' : ''}" type="button" data-course-detail-tab="outline">课程大纲</button></div>${detailTab === 'outline' ? card(outlineContent, 'mp-course-detail-section') : card(`<h3>课程介绍</h3><article class="mp-rich-content mp-course-detail-content">${detailParagraphs}</article>`, 'mp-course-detail-section')}</section>`,
-    `<section class="mp-course-list-section"><div class="mp-course-list-head"><h2>选择班级</h2><span class="mp-muted">${classes.length}个可见班级</span></div><div class="mp-registration-list">${classes.length ? classes.map(offlineClassSummary).join('') : '<div class="mp-empty">暂无可报班级</div>'}</div></section>`
+    `<div class="mp-bottom-actions mp-course-detail-actions">
+      <button class="mp-button secondary mp-icon-action" type="button" data-action="consult"><span class="mp-linear-icon mp-linear-icon-consult" aria-hidden="true"></span><span>咨询</span></button>
+      <button class="mp-button secondary mp-icon-action" type="button" data-action="share"><span class="mp-linear-icon mp-linear-icon-share" aria-hidden="true"></span><span>分享</span></button>
+      <a class="mp-button mp-course-detail-primary" href="/learner/pages/fast-registration.html?courseId=${encodeURIComponent(item.id)}">去报名</a>
+    </div>`
   ));
   document.querySelectorAll('[data-course-detail-tab]').forEach(tab => tab.addEventListener('click', () => go(`/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}&tab=${tab.dataset.courseDetailTab}`)));
 }
 function renderCourseDetail(item = course('COURSE-CR-2026-0002')) {
   if (item.type === 'class' && item.objectType === 'course') { renderOfflineCourseDetail(item); return; }
   const isClass = item.type === 'class';
-  const teacher = state.teachers.find(row => row.name === item.teacher);
   const status = isClass ? item.classStatus || '招生中' : (item.sellable === false ? (item.product?.status || '未上架') : item.status || '可购买');
   const statusTone = status.includes('满') || status === '已下架' || status === '未上架' || status === '草稿' ? 'gray' : 'green';
   const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
@@ -628,16 +683,12 @@ function renderCourseDetail(item = course('COURSE-CR-2026-0002')) {
     const content = `<span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><span class="mp-course-detail-chapter-copy"><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></span>${action}`;
     return available ? `<a class="mp-course-detail-chapter is-playable" href="${videoLessonLink(item, index, preview)}">${content}</a>` : `<div class="mp-course-detail-chapter is-locked" aria-disabled="true">${content}</div>`;
   }).join('')}</div>` : '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
-  const teacherSection = teacher
-    ? `<section class="mp-course-detail-teacher-section"><div class="mp-section-head"><h3>授课教师</h3><a class="mp-link" href="${teacherLink(teacher)}">查看详情</a></div>${teacherCard(teacher)}</section>`
-    : '';
+  const recommendation = item.recommendation ? `<p class="mp-course-detail-subtitle">${esc(item.recommendation)}</p>` : '';
 
   layout(stack(
-    `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${pill(isClass ? '面授课程' : '精品视频', 'light')}${pill(status, statusTone)}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">${isClass ? '面授课程' : '精品课程'}</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2><strong>${money2(item.price)}</strong></div><p class="mp-course-detail-subtitle">${esc(item.teacher)}老师 · ${esc(item.professional || item.category)}</p><dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div>${ageFact}<div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div><dt>授课教师</dt><dd>${esc(item.teacher)}</dd></div></dl></div></section>`,
-    teacherSection,
+    `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${courseCoverTags(item, isClass ? '面授课程' : '精品视频', status, statusTone)}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">${isClass ? '面授课程' : '精品课程'}</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2><strong>${money2(item.price)}</strong></div>${recommendation}<dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div>${ageFact}<div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div></dl></div></section>`,
+    courseTeacherSection(item),
     `<section class="mp-course-detail-tab-section"><div class="mp-tabs mp-course-detail-tabs" role="tablist"><button class="mp-tab ${detailTab === 'intro' ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === 'intro'}" data-course-detail-tab="intro">课程介绍</button>${hasOutline ? `<button class="mp-tab ${detailTab === 'outline' ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === 'outline'}" data-course-detail-tab="outline">课程大纲</button>` : ''}</div>${detailTab === 'outline' ? card(`<div class="mp-section-head"><h3>课程大纲</h3><span class="mp-muted">共${item.outline.length}章</span></div>${outlineContent}`, 'mp-course-detail-section') : card(`<h3>课程介绍</h3><article class="mp-rich-content mp-course-detail-content">${detailParagraphs}<figure class="mp-rich-figure"><div class="mp-rich-image" role="img" aria-label="${esc(item.name)}课程内容图片占位"><span>课程图文</span><strong>${esc(item.professional || item.category)}课堂内容</strong></div><figcaption>课程内容展示，以实际发布内容为准</figcaption></figure></article>`, 'mp-course-detail-section')}</section>`,
-    // CR-2026-012：详情页展示课程档案的封面、标签与 C 端推荐语。
-    `<section class="mp-course-detail-display"><div class="mp-section-head"><h3>展示信息</h3><span class="mp-muted">课程级维护</span></div><dl class="mp-course-detail-facts"><div><dt>课程封面</dt><dd>${esc(item.coverFile || (item.cover === '已配置' ? '已配置' : '未配置'))}</dd></div><div><dt>课程标签</dt><dd>${esc((item.tags || []).join('、') || '—')}</dd></div><div><dt>C 端推荐语</dt><dd>${esc(item.recommendation || '—')}</dd></div></dl></section>`,
     detailActions(item)
   ));
   document.querySelectorAll('[data-course-detail-tab]').forEach(tab => tab.addEventListener('click', () => go(`/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}&tab=${tab.dataset.courseDetailTab}`)));
@@ -653,7 +704,9 @@ function fastRegistrationCard(item) {
   return `<article class="mp-registration-card"><header class="mp-registration-head"><div class="mp-registration-title"><small>班级</small><h3>${esc(className)}</h3></div><div class="mp-registration-status">${pill(item.learnerStatus, available ? 'green' : 'gray')}<span>${esc(seatText)}</span></div></header><div class="mp-registration-course"><div><span>课程</span><strong>${esc(courseName)}</strong></div><div><span>专业</span><strong>${esc(item.professional || item.category)}</strong></div></div><dl class="mp-registration-facts"><div><dt>首课日期</dt><dd>${esc(item.firstLessonDate || '待定')}</dd></div><div><dt>授课教师</dt><dd>${esc(item.teacher)}</dd></div><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule)}</dd></div><div class="wide"><dt>上课教室</dt><dd>${esc(item.campus)} · ${esc(item.classroom || '教室待定')}</dd></div><div><dt>课次</dt><dd>${esc(item.lessons || item.hours)}课次</dd></div><div><dt>剩余名额</dt><dd>${esc(item.remainingSeats)} / ${esc(item.capacity)}</dd></div></dl><footer class="mp-registration-footer"><div class="mp-registration-fee"><span>费用</span><strong>${money2(item.price)}</strong></div>${action}</footer></article>`;
 }
 function renderFastRegistration() {
-  const classItems = (state.classOptions || []).filter(item => item.visibleInFastChannel && !['CLASS_STARTED', 'CLASS_CANCELLED'].includes(item.unavailableReasonCode));
+  const courseIdFilter = params.get('courseId') || '';
+  const filteredCourse = courseIdFilter ? state.courses.find(item => item.id === courseIdFilter) : null;
+  const classItems = (state.classOptions || []).filter(item => (!courseIdFilter || item.courseId === courseIdFilter) && item.visibleInFastChannel && !['CLASS_STARTED', 'CLASS_CANCELLED'].includes(item.unavailableReasonCode));
   const campusOptions = [...new Set(classItems.map(item => item.campus).filter(Boolean))];
   const disciplineOptions = [...new Set(state.courses.map(item => item.discipline).filter(Boolean))];
   const professionalTree = disciplineOptions.map(discipline => ({
@@ -664,10 +717,13 @@ function renderFastRegistration() {
     }))
   }));
   const filterOptions = (items, emptyText) => `<option value="">${emptyText}</option>${items.map(item => `<option value="${esc(item)}">${esc(item)}</option>`).join('')}`;
-  layout(stack(card(`<div class="mp-section-head"><h2 id="fast-batch-title">2026年秋季</h2><span id="fast-result-count" class="mp-muted"></span></div><div class="mp-tabs"><button class="mp-tab" data-season="春季">春季</button><button class="mp-tab" data-season="暑假">暑假</button><button class="mp-tab active" data-season="秋季">秋季</button><button class="mp-tab" data-season="寒假">寒假</button></div><div class="mp-fast-filter-chips" aria-label="报名筛选条件"><button id="fast-profession-trigger" class="mp-fast-filter-chip" type="button" aria-haspopup="dialog" aria-controls="fast-profession-dialog" aria-expanded="false"><span>专业</span><b id="fast-profession-value">全部专业</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="campus"><span>校区</span><b id="fast-campus-value">全部校区</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="weekday"><span>上课时间</span><b id="fast-weekday-value">全部时间</b><i aria-hidden="true">›</i></button><button id="fast-open-only" class="mp-fast-filter-chip" type="button" aria-pressed="false"><span>只看可报名</span></button></div><div class="mp-fast-filter-actions"><button id="fast-filter-reset" class="mp-button ghost" type="button">重置筛选</button></div>`), `<div id="class-list" class="mp-registration-list"></div>`, `<dialog id="fast-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="fast-cascade-title"><header class="mp-cascade-head"><div><h2 id="fast-cascade-title">选择专业</h2><p id="fast-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="fast-cascade-path" class="mp-cascade-path"></div><div id="fast-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="fast-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="fast-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`));
+  layout(stack(card(`<div class="mp-section-head"><h2 id="fast-batch-title">2026年秋季</h2><span id="fast-result-count" class="mp-muted"></span></div><div class="mp-tabs"><button class="mp-tab" data-season="春季">春季</button><button class="mp-tab" data-season="暑假">暑假</button><button class="mp-tab active" data-season="秋季">秋季</button><button class="mp-tab" data-season="寒假">寒假</button></div><div class="mp-fast-filter-chips" aria-label="报名筛选条件"><button id="fast-profession-trigger" class="mp-fast-filter-chip" type="button" aria-haspopup="dialog" aria-controls="fast-profession-dialog" aria-expanded="false"><span>专业</span><b id="fast-profession-value">全部专业</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="campus"><span>校区</span><b id="fast-campus-value">全部校区</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="weekday"><span>上课时间</span><b id="fast-weekday-value">全部时间</b><i aria-hidden="true">›</i></button><button id="fast-open-only" class="mp-fast-filter-chip" type="button" aria-pressed="false"><span>只看可报名</span></button></div><div class="mp-fast-filter-actions"><button id="fast-filter-reset" class="mp-button ghost" type="button">重置筛选</button></div><div class="mp-fast-sort-row"><span>排序</span><div class="mp-sort-switch" role="group" aria-label="快速报名排序"><button class="active" type="button" data-fast-sort="latest" aria-pressed="true">最新</button><button type="button" data-fast-sort="sales" aria-pressed="false">销量</button></div></div>`), `<div id="class-list" class="mp-registration-list"></div>`, `<dialog id="fast-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="fast-cascade-title"><header class="mp-cascade-head"><div><h2 id="fast-cascade-title">选择专业</h2><p id="fast-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="fast-cascade-path" class="mp-cascade-path"></div><div id="fast-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="fast-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="fast-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`));
   const selectedMajor = { discipline: '', field: '', professional: '' };
   const professionTrigger = document.querySelector('#fast-profession-trigger');
   const professionValue = document.querySelector('#fast-profession-value');
+  professionTrigger.querySelector(':scope > span')?.remove();
+  document.querySelector('[data-fast-choice="campus"] > span')?.remove();
+  document.querySelector('[data-fast-choice="weekday"] > span')?.remove();
   const cascadeDialog = document.querySelector('#fast-profession-dialog');
   const cascadePath = document.querySelector('#fast-cascade-path');
   const cascadeOptions = document.querySelector('#fast-cascade-options');
@@ -676,6 +732,7 @@ function renderFastRegistration() {
   let selectedCampus = '';
   let selectedWeekday = '';
   let openOnly = false;
+  let activeSort = params.get('sort') === 'sales' ? 'sales' : 'latest';
   const cascadeSteps = [{ key: 'discipline', label: '专业门类' }, { key: 'field', label: '专业分类' }, { key: 'professional', label: '专业' }];
   let draftMajor = { ...selectedMajor };
   let activeCascadeStep = 'discipline';
@@ -683,15 +740,23 @@ function renderFastRegistration() {
     const pathText = [selectedMajor.discipline, selectedMajor.field, selectedMajor.professional].filter(Boolean).join(' / ');
     professionValue.textContent = pathText || '全部专业';
     professionTrigger.classList.toggle('has-value', Boolean(pathText));
+    professionTrigger.setAttribute('aria-label', `专业：${pathText || '全部专业'}`);
   };
   const updateFastFilterChips = () => {
-    document.querySelector('#fast-campus-value').textContent = selectedCampus || '全部校区';
-    document.querySelector('#fast-weekday-value').textContent = ({ weekday: '工作日', saturday: '周六', sunday: '周日' })[selectedWeekday] || '全部时间';
-    document.querySelector('[data-fast-choice="campus"]').classList.toggle('has-value', Boolean(selectedCampus));
-    document.querySelector('[data-fast-choice="weekday"]').classList.toggle('has-value', Boolean(selectedWeekday));
+    const campusValue = selectedCampus || '全部校区';
+    const weekdayValue = ({ weekday: '工作日', saturday: '周六', sunday: '周日' })[selectedWeekday] || '全部时间';
+    const campusTrigger = document.querySelector('[data-fast-choice="campus"]');
+    const weekdayTrigger = document.querySelector('[data-fast-choice="weekday"]');
+    document.querySelector('#fast-campus-value').textContent = campusValue;
+    document.querySelector('#fast-weekday-value').textContent = weekdayValue;
+    campusTrigger.classList.toggle('has-value', Boolean(selectedCampus));
+    weekdayTrigger.classList.toggle('has-value', Boolean(selectedWeekday));
+    campusTrigger.setAttribute('aria-label', `校区：${campusValue}`);
+    weekdayTrigger.setAttribute('aria-label', `上课时间：${weekdayValue}`);
     const openOnlyTrigger = document.querySelector('#fast-open-only');
     openOnlyTrigger.classList.toggle('has-value', openOnly);
     openOnlyTrigger.setAttribute('aria-pressed', String(openOnly));
+    openOnlyTrigger.setAttribute('aria-label', `只看可报名：${openOnly ? '已开启' : '未开启'}`);
   };
   const cascadeValues = () => {
     if (activeCascadeStep === 'discipline') return professionalTree.map(item => item.value);
@@ -723,8 +788,8 @@ function renderFastRegistration() {
   };
   const draw = () => {
     const activeSeason = document.querySelector('[data-season].active')?.dataset.season || '秋季';
-    const items = classItems.filter(item => (item.season || '秋季') === activeSeason && (!selectedMajor.discipline || item.discipline === selectedMajor.discipline) && (!selectedMajor.field || item.field === selectedMajor.field) && (!selectedMajor.professional || item.professional === selectedMajor.professional) && (!selectedCampus || item.campus === selectedCampus) && scheduleMatches(item.schedule, selectedWeekday) && (!openOnly || item.bookable));
-    document.querySelector('#fast-batch-title').textContent = `2026年${activeSeason}`;
+    const items = sortedLearnerItems(classItems.filter(item => (item.season || '秋季') === activeSeason && (!selectedMajor.discipline || item.discipline === selectedMajor.discipline) && (!selectedMajor.field || item.field === selectedMajor.field) && (!selectedMajor.professional || item.professional === selectedMajor.professional) && (!selectedCampus || item.campus === selectedCampus) && scheduleMatches(item.schedule, selectedWeekday) && (!openOnly || item.bookable)), activeSort);
+    document.querySelector('#fast-batch-title').textContent = filteredCourse ? `${filteredCourse.name} · ${activeSeason}` : `2026年${activeSeason}`;
     document.querySelector('#fast-result-count').textContent = `${items.length}个班级`;
     document.querySelector('#class-list').innerHTML = items.length ? items.map(fastRegistrationCard).join('') : '<div class="mp-empty">当前条件下暂无可报名班级</div>';
   };
@@ -795,6 +860,16 @@ function renderFastRegistration() {
   document.querySelectorAll('[data-fast-choice]').forEach(chip => chip.addEventListener('click', () => openFastChoice(chip.dataset.fastChoice)));
   document.querySelector('#fast-open-only').addEventListener('click', () => { openOnly = !openOnly; updateFastFilterChips(); draw(); });
   document.querySelector('#fast-filter-reset').addEventListener('click', () => { Object.assign(selectedMajor, { discipline: '', field: '', professional: '' }); selectedCampus = ''; selectedWeekday = ''; openOnly = false; updateProfessionValue(); updateFastFilterChips(); draw(); });
+  document.querySelectorAll('[data-fast-sort]').forEach(control => control.addEventListener('click', () => {
+    activeSort = control.dataset.fastSort;
+    document.querySelectorAll('[data-fast-sort]').forEach(item => { const active = item === control; item.classList.toggle('active', active); item.setAttribute('aria-pressed', String(active)); });
+    const url = new URL(window.location.href);
+    if (activeSort === 'latest') url.searchParams.delete('sort');
+    else url.searchParams.set('sort', activeSort);
+    window.history.replaceState({}, '', url);
+    draw();
+  }));
+  document.querySelectorAll('[data-fast-sort]').forEach(item => { const active = item.dataset.fastSort === activeSort; item.classList.toggle('active', active); item.setAttribute('aria-pressed', String(active)); });
   updateProfessionValue();
   updateFastFilterChips();
   draw();
@@ -830,7 +905,7 @@ function renderFastRegistrationDetail(item = course('class-001')) {
   else if (pendingOrder) primaryAction = `<a class="mp-button mp-course-detail-primary" href="/learner/pages/payment.html?classId=${encodeURIComponent(item.id)}&orderId=${encodeURIComponent(pendingOrder.id)}">继续支付</a>`;
   else if (available) primaryAction = `<a class="mp-button mp-course-detail-primary" href="/learner/pages/payment.html?classId=${encodeURIComponent(item.id)}">立即报名</a>`;
   const studentBlock = isLoggedIn() ? card(`<div class="mp-section-head"><h3>报名学员</h3><a class="mp-link" href="/learner/pages/student-management.html">管理学员</a></div>${state.students.length ? `<label class="mp-field"><span>选择学员</span><select id="fast-student-select">${state.students.map(student => `<option value="${student.id}" ${student.id === currentStudentId ? 'selected' : ''}>${esc(student.name)}</option>`).join('')}</select></label>` : '<div class="mp-empty">尚未添加学员档案</div>'}`, 'mp-fast-detail-section') : '';
-  const action = `<div class="mp-bottom-actions mp-course-detail-actions"><button class="mp-button secondary" type="button" data-action="consult">咨询</button><button class="mp-button secondary" type="button" data-action="share">分享</button>${primaryAction}</div>`;
+  const action = `<div class="mp-bottom-actions mp-course-detail-actions"><button class="mp-button secondary mp-icon-action" type="button" data-action="consult"><span class="mp-linear-icon mp-linear-icon-consult" aria-hidden="true"></span><span>咨询</span></button><button class="mp-button secondary mp-icon-action" type="button" data-action="share"><span class="mp-linear-icon mp-linear-icon-share" aria-hidden="true"></span><span>分享</span></button>${primaryAction}</div>`;
   layout(stack(
     `<section class="mp-fast-detail-hero"><div class="mp-fast-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${pill('快速报名', 'light')}${pill(status, statusTone)}</div></div><div class="mp-fast-detail-summary"><h2>${esc(item.className || item.name)}</h2><p>${esc(item.courseName || item.name)} · ${esc(item.professional || item.category)}</p><strong class="mp-fast-detail-price">${money2(item.price)}</strong></div></section>`,
     card(`<div class="mp-section-head"><h3>报名信息</h3>${pill(status, statusTone)}</div><dl class="mp-fast-detail-facts"><div><dt>授课教师</dt><dd>${esc(item.teacher)}老师</dd></div><div><dt>首课日期</dt><dd>${esc(item.firstLessonDate || '待定')}</dd></div><div class="wide"><dt>上课教室</dt><dd>${esc(item.campus)} · ${esc(item.classroom || '待定')}</dd></div><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule || '以开课通知为准')}</dd></div><div><dt>总课次</dt><dd>${esc(item.hours)}课次</dd></div><div><dt>剩余名额</dt><dd>${esc(item.remainingSeats)} / ${esc(item.capacity)}</dd></div><div><dt>报名截止</dt><dd>${esc(item.deadline || '以招生通知为准')}</dd></div></dl>${item.unavailableReason ? `<p class="mp-notice">${esc(item.unavailableReason)}</p>` : ''}`, 'mp-fast-detail-section'),
@@ -966,7 +1041,7 @@ function renderPayment() {
   const subjectRow = isClassItem
     ? `<div class="mp-row"><span class="mp-label">当前学员</span><select id="student-select" style="border:0;background:transparent;color:var(--ink);text-align:right">${state.students.map(student => `<option value="${student.id}" ${student.id === state.currentStudentId ? 'selected' : ''}>${esc(student.name)}</option>`).join('')}</select></div>`
     : `<div class="mp-row"><span class="mp-label">购买账号</span><strong>${esc(account.name)}${account.phone ? `（${esc(account.phone)}）` : ''}</strong></div>`;
-  layout(stack(card(`<div class="mp-pills">${pill(item.type === 'video' ? '视频课程' : '面授课程')}${activeOrder ? pill(previousStatus, 'amber') : ''}</div><h2 style="margin-top:10px">${esc(item.name)}</h2><p>${esc(courseMeta(item))}</p>${stateNotice}<div class="mp-divider"></div>${subjectRow}<div class="mp-row"><span class="mp-label">应付金额</span><strong class="mp-price">${money2(item.price)}</strong></div>${isClassItem ? '<p class="mp-notice">名额以支付成功为准。提交订单不占用名额。</p>' : ''}${activeOrder ? `<div class="mp-payment-order-ref">订单号：${esc(activeOrder.id)}</div>` : ''}`), card(`<div class="mp-field"><label for="payment-outcome">支付结果（演示）</label><select id="payment-outcome"><option value="success">支付成功</option>${isClassItem ? '<option value="seat-failed">支付成功但最终占位失败</option>' : ''}<option value="cancelled">用户取消</option><option value="timeout">支付超时</option></select></div><label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--muted);margin-top:12px"><input id="agreement" type="checkbox" style="margin-top:3px">我已阅读并同意用户协议、隐私政策和课程报名须知</label><div id="payment-error" class="mp-notice" hidden style="margin-top:12px"></div>`), `<div class="mp-actions"><button class="mp-button full" id="pay-button" type="button">${activeOrder ? '继续支付' : '确认支付'}</button><a class="mp-button secondary full" href="/learner/pages/orders.html">返回订单</a></div>`));
+  layout(stack(card(`<div class="mp-pills">${pill(item.type === 'video' ? '视频课程' : '面授课程')}${activeOrder ? pill(previousStatus, 'amber') : ''}</div><h2 style="margin-top:10px">${esc(item.name)}</h2><p>${esc(courseMeta(item))}</p>${stateNotice}<div class="mp-divider"></div>${subjectRow}<div class="mp-row"><span class="mp-label">应付金额</span><strong class="mp-price">${money2(item.price)}</strong></div>${isClassItem ? '<p class="mp-notice">名额以支付成功为准。提交订单不占用名额。</p>' : ''}${activeOrder ? `<div class="mp-payment-order-ref">订单号：${esc(activeOrder.id)}</div>` : ''}`), card(`<div class="mp-field"><label for="payment-outcome">支付结果（演示）</label><select id="payment-outcome"><option value="success">支付成功</option><option value="pending">未支付</option>${isClassItem ? '<option value="seat-failed">支付成功但最终占位失败</option>' : ''}<option value="cancelled">用户取消</option><option value="timeout">支付超时</option></select></div><label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--muted);margin-top:12px"><input id="agreement" type="checkbox" style="margin-top:3px">我已阅读并同意用户协议、隐私政策和课程报名须知</label><div id="payment-error" class="mp-notice" hidden style="margin-top:12px"></div>`), `<div class="mp-actions"><button class="mp-button full" id="pay-button" type="button">${activeOrder ? '继续支付' : '确认支付'}</button><a class="mp-button secondary full" href="/learner/pages/orders.html">返回订单</a></div>`));
   // P1-4: switching the student re-resolves the resumable order instead of keeping the previous one.
   document.querySelector('#student-select')?.addEventListener('change', event => { state.currentStudentId = event.target.value; saveState(); renderPayment(); });
   document.querySelector('#pay-button').addEventListener('click', () => {
@@ -1020,10 +1095,13 @@ function renderPayment() {
         // 重新购买按新授权起算：显式清空上一次冻结或失效的留痕，避免旧记录污染本次授权。
         upsertDemoRecord('videoEntitlements', { id: `${state.accountId}-${item.id}`, accountId: state.accountId, courseId: item.id, courseVersion: patch.snapshot.courseVersion, snapshot: patch.snapshot, status: '生效', grantedAt: now, updatedAt: now, frozenAt: '', frozenReason: '', freezeRefundKey: '', restoredAt: '', restoreReason: '', invalidatedAt: '', invalidReason: '', invalidatedBy: '', invalidOrderId: '' });
       }
+    } else if (outcome === 'pending') {
+      patch.status = '待支付'; patch.paidAt = ''; patch.paymentReason = '尚未完成支付，可在订单有效期内继续支付'; patch.cancelType = '';
+      upsertDemoRecord('orders', patch);
     } else {
       patch.status = '已取消'; patch.paidAt = ''; patch.paymentReason = outcome === 'timeout' ? '支付超时，订单已关闭' : '用户主动取消支付'; patch.cancelType = outcome === 'timeout' ? 'timeout' : 'cancel'; upsertDemoRecord('orders', patch);
     }
-    const index = state.orders.findIndex(order => order.id === patch.id); if (index < 0) state.orders.unshift(patch); else state.orders[index] = { ...state.orders[index], ...patch }; saveState(); toast(outcome === 'seat-failed' ? '报名未成功，退款处理中' : outcome === 'success' ? (isClass ? '支付成功，已自动分班并占用名额' : '支付成功，学习权限已开通') : '支付结果已记录，课程权限和面授名额均未生效');
+    const index = state.orders.findIndex(order => order.id === patch.id); if (index < 0) state.orders.unshift(patch); else state.orders[index] = { ...state.orders[index], ...patch }; saveState(); toast(outcome === 'seat-failed' ? '报名未成功，退款处理中' : outcome === 'success' ? (isClass ? '支付成功，已自动分班并占用名额' : '支付成功，学习权限已开通') : outcome === 'pending' ? '订单已保留为待支付，可稍后继续支付' : '支付结果已记录，课程权限和面授名额均未生效');
     setTimeout(() => go(`/learner/pages/order-detail.html?orderId=${encodeURIComponent(patch.id)}`), 450);
   });
 }
@@ -1229,7 +1307,7 @@ function learningRecords() {
   const videoHasAccess = state.orders.some(order => !order.classId && order.courseId === 'COURSE-CR-2026-0002' && order.status === '已支付') || (shared.videoEntitlements || []).some(item => item.accountId === state.accountId && item.courseId === 'COURSE-CR-2026-0002' && item.status === '生效');
   const sharedVideo = (shared.videoEntitlements || []).filter(item => item.accountId === state.accountId && item.status === '生效').map(entitlement => { const progress = shared.progress?.[`${state.accountId}-${entitlement.courseId}`] || {}; return { ...(entitlement.snapshot?.course || {}), courseId: entitlement.courseId, courseVersion: entitlement.courseVersion, studentIds: state.students.map(student => student.id), type: 'video', status: 'ongoing', progress: Number(progress.percent || 0), lastPosition: progress.lastPosition || '尚未开始学习' }; });
   const sharedClasses = (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.status === '已分班').map(enrollment => { const source = state.courses.find(courseItem => courseItem.id === enrollment.classId) || {}; return { ...source, courseId: enrollment.classId, studentIds: [state.currentStudentId], type: 'class', status: 'upcoming', progress: 0, className: source.className || source.name, teacher: source.teacher, classroom: `${source.campus || ''} · ${source.classroom || ''}`, nextLesson: source.schedule || '待排课' }; });
-  return [...records, ...sharedVideo, ...sharedClasses].filter(item => item.studentIds.includes(state.currentStudentId)).map(item => {
+  return [...records.filter(item => !isLegacyClassRecord(item)), ...sharedVideo, ...sharedClasses].filter(item => item.studentIds.includes(state.currentStudentId)).map(item => {
     const source = item.courseId ? course(item.courseId) : {};
     const activeOrderSnapshot = item.type === 'video' ? state.orders.find(order => !order.classId && order.courseId === item.courseId && order.status === '已支付')?.snapshot?.course : null;
     const accessRevoked = item.type === 'video' && !videoHasAccess;
@@ -1440,11 +1518,15 @@ function renderStudentEdit() {
     const error = document.querySelector('#profile-student-error');
     if (state.students.some(item => item.id !== student?.id && item.name === name)) { error.hidden = false; error.textContent = '该学员已存在，请直接切换当前学员。'; return; }
     const values = { name, gender: selectedGender, birthMonth, relation: document.querySelector('#profile-student-relation').value };
-    if (student) Object.assign(student, values);
+    if (student) {
+      Object.assign(student, values);
+      upsertDemoRecord('students', { ...student, accountId: state.accountId });
+    }
     else {
       const newStudent = { id: `student-${Date.now()}`, ...values };
       state.students.push(newStudent);
       state.currentStudentId = newStudent.id;
+      upsertDemoRecord('students', { ...newStudent, accountId: state.accountId });
     }
     saveState();
     toast(isEditing ? `已更新学员：${name}` : `已添加学员：${name}`);

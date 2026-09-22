@@ -76,7 +76,6 @@ export const MALL_FIELD_SPEC = {
       groups: [
         { heading: '发布商品字段', fields: [
           { id: 'FD-MALL-001', label: '关联课程', type: '下拉', length: '必选 1 门', required: '是', note: '只能选择课程库中已完成编排的视频课程' },
-          { id: 'FD-MALL-051', label: '引用课程版本', type: '只读', length: 'v1 起单调递增', required: '系统记录', note: '发布时锁定版本；课程升版后商品不自动跟随，列表显示可同步提示并由运营显式同步', constraints: { readOnly: true, system: true } },
           { id: 'FD-MALL-057', label: '课程停用提示', type: '只读提示', length: '—', required: '关联课程停用时展示', note: '提示关联课程已停用，请恢复课程或下架商品；不自动修改商品状态', constraints: { readOnly: true, derived: true } },
           { id: 'FD-MALL-052', label: '课程基本信息', type: '只读信息组', length: '8 项', required: '系统继承', note: '课程编号、名称、类型、专业、申报教师、总课时、难度、适合年龄', constraints: { readOnly: true, derived: true } },
           { id: 'FD-MALL-053', label: '课程大纲', type: '只读结构', length: '章节 + 课时', required: '系统继承', note: '展示关联版本的章节和课时，商品页不可修改', constraints: { readOnly: true, derived: true } },
@@ -87,9 +86,8 @@ export const MALL_FIELD_SPEC = {
           { id: 'FD-MALL-003', label: '售卖价格', type: '金额', length: '大于 0，保留两位小数', required: '是', note: '以商品配置为准，课程档案价格仅作发布初值', constraints: { exclusiveMin: 0, decimals: 2 } },
           { id: 'FD-MALL-004', label: '试看策略', type: '单选', length: '不允许试看 / 允许试看', required: '是', note: '由商品配置决定，默认不允许；开启后只能播放第一课时', constraints: { options: ['不允许试看', '允许试看'] } },
           { id: 'FD-MALL-005', label: '试看课时', type: '下拉', length: '第 1 课时', required: '允许试看时必填', note: '只能选择第一课时', constraints: { options: ['第 1 课时'], requiredWhen: 'FD-MALL-004=允许试看' } },
-          { id: 'FD-MALL-054', label: '上架方式', type: '单选', length: '仅保存 / 立即上架 / 定时上架', required: '是', note: '仅保存时封面可为空；上架前必须补齐展示信息', constraints: { options: ['仅保存', '立即上架', '定时上架'] } },
           { id: 'FD-MALL-011', label: '商品状态', type: '只读', length: '草稿 / 已上架 / 已下架', required: '系统计算', note: '保存为草稿，发布后已上架；下架保留商品主体与调价记录', constraints: { readOnly: true, system: true } },
-          { id: 'FD-MALL-007', label: '定时上架时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '定时上架时必填', note: '到点自动上架；下架只影响购买入口', constraints: { format: 'YYYY-MM-DD HH:mm', requiredWhen: 'FD-MALL-054=定时上架' } },
+          { id: 'FD-MALL-058', label: '是否推荐', type: '开关', length: '是 / 否', required: '否', note: '仅已上架且关联课程启用时生效；控制商品是否进入学员端首页“视频课程推荐”，不改变上下架状态', constraints: { default: false } },
           // CR-2026-020：教学属性只读带入；运营四字段写在该商品记录自身。
           ...courseFieldRows('MALL', 20, COURSE_TEACHING_FIELDS, { type: '文本（只读）', required: '系统继承', note: '来自教师申报与编排环节，发布商品时只读带入，不可修改', constraints: { readOnly: true, derived: true } }),
           ...courseFieldRows('MALL', 22, COURSE_DISPLAY_FIELDS)
@@ -102,7 +100,8 @@ export const MALL_FIELD_SPEC = {
         '价格、试看与上下架以商品配置为准，课程档案不得覆盖售卖字段与售卖单元的展示素材。',
         '关闭试看时未购买账号不能播放任何课时；开启试看时只能播放第一课时。',
         '课程封面、图文详情、课程标签与 C 端推荐语写在该商品记录自身（售卖单元级存储），不写入课程档案；字段定义与发布班级共用同一份规格。',
-        '商品草稿可不上传封面；立即或定时上架前必须上传。同一商品再次编辑时展示四字段只读带入，点“修改展示信息”后可编辑。',
+        '是否推荐是独立展示属性：关闭后仅移出学员端首页推荐栏目；商品列表、课程列表、订单和学习权限不受影响。商品下架或关联课程停用时首页自动不展示，但保留推荐值。',
+        '商品保存后为草稿，从列表手动上架或下架；上架前必须上传封面。同一商品再次编辑时展示四字段只读带入，点“修改展示信息”后可编辑。',
         '新增、编辑用“关联课程／销售设置／展示信息”三段式工作台；详情用“商品概览／课程内容／展示与销售／变更记录”四页签且全部只读。'
       ]
     }

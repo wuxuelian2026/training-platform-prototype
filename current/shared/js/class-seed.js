@@ -2,45 +2,114 @@
 // P0-1: one class entity keeps one primary key, one name and one enrollment count on both ends.
 // CR-2026-044: legacy `fast` maps only to visibleInFastChannel; it never changes bookability.
 
+// CR-2026-056：面授班级阶段状态 Mock 数据。
+// 排课阶段：待排课 3 条、排课中 3 条、已完成 15 条。
+// 已完成排课的 15 条再按招生状态分为未开始 3 条、进行中 3 条、已结束 9 条；
+// 招生已结束的 9 条按教学状态分为待开课、授课中、已结课各 3 条。
+const publishedSessions = (firstDate, total = 8) => Array.from({ length: total }, (_, index) => {
+  const date = new Date(`${firstDate}T00:00:00+08:00`);
+  date.setDate(date.getDate() + index * 7);
+  const localDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return {
+    index: index + 1,
+    date: localDate,
+    weekday: `周${['日', '一', '二', '三', '四', '五', '六'][date.getDay()]}`,
+    startTime: '09:00',
+    endTime: '10:30',
+    start: '09:00',
+    end: '10:30',
+    lessonDuration: 90,
+    roomId: 'venue-201',
+    status: '待上课'
+  };
+});
+
+const classRecord = ({ id, name, courseId = 'COURSE-CR-2026-0001', course = '舞蹈基本功', teacher = '王玥', major = '中国舞', scheduleStatus, enrollStart = '', deadline = '', firstLessonDate = '', sessions = [], enrolled = 0, capacity = 20, recommended = false, updatedAt = '2026-09-17 10:00' }) => ({
+  id,
+  name,
+  courseId,
+  course,
+  courseVersion: 1,
+  professional: major,
+  teacher,
+  batch: '秋季',
+  capacity,
+  enrolled,
+  price: 1680,
+  scheduleStatus,
+  scheduleVersion: scheduleStatus === '已发布' ? 1 : 0,
+  schedule: scheduleStatus === '已发布' ? '每周六 09:00-10:30' : '',
+  weekdays: scheduleStatus === '已发布' ? ['周六'] : [],
+  firstLessonDate,
+  lessonDuration: 90,
+  lessons: sessions.length || 8,
+  sessions,
+  displayStatus: scheduleStatus === '已发布' ? '显示' : '隐藏',
+  display: scheduleStatus === '已发布' ? '已展示' : '未发布',
+  visibleInFastChannel: scheduleStatus === '已发布',
+  fast: scheduleStatus === '已发布' ? '是' : '否',
+  recommended,
+  enrollStart,
+  deadline,
+  enrollmentClosed: false,
+  trialEnabled: '是',
+  trialFee: '否',
+  trialPrice: '',
+  trialNote: '请联系课程顾问了解试听安排。',
+  status: scheduleStatus === '草稿' ? '排班草稿' : scheduleStatus === '已发布' ? '招生中' : '待排课',
+  campus: '南湖校区',
+  classroom: '音乐楼201',
+  roomId: 'venue-201',
+  updatedAt
+});
+
+const pendingScheduleClasses = [1, 2, 3].map(index => classRecord({
+  id: `class-mock-pending-${String(index).padStart(2, '0')}`,
+  name: `秋季中国舞待排课${index}班`,
+  scheduleStatus: '待排课'
+}));
+
+const arrangingClasses = [1, 2, 3].map(index => classRecord({
+  id: `class-mock-arranging-${String(index).padStart(2, '0')}`,
+  name: `秋季中国舞排课中${index}班`,
+  scheduleStatus: '草稿'
+}));
+
+const completedEnrollmentNotStarted = [1, 2, 3].map(index => {
+  const sessions = publishedSessions('2026-11-07');
+  return classRecord({ id: `class-mock-ready-${String(index).padStart(2, '0')}`, name: `秋季中国舞待招生${index}班`, scheduleStatus: '已发布', enrollStart: '2026-10-01 09:00', deadline: '2026-10-31 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 2, updatedAt: '2026-09-20 10:00' });
+});
+
+const completedEnrollmentOngoing = [1, 2, 3].map(index => {
+  const sessions = publishedSessions('2026-10-10');
+  return classRecord({ id: `class-mock-enrolling-${String(index).padStart(2, '0')}`, name: `秋季中国舞招生中${index}班`, scheduleStatus: '已发布', enrollStart: '2026-09-01 09:00', deadline: '2026-10-01 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 6, recommended: index === 1, updatedAt: '2026-09-18 10:00' });
+});
+
+const completedEnrollmentEndedPending = [1, 2, 3].map(index => {
+  const sessions = publishedSessions('2026-11-14');
+  return classRecord({ id: `class-mock-ended-pending-${String(index).padStart(2, '0')}`, name: `秋季中国舞已截止待开课${index}班`, scheduleStatus: '已发布', enrollStart: '2026-08-20 09:00', deadline: '2026-09-10 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 12, updatedAt: '2026-09-15 10:00' });
+});
+
+const completedEnrollmentEndedTeaching = [1, 2, 3].map(index => {
+  const sessions = publishedSessions('2026-09-10');
+  return classRecord({ id: `class-mock-ended-teaching-${String(index).padStart(2, '0')}`, name: `秋季中国舞已截止授课中${index}班`, scheduleStatus: '已发布', enrollStart: '2026-08-20 09:00', deadline: '2026-09-10 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 14, updatedAt: '2026-09-12 10:00' });
+});
+
+const completedEnrollmentEndedFinished = [1, 2, 3].map(index => {
+  const sessions = publishedSessions('2026-07-04');
+  return classRecord({ id: `class-mock-ended-finished-${String(index).padStart(2, '0')}`, name: `秋季中国舞已结课${index}班`, scheduleStatus: '已发布', enrollStart: '2026-06-01 09:00', deadline: '2026-09-01 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 18, updatedAt: '2026-08-30 10:00' });
+});
+
 export const classSeed = [
-  {
-    id: 'class-001', courseId: 'COURSE-CR-2026-0001', archive: '完整课程',
-    name: '少儿中国舞基础班', className: '2026秋季中国舞启蒙一班', course: '舞蹈基本功', courseName: '少儿中国舞基础',
-    batch: '秋季', season: '秋季', teacher: '王玥', category: '舞蹈类',
-    professional: '中国舞', discipline: '舞蹈', field: '舞蹈表演', level: '初级', age: '少儿', lessons: 16,
-    campus: '龙泉校区', classroom: '综合楼302', schedule: '每周六 09:00-10:30', weekday: '周六', startTime: '09:00', endTime: '10:30', firstLessonDate: '2026-09-19',
-    cover: '已配置', coverFile: '舞蹈基本功-封面.png', displayDetail: '从身体控制、节奏训练到基本舞姿，建立少儿中国舞的基础训练体系。', tags: ['中国舞', '基础'], recommendation: '从每一次站立开始建立身体控制。', price: '1680.00', deadline: '2026-09-30 23:59', enrolled: 17, capacity: 20,
-    status: '招生中', display: '已展示', fast: '否', courseVersion: 2, created: '2026-08-28', scheduleStatus: '已发布', scheduleVersion: 1, schedulePublishedAt: '2026-09-01 10:00'
-  },
-  {
-    id: 'class-002', courseId: 'LIB-003', archive: '轻量课程档案',
-    name: '少儿美术兴趣班', className: '2026秋季少儿美术兴趣班', course: '少儿美术兴趣班', courseName: '少儿美术兴趣班',
-    batch: '秋季', season: '秋季', teacher: '李青', category: '美术类',
-    professional: '少儿绘画', discipline: '绘画', field: '少儿绘画', level: '启蒙', age: '少儿', lessons: 20,
-    campus: '南湖校区', classroom: '艺术楼103', schedule: '每周日 14:00-15:30', weekday: '周日', startTime: '14:00', endTime: '15:30', firstLessonDate: '2026-09-13',
-    cover: '已配置', coverFile: '少儿美术兴趣班-封面.png', displayDetail: '以主题创作和材料体验激发少儿绘画兴趣。', tags: ['美术', '少儿'], recommendation: '让孩子在创作中发现自己的表达方式。', price: '2280.00', deadline: '2026-09-25 23:59', enrolled: 15, capacity: 15,
-    status: '已满员', display: '已展示', fast: '否', courseVersion: 1, created: '2026-08-18', scheduleStatus: '已发布', scheduleVersion: 1, schedulePublishedAt: '2026-09-01 10:10'
-  },
-  {
-    id: 'class-003', courseId: 'COURSE-CR-2026-0001', archive: '完整课程',
-    name: '少儿中国舞提高班', className: '2026秋季中国舞提高二班', course: '舞蹈基本功', courseName: '少儿中国舞提高',
-    batch: '秋季', season: '秋季', teacher: '王玥', category: '舞蹈类',
-    professional: '中国舞', discipline: '舞蹈', field: '舞蹈表演', level: '初级', age: '少儿', lessons: 16,
-    campus: '南湖校区', classroom: '艺术楼201', schedule: '每周日 10:00-11:30', weekday: '周日', startTime: '10:00', endTime: '11:30', firstLessonDate: '2026-09-20',
-    cover: '已配置', coverFile: '少儿中国舞提高班-封面.png', displayDetail: '面向有基础学员的进阶组合训练，强化舞台表现。', tags: ['中国舞', '提高'], recommendation: '从基础走向舞台表达。', price: '1880.00', deadline: '2026-10-08 23:59', enrolled: 13, capacity: 18,
-    status: '招生中', display: '已展示', fast: '是', courseVersion: 2, created: '2026-08-30', scheduleStatus: '已发布', scheduleVersion: 1, schedulePublishedAt: '2026-09-02 09:30'
-  },
-  {
-    id: 'class-004', courseId: 'COURSE-CR-2026-0003', archive: '完整课程',
-    name: '国画入门工作坊', className: '2026秋季国画入门工作坊', course: '少儿国画入门', courseName: '少儿国画入门',
-    batch: '秋季', season: '秋季', teacher: '李青', category: '美术类',
-    professional: '中国画', discipline: '绘画', field: '中国画', level: '启蒙', age: '少儿', lessons: 20,
-    campus: '', classroom: '', schedule: '', weekday: '', startTime: '', endTime: '', firstLessonDate: '',
-    cover: '未配置', coverFile: '', displayDetail: '以笔墨体验和传统题材临摹为主，适合零基础少儿建立国画兴趣。', tags: ['国画', '少儿'], recommendation: '一笔一画认识中国画。', price: '2280.00', deadline: '2026-10-15 23:59', enrolled: 0, capacity: 16,
-    status: '待排班', display: '未发布', fast: '是', courseVersion: 1, created: '2026-09-09', scheduleStatus: '未排班', scheduleVersion: 0, sessions: []
-  }
+  ...pendingScheduleClasses,
+  ...arrangingClasses,
+  ...completedEnrollmentNotStarted,
+  ...completedEnrollmentOngoing,
+  ...completedEnrollmentEndedPending,
+  ...completedEnrollmentEndedTeaching,
+  ...completedEnrollmentEndedFinished
 ];
 
 export function cloneClassSeed() {
-  return classSeed.map(item => ({ ...item }));
+  return classSeed.map(item => ({ ...item, weekdays: [...(item.weekdays || [])], sessions: (item.sessions || []).map(session => ({ ...session })) }));
 }

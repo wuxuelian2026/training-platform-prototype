@@ -137,6 +137,12 @@ body { background: #f7f7f5; }
 .mp-fast-filter-chip:focus-visible, .mp-course-filter-chip:focus-visible { outline: 3px solid rgba(139,2,2,.18); outline-offset: 1px; }
 .mp-fast-filter-actions { display: flex; justify-content: flex-end; margin-top: 2px; }
 .mp-fast-filter-actions .mp-button { min-height: 34px; padding: 0; }
+.mp-fast-sort-row { display: flex; min-height: 34px; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; padding-top: 10px; border-top: 1px solid #eee9e3; color: var(--muted); font-size: 12px; }
+.mp-sort-switch { display: inline-grid; grid-template-columns: repeat(2, 44px); flex: none; overflow: hidden; border: 1px solid #dcd5cf; border-radius: 6px; background: #fff; }
+.mp-sort-switch button { width: 44px; min-height: 30px; padding: 0; border: 0; border-right: 1px solid #e4ded8; background: transparent; color: #746b65; font-size: 12px; }
+.mp-sort-switch button:last-child { border-right: 0; }
+.mp-sort-switch button.active { background: #8b0202; color: #fff; font-weight: 700; }
+.mp-sort-switch button:focus-visible { position: relative; z-index: 1; outline: 3px solid rgba(139,2,2,.18); outline-offset: -2px; }
 .mp-filter-choice-dialog { position: fixed; inset: auto 0 0; width: min(100%, 520px); max-width: none; margin: 0 auto; padding: 0; border: 0; background: transparent; }
 .mp-filter-choice-dialog::backdrop { background: rgba(34,24,20,.42); }
 .mp-filter-choice-sheet { overflow: hidden; border: 1px solid #e4ddd7; border-bottom: 0; border-radius: 10px 10px 0 0; background: #fff; box-shadow: 0 -12px 36px rgba(31,31,31,.14); }
@@ -340,7 +346,9 @@ body { background: #f7f7f5; }
 .mp-course-filter-chip[hidden] { display: none; }
 .mp-course-list-section { display: grid; min-width: 0; gap: 10px; }
 .mp-course-list-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 2px 2px 0; }
-.mp-course-list-head h2 { margin: 0; font-size: 16px; }
+.mp-list-summary { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+.mp-course-list-head h2 { margin: 0; font-size: 16px; white-space: nowrap; }
+.mp-list-summary .mp-muted { font-size: 11px; white-space: nowrap; }
 .mp-course-choice-sheet { gap: 0; }
 .mp-course-choice-sheet .mp-cascade-options { max-height: min(44vh, 340px); }
 .mp-course-toggle { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 0; border-bottom: 1px solid #eee9e3; }
@@ -1584,14 +1592,6 @@ body { background: #f7f7f5; }
 .teacher-lesson-dialog .editor-select { min-width: 88px; }
 .teacher-lesson-dialog .rich-editor { min-height: 140px; font-size: 13px; }
 
-/* P1（2026-09-18）：教师端证书「审核状态」与「有效期」分维度——需要处理事项独立提醒区。 */
-.teacher-certificate-actions { margin: 0 0 12px; padding: 12px 14px; border: 1px solid #f0d7c7; border-radius: 10px; background: #fdf7f2; }
-.teacher-certificate-actions-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-.teacher-certificate-actions-head strong { font-size: 14px; color: #b25f22; }
-.teacher-certificate-actions-head span { font-size: 12px; color: var(--text-muted, #6b7385); }
-.teacher-certificate-actions ul { margin: 0; padding-left: 16px; display: grid; gap: 4px; }
-.teacher-certificate-actions li { font-size: 12px; color: var(--text-muted, #6b7385); }
-.teacher-certificate-actions li button { border: 0; background: transparent; padding: 0; margin-right: 6px; color: var(--brand, #2f6fed); font-size: 12px; text-decoration: underline; }
 .teacher-certificate-card.is-focus { outline: 2px solid var(--brand, #2f6fed); outline-offset: 2px; }
 .teacher-contract-card-note { margin: 8px 0 0; font-size: 12px; color: #b25f22; }
 

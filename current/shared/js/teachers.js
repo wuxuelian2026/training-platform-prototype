@@ -1137,13 +1137,11 @@ function initContracts() {
   const apply = () => {
     const status = activeContractStatus;
     const termStatus = form?.querySelector('[name="termStatus"]')?.value || '';
-    const type = form?.querySelector('[name="type"]')?.value || '';
     const teacher = (form?.querySelector('[name="teacher"]')?.value || '').trim();
     let visible = 0;
     rows.forEach((row) => {
       const matches = (!status || row.dataset.status === status)
         && (!termStatus || termStatusOf(row) === termStatus)
-        && (!type || row.dataset.type === type)
         && (!teacher || row.dataset.teacher.includes(teacher));
       row.hidden = !matches;
       if (matches) visible += 1;

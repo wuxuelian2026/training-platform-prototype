@@ -30,6 +30,16 @@
 .sales-switch-control { display: flex; min-height: 36px; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .sales-switch-control input { width: 18px; height: 18px; accent-color: var(--brand); }
 .sales-switch-control em { font-style: normal; }
+.sales-table-switch { display: inline-flex; min-width: 66px; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.sales-table-switch input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.sales-table-switch span { position: relative; width: 30px; height: 18px; flex: 0 0 auto; border: 1px solid #bfbfbf; border-radius: 9px; background: #bfbfbf; transition: background-color .16s ease, border-color .16s ease; }
+.sales-table-switch span::after { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.18); content: ''; transition: transform .16s ease; }
+.sales-table-switch input:checked + span { border-color: var(--brand); background: var(--brand); }
+.sales-table-switch input:checked + span::after { transform: translateX(12px); }
+.sales-table-switch input:focus-visible + span { outline: 2px solid color-mix(in srgb, var(--brand) 35%, transparent); outline-offset: 2px; }
+.sales-table-switch input:disabled + span { border-color: #d9d9d9; background: #e8e8e8; }
+.sales-table-switch:has(input:disabled) { cursor: not-allowed; opacity: .7; }
+.sales-table-switch em { min-width: 1em; font-style: normal; }
 .sales-dialog-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
 .sales-dialog-grid .wide { grid-column: 1 / -1; }
 .sales-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
