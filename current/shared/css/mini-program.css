@@ -490,7 +490,6 @@ body { background: #f7f7f5; }
 .teacher-lesson-tabs button { min-height: 46px; padding: 0 6px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 11px; }
 .teacher-lesson-tabs button.active { border-bottom-color: var(--brand); color: var(--brand); font-weight: 700; }
 .teacher-lesson-tabbar { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 14px; border-bottom: 1px solid #eee9e5; background: #fffaf7; }
-.teacher-lesson-tabbar strong { font-size: 12px; }
 .teacher-lesson-tab-action { min-height: 34px; padding: 0 10px; border: 1px solid var(--brand); border-radius: 5px; background: #fff; color: var(--brand); font-size: 10px; }
 .teacher-lesson-tab-content { padding: 10px 0 0; }
 .teacher-lesson-tab-content > .teacher-lesson-section { margin: 0 10px 10px; }
