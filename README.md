@@ -83,6 +83,22 @@ npm run preview
 - PRD、客户确认版文档、内部会议材料等资料应单独管理，不要随原型公开发布。
 - 如果使用 GitHub Pages 发布在线演示，需要检查页面中的绝对路径，并确认项目子路径下的页面跳转正常。
 
+## 迭代版本与在线预览
+
+- `main`：迭代 1 冻结版，冻结提交为 `01174e0`，后续不接受迭代 2 的直接覆盖。
+- `iteration-2`：迭代 2 当前开发和评审版。
+- GitHub Pages 根地址：迭代 2 当前评审版。
+- GitHub Pages `/iteration-1/`：迭代 1 冻结版。
+
+发布后的预览地址：
+
+```text
+https://wuxuelian2026.github.io/training-platform-prototype/
+https://wuxuelian2026.github.io/training-platform-prototype/iteration-1/
+```
+
+迭代 1 的开发源代码已经在线下冻结，线上原型仅用于回看和评审；实际开发以开发团队的线下代码为准。迭代 2 评审期间只推送 `iteration-2` 分支，确认冻结后再决定是否将其作为新的默认版本。
+
 ## 当前原型范围
 
 当前原型覆盖培训子系统的后台管理端、教师端、学员端及运营可视化等主要业务场景。页面中的数据为演示数据，交互主要用于流程验证和界面评审。

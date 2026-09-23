@@ -5,6 +5,7 @@
 import { relativePath } from './paths.js';
 
 const LOGIN_KEY = 'hbyx-mini-logged-in';
+const ROLE_KEY = 'hbyx-mini-role';
 
 // 学员端公开页（发现类内容，不含个人数据）；其余学员端页面与教师端全部页面需要登录。
 const LEARNER_PUBLIC_PAGES = new Set([
@@ -13,6 +14,7 @@ const LEARNER_PUBLIC_PAGES = new Set([
 ]);
 
 export const isMiniLoggedIn = () => sessionStorage.getItem(LOGIN_KEY) === '1';
+export const isMiniRole = (role) => sessionStorage.getItem(ROLE_KEY) === role;
 export const isLearnerPublicPage = (pageName) => LEARNER_PUBLIC_PAGES.has(String(pageName || '').replace('.html', ''));
 
 export const miniPageName = (path) => (String(path || location.pathname).split('/').pop() || '').replace('.html', '');

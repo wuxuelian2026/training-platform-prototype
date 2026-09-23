@@ -13,9 +13,10 @@
     "build:prd-states": "node scripts/build-prd-states.mjs",
     "check:prd-states": "node scripts/build-prd-states.mjs --check",
     "check:changes": "node scripts/check-change-coverage.mjs",
-    "check:spec": "npm run check:page-spec && npm run check:prd-fields && npm run check:prd-states && npm run check:changes && npm run check:params",
+    "check:spec": "npm run check:page-spec && npm run check:prd-fields && npm run check:prd-states && npm run check:changes && npm run check:params && npm run check:course-hours",
     "audit:alignment": "node scripts/audit-field-alignment.mjs",
-    "check:params": "node scripts/check-parameter-consistency.mjs"
+    "check:params": "node scripts/check-parameter-consistency.mjs",
+    "check:course-hours": "node scripts/check-course-hours.mjs"
   },
   "devDependencies": {
     "vite": "^6.1.0"

@@ -37,7 +37,7 @@ export const CRM_FIELD_SPEC = {
           { id: 'FD-ACADEMIC-031', label: '课程与版本', type: '文本（只读）', length: '—', required: '系统继承', note: '由班级锁定的 course_id + course_version 带入', constraints: { readOnly: true, derived: true } },
           { id: 'FD-ACADEMIC-015', label: '班级名称', type: '文本（只读）', length: '≤ 50 字', required: '系统继承', note: '由 class_id 带入，不可在排课页修改', constraints: { readOnly: true, derived: true } },
           { id: 'FD-ACADEMIC-016', label: '批次与容量', type: '文本（只读）', length: '—', required: '系统继承', note: '由班级招生配置带入', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-ACADEMIC-033', label: '总课时', type: '只读', length: '正整数', required: '系统继承', note: '从班级引用课程版本继承，等于课次数', constraints: { readOnly: true, min: 1, integer: true } }
+          { id: 'FD-ACADEMIC-033', label: '总课时', type: '只读', length: '正整数', required: '系统继承', note: '取班级所引用课程在课程库的总课时（课时以课程库为准），一个课时对应一个课次，已排课时课次数等于总课时（CR-2026-127）', constraints: { readOnly: true, min: 1, integer: true } }
         ] },
         { heading: '排课工作台 · 第 2 步 教师与场地', fields: [
           { id: 'FD-ACADEMIC-017', label: '授课教师', type: '下拉', length: '可选教师', required: '是', note: '需满足该专业可排课条件' },

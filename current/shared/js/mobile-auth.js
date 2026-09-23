@@ -26,7 +26,9 @@ const fillDemoAccounts = role => {
   accountSelect.value = options.some(item => item.value === stored) ? stored : options[0]?.value || '';
 };
 const safeRedirect = (redirect, role) => {
-  const target = redirect && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : role === 'teacher' ? '/teacher/index.html' : '/learner/index.html';
+  const validPath = redirect && redirect.startsWith('/') && !redirect.startsWith('//');
+  const rolePath = role === 'teacher' ? '/teacher/' : '/learner/';
+  const target = validPath && redirect.startsWith(rolePath) ? redirect : role === 'teacher' ? '/teacher/index.html' : '/learner/index.html';
   return relativePath(target);
 };
 

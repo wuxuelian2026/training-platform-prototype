@@ -38,7 +38,7 @@ const urlOf = (key) => {
   return `/admin/pages/${key}.html`;
 };
 const viewportOf = (key) => (key.startsWith('learner/') || key.startsWith('teacher/') ? [390, 844] : [1280, 900]);
-// 参数依赖页：缺参会渲染空态或跳回列表（ZK-B-18／ZK-B-21），巡检按演示基��注入有效参数，
+// 参数依赖页：缺参会渲染空态或跳回列表（ZK-B-18／ZK-B-21），巡检按演示基准注入有效参数，
 // 否则「正文过短」会被误判成页面缺陷（如 teacher/class-overview 需要 ?class=）。
 const PARAMS_OF = {
   'learner/course-detail': '?courseId=COURSE-CR-2026-0002',

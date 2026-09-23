@@ -57,13 +57,17 @@ export function classTeachingStatus(record, now = DEMO_NOW) {
 export function classLessonProgress(record, now = DEMO_NOW) {
   const sessions = Array.isArray(record?.sessions) ? record.sessions : [];
   const total = Number(record?.lessons || sessions.length || 0);
-  const completed = sessions.filter(session => {
-    if (['已完成', '已上课', 'completed'].includes(session?.status)) return true;
-    // ZK-B-14：课次不设「已取消」状态（4 态口径，见 CR-2026-099），不再保留该状态的防御分支。
-    const endAt = asDate(`${session?.date || ''} ${session?.endTime || session?.end || '23:59'}`);
-    return endAt ? now >= endAt : false;
-  }).length;
+  const completed = sessions.filter(session => isSessionPast(session, now)).length;
   return { completed: Math.min(completed, total), total };
+}
+
+// 课次是否已结束：种子与排课结果里的 status 可能仍是占位的「待上课」，
+// 后台课表按日期派生状态，学员端沿用同一判定，避免课表与上课记录各算一套。
+// ZK-B-14：课次不设「已取消」状态（4 态口径，见 CR-2026-099），不再保留该状态的防御分支。
+export function isSessionPast(session, now = DEMO_NOW) {
+  if (['已完成', '已上课', 'completed'].includes(session?.status)) return true;
+  const endAt = asDate(`${session?.date || ''} ${session?.endTime || session?.end || '23:59'}`);
+  return endAt ? now >= endAt : false;
 }
 
 export function classStageProjection(record, now = DEMO_NOW) {

@@ -455,6 +455,8 @@ body { background: #f7f7f5; }
 .teacher-lesson-hero-head > div { min-width: 0; }
 .teacher-lesson-hero-head > div > span { display: block; color: var(--muted); font-size: 10px; }
 .teacher-lesson-hero-head h2 { margin: 4px 0 0; font-size: 17px; line-height: 1.4; }
+.teacher-lesson-class-link { color: inherit; text-decoration: none; }
+.teacher-lesson-class-link:hover, .teacher-lesson-class-link:focus-visible { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
 .teacher-lesson-hero-head .mp-pill { flex: none; }
 .teacher-lesson-hero dl { display: grid; grid-template-columns: 1.1fr .9fr; margin: 0; border-top: 1px solid #eee9e5; }
 .teacher-lesson-hero dl div { min-width: 0; padding: 11px 14px; }
@@ -483,6 +485,15 @@ body { background: #f7f7f5; }
 .teacher-lesson-readiness li.done { color: #277435; }
 .teacher-lesson-readiness li.done i { border-color: #82b48a; background: #edf7ee; }
 .teacher-lesson-section { min-width: 0; padding: 0 14px 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
+.teacher-lesson-workspace { min-width: 0; overflow: hidden; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
+.teacher-lesson-tabs { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid #eee9e5; background: rgba(255,255,255,.98); }
+.teacher-lesson-tabs button { min-height: 46px; padding: 0 6px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 11px; }
+.teacher-lesson-tabs button.active { border-bottom-color: var(--brand); color: var(--brand); font-weight: 700; }
+.teacher-lesson-tabbar { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 14px; border-bottom: 1px solid #eee9e5; background: #fffaf7; }
+.teacher-lesson-tabbar strong { font-size: 12px; }
+.teacher-lesson-tab-action { min-height: 34px; padding: 0 10px; border: 1px solid var(--brand); border-radius: 5px; background: #fff; color: var(--brand); font-size: 10px; }
+.teacher-lesson-tab-content { padding: 10px 0 0; }
+.teacher-lesson-tab-content > .teacher-lesson-section { margin: 0 10px 10px; }
 .teacher-lesson-section-head { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #eee9e5; }
 .teacher-lesson-section-head > div { display: flex; align-items: center; gap: 8px; }
 .teacher-lesson-section-head > div > span { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 4px; background: #f3efec; color: #7d716a; font-size: 9px; font-variant-numeric: tabular-nums; }
@@ -498,11 +509,16 @@ body { background: #f7f7f5; }
 .teacher-attendance-summary span { color: var(--muted); font-size: 9px; }
 .teacher-attendance-summary b { margin-right: 2px; color: #514943; font-size: 11px; }
 .teacher-attendance-toolbar > button { min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--brand); font-size: 10px; }
+.teacher-attendance-batch { display: flex; align-items: center; gap: 8px; }
+.teacher-attendance-batch button { min-height: 36px; padding: 0 8px; border: 1px solid #ded7d1; border-radius: 5px; background: #fff; color: var(--brand); font-size: 10px; }
+.teacher-attendance-help { margin: 0 0 8px; color: var(--muted); font-size: 10px; }
 .teacher-lesson-student-list { display: grid; border-top: 1px solid #eee9e5; }
 .teacher-lesson-student { padding: 12px 0; border-bottom: 1px solid #f0ece8; }
 .teacher-lesson-student-head { display: flex; min-width: 0; align-items: center; gap: 8px; }
 .teacher-lesson-student-avatar { display: grid; width: 30px; height: 30px; flex: none; place-items: center; border-radius: 50%; background: #f2e7e3; color: var(--brand); font-size: 10px; font-weight: 700; }
 .teacher-lesson-student-head strong { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.teacher-attendance-select { display: grid; width: 24px; height: 32px; place-items: center; flex: none; }
+.teacher-attendance-select input { width: 16px; height: 16px; accent-color: var(--brand); }
 .teacher-lesson-student-head .mp-pill, .teacher-lesson-unmarked { margin-left: auto; }
 .teacher-lesson-student-head .mp-pill { min-height: 20px; padding: 0 6px; font-size: 9px; }
 .teacher-lesson-unmarked { color: var(--muted); font-size: 9px; }
@@ -528,6 +544,21 @@ body { background: #f7f7f5; }
 .teacher-homework-published p { margin: 4px 0 0; color: #655d58; font-size: 10px; }
 .teacher-homework-published span { margin-top: 4px; color: var(--muted); font-size: 9px; }
 .teacher-homework-published button { min-height: 44px; flex: none; padding: 0; border: 0; background: transparent; color: var(--brand); font-size: 10px; }
+.teacher-homework-page { display: grid; gap: 12px; min-width: 0; padding-bottom: 24px; }
+.teacher-homework-page-head { display: grid; gap: 12px; min-width: 0; padding: 2px 0 4px; }
+.teacher-homework-page-head .mp-button { justify-self: start; min-height: 40px; }
+.teacher-homework-page-head > div { min-width: 0; }
+.teacher-homework-page-head span, .teacher-homework-page-card-head span { color: var(--muted); font-size: 10px; }
+.teacher-homework-page-head h2 { margin: 4px 0 0; font-size: 20px; }
+.teacher-homework-page-head p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+.teacher-homework-page-card { min-width: 0; padding: 0 14px 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
+.teacher-homework-page-card-head { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 0 12px; border-bottom: 1px solid #eee9e5; }
+.teacher-homework-page-card-head > div { min-width: 0; }
+.teacher-homework-page-card-head h3 { margin: 3px 0 0; font-size: 14px; }
+.teacher-homework-page-card-head .mp-pill { flex: none; }
+.teacher-homework-page-form .teacher-homework-form { padding: 14px 0 0; }
+.teacher-homework-page-actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 9px; padding-top: 2px; }
+.teacher-homework-page-actions .mp-button { width: 100%; }
 .teacher-lesson-locked { padding: 28px 18px; border: 1px solid #e4ded9; border-radius: 8px; background: #fff; text-align: center; }
 .teacher-lesson-locked strong { font-size: 14px; }
 .teacher-lesson-locked p { margin: 7px auto 14px; color: var(--muted); font-size: 11px; line-height: 1.55; }
@@ -548,7 +579,7 @@ body { background: #f7f7f5; }
 .teacher-homework-form { display: grid; gap: 12px; padding: 14px 0; }
 .teacher-homework-form .mp-field label, .teacher-homework-formats legend, .teacher-homework-resources legend { color: #514943; font-size: 10px; }
 .teacher-homework-form label b, .teacher-homework-formats b { color: var(--brand); }
-.teacher-homework-form textarea { min-height: 82px; }
+.teacher-homework-form textarea { min-height: 160px; resize: vertical; }
 .teacher-homework-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .teacher-homework-formats, .teacher-homework-resources { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; border: 0; }
 .teacher-homework-formats legend, .teacher-homework-resources legend { width: 100%; margin-bottom: 1px; }
@@ -686,13 +717,30 @@ body { background: #f7f7f5; }
 .teacher-class-detail-tabs button.active::after { position: absolute; right: 11px; bottom: 0; left: 11px; height: 2px; background: var(--brand); content: ''; }
 .teacher-class-detail-tabs button:focus-visible { outline: 3px solid rgba(139,2,2,.16); outline-offset: -3px; }
 .teacher-class-detail-panel, .teacher-class-overview { min-width: 0; }
+.teacher-class-overview, .teacher-class-students-panel, .teacher-class-lessons-panel, .teacher-class-graduation-panel { scroll-margin-top: 112px; }
 .teacher-class-core-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; overflow: hidden; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
 .teacher-class-core-metrics div { min-width: 0; padding: 12px; }
 .teacher-class-core-metrics div + div { border-left: 1px solid #eee9e5; }
 .teacher-class-core-metrics dt { color: var(--muted); font-size: 9px; }
 .teacher-class-core-metrics dd { margin: 4px 0 0; color: #403833; font-size: 19px; font-weight: 700; }
 .teacher-class-core-metrics dd small { margin-left: 2px; color: #655d58; font-size: 9px; font-weight: 400; }
-.teacher-class-detail-progress, .teacher-class-next-lesson, .teacher-class-recent-record, .teacher-class-students-panel, .teacher-class-schedule-panel, .teacher-class-records-panel { min-width: 0; margin-top: 10px; padding: 0 14px 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
+/* CR-2026-135：指标口径说明行；上课安排把时间与教室合并成一行。 */
+.teacher-class-metrics-note { margin: 8px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.teacher-class-teaching-progress { min-width: 0; margin-top: 10px; }
+.teacher-class-teaching-progress > .teacher-class-detail-section-head { padding: 0 2px; }
+.teacher-class-teaching-progress > .teacher-class-core-metrics { margin-top: 10px; }
+.teacher-class-teaching-progress > .teacher-class-detail-progress { margin-top: 10px; }
+.teacher-class-arrange-rows { margin: 6px 0 0; }
+.teacher-class-arrange-rows > div { display: grid; grid-template-columns: 82px minmax(0, 1fr); align-items: baseline; gap: 10px; padding: 8px 0; }
+.teacher-class-arrange-rows > div + div { border-top: 1px solid #f2ede8; }
+.teacher-class-arrange-rows dt { color: var(--muted); font-size: 10px; }
+.teacher-class-arrange-rows dd { margin: 0; color: #403833; font-size: 12px; line-height: 1.5; }
+.teacher-class-adjustment { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #eee7e0; }
+.teacher-class-adjustment > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.teacher-class-adjustment strong { font-size: 11px; }
+.teacher-class-adjustment p { margin: 6px 0 0; color: #514943; font-size: 10px; line-height: 1.5; }
+.teacher-class-adjustment small { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.teacher-class-detail-progress, .teacher-class-next-lesson, .teacher-class-arrange, .teacher-class-recent-record, .teacher-class-students-panel, .teacher-class-schedule-panel, .teacher-class-records-panel { min-width: 0; margin-top: 10px; padding: 0 14px 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
 .teacher-class-detail-progress > div:first-child { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 12px; }
 .teacher-class-detail-progress span { color: var(--muted); font-size: 10px; }
 .teacher-class-detail-progress strong { color: #514943; font-size: 12px; }
@@ -700,9 +748,25 @@ body { background: #f7f7f5; }
 .teacher-class-progress-ruler i { height: 8px; border-radius: 2px; background: #e8e3df; }
 .teacher-class-progress-ruler i.done { background: #6e9d75; }
 .teacher-class-progress-ruler i.current { background: var(--brand); }
+/* CR-2026-133：进度条、待处理区、课次与学员筛选、学员排序。 */
+.teacher-class-progress-bar { height: 8px; border-radius: 4px; background: #e8e3df; overflow: hidden; }
+.teacher-class-progress-bar i { display: block; height: 100%; border-radius: 4px; background: var(--brand); }
+.teacher-class-todos { min-width: 0; margin-top: 10px; padding: 0 14px 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
+.teacher-class-todos ul { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.teacher-class-todos button { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; width: 100%; padding: 10px 12px; border: 1px solid #eee7e0; border-radius: 8px; background: #fffaf6; text-align: left; }
+.teacher-class-todos strong { font-size: 12px; }
+.teacher-class-todos small { grid-column: 1; color: var(--muted); font-size: 10px; }
+.teacher-class-todos span { grid-row: 1 / span 2; color: #a79e96; font-size: 18px; }
+.teacher-class-lesson-filters, .teacher-class-student-filters { margin: 10px 0; }
+.teacher-class-student-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.teacher-class-student-sort { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 8px 0 0; color: var(--muted); font-size: 11px; }
+.teacher-class-student-sort select { min-height: 34px; padding: 0 8px; border: 1px solid #e2dad3; border-radius: 6px; background: #fff; font-size: 11px; }
 .teacher-class-detail-section-head { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #eee9e5; }
 .teacher-class-detail-section-head h3 { margin: 0; font-size: 14px; }
 .teacher-class-detail-section-head > span:not(.mp-pill) { color: var(--muted); font-size: 9px; }
+.teacher-class-section-link { display: inline-flex; min-height: 32px; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: var(--brand); font-size: 10px; }
+.teacher-class-section-link span { font-size: 16px; line-height: 1; }
+.teacher-class-section-link:focus-visible { border-radius: 4px; outline: 3px solid rgba(139,2,2,.16); outline-offset: 2px; }
 .teacher-class-next-lesson > a { display: grid; grid-template-columns: 66px minmax(0, 1fr) auto; min-width: 0; min-height: 72px; align-items: center; gap: 10px; color: var(--ink); }
 .teacher-class-next-time { padding-right: 10px; border-right: 1px solid #eee9e5; }
 .teacher-class-next-time strong, .teacher-class-next-time span { display: block; }
@@ -713,11 +777,25 @@ body { background: #f7f7f5; }
 .teacher-class-next-lesson > a > div:nth-child(2) strong { font-size: 11px; }
 .teacher-class-next-lesson > a > div:nth-child(2) p { margin: 5px 0 0; color: var(--muted); font-size: 9px; }
 .teacher-class-next-lesson > a > span { color: #a79e96; font-size: 20px; }
+.teacher-class-next-lesson.is-empty > p { margin: 13px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+/* CR-2026-133：下一节课的行动入口、未开始课次提示、结业申请入口与判定依据。 */
+.teacher-class-next-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.teacher-class-next-actions .mp-button { min-height: 40px; }
+.teacher-class-session-hint { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
+.teacher-class-session.is-stopped { background: #faf8f6; }
+.teacher-class-graduation-facts { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+.teacher-class-graduation-apply { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #eee7e0; }
+.teacher-class-graduation-apply p, .teacher-class-graduation-note { margin: 0 0 10px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.teacher-class-graduation-apply .mp-button { width: 100%; }
+.teacher-graduation-picker > div { display: grid; gap: 6px; max-height: 220px; overflow-y: auto; }
+.teacher-graduation-picker label { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 8px; padding: 8px 10px; border: 1px solid #eee7e0; border-radius: 8px; font-size: 12px; }
+.teacher-graduation-picker label small { grid-column: 2; color: var(--muted); font-size: 10px; }
 .teacher-class-no-next { margin: 13px 0 0; color: var(--muted); font-size: 11px; }
 .teacher-class-recent-record > strong { display: block; margin-top: 12px; font-size: 12px; }
 .teacher-class-recent-record > p { margin: 5px 0 0; color: #655d58; font-size: 10px; line-height: 1.6; }
 .teacher-class-recent-record > small { display: block; margin-top: 7px; color: var(--muted); font-size: 9px; }
 .teacher-class-students-panel, .teacher-class-schedule-panel, .teacher-class-records-panel { margin-top: 0; }
+.teacher-class-students-more { margin-top: 10px; }
 .teacher-class-student-search { position: relative; padding: 12px 0; border-bottom: 1px solid #eee9e5; }
 .teacher-class-student-search > span { position: absolute; top: 26px; left: 12px; width: 11px; height: 11px; border: 1.5px solid #8c817a; border-radius: 50%; }
 .teacher-class-student-search > span::after { position: absolute; right: -5px; bottom: -3px; width: 6px; height: 1.5px; background: #8c817a; content: ''; transform: rotate(45deg); }
@@ -734,6 +812,7 @@ body { background: #f7f7f5; }
 .teacher-class-student-rate { text-align: right; }
 .teacher-class-student-rate b, .teacher-class-student-rate small { display: block; }
 .teacher-class-student-rate b { color: #514943; font-size: 10px; }
+.teacher-class-student-row.is-focus .teacher-class-student-rate b { color: var(--danger); }
 .teacher-class-student-rate small { margin-top: 2px; color: var(--muted); font-size: 8px; }
 .teacher-class-student-arrow { color: #aaa19b; font-size: 18px; line-height: 1; }
 .teacher-class-detail-empty { padding: 34px 12px; color: var(--muted); font-size: 11px; text-align: center; }
@@ -782,9 +861,45 @@ body { background: #f7f7f5; }
 .teacher-class-student-homework article > div { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
 .teacher-class-student-homework strong { font-size: 10px; }
 .teacher-class-student-homework p { margin: 4px 0 0; color: var(--muted); font-size: 9px; }
-.teacher-class-student-comment { padding-top: 11px; }
-.teacher-class-student-comment time { color: var(--muted); font-size: 9px; }
-.teacher-class-student-comment p { margin: 5px 0 0; color: #5f5650; font-size: 10px; line-height: 1.65; }
+.teacher-student-detail-identity { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
+.teacher-student-detail-avatar { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 50%; background: #f1e9e3; color: var(--brand); font-size: 18px; font-weight: 700; }
+.teacher-student-detail-identity h2 { margin: 3px 0 0; font-size: 18px; }
+.teacher-student-detail-identity p { margin: 4px 0 0; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.teacher-student-detail-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 10px 0 0; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
+.teacher-student-detail-metrics div { min-width: 0; padding: 11px 8px; text-align: center; }
+.teacher-student-detail-metrics div + div { border-left: 1px solid #eee9e5; }
+.teacher-student-detail-metrics dt { color: var(--muted); font-size: 9px; }
+.teacher-student-detail-metrics dd { margin: 4px 0 0; color: #403833; font-size: 16px; font-weight: 700; }
+.teacher-student-detail-metrics dd small { margin-left: 2px; color: var(--muted); font-size: 9px; font-weight: 400; }
+.teacher-student-detail-tabs { position: sticky; top: 54px; z-index: 4; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); min-width: 0; margin-top: 10px; overflow: hidden; border: 1px solid #e5dfda; border-radius: 7px; background: rgba(255,255,255,.98); box-shadow: 0 3px 10px rgba(44,32,25,.04); }
+.teacher-student-detail-tabs button { position: relative; min-width: 0; min-height: 46px; padding: 0 2px; border: 0; background: transparent; color: var(--muted); font-size: 10px; }
+.teacher-student-detail-tabs button.active { color: var(--brand); font-weight: 700; }
+.teacher-student-detail-tabs button.active::after { position: absolute; right: 11px; bottom: 0; left: 11px; height: 2px; background: var(--brand); content: ''; }
+.teacher-student-detail-section { min-width: 0; margin-top: 10px; padding: 0 14px 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
+.teacher-student-detail-section-head { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #eee9e5; }
+.teacher-student-detail-section-head h3 { margin: 0; font-size: 14px; }
+.teacher-student-detail-section-head span { color: var(--muted); font-size: 9px; }
+.teacher-student-detail-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.teacher-student-detail-facts div { min-width: 0; padding: 11px 4px; border-bottom: 1px solid #f0ece8; }
+.teacher-student-detail-facts div:nth-child(odd) { padding-right: 10px; }
+.teacher-student-detail-facts div:nth-child(even) { padding-left: 10px; border-left: 1px solid #f0ece8; }
+.teacher-student-detail-facts dt { color: var(--muted); font-size: 9px; }
+.teacher-student-detail-facts dd { margin: 4px 0 0; overflow: hidden; color: #403833; font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.teacher-student-detail-counts { margin: 11px 0 3px; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.teacher-student-detail-record-list { display: grid; }
+.teacher-student-detail-record { display: flex; min-height: 55px; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #f0ece8; }
+.teacher-student-detail-record:last-child { border-bottom: 0; }
+.teacher-student-detail-record > div:first-child { min-width: 0; }
+.teacher-student-detail-record strong, .teacher-student-detail-record span { display: block; }
+.teacher-student-detail-record strong { font-size: 11px; }
+.teacher-student-detail-record span { margin-top: 3px; color: var(--muted); font-size: 9px; }
+.teacher-student-detail-record > div:last-child { display: flex; flex: none; align-items: center; gap: 5px; }
+.teacher-student-detail-record .mp-pill { min-height: 21px; padding: 0 6px; font-size: 8px; }
+@media (max-width: 360px) {
+  .teacher-student-detail-identity { grid-template-columns: 36px minmax(0, 1fr); }
+  .teacher-student-detail-avatar { width: 36px; height: 36px; font-size: 16px; }
+  .teacher-student-detail-identity > .mp-pill { grid-column: 2; justify-self: start; }
+}
 @media (max-width: 360px) {
   .teacher-class-detail-head > dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .teacher-class-detail-head > dl div:nth-child(3) { border-top: 1px solid #eee9e5; border-left: 0; }
@@ -1497,12 +1612,11 @@ body { background: #f7f7f5; }
 .mp-linear-icon-share::before, .mp-linear-icon-share::after { position: absolute; content: ''; }
 .mp-linear-icon-share::before { top: 7px; left: 4px; width: 8px; height: 1.4px; background: currentColor; box-shadow: 1px -5px 0 -0.15px currentColor, 1px 5px 0 -0.15px currentColor; transform: rotate(-30deg); }
 .mp-linear-icon-share::after { top: 1px; left: 1px; width: 4px; height: 4px; border: 1.4px solid currentColor; border-radius: 50%; box-shadow: 9px 5px 0 -1.4px #fff, 9px 5px 0 0 currentColor, 0 11px 0 -1.4px #fff, 0 11px 0 0 currentColor; }
-.mp-class-detail-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; padding: 0 4px; border-bottom: 1px solid #e7e2dc; }
-.mp-class-detail-tabs .mp-tab { min-width: 0; }
-.mp-class-detail-hero { min-width: 0; overflow: hidden; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
-.mp-class-detail-cover { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #7b4f39; }
-.mp-class-detail-cover::after { position: absolute; right: 18px; bottom: -8px; color: rgba(255,255,255,.14); content: attr(data-cover-mark); font-size: 112px; font-weight: 700; line-height: 1; }
-.mp-class-detail-summary { padding: 16px; }
+/* I1-CLASS-DETAIL-14：班级身份区与课程信息合并为一张卡后的头部样式。 */
+.mp-class-detail-head { padding-bottom: 12px; border-bottom: 1px solid #f0ece8; }
+.mp-class-detail-head h2 { margin: 0; font-size: 18px; line-height: 1.4; }
+.mp-class-detail-head .mp-pills { margin-top: 8px; }
+.mp-class-detail-head-meta { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
 .mp-class-detail-summary h2 { margin: 0; font-size: 19px; line-height: 1.4; }
 .mp-class-detail-summary p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
 .mp-class-detail-block { min-width: 0; padding: 16px; background: #fff; border: 1px solid #e9e4df; border-radius: 8px; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
@@ -1532,6 +1646,56 @@ body { background: #f7f7f5; }
 .mp-class-result-status strong { font-size: 16px; }
 .mp-class-result-status p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .mp-class-detail-block > .mp-button { margin-top: 10px; min-height: 38px; font-size: 12px; }
+/* 班级详情改为单页纵向滚动：顶部条只做滚动定位，section 留出锚点偏移避开吸顶条。 */
+.mp-class-nav { position: sticky; top: 54px; z-index: 4; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; margin: -16px -16px 0; background: rgba(255,255,255,.97); border-bottom: 1px solid #e7e2dc; backdrop-filter: blur(10px); }
+.mp-class-nav .mp-tab { min-width: 0; min-height: 44px; font-size: 13px; }
+.mp-class-nav .mp-tab.active::after { bottom: 0; }
+/* I1-CLASS-DETAIL-10/12：三个分段各占一列，右侧留一列放「说明」，不再用悬浮按钮压内容。 */
+.mp-class-nav { grid-auto-columns: unset; grid-template-columns: repeat(3, 1fr) auto; }
+.mp-class-nav .mp-class-nav-help { padding: 0 12px; color: var(--muted); font-size: 12px; }
+body:has(.mp-class-nav) .page-help-trigger { display: none; }
+/* I1-CLASS-DETAIL-12：课表分享视图不展示说明入口，避免压住课次状态。 */
+body:has(.is-schedule-share) .page-help-trigger { display: none; }
+.mp-class-section { scroll-margin-top: 106px; }
+.mp-class-result-group { display: grid; gap: 12px; }
+.mp-class-hero-kicker { display: block; color: var(--muted); font-size: 11px; }
+.mp-class-next { display: grid; gap: 6px; padding: 14px 16px; background: #fff; border: 1px solid #e9e4df; border-left: 3px solid var(--brand); border-radius: 8px; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
+.mp-class-next strong { font-size: 16px; }
+.mp-class-next p { margin: 0; color: var(--muted); font-size: 12px; }
+.mp-class-next-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mp-class-next .mp-button { justify-self: start; min-height: 34px; margin-top: 4px; padding: 0 12px; font-size: 12px; }
+/* I1-CLASS-DETAIL-17：顶部「待提交作业」卡已下线，作业入口只保留在课次行内。 */
+.mp-class-summary { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+/* I1-CLASS-DETAIL-18：未结课时的成果说明只占一行。 */
+.mp-class-result-hint { margin: 2px 0 0; padding: 0 2px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+/* I1-CLASS-DETAIL-08：出勤口径单独一行小字，说明迟到/请假/补录怎么算。 */
+.mp-class-summary-note { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.mp-class-record-list { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.mp-class-record { padding: 10px 12px; border: 1px solid #eee7e0; border-radius: 8px; }
+.mp-class-record-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.mp-class-record-head > div:first-child { min-width: 0; }
+.mp-class-record-head strong { display: block; font-size: 13px; }
+.mp-class-record-head small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.mp-class-record-tags { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: 4px; }
+.mp-class-record-hw { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #eee7e0; }
+.mp-class-record-hw > div { min-width: 0; }
+.mp-class-record-hw strong { display: block; font-size: 12px; }
+.mp-class-record-hw small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.mp-class-record-hw .mp-button { flex: none; min-height: 32px; padding: 0 10px; font-size: 11px; }
+.mp-class-detail-head + .mp-class-detail-group { margin-top: 12px; }
+/* I1-CLASS-DETAIL-21：课程简介与课程大纲默认收起，可展开／收起；简介含课程图片占位。 */
+.mp-class-fold-actions { display: flex; align-items: center; gap: 10px; }
+.mp-class-fold-toggle { padding: 0; border: 0; background: transparent; color: var(--brand); font-size: 12px; cursor: pointer; }
+.mp-class-fold-toggle:focus-visible { outline: 3px solid rgba(139, 2, 2, .18); outline-offset: 2px; border-radius: 4px; }
+.mp-class-fold-body { margin-top: 10px; }
+.mp-class-fold-body.is-collapsed .mp-class-fold-clamp { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.mp-class-fold-body.is-collapsed .mp-class-fold-hide { display: none; }
+.mp-class-intro-figure { display: grid; place-items: center; aspect-ratio: 16 / 9; margin-top: 12px; border: 1px dashed #d9d2cb; border-radius: 8px; background: #faf7f4; color: var(--muted); font-size: 12px; }
+.mp-class-detail-group + .mp-class-detail-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid #f0ece8; }
+.mp-class-detail-group h4 { margin: 0 0 10px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.mp-class-lesson-more { margin-top: 8px; }
+.mp-class-lesson-list.is-collapsed li:nth-child(n+4) { display: none; }
+.mp-class-lesson.is-next { border-color: var(--brand); background: #fffaf6; }
 .mp-fast-detail-hero { min-width: 0; overflow: hidden; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
 .mp-fast-detail-cover { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #7b4f39; }
 .mp-fast-detail-cover::after { position: absolute; right: 18px; bottom: -8px; color: rgba(255,255,255,.14); content: attr(data-cover-mark); font-size: 112px; font-weight: 700; line-height: 1; }
@@ -1583,20 +1747,69 @@ body { background: #f7f7f5; }
 .mp-locked p { margin: 8px 0 18px; color: var(--muted); }
 @media (max-width: 360px) { .mobile-main { padding-right: 12px; padding-left: 12px; } .mp-metric-grid { gap: 5px; } .mp-metric { padding: 10px 8px; } .mp-button { padding: 0 12px; } .mp-filter-grid { grid-template-columns: 1fr; } }
 
-/* 教师端课次弹窗里的富文本编辑器（作业描述）：窄屏下工具栏换行、下拉保留可读宽度。 */
-.teacher-lesson-dialog .rich-editor-shell { border-radius: 8px; }
-.teacher-lesson-dialog .editor-toolbar { flex-wrap: wrap; }
-.teacher-lesson-dialog .editor-select { min-width: 88px; }
-.teacher-lesson-dialog .rich-editor { min-height: 140px; font-size: 13px; }
-
 .teacher-certificate-card.is-focus { outline: 2px solid var(--brand, #2f6fed); outline-offset: 2px; }
 .teacher-contract-card-note { margin: 8px 0 0; font-size: 12px; color: #b25f22; }
 
 /* P1（2026-09-18）：本人可维护资料的分组说明（只读态常驻）。 */
 .teacher-archive-group-notes { margin: 10px 0 0; font-size: 12px; color: var(--text-muted, #6b7385); }
 /* CR-2026-102：学员端班级课表与分享入口。 */
-.mp-class-timetable { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.mp-class-timetable li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #eee7e0; border-radius: 8px; background: #fff; }
-.mp-class-timetable li strong { display: block; font-size: 13px; }
-.mp-class-timetable li small { display: block; margin-top: 2px; color: #8a8a8a; font-size: 12px; }
+.mp-class-lesson-list { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.mp-class-lesson { padding: 10px 12px; border: 1px solid #eee7e0; border-radius: 8px; background: #fff; }
+/* I1-CLASS-DETAIL-20：课次行整体可点，行首为按钮，右侧给可点提示。 */
+.mp-class-lesson-main { display: flex; width: 100%; align-items: flex-start; gap: 8px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.mp-class-lesson-main .mp-class-lesson-head { flex: 1; min-width: 0; }
+.mp-class-lesson-main:focus-visible { outline: 3px solid rgba(139, 2, 2, .18); outline-offset: 3px; border-radius: 6px; }
+.mp-class-lesson-chevron { flex: none; align-self: center; color: var(--muted); font-size: 16px; line-height: 1; }
+.mp-dialog-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid #f0ece8; }
+.mp-dialog-section h3 { margin: 0 0 8px; font-size: 14px; }
+.mp-dialog-rows { display: grid; gap: 8px; margin: 14px 0 0; }
+.mp-dialog-rows > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.mp-dialog-rows dt { flex: none; color: var(--muted); font-size: 12px; }
+.mp-dialog-rows dd { margin: 0; font-size: 13px; text-align: right; }
+.mp-lesson-dialog .mp-dialog-card { max-height: min(88vh, 720px); overflow-y: auto; }
+/* CR-2026-132：课次详情弹层头部状态胶囊、进度与教师评语块。 */
+.mp-lesson-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.mp-lesson-dialog-head h2 { margin: 0; }
+.mp-dialog-comment { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #faf7f4; }
+.mp-dialog-comment span { color: var(--muted); font-size: 11px; }
+.mp-dialog-comment p { margin: 4px 0 0; font-size: 13px; line-height: 1.6; }
+/* 关闭为次要动作，右对齐；主行动（去提交／查看作业）留在作业区。 */
+.mp-dialog-actions { justify-content: flex-end; margin-top: 16px; }
+.mp-class-lesson-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.mp-class-lesson-head > div:first-child { min-width: 0; }
+.mp-class-lesson strong { display: block; font-size: 13px; }
+.mp-class-lesson small { display: block; margin-top: 2px; color: #8a8a8a; font-size: 12px; }
 .mp-class-timetable-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+/* I1-CLASS-DETAIL-09：展开/收起课次按钮补齐 44px 触控高度（覆盖 .mp-class-detail-block > .mp-button 的 38px）。 */
+.mp-class-detail-block > .mp-class-lesson-more { min-height: 44px; }
+/* I1-CLASS-DETAIL-05/10：小程序页说明按钮补到 44px；底部有常驻操作条时上移，避免压住内容与操作条。 */
+body:has([data-mobile-shell]) .page-help-trigger { width: 44px; height: 44px; }
+body:has([data-mobile-shell]):has(.mp-bottom-actions) .page-help-trigger { bottom: calc(142px + env(safe-area-inset-bottom)); }
+/* I1-TEACHER-CLASS-01：教师端班级详情——课次行内含教师考勤（开始／结束上课时间、教学记录文本）。 */
+.teacher-class-session { margin-top: 10px; padding: 12px 13px; border: 1px solid #eee7e0; border-radius: 8px; background: #fff; }
+.teacher-class-session.is-done { background: #fdfcfb; }
+.teacher-class-session-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.teacher-class-session-head strong { display: block; font-size: 13px; }
+.teacher-class-session-head small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+.teacher-class-session-attendance { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin: 10px 0 0; padding-top: 10px; border-top: 1px dashed #eee7e0; }
+.teacher-class-session-attendance > div.wide { grid-column: 1 / -1; }
+.teacher-class-session-attendance dt { color: var(--muted); font-size: 11px; }
+.teacher-class-session-attendance dd { margin: 3px 0 0; font-size: 13px; }
+.teacher-class-session-link { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; margin-top: 10px; border: 1px solid #e2dad3; border-radius: 6px; color: var(--brand); font-size: 12px; font-weight: 600; text-decoration: none; }
+.teacher-class-graduation-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 11px 13px; border: 1px solid #eee7e0; border-radius: 8px; background: #fff; }
+.teacher-class-graduation-row strong { display: block; font-size: 13px; }
+.teacher-class-graduation-row small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+.teacher-class-empty { margin-top: 10px; padding: 20px 14px; border: 1px dashed #e2dad3; border-radius: 8px; text-align: center; }
+.teacher-class-empty strong { display: block; font-size: 14px; }
+.teacher-class-empty p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+/* I1-TEACHER-CLASS-03：课次详情的作业区块（按课次查看提交与批改情况）。 */
+.teacher-lesson-homework-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin: 10px 0 0; }
+.teacher-lesson-homework-rows > div.wide { grid-column: 1 / -1; }
+.teacher-lesson-homework-rows dt { color: var(--muted); font-size: 11px; }
+.teacher-lesson-homework-rows dd { margin: 3px 0 0; font-size: 13px; }
+.teacher-lesson-homework-links { display: flex; gap: 8px; margin-top: 12px; }
+.teacher-lesson-homework-links .mp-button { flex: 1; min-height: 40px; font-size: 12px; }
+/* I1-TEACHER-CLASS-04：课次详情的学员考勤名单。 */
+.teacher-lesson-attendance-list { display: grid; gap: 8px; margin-top: 12px; }
+.teacher-lesson-attendance-list > div { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border: 1px solid #eee7e0; border-radius: 8px; background: #fff; }
+.teacher-lesson-attendance-list strong { flex: 1; font-size: 13px; font-weight: 600; }

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - iteration-2
   workflow_dispatch:
 
 permissions:
@@ -21,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -36,6 +39,18 @@ jobs:
       - name: Build prototype
         working-directory: current
         run: npm run build
+
+      - name: Build frozen iteration 1 preview
+        shell: bash
+        run: |
+          rm -rf /tmp/iteration-1-source /tmp/iteration-1-dependencies
+          mkdir -p /tmp/iteration-1-source
+          git archive 01174e0 current | tar -x -C /tmp/iteration-1-source --strip-components=1
+          cd /tmp/iteration-1-source
+          npm install --no-audit --no-fund --cache /tmp/iteration-1-dependencies
+          npm run build
+          mkdir -p "$GITHUB_WORKSPACE/current/dist/iteration-1"
+          cp -R dist/. "$GITHUB_WORKSPACE/current/dist/iteration-1/"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
