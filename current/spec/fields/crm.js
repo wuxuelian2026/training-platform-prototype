@@ -52,7 +52,7 @@ export const CRM_FIELD_SPEC = {
           { id: 'FD-ACADEMIC-023', label: '单次课时长', type: '下拉', length: '45 / 60 / 90 / 120 / 150 分钟', required: '是', note: '所有上课日公用；默认 45 分钟；一个课时对应一个课次' },
           { id: 'FD-ACADEMIC-024', label: '上课结束时间', type: '按上课日重复的时间（自动计算）', length: 'HH:mm', required: '系统计算', note: '每个上课日均由该日开始时间加公用单次课时长计算，只读', constraints: { format: 'HH:mm', system: true, readOnly: true } },
           { id: 'FD-ACADEMIC-021', label: '首次上课日期', type: '日期', length: 'YYYY-MM-DD', required: '是', note: '决定首次课次日期', constraints: { format: 'YYYY-MM-DD' } },
-          { id: 'FD-ACADEMIC-036', label: '末次上课日期', type: '只读', length: 'YYYY-MM-DD', required: '系统计算', note: '取未取消、未停课课次中最晚的日期；停课、恢复、调课、补课和增删课次后自动重算，不是发布时锁定的快照；结业后不再变化', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD' } }
+          { id: 'FD-ACADEMIC-036', label: '末次上课日期', type: '只读', length: 'YYYY-MM-DD', required: '系统计算', note: '取全部课次中最晚的日期（CR-2026-138 无停课与取消状态）；课次调整、增删课次后自动重算，不是发布时锁定的快照；结业后不再变化', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD' } }
         ] },
         { heading: '排课工作台 · 第 4 步 冲突校验', fields: [
           { id: 'FD-ACADEMIC-037', label: '教师时间冲突', type: '只读', length: '无冲突 / 冲突', required: '系统计算', note: '校验所选教师在全部课次上是否已有排课', constraints: { readOnly: true, system: true } },
@@ -79,7 +79,7 @@ export const CRM_FIELD_SPEC = {
         '排课工作台：时间默认吸附到最近的 15 分钟刻度；偏离刻度时强制提示修正后再保存。',
         '排课工作台：教师、教室或时段存在冲突时必须先修正，修正后才允许发布。',
         '排课工作台：一次课就是一个课次，课时费按课次数计算。',
-        '排课工作台：末次上课日期取未取消、未停课课次中最晚的日期，随课次变动重算，结业后不再变化。',
+        '排课工作台：末次上课日期取全部课次中最晚的日期（CR-2026-138 无停课与取消状态），随课次变动重算，结业后不再变化。',
         '排课工作台：同一班级的多个上课日共用同一开始时间、课时时长与教室。'
       ]
     },
@@ -89,14 +89,35 @@ export const CRM_FIELD_SPEC = {
           { id: 'FD-CRM-016', label: '联系人', type: '文本', length: '2–30 字', required: '是', note: '线索联系人姓名', constraints: { minLength: 2, maxLength: 30 } },
           { id: 'FD-CRM-017', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '用于跟进与转化', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
           { id: 'FD-CRM-018', label: '意向课程', type: '文本', length: '≤ 50 字', required: '否', note: '记录意向方向，便于分配课程顾问', constraints: { maxLength: 50 } },
-          { id: 'FD-CRM-019', label: '来源类型', type: '下拉', length: '线上咨询 / 后台登记 / 转介绍 / 活动', required: '否', note: '记录线索来源渠道；与试听登记使用同一套预置来源，不再出现“咨询／后台登记试听”两套写法', constraints: { options: ['线上咨询', '后台登记', '转介绍', '活动'] } }
+          { id: 'FD-CRM-019', label: '来源类型', type: '下拉', length: '线上咨询 / 后台登记 / 转介绍 / 活动', required: '否', note: '记录线索来源渠道；与试听登记使用同一套预置来源，不再出现“咨询／后台登记试听”两套写法', constraints: { options: ['线上咨询', '后台登记', '转介绍', '活动'] } },
+          { id: 'FD-CRM-075', label: '线索标签', type: '多选', length: '最多 5 个', required: '否', note: '固定标签用于销售分层与筛选，不参与线索状态流转', constraints: { options: ['高意向', '待回访', '试听后待转化', '价格敏感', '已流失待激活'], multi: true, maxItems: 5 } }
         ] }
       ],
       notes: [
         '线索可继续流转为试听或直接报名，流转过程保留历史记录。',
         '填写跟进后记录跟进时间、跟进人和跟进内容。',
-        'CR-2026-038：线索状态与试听状态由状态源统一登记，线索状态“已转化”与转化列表中该线索的“已报名”必须一致。',
+        'CR-2026-038：线索状态与试听状态由状态源统一登记；线索“已转化”保留销售历史，转化列表“已报名”仅由当前有效已支付面授订单派生，退款后不再计入。',
+        '同一手机号只保留一条主线索；已流失线索通过重新激活恢复，不重新建档，意向变化记录在跟进记录中。',
         'CR-2026-038：线索详情展示该线索名下的试听记录与报名结果，形成完整链条。'
+        ,'P2：线索标签仅用于销售分层、筛选和详情识别，不改变 `SM-LEAD` 状态；标签取固定枚举，最多 5 个，可在列表行操作中维护。'
+      ]
+    },
+    'crm/conversions': {
+      groups: [
+        { heading: '报名转化派生字段', fields: [
+          { id: 'FD-CRM-076', label: '线索编号', type: '文本（只读）', length: '—', required: '系统派生', note: '取线索 lead_no，不允许在本页编辑', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-077', label: '联系人', type: '文本（只读）', length: '—', required: '系统派生', note: '取线索联系人', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-078', label: '意向课程', type: '文本（只读）', length: '—', required: '系统派生', note: '取线索意向课程', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-079', label: '试听状态', type: '状态（只读）', length: 'SM-TRIAL 四态或无试听记录', required: '系统派生', note: '取关联试听事实，不新增转化状态', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-080', label: '报名状态', type: '状态（只读）', length: '已报名 / 未转化', required: '系统派生', note: '仅有效面授订单计入已报名；待支付、已取消、已退款不计入', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-081', label: '报名班级', type: '文本（只读）', length: '—', required: '系统派生', note: '取有效报名订单关联班级', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-082', label: '负责人', type: '文本（只读）', length: '—', required: '系统派生', note: '取线索负责人', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-083', label: '转化漏斗', type: '统计（只读）', length: '当前线索 / 有效跟进 / 已试听 / 已报名', required: '系统派生', note: '展示数量、相对当前线索占比和相邻阶段转化率，不支持编辑', constraints: { readOnly: true, derived: true } }
+        ] }
+      ],
+      notes: [
+        '报名转化是按线索、试听和订单事实派生的只读视图，不落独立业务数据。',
+        '本页不新增状态机；报名状态只通过 source_lead_id/source_lead_no 关联当前有效已支付面授订单计算，待支付、已取消、退款中、已退款均显示为未转化。'
       ]
     },
     'crm/trials': {
@@ -122,6 +143,9 @@ export const CRM_FIELD_SPEC = {
         '试听教师需满足该专业可排课条件；资质或合同不满足时不可安排。',
         'CR-2026-038：试听状态取值以状态源 `SM-TRIAL` 为准；同一试听记录在试听列表与报名转化列表的取值来自同一字段。',
         'CR-2026-038：报名转化页是按线索派生的只读视图，不维护独立数据；其线索状态与试听状态引用 `SM-LEAD`／`SM-TRIAL`，不新增独立状态机。'
+        ,'试听登记由服务端最终校验同一线索同一时间重复记录、同一教师同一时间重复安排、教师既有课次冲突及教师专业资质；冲突时阻止保存并保留表单。'
+        ,'试听取消必须填写取消原因，取消记录保留且不恢复；再次试听需新建记录。'
+        ,'转报名按线索幂等，只展示当前可报名班级；存在待支付、已支付或退款中的面授订单时禁止重复创建待支付订单。'
       ]
     }
   }

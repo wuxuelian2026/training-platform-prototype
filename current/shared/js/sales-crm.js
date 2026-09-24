@@ -17,6 +17,7 @@ const businessPage = businessRoot?.dataset.businessPage;
 let businessData = null;
 let businessActive = null;
 let businessToastTimer;
+let syncingLeadStatuses = false;
 
 const professionalOptions = ['音乐类', '舞蹈类', '美术类', '戏剧类'];
 const lessonDurationOptions = () => buildLessonDurationOptions().map(option => Number(option.value));
@@ -71,7 +72,7 @@ const dataSets = {
     { id: 'trial-he', leadNo: 'CL20260905003', student: '何安', phone: '137****3130', course: '少儿美术启蒙班', time: '2026-09-15 18:30', campus: '南湖校区', status: '已确认', source: '转介绍', owner: '赵顾问' }
   ],
   leads: [
-    { id: 'lead-zhou', number: 'CL20260908012', student: '周女士', phone: '139****8612', course: '少儿中国舞基础班', source: '线上咨询', status: '跟进中', next: '2026-09-09', owner: '赵顾问' },
+    { id: 'lead-zhou', number: 'CL20260908012', student: '周女士', phone: '139****8612', course: '少儿中国舞基础班', source: '线上咨询', status: '跟进中', next: '2026-09-09', owner: '赵顾问', followUps: [] },
     { id: 'lead-li', number: 'CL20260907008', student: '李先生', phone: '138****5541', course: '成人声乐班', source: '后台登记', status: '跟进中', next: '2026-09-12', owner: '赵顾问' },
     { id: 'lead-he', number: 'CL20260905003', student: '何女士', phone: '137****3130', course: '少儿美术启蒙班', source: '转介绍', status: '已转化', next: '—', owner: '赵顾问' },
     { id: 'lead-sun', number: 'CL20260904006', student: '孙先生', phone: '136****7192', course: '中国画基础', source: '活动', status: '已流失', next: '—', owner: '赵顾问' }
@@ -87,16 +88,20 @@ window.addEventListener('hbyx-academic-toast', (event) => {
 // CR-2026-038 §4.2：线索与试听共用一套预置来源。
 const leadSources = ['线上咨询', '后台登记', '转介绍', '活动'];
 
-// CR-2026-038 §2.1：报名转化按线索派生，报名状态由该线索是否生成面授订单决定。
+// CR-2026-038 §2.1：报名转化按线索派生，当前报名状态只由有效已支付面授订单决定。
 function leadOrderOf(lead) {
-  return dataSets.orders.find((order) => order.type === '面授课程' && (order.student === lead.student || order.number === lead.number)) || null;
+  return dataSets.orders.find((order) => order.type === '面授课程'
+    && ['待支付', '已支付', '退款中'].includes(order.status)
+    && (order.sourceLeadNo === lead.number || order.sourceLeadId === lead.id)) || null;
 }
 
 function derivedConversions() {
   return dataSets.leads.map((lead) => {
     const trial = dataSets.trials.find((item) => item.leadNo === lead.number) || null;
     const order = leadOrderOf(lead);
-    const enrolled = lead.status === '已转化' || Boolean(order && order.status === '已支付');
+    // 销售状态与当前报名结果分离：线索可保留“已转化”历史，但只有有效已支付订单计入当前报名。
+    const enrolled = Boolean(order && order.status === '已支付');
+    const salesStatus = lead.status === '已转化' ? '已转化' : '未转化';
     return {
       id: `conversion-${lead.id}`,
       leadId: lead.id,
@@ -107,10 +112,73 @@ function derivedConversions() {
       time: trial?.time || lead.next || '—',
       trial: trial?.status || '',
       status: enrolled ? '已报名' : '未转化',
+      salesStatus,
       className: order?.linked || order?.name || '—',
       owner: lead.owner
     };
   });
+}
+
+function bookableClassOptions() {
+  return dataSets.classes
+    .filter((record) => classEnrollmentCondition(record) === '报名中')
+    .filter((record) => classDisplayStatus(record) === '显示')
+    .map((record) => `<option value="${escapeHtml(record.id)}">${escapeHtml(record.name)} · ${escapeHtml(record.course || '—')} · 剩余 ${Math.max(0, Number(record.capacity || 0) - Number(record.enrolled || 0))} 个名额</option>`)
+    .join('');
+}
+
+function bookableClassField() {
+  const options = bookableClassOptions();
+  if (!options) {
+    return `<div style="padding:14px 16px;border:1px dashed #d0d5dd;border-radius:8px;color:#667085;background:#f9fafb;font-size:13px;">当前暂无可报名班级，请先完成班级排课、发布或检查报名窗口和剩余名额。</div>`;
+  }
+  return `<label class="form-field wide"><span>报名班级<b class="required-mark">*</b></span><select name="classId" required><option value="">请选择可报名班级</option>${options}</select></label>`;
+}
+
+function createLeadOrder(lead, classId) {
+  if (!classId) { showToast('暂无可报名班级，无法转报名。', 'warning'); return false; }
+  const existing = leadOrderOf(lead);
+  if (existing) {
+    openBusinessDialog('已有进行中订单', '该线索已存在面授订单，不能重复创建待支付订单。',
+      `<div class="sales-detail-list"><div><span>订单号</span><strong>${escapeHtml(existing.number)}</strong></div><div><span>订单状态</span><strong>${tag(existing.status)}</strong></div><div><span>关联班级</span><strong>${escapeHtml(existing.linked || existing.name || '—')}</strong></div><div><span>订单金额</span><strong>¥${escapeHtml(existing.amount || '0.00')}</strong></div></div>`,
+      '<a class="button primary" href="./offline-orders.html">查看订单</a><button type="button" class="button" data-dialog-close>关闭</button>');
+    return false;
+  }
+  const classRecord = dataSets.classes.find((record) => record.id === classId);
+  if (!classRecord || classEnrollmentCondition(classRecord) !== '报名中' || classDisplayStatus(classRecord) !== '显示') {
+    showToast('所选班级当前不可报名，请刷新后重新选择。', 'warning');
+    return false;
+  }
+  const order = {
+    id: demoId('order'), number: `OD${Date.now()}`, name: classRecord.course || classRecord.name,
+    type: '面授课程', student: lead.student, account: lead.student, amount: String(classRecord.price || '0.00'),
+    status: '待支付', fulfillment: '未生成报名', linked: classRecord.name, classId: classRecord.id,
+    courseId: classRecord.courseId, time: demoTime(), sourceLeadNo: lead.number, sourceLeadId: lead.id,
+    logs: [{ at: demoTime(), role: '课程顾问', from: '—', to: '待支付', reason: 'CRM 转报名创建订单' }]
+  };
+  dataSets.orders.unshift(order);
+  upsertDemoRecord('orders', order);
+  return true;
+}
+
+function timeRangeOverlaps(left, right) {
+  const start = value => String(value || '').replace('T', ' ');
+  return start(left.start) < start(right.end) && start(right.start) < start(left.end);
+}
+
+function trialConflictOf({ leadNo, time, teacher }) {
+  const trialStart = String(time || '').replace('T', ' ');
+  const trialEnd = `${trialStart}:59`;
+  const duplicate = dataSets.trials.find(item => item.leadNo === leadNo && !['已取消'].includes(item.status) && item.time === trialStart);
+  if (duplicate) return '该线索在相同时间已有试听记录，请直接查看既有记录。';
+  if (!teacher) return '';
+  const sameTeacher = dataSets.trials.find(item => item.teacher === teacher && item.status !== '已取消' && item.time && item.time === trialStart);
+  if (sameTeacher) return `教师 ${teacher} 在该时间已有试听安排，请调整教师或时间。`;
+  const scheduled = dataSets.classes.flatMap(item => (item.sessions || []).map(session => ({
+    date: session.date, start: `${session.date} ${session.startTime || session.start || ''}`, end: `${session.date} ${session.endTime || session.end || ''}`, teacher: item.teacher
+  })));
+  const conflict = scheduled.find(item => item.teacher === teacher && item.start.startsWith(trialStart.slice(0, 10)) && timeRangeOverlaps({ start: trialStart, end: trialEnd }, item));
+  return conflict ? `教师 ${teacher} 在该时段已有课次安排，请调整教师或时间。` : '';
 }
 
 function sharedCourseCatalog() {
@@ -149,12 +217,22 @@ function syncSharedBusinessData() {
     const account = (shared.accounts || []).find(item => item.id === order.accountId);
     const isClass = course?.type === '面授课程' || Boolean(order.classId);
     // RM-F-07 / I1-DEC-25: video orders are keyed by the purchasing account, never a placeholder label.
-    return { id: `shared-${order.id}`, number: order.id, name: classRecord?.name || course?.name || order.courseName || order.courseId, type: isClass ? '面授课程' : '视频课程', student: isClass ? (student?.name || order.studentName || '—') : (account?.name || order.accountName || order.accountId || '—'), account: account?.name || order.accountName || order.accountId || '—', accountPhone: account?.phone || '', amount: Number(order.amount || 0).toFixed(2), status: order.status, fulfillment: order.status === '已支付' ? (isClass ? '已分班' : '学习中') : (isClass ? '未生成报名' : '待开通'), linked: isClass ? (classRecord?.name || '未生成报名') : (order.status === '已支付' ? '学习权限：已开通' : '学习权限：未开通'), time: order.createdAt || demoTime(), accountId: order.accountId, studentId: order.studentId, classId: order.classId, sourceOrderId: order.id };
+    return { id: `shared-${order.id}`, number: order.id, name: classRecord?.name || course?.name || order.courseName || order.courseId, type: isClass ? '面授课程' : '视频课程', student: isClass ? (student?.name || order.studentName || '—') : (account?.name || order.accountName || order.accountId || '—'), account: account?.name || order.accountName || order.accountId || '—', accountPhone: account?.phone || '', amount: Number(order.amount || 0).toFixed(2), status: order.status, fulfillment: order.status === '已支付' ? (isClass ? '已分班' : '学习中') : (isClass ? '未生成报名' : '待开通'), linked: isClass ? (classRecord?.name || '未生成报名') : (order.status === '已支付' ? '学习权限：已开通' : '学习权限：未开通'), time: order.createdAt || demoTime(), accountId: order.accountId, studentId: order.studentId, classId: order.classId, sourceLeadId: order.sourceLeadId, sourceLeadNo: order.sourceLeadNo, sourceOrderId: order.id };
   });
   dynamicOrders.forEach(row => {
     const index = dataSets.orders.findIndex(item => item.id === row.id);
     if (index < 0) dataSets.orders.unshift(row); else dataSets.orders[index] = { ...dataSets.orders[index], ...row };
   });
+  // CRM-closure: successful payment plus valid class enrollment is the single event that converts a lead.
+  if (!syncingLeadStatuses) {
+    const paidLeadIds = new Set(dataSets.orders.filter(order => order.type === '面授课程' && order.status === '已支付' && (order.sourceLeadNo || order.sourceLeadId)).map(order => `${order.sourceLeadId || ''}|${order.sourceLeadNo || ''}`));
+    const converted = dataSets.leads.filter(lead => paidLeadIds.has(`${lead.id}|${lead.number}`) && lead.status !== '已转化');
+    if (converted.length) {
+      syncingLeadStatuses = true;
+      converted.forEach(lead => { lead.status = '已转化'; lead.convertedAt = demoTime(); upsertDemoRecord('leads', lead); });
+      syncingLeadStatuses = false;
+    }
+  }
   return shared;
 }
 function persistProduct(record) { upsertDemoRecord('products', record); }
@@ -197,6 +275,9 @@ syncSharedBusinessData();
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const statusClass = (value) => ({ 已上架: 'green', 已下架: 'gray', 草稿: 'gray', 已支付: 'green', 待支付: 'amber', 退款中: 'amber', 已退款: 'gray', 已取消: 'gray', 进行中: 'brand', 已结束: 'gray', 未开始: 'gray', 招生中: 'brand', 已满员: 'amber', 未发布: 'gray', 已展示: 'green', 待确认: 'amber', 已确认: 'brand', 已试听: 'green', 已报名: 'green', 已放弃: 'gray', 已分班: 'green', 学习中: 'brand', 已完成: 'green', 跟进中: 'brand', 已转化: 'green', 已流失: 'gray', 未转化: 'amber' }[value] || 'gray');
 const tag = (value) => `<span class="tag ${statusClass(value)}">${escapeHtml(value)}</span>`;
+const LEAD_TAG_OPTIONS = ['高意向', '待回访', '试听后待转化', '价格敏感', '已流失待激活'];
+const leadTagsOf = (row) => Array.isArray(row?.tags) ? row.tags.filter(value => LEAD_TAG_OPTIONS.includes(value)).slice(0, 5) : [];
+const leadTagsDisplay = (row) => leadTagsOf(row).map(value => `<span class="crm-lead-tag">${escapeHtml(value)}</span>`).join('') || '<span class="sub-cell">未标记</span>';
 
 function showToast(message, kind = 'success') {
   const element = document.querySelector('[data-business-toast]'); if (!element) return;
@@ -646,7 +727,7 @@ function renderTrials() {
   // CR-2026-038 §4.1／§5：试听状态只取 SM-TRIAL 四态，指标卡改为派生值。
   const trialMetrics = (list) => metricCards([['待确认', list.filter((row) => row.status === '待确认').length, '需要确认试听时间'], ['已确认', list.filter((row) => row.status === '已确认').length, '已发送通知'], ['已试听', list.filter((row) => row.status === '已试听').length, '可进入报名转化'], ['已取消', list.filter((row) => row.status === '已取消').length, '保留取消原因']]);
   pageFrame('后台登记试听', '', '<button class="button primary" data-business-action="trial-create">登记试听</button>', trialMetrics(businessData) + filterPanel('trial-filter', selectField('试听状态', 'status', ['待确认', '已确认', '已试听', '已取消']) + selectField('来源线索编号', 'leadNo', [...new Set(businessData.map((row) => row.leadNo).filter(Boolean))]) + selectField('目标课程', 'course', [...new Set(businessData.map((row) => row.course).filter(Boolean))]) + selectField('校区', 'campus', ['龙泉校区', '南湖校区']) + selectField('来源', 'source', leadSources) + inputField('关键词', 'keyword', '学员姓名 / 家长手机号', true)) + table('<thead><tr><th>学员姓名</th><th>家长手机号</th><th>目标课程</th><th>试听时间</th><th>校区</th><th>试听状态</th><th>来源线索编号</th><th>来源</th><th>跟进人</th><th>操作</th></tr></thead>'));
-  const rows = (row) => `<td>${row.student}</td><td>${row.phone}</td><td>${row.course}</td><td>${row.time}</td><td>${row.campus}</td><td>${tag(row.status)}</td><td>${row.leadNo || '—'}</td><td>${row.source}</td><td>${row.owner}</td><td class="action-cell">${row.status === '待确认' ? '<button class="text-button" data-business-action="trial-confirm">确认试听</button>' : ''}<button class="text-button" data-business-action="trial-view">查看</button></td>`;
+  const rows = (row) => `<td>${row.student}</td><td>${row.phone}</td><td>${row.course}</td><td>${row.time}</td><td>${row.campus}</td><td>${tag(row.status)}</td><td>${row.leadNo || '—'}</td><td>${row.source}</td><td>${row.owner}</td><td class="action-cell">${['待确认', '已确认'].includes(row.status) ? `${row.status === '待确认' ? '<button class="text-button" data-business-action="trial-confirm">确认试听</button>' : ''}<button class="text-button" data-business-action="trial-cancel">取消试听</button>` : ''}<button class="text-button" data-business-action="trial-view">查看</button></td>`;
   renderRows(businessData, rows, () => true);
   document.querySelector('#trial-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, leadNo, course, campus, source, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!leadNo.value || row.leadNo === leadNo.value) && (!course.value || row.course === course.value) && (!campus.value || row.campus === campus.value) && (!source.value || row.source === source.value) && (!keyword.value.trim() || `${row.student}${row.phone}`.includes(keyword.value.trim()))); });
 }
@@ -655,10 +736,10 @@ function renderLeads() {
   businessData = dataSets.leads;
   // CR-2026-038 §3／§5：线索状态只取 SM-LEAD 四态；指标卡与来源类型均与列表同源。
   const leadMetrics = (list) => metricCards([['待分配', list.filter((row) => row.status === '待分配').length, '等待负责人分配'], ['跟进中', list.filter((row) => row.status === '跟进中').length, '需要继续跟进'], ['已转化', list.filter((row) => row.status === '已转化').length, '已生成报名结果'], ['已流失', list.filter((row) => row.status === '已流失').length, '保留历史记录', list.length ? Math.round((list.filter((row) => row.status === '已流失').length / list.length) * 100) : 0]]);
-  pageFrame('线索跟进', '', '<button class="button primary" data-business-action="lead-create">新增线索</button>', leadMetrics(businessData) + filterPanel('lead-filter', selectField('线索状态', 'status', ['待分配', '跟进中', '已转化', '已流失']) + selectField('来源类型', 'source', leadSources) + inputField('关键词', 'keyword', '学员姓名 / 手机号', true)) + table('<thead><tr><th>线索编号</th><th>联系人</th><th>手机号</th><th>意向课程</th><th>来源</th><th>线索状态</th><th>下次跟进</th><th>负责人</th><th>操作</th></tr></thead>'));
-  const rows = (row) => `<td>${row.number}</td><td>${row.student}</td><td>${row.phone}</td><td>${row.course}</td><td>${row.source}</td><td>${tag(row.status)}</td><td>${row.next}</td><td>${row.owner}</td><td class="action-cell"><button class="text-button" data-business-action="lead-follow">填写跟进</button>${row.status === '跟进中' ? '<button class="text-button" data-business-action="lead-trial">转为试听</button><button class="text-button" data-business-action="lead-enroll">转报名</button>' : ''}<button class="text-button" data-business-action="lead-view">查看</button></td>`;
+  pageFrame('线索跟进', '', '<button class="button primary" data-business-action="lead-create">新增线索</button>', leadMetrics(businessData) + filterPanel('lead-filter', selectField('线索状态', 'status', ['待分配', '跟进中', '已转化', '已流失']) + selectField('来源类型', 'source', leadSources) + selectField('线索标签', 'tag', LEAD_TAG_OPTIONS) + inputField('关键词', 'keyword', '学员姓名 / 手机号', true)) + table('<thead><tr><th>线索编号</th><th>联系人</th><th>手机号</th><th>意向课程</th><th>来源</th><th>线索状态</th><th>标签</th><th>下次跟进</th><th>负责人</th><th>操作</th></tr></thead>'));
+  const rows = (row) => `<td>${row.number}</td><td>${row.student}</td><td>${row.phone}</td><td>${row.course}</td><td>${row.source}</td><td>${tag(row.status)}</td><td><div class="crm-lead-tags">${leadTagsDisplay(row)}</div></td><td>${row.next}</td><td>${row.owner}</td><td class="action-cell">${row.status === '待分配' ? '<button class="text-button" data-perm="PERM-CRM-007" data-business-action="lead-assign">分配</button>' : ''}${row.status === '跟进中' ? '<button class="text-button" data-perm="PERM-CRM-007" data-business-action="lead-lose">标记流失</button>' : ''}<button class="text-button" data-business-action="lead-follow">填写跟进</button><button class="text-button" data-business-action="lead-tags">编辑标签</button>${row.status === '跟进中' ? '<button class="text-button" data-business-action="lead-trial">转为试听</button><button class="text-button" data-business-action="lead-enroll">转报名</button>' : ''}${row.status === '已流失' ? '<button class="text-button" data-business-action="lead-reactivate">重新激活</button>' : ''}<button class="text-button" data-business-action="lead-view">查看</button></td>`;
   renderRows(businessData, rows, () => true);
-  document.querySelector('#lead-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, source, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!source.value || row.source === source.value) && (!keyword.value.trim() || `${row.student}${row.phone}`.includes(keyword.value.trim()))); });
+  document.querySelector('#lead-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, source, tag: tagField, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!source.value || row.source === source.value) && (!tagField.value || leadTagsOf(row).includes(tagField.value)) && (!keyword.value.trim() || `${row.student}${row.phone}`.includes(keyword.value.trim()))); });
 }
 
 function renderConversions() {
@@ -667,7 +748,10 @@ function renderConversions() {
   const converted = businessData.filter((row) => row.status === '已报名').length;
   const attended = businessData.filter((row) => row.trial === '已试听').length;
   const rate = businessData.length ? `${((converted / businessData.length) * 100).toFixed(1)}%` : '0.0%';
-  pageFrame('报名转化', '', '<button class="button" data-business-action="conversion-export">导出转化数据</button>', metricCards([['线索总数', businessData.length, '与线索跟进同源'], ['已试听', attended, '完成试听记录'], ['已报名', converted, '已生成面授订单', businessData.length ? Math.round((converted / businessData.length) * 100) : 0], ['报名转化率', rate, '已报名 ÷ 线索总数']]) + filterPanel('conversion-filter', selectField('转化状态', 'status', ['已报名', '未转化']) + selectField('试听状态', 'trial', ['待确认', '已确认', '已试听', '已取消', '无试听记录']) + selectField('目标课程', 'course', [...new Set(businessData.map((row) => row.course).filter(Boolean))]) + inputField('关键词', 'keyword', '学员姓名 / 手机号', true)) + table('<thead><tr><th>线索编号</th><th>联系人</th><th>意向课程</th><th>试听时间</th><th>试听状态</th><th>报名状态</th><th>报名班级</th><th>负责人</th><th>操作</th></tr></thead>'));
+  const followUp = dataSets.leads.filter((lead) => Array.isArray(lead.followUps) && lead.followUps.length).length;
+  const funnelTotal = businessData.length || 1;
+  const funnel = [['当前线索', businessData.length], ['有效跟进', followUp], ['已试听', attended], ['已报名', converted]].map(([label, count], index, stages) => `<div class="crm-funnel-step"><div class="crm-funnel-head"><strong>${label}</strong><span>${count} · ${Math.round((count / funnelTotal) * 100)}%</span></div><div class="crm-funnel-bar"><span style="width:${Math.round((count / funnelTotal) * 100)}%"></span></div>${index ? `<small>较上一阶段 ${stages[index - 1][1] ? Math.round((count / stages[index - 1][1]) * 100) : 0}%</small>` : '<small>统计基准</small>'}</div>`).join('');
+  pageFrame('报名转化', '', '<button class="button" data-business-action="conversion-export">导出转化数据</button>', metricCards([['当前线索', businessData.length, '与线索跟进同源'], ['已试听', attended, '完成试听记录'], ['已报名', converted, '已生成面授订单', businessData.length ? Math.round((converted / businessData.length) * 100) : 0], ['报名转化率', rate, '已报名 ÷ 当前线索']]) + `<section class="crm-funnel"><div class="crm-funnel-title"><h3>报名转化漏斗</h3><span>只读派生统计</span></div><p>按当前全部线索、跟进、试听和有效报名事实计算，不单独维护状态。</p><div class="crm-funnel-grid">${funnel}</div></section>` + filterPanel('conversion-filter', selectField('转化状态', 'status', ['已报名', '未转化']) + selectField('试听状态', 'trial', ['待确认', '已确认', '已试听', '已取消', '无试听记录']) + selectField('目标课程', 'course', [...new Set(businessData.map((row) => row.course).filter(Boolean))]) + inputField('关键词', 'keyword', '学员姓名 / 手机号', true)) + table('<thead><tr><th>线索编号</th><th>联系人</th><th>意向课程</th><th>试听时间</th><th>试听状态</th><th>报名状态</th><th>报名班级</th><th>负责人</th><th>操作</th></tr></thead>'));
   const rows = (row) => `<td>${row.number}</td><td>${row.student}</td><td>${row.course}</td><td>${row.time}</td><td>${row.trial ? tag(row.trial) : '—'}</td><td>${tag(row.status)}</td><td>${row.className}</td><td>${row.owner}</td><td class="action-cell">${row.status === '未转化' ? '<button class="text-button" data-business-action="conversion-enroll">转报名</button>' : ''}<button class="text-button" data-business-action="conversion-view">查看</button></td>`;
   renderRows(businessData, rows, () => true);
   document.querySelector('#conversion-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, trial, course, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!trial.value || (trial.value === '无试听记录' ? !row.trial : row.trial === trial.value)) && (!course.value || row.course === course.value) && (!keyword.value.trim() || `${row.student}${row.number}`.includes(keyword.value.trim()))); });
@@ -767,7 +851,7 @@ function openClassDetail(row) {
 }
 
 function openDetail(row, kind) {
-  const labels = kind === 'product' ? [['商品名称', row.name], ['关联课程', row.course], ['售价', `¥${row.price}`], ['销售数量', row.sales], ['商品状态', row.status], ['上架时间', row.updated]] : kind === 'order' ? [['订单号', row.number], ['课程类型', row.type], ['学员', row.student], ['订单金额', `¥${row.amount}`], ['订单状态', row.status], ['关联状态', row.fulfillment], ['关联班级 / 权限', row.linked], ['下单时间', row.time]] : kind === 'class' ? [['班级名称', row.name], ['关联课程', row.course], ['授课教师', row.teacher], ['报名情况', `${row.enrolled} / ${row.capacity}`], ['运营状态', row.status], ['前台展示状态', row.display]] : kind === 'trial' ? [['学员', row.student], ['家长手机号', row.phone], ['目标课程', row.course], ['试听时间', row.time], ['校区', row.campus], ['试听状态', row.status]] : kind === 'lead' ? [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course], ['来源', row.source], ['线索状态', row.status]] : [['线索编号', row.number], ['联系人', row.student], ['意向课程', row.course], ['试听状态', row.trial], ['报名状态', row.status], ['报名班级', row.className]];
+  const labels = kind === 'product' ? [['商品名称', row.name], ['关联课程', row.course], ['售价', `¥${row.price}`], ['销售数量', row.sales], ['商品状态', row.status], ['上架时间', row.updated]] : kind === 'order' ? [['订单号', row.number], ['课程类型', row.type], ['学员', row.student], ['订单金额', `¥${row.amount}`], ['订单状态', row.status], ['关联状态', row.fulfillment], ['关联班级 / 权限', row.linked], ['下单时间', row.time]] : kind === 'class' ? [['班级名称', row.name], ['关联课程', row.course], ['授课教师', row.teacher], ['报名情况', `${row.enrolled} / ${row.capacity}`], ['运营状态', row.status], ['前台展示状态', row.display]] : kind === 'trial' ? [['学员', row.student], ['家长手机号', row.phone], ['目标课程', row.course], ['试听时间', row.time], ['校区', row.campus], ['试听状态', row.status]] : kind === 'lead' ? [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course], ['来源', row.source], ['线索状态', row.status]] : [['线索编号', row.number], ['联系人', row.student], ['意向课程', row.course], ['试听状态', row.trial], ['销售状态', row.salesStatus], ['报名状态', row.status], ['报名班级', row.className]];
   openBusinessDialog(`${kind === 'product' ? '商品' : kind === 'order' || kind === 'offline' ? '订单' : kind === 'class' ? '班级' : kind === 'trial' ? '试听预约' : kind === 'lead' ? '线索' : '报名转化'}详情`, '查看当前记录的完整字段和状态。', `<div class="sales-detail-list">${labels.map(([label, value]) => `<div><span>${label}</span><strong>${label.includes('状态') ? tag(value) : escapeHtml(value)}</strong></div>`).join('')}</div>`);
 }
 
@@ -786,14 +870,20 @@ function appendProductChangeLog(row) {
 // CR-2026-038 §2.2：试听记录必须关联来源线索，保存后进入试听列表。
 function openTrialForm() {
   const leadOptions = dataSets.leads.map((item) => `<option value="${escapeHtml(item.number)}">${escapeHtml(item.number)} · ${escapeHtml(item.student)} · ${escapeHtml(item.course)}</option>`).join('');
-  const fields = `<label class="form-field wide"><span>来源线索编号 <b class="required-mark">*</b></span><select name="leadNo" required><option value="">请选择来源线索</option>${leadOptions}</select></label>${inputField('学员姓名', 'student', '请输入学员姓名')}${inputField('家长手机号', 'phone', '请输入手机号')}${inputField('目标课程', 'course', '请输入目标课程')}${inputField('试听时间', 'time', '2026-09-20 09:00')}${selectField('试听校区', 'campus', ['龙泉校区', '南湖校区'])}${selectField('来源', 'source', leadSources)}<label class="form-field wide"><span>备注</span><textarea name="remark" placeholder="选填，记录试听安排或特殊说明"></textarea></label>`;
+  const fields = `<label class="form-field wide"><span>来源线索编号 <b class="required-mark">*</b></span><select name="leadNo" required><option value="">请选择来源线索</option>${leadOptions}</select></label>${inputField('学员姓名', 'student', '请输入学员姓名')}${inputField('家长手机号', 'phone', '请输入手机号')}${inputField('目标课程', 'course', '请输入目标课程')}${inputField('试听时间', 'time', '2026-09-20 09:00')}${selectField('试听校区', 'campus', ['龙泉校区', '南湖校区'])}${selectField('试听教师', 'teacher', ['王玥', '陈晨', '赵老师'])}${selectField('来源', 'source', leadSources)}<label class="form-field wide"><span>备注</span><textarea name="remark" placeholder="选填，记录试听安排或特殊说明"></textarea></label>`;
   const dialog = openBusinessDialog('登记试听', '试听记录必须关联来源线索；线索与试听的来源类型使用同一套取值。', `<form id="business-dialog-form" class="sales-dialog-grid">${fields}</form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">确认</button>');
   dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const leadNo = String(data.get('leadNo') || '');
     if (!leadNo) { showToast('请选择来源线索编号', 'error'); return; }
-    dataSets.trials.unshift({ id: `trial-${Date.now()}`, leadNo, student: String(data.get('student') || '').trim() || '—', phone: String(data.get('phone') || '').trim() || '—', course: String(data.get('course') || '').trim() || '—', time: String(data.get('time') || '').trim() || '—', campus: data.get('campus'), status: '待确认', source: data.get('source') || '后台登记', owner: '赵顾问' });
+    const time = String(data.get('time') || '').trim();
+    const teacher = String(data.get('teacher') || '').trim();
+    const conflict = trialConflictOf({ leadNo, time, teacher });
+    if (conflict) { showToast(conflict, 'warning'); return; }
+    const record = { id: demoId('trial'), leadNo, student: String(data.get('student') || '').trim() || '—', phone: String(data.get('phone') || '').trim() || '—', course: String(data.get('course') || '').trim() || '—', time: time || '—', campus: data.get('campus'), teacher, status: '待确认', source: data.get('source') || '后台登记', owner: '赵顾问', remark: String(data.get('remark') || '').trim() };
+    dataSets.trials.unshift(record);
+    upsertDemoRecord('trials', record);
     closeBusinessDialog();
     renderTrials();
     showToast('试听记录已登记，并已关联来源线索。');
@@ -807,13 +897,15 @@ function openLeadDetail(row) {
   const facts = [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course], ['来源', row.source], ['线索状态', row.status], ['下次跟进', row.next], ['负责人', row.owner]];
   const factRows = facts.map(([label, value]) => `<div><span>${label}</span><strong>${label.includes('状态') ? tag(value) : escapeHtml(String(value ?? '—'))}</strong></div>`).join('');
   const trialRows = trials.length ? trials.map((item) => `<tr><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.campus)}</td><td>${tag(item.status)}</td><td>${escapeHtml(item.owner)}</td></tr>`).join('') : '<tr><td colspan="4">暂无试听记录</td></tr>';
-  const body = `<div class="sales-detail-list">${factRows}</div><section class="course-detail-section wide"><h3>试听记录</h3><div class="table-wrap"><table><thead><tr><th>试听时间</th><th>校区</th><th>试听状态</th><th>跟进人</th></tr></thead><tbody>${trialRows}</tbody></table></div></section><section class="course-detail-section wide"><h3>报名结果</h3><p>${order ? `已生成面授订单 ${escapeHtml(order.number)}，关联班级：${escapeHtml(order.linked || '—')}` : '暂无报名订单，报名状态为未转化。'}</p></section>`;
+  const followUps = Array.isArray(row.followUps) ? row.followUps : [];
+  const followRows = followUps.length ? followUps.map(item => `<tr><td>${escapeHtml(item.at)}</td><td>${escapeHtml(item.method)}</td><td>${escapeHtml(item.content)}</td><td>${escapeHtml(item.next || '—')}</td><td>${escapeHtml(item.owner || '—')}</td></tr>`).join('') : '<tr><td colspan="5">暂无跟进记录</td></tr>';
+  const body = `<div class="sales-detail-list">${factRows}<div><span>线索标签</span><strong><span class="crm-lead-tags">${leadTagsDisplay(row)}</span></strong></div></div><section class="course-detail-section wide"><h3>跟进记录</h3><div class="table-wrap"><table><thead><tr><th>时间</th><th>方式</th><th>内容</th><th>下次跟进</th><th>跟进人</th></tr></thead><tbody>${followRows}</tbody></table></div></section><section class="course-detail-section wide"><h3>试听记录</h3><div class="table-wrap"><table><thead><tr><th>试听时间</th><th>校区</th><th>试听状态</th><th>跟进人</th></tr></thead><tbody>${trialRows}</tbody></table></div></section><section class="course-detail-section wide"><h3>报名结果</h3><p>${order ? `已生成面授订单 ${escapeHtml(order.number)}，关联班级：${escapeHtml(order.linked || '—')}，当前订单状态：${escapeHtml(order.status)}` : '暂无报名订单，报名状态为未转化。'}</p></section>`;
   openBusinessDialog('线索详情', `${row.number} · ${row.student}`, `<div class="course-detail-grid">${body}</div>`, '<button type="button" class="button" data-dialog-close>关闭</button>');
 }
 
-function openSimpleForm(title, subtitle, fields, onSubmitMessage) {
+function openSimpleForm(title, subtitle, fields, onSubmitMessage, onSubmit) {
   const dialog = openBusinessDialog(title, subtitle, `<form id="business-dialog-form" class="sales-dialog-grid">${fields}</form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">确认</button>');
-  dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => { event.preventDefault(); closeBusinessDialog(); showToast(onSubmitMessage); });
+  dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const result = onSubmit ? onSubmit(data, event.currentTarget) : true; if (result === false) return; closeBusinessDialog(); showToast(onSubmitMessage); });
 }
 
 function openClassDeadlineForm(row) {
@@ -888,15 +980,26 @@ function handleBusinessAction(action, row) {
   if (action === 'class-teaching-schedule') { openSchedulePlanner({ classId: row.id, mode: 'view' }); return; }
   if (action === 'class-session-adjust') { openSessionAdjustment({ classId: row.id }); return; }
   if (action === 'trial-view') return openDetail(row, 'trial');
-  if (action === 'trial-confirm') { row.status = '已确认'; renderTrials(); showToast('试听时间已确认，已发送学员通知。'); return; }
+  if (action === 'trial-confirm') { row.status = '已确认'; row.confirmedAt = demoTime(); upsertDemoRecord('trials', row); renderTrials(); showToast('试听时间已确认，已发送学员通知。'); return; }
+  if (action === 'trial-cancel') return openSimpleForm('取消试听', '取消后保留历史记录，不再占用试听安排；如需再次试听请新建记录。', inputField('取消原因', 'reason', '请输入取消原因', true), '试听已取消。', (data) => { row.status = '已取消'; row.cancelledAt = demoTime(); row.cancelReason = String(data.get('reason') || '').trim(); upsertDemoRecord('trials', row); renderTrials(); });
   if (action === 'trial-create') return openTrialForm();
   if (action === 'lead-view') return openLeadDetail(row);
-  if (action === 'lead-follow') return openSimpleForm('填写跟进', '记录跟进方式、内容和下次跟进时间。', selectField('跟进方式', 'method', ['电话', '微信', '面谈', '短信']) + inputField('跟进内容', 'content', '请输入跟进内容', true) + inputField('下次跟进时间', 'next', '2026-09-20 10:00'), '跟进记录已保存。');
-  if (action === 'lead-trial') return openSimpleForm('转为试听', '已自动带入线索学员和意向课程。', inputField('试听时间', 'time', '2026-09-20 09:00') + selectField('试听校区', 'campus', ['龙泉校区', '南湖校区']) + selectField('试听教师', 'teacher', ['王玥', '陈晨', '赵老师']), '试听记录已生成。');
-  if (action === 'lead-enroll') return openSimpleForm('报名确认', '选择课程和班级后生成面授订单。', selectField('课程', 'course', ['少儿中国舞基础班', '成人声乐班', '中国画基础']) + selectField('班级', 'className', ['秋季一班', '周末班', '南湖一班']), '面授订单已生成，可在统一订单管理中按“面授课程”筛选查看。');
-  if (action === 'lead-create') return openSimpleForm('新增线索', '录入线索后进入跟进流程。', inputField('联系人', 'student', '请输入联系人') + inputField('手机号', 'phone', '请输入手机号') + inputField('意向课程', 'course', '请输入意向课程', true) + selectField('来源类型', 'source', ['咨询', '后台登记试听']), '线索已创建。');
+  if (action === 'lead-assign') return openSimpleForm('分配线索', '分配后线索进入跟进中，并记录当前负责人。', selectField('负责人', 'owner', ['赵顾问', '王顾问', '陈顾问']), '线索已分配。', (data) => { const owner = String(data.get('owner') || '').trim(); if (!owner) return false; row.owner = owner; row.status = '跟进中'; row.assignedAt = demoTime(); upsertDemoRecord('leads', row); renderLeads(); });
+  if (action === 'lead-lose') return openSimpleForm('标记线索流失', '标记流失必须填写原因；历史跟进记录会保留，后续可重新激活。', inputField('流失原因', 'reason', '请输入流失原因', true), '线索已标记为已流失。', (data) => { const reason = String(data.get('reason') || '').trim(); if (!reason) return false; row.status = '已流失'; row.lostReason = reason; row.lostAt = demoTime(); upsertDemoRecord('leads', row); renderLeads(); });
+  if (action === 'lead-tags') {
+    const selected = new Set(leadTagsOf(row));
+    const fields = `<fieldset class="crm-tag-picker"><legend>选择标签（最多 5 个）</legend>${LEAD_TAG_OPTIONS.map((value) => `<label><input type="checkbox" name="tags" value="${escapeHtml(value)}" ${selected.has(value) ? 'checked' : ''}> ${escapeHtml(value)}</label>`).join('')}</fieldset>`;
+    const dialog = openBusinessDialog('编辑线索标签', '标签用于销售分层和筛选，不改变线索状态或转化流程。', `<form id="business-dialog-form" class="sales-dialog-grid">${fields}</form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存标签</button>');
+    dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => { event.preventDefault(); const values = [...new FormData(event.currentTarget).getAll('tags')]; if (values.length > 5) return showToast('最多选择 5 个标签。', 'warning'); row.tags = values; upsertDemoRecord('leads', row); closeBusinessDialog(); renderLeads(); showToast('线索标签已保存。'); });
+    return;
+  }
+  if (action === 'lead-follow') return openSimpleForm('填写跟进', '记录跟进方式、内容和下次跟进时间。', selectField('跟进方式', 'method', ['电话', '微信', '面谈', '短信']) + inputField('跟进内容', 'content', '请输入跟进内容', true) + inputField('下次跟进时间', 'next', '2026-09-20 10:00'), '跟进记录已保存。', (data) => { row.followUps = [...(row.followUps || []), { at: demoTime(), method: data.get('method'), content: String(data.get('content') || '').trim(), next: data.get('next') || '—', owner: row.owner || '当前账号' }]; row.next = data.get('next') || '—'; if (row.status === '待分配') row.status = '跟进中'; upsertDemoRecord('leads', row); renderLeads(); });
+  if (action === 'lead-trial') return openSimpleForm('转为试听', '已自动带入线索学员和意向课程；同一线索同一时间不可重复登记。', inputField('试听时间', 'time', '2026-09-20 09:00') + selectField('试听校区', 'campus', ['龙泉校区', '南湖校区']) + selectField('试听教师', 'teacher', ['王玥', '陈晨', '赵老师']), '试听记录已生成。', (data) => { const time = String(data.get('time') || '').trim(); const teacher = String(data.get('teacher') || '').trim(); const conflict = trialConflictOf({ leadNo: row.number, time, teacher }); if (conflict) { showToast(conflict, 'warning'); return false; } const record = { id: demoId('trial'), leadId: row.id, leadNo: row.number, student: row.student, phone: row.phone, course: row.course, time, campus: data.get('campus'), teacher, status: '待确认', source: row.source, owner: row.owner }; dataSets.trials.unshift(record); upsertDemoRecord('trials', record); renderLeads(); });
+  if (action === 'lead-enroll') return openSimpleForm('报名确认', '仅可选择当前可报名班级；生成待支付面授订单后，支付成功才计入当前报名。', bookableClassField(), '面授订单已生成，可在统一订单管理中按“面授课程”筛选查看。', (data) => { if (!createLeadOrder(row, data.get('classId'))) return false; renderLeads(); });
+  if (action === 'lead-reactivate') return openSimpleForm('重新激活线索', '重新激活必须填写原因，并将线索恢复为跟进中。', inputField('激活原因', 'reason', '请输入重新激活原因', true) + inputField('下次跟进时间', 'next', '2026-09-20 10:00', true), '线索已重新激活。', (data) => { row.status = '跟进中'; row.next = data.get('next'); row.followUps = [...(row.followUps || []), { at: demoTime(), method: '重新激活', content: data.get('reason'), next: data.get('next'), owner: row.owner || '当前账号' }]; upsertDemoRecord('leads', row); renderLeads(); });
+  if (action === 'lead-create') return openSimpleForm('新增线索', '录入线索后进入跟进流程。', inputField('联系人', 'student', '请输入联系人') + inputField('手机号', 'phone', '请输入手机号') + inputField('意向课程', 'course', '请输入意向课程', true) + selectField('来源类型', 'source', leadSources), '线索已创建。', (data) => { const phone = String(data.get('phone') || '').trim(); const duplicate = dataSets.leads.find(item => item.phone === phone); if (duplicate) { showToast(`该手机号已有线索 ${duplicate.number}，请直接查看既有记录。`, 'warning'); return; } const lead = { id: demoId('lead'), number: `CL${Date.now()}`, student: data.get('student'), phone, course: data.get('course') || '—', source: data.get('source'), status: '待分配', next: '—', owner: '—', followUps: [] }; dataSets.leads.unshift(lead); upsertDemoRecord('leads', lead); renderLeads(); });
   if (action === 'conversion-view') return openDetail(row, 'conversion');
-  if (action === 'conversion-enroll') return openSimpleForm('转报名', '选择课程和班级后生成面授订单。', selectField('课程', 'course', ['少儿中国舞基础班', '成人声乐班', '中国画基础']) + selectField('班级', 'className', ['秋季一班', '周末班', '南湖一班']), '报名订单已生成，可在统一订单管理中按“面授课程”筛选查看。');
+  if (action === 'conversion-enroll') return openSimpleForm('转报名', '仅可选择当前可报名班级；生成待支付面授订单后，支付成功才计入当前报名。', bookableClassField(), '报名订单已生成，可在统一订单管理中按“面授课程”筛选查看。', (data) => { const lead = dataSets.leads.find(item => item.id === row.leadId || item.number === row.number); if (!lead) return false; if (!createLeadOrder(lead, data.get('classId'))) return false; renderConversions(); });
   if (action.endsWith('export')) return showToast('导出任务已创建，数据将按当前角色权限脱敏。');
 }
 

@@ -177,6 +177,13 @@ const defaultState = () => ({
   buildings: [],
   venues: [],
   classes: [],
+  // CR-2026-作业链路：作业定义与学员提交记录分离，教师端与学员端共用同源演示集合。
+  homeworks: [],
+  homeworkSubmissions: [],
+  homeworkNotifications: [],
+  homeworkAudits: [],
+  // CR-2026-作业链路：新作业截止时间默认取参数配置，默认发布后 72 小时。
+  homeworkDeadlineHours: 72,
   orders: teachingDemoOrders(),
   enrollments: [...teachingDemoEnrollments(), ...enrollingDemoEnrollments()],
   videoEntitlements: [],
@@ -278,6 +285,12 @@ export function videoRefundSettings() {
 export function paymentTimeoutSettings() {
   const settings = readStored().orderSettings || {};
   return { paymentTimeoutMinutes: clampInt(settings.paymentTimeoutMinutes ?? 30, 1, 1440, 30) };
+}
+
+// CR-2026-作业链路：教师端发布作业与服务层共用后台的截止时间参数（1–720 小时）。
+export function homeworkDeadlineSettings() {
+  const settings = readStored();
+  return { deadlineHours: clampInt(settings.homeworkDeadlineHours ?? 72, 1, 720, 72) };
 }
 
 // CR-2026-104：文件上传规格由「参数配置」维护，上传校验、提示文案与后台上传入口读取同一份配置。

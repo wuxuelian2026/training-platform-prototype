@@ -7,6 +7,10 @@ current/legacy/
 current/.codex-tmpfix/
 # 全量页面巡检工具的本地输出（scripts/sweep-pages.mjs 生成）不入版本
 current/_sweep-pages.json
+# 会话过程文件（进度/发现/计划）不入版本，避免污染交付物
+current/findings.md
+current/progress.md
+current/task_plan.md
 .env
 .env.*
 !.env.example

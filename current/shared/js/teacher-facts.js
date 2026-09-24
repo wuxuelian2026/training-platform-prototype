@@ -275,7 +275,7 @@ const addDays = (iso, days) => {
   return toLocalDateString(date);
 };
 
-// 已开班次：由班级种子派生的课时日期（未发布或已停课的班级不计入）。
+// 已开班次：由班级种子派生的课时日期（未发布的班级不计入）。
 export const TEACHER_LESSON_SESSIONS = classSeed
   .filter((item) => item.status && item.status !== '未发布' && item.firstLessonDate && item.lessons)
   .flatMap((item) => Array.from({ length: Number(item.lessons) }, (_, index) => ({

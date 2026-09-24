@@ -92,10 +92,10 @@ export const TEACHER_APP_FIELD_SPEC = {
       groups: [
         { heading: '发布作业字段', fields: [
           { id: 'FD-TAPP-006', label: '作业标题', type: '文本', length: '≤ 50 字', required: '是', note: '学员端作业本展示的标题', constraints: { maxLength: 50 } },
-          { id: 'FD-TAPP-007', label: '作业描述', type: '富文本', length: '≤ 2000 字', required: '是', note: '作业要求与完成说明；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 2000, richText: true } },
+          { id: 'FD-TAPP-007', label: '作业描述', type: '长文本', length: '≤ 2000 字', required: '是', note: '作业要求与完成说明；使用普通多行长文本输入，不提供富文本编辑器', constraints: { maxLength: 2000 } },
           { id: 'FD-TAPP-008', label: '作业类型', type: '下拉', length: '练习视频 / 乐谱练习 / 绘画作品 / 文字报告 / 其他', required: '是', note: '决定学员端提交方式与批阅口径', constraints: { options: ['练习视频', '乐谱练习', '绘画作品', '文字报告', '其他'] } },
           { id: 'FD-TAPP-009', label: '提交格式', type: '多选', length: '图片 / 视频 / 音频 / 文字 / PDF', required: '是', note: '至少选择一种允许提交的格式', constraints: { options: ['图片', '视频', '音频', '文字', 'PDF'], minItems: 1, multi: true } },
-          { id: 'FD-TAPP-010', label: '截止时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '默认课后 48 小时', constraints: { format: 'YYYY-MM-DD HH:mm' } },
+          { id: 'FD-TAPP-010', label: '截止时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '默认取「参数配置 → 作业默认截止时间（小时）」（当前默认 72 小时），可按本次作业调整；必须晚于发布时刻', constraints: { format: 'YYYY-MM-DD HH:mm', systemParam: 'homeworkDeadlineHours', defaultOffsetHours: 72 } },
           { id: 'FD-TAPP-011', label: '是否必交', type: '开关', length: '是 / 否', required: '否', note: '默认开启；必交作业未提交影响结业判定', constraints: { boolean: true } },
           { id: 'FD-TAPP-012', label: '参考资料', type: '多选', length: '至少 0 个资源', required: '否', note: '从教学资源库引用，随作业下发给学员', constraints: { multi: true } },
           { id: 'FD-TAPP-013', label: '发布', type: '按钮', length: '—', required: '是', note: '提交后推送至学员端作业本', constraints: { action: true } }
@@ -103,7 +103,8 @@ export const TEACHER_APP_FIELD_SPEC = {
       ],
       notes: [
         '作业发布后推送至该班级学员的作业本，学员在截止时间前提交。',
-        '教师只能对本人在授班级发布作业，截止时间不得早于发布时刻。',
+        '教师只能对本人在授班级发布作业；发布时校验班级授课教师与当前登录教师一致，截止时间必须晚于发布时刻，否则拒绝发布并提示。',
+        '作业截止时间默认值与后台「参数配置 → 作业默认截止时间（小时）」同源，教师端发布表单不写死默认值。',
         '参考资料从教学资源库引用，不复制资源本体。'
       ]
     },

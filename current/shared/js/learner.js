@@ -4,11 +4,12 @@ import { mountPageHelp } from './page-help.js';
 import { toLocalDateTimeString, toLocalMonthString } from './date-utils.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
-import { accountStudents, demoId, demoTime, getCurrentAccountId, paymentTimeoutSettings, readDemoState, subscribeDemoState, transitionVideoEntitlement, upsertDemoRecord, updateDemoRecord, videoRefundSettings, writeDemoState } from './demo-store.js';
-import { DEMO_TODAY, demoDateTime } from './demo-clock.js';
+import { accountStudents, demoId, demoTime, fileSpecSettings, getCurrentAccountId, paymentTimeoutSettings, readDemoState, subscribeDemoState, transitionVideoEntitlement, upsertDemoRecord, updateDemoRecord, videoRefundSettings, writeDemoState } from './demo-store.js';
+import { DEMO_NOW, DEMO_TODAY, demoDateTime } from './demo-clock.js';
 import { classSeed } from './class-seed.js';
 import { venueSeed } from './venue-seed.js';
 import { lessonAttendanceStatus } from './lesson-records.js';
+import { getHomework, listHomework, getStudentSubmission, homeworkFileLimitMb, homeworkLifecycleStatus, listSubmissions, saveDraftSubmission, submitHomework as submitHomeworkRecord, syncHomeworkNotificationReads } from './homework-store.js';
 import { resolveHomeBanners } from './banner-seed.js';
 import { isLearnerPublicPage, isMiniLoggedIn, isMiniRole, miniPageName, redirectMiniLogin } from './mobile-guard.js';
 import { toCanonicalCourseId } from './course-seed.js';
@@ -329,6 +330,18 @@ function readState() {
 }
 let state = readState();
 function saveState() { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+let sharedLearnerHomeworkMessages = [];
+function learnerMessageFeed() {
+  const studentId = state.currentStudentId || currentStudent()?.id || '';
+  sharedLearnerHomeworkMessages = (readDemoState().homeworkNotifications || [])
+    .filter((item) => item.audience === 'learner' && (!item.recipientId || item.recipientId === studentId))
+    .map((item) => ({ ...item }));
+  return [...state.messages, ...sharedLearnerHomeworkMessages].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+}
+function saveLearnerMessageFeed() {
+  saveState();
+  syncHomeworkNotificationReads(sharedLearnerHomeworkMessages);
+}
 function saveVideoProgress(courseId, patch) {
   writeDemoState(next => {
     const key = `${state.accountId}-${courseId}`;
@@ -1031,7 +1044,6 @@ function sessionHasHappened(session) { return ['已完成', '已上课'].include
 // 未到时间的课次不再标「待签到」，避免家长误读成「该签到没签」。
 function deriveAttendance(item, session) {
   const status = sessionDisplayStatus(session);
-  if (status === '已停课') return { label: '已停课', tone: 'gray', counted: false, started: false };
   if (status === '上课中') return { label: '进行中', tone: 'green', counted: false, started: true };
   if (status === '已完成' || status === '已上课') {
     const record = lessonAttendanceStatus(item, session.index, currentStudent());
@@ -1044,6 +1056,7 @@ function deriveAttendance(item, session) {
 }
 function homeworkPill(work) {
   if (!work) return '';
+  if (work.status === '已点评') return pill('作业已点评', 'green');
   if (work.status === '已提交') return pill('作业已提交', 'green');
   return pill(work.status === '草稿' ? '作业草稿' : '作业待提交', 'amber');
 }
@@ -1065,7 +1078,7 @@ function classLessonsView(item, sessions, work, nextSession, { scheduleOnly = fa
   const summary = scheduleOnly ? '' : counted.length
     ? `<p class="mp-class-summary">有效出勤 ${attended.length}/${counted.length} 次 · 出勤率 ${Math.round(attended.length / counted.length * 100)}%</p><p class="mp-class-summary-note">已上过的课次才计入出勤；迟到计出勤，请假与待补录不计入。</p>`
     : '<p class="mp-class-summary">尚未开课，出勤率会在首次课后统计。</p>';
-  const statusTone = (value) => (value === '已完成' || value === '已上课' ? 'gray' : value === '已停课' ? 'amber' : 'green');
+  const statusTone = (value) => (value === '已完成' || value === '已上课' ? 'gray' : 'green');
   const row = (entry) => {
     const session = entry.session;
     const time = `${esc(session.startTime || session.start || '—')}–${esc(session.endTime || session.end || '—')}`;
@@ -1092,7 +1105,7 @@ function classNextSessionView(item, session) {
   // 已结课或全部课次完成时才没有下一次课；课表本身在报名前已发布，不写「课表发布后」的等待语义。
   if (!session) return `<section class="mp-class-next is-empty">${kicker}<strong>暂无下一次课</strong><p>本班课次已全部完成。</p></section>`;
   const time = `${esc(session.startTime || session.start || '—')}–${esc(session.endTime || session.end || '—')}`;
-  return `<section class="mp-class-next">${kicker}<div class="mp-class-next-head"><strong>${esc(session.date)} ${esc(session.weekday || '')} ${time}</strong>${pill(session.status || '待上课', session.status === '已停课' ? 'amber' : 'green')}</div><p>${esc(roomText(item, '教室待定'))} · ${esc(item.teacher)}老师</p><button type="button" class="mp-button secondary" data-class-jump="lessons">查看课表</button></section>`;
+  return `<section class="mp-class-next">${kicker}<div class="mp-class-next-head"><strong>${esc(session.date)} ${esc(session.weekday || '')} ${time}</strong>${pill(session.status || '待上课', 'green')}</div><p>${esc(roomText(item, '教室待定'))} · ${esc(item.teacher)}老师</p><button type="button" class="mp-button secondary" data-class-jump="lessons">查看课表</button></section>`;
 }
 // CR-2026-102：班级课表从班级主体（种子 + demo state）读取正式课次，与后台课表同一份数据；
 // 家长／学员可查看每次课的日期、时间、教室与状态，并通过「分享给家长」生成分享链接。
@@ -1144,9 +1157,9 @@ function resultSection(item, record) {
 }
 // 课次详情弹层：不新增独立页面（独立课次详情页属迭代2 范围）。
 // CR-2026-132：课次身份用「第 N 次 / 共 M 次」讲清进度，上课地点取该课次教室，
-// 已停课课次给出补课说明，已上课次展示出勤结果、课后作业与教师评语。
+// 未开始课次只展示安排，已上课次展示出勤结果、课后作业与教师评语。
 let classLessonRows = [];
-function lessonStatusTone(value) { return value === '已完成' || value === '已上课' ? 'gray' : value === '已停课' ? 'amber' : 'green'; }
+function lessonStatusTone(value) { return value === '已完成' || value === '已上课' ? 'gray' : 'green'; }
 function sessionRoomText(session, item, fallback = '教室待定') {
   const room = venueSeed.find((entry) => entry.id === (session && session.roomId));
   return room ? `${room.campus} · ${room.name}` : roomText(item, fallback);
@@ -1157,18 +1170,15 @@ function showLessonDetailDialog(item, entry) {
   const time = `${session.startTime || session.start || '—'}–${session.endTime || session.end || '—'}`;
   const total = classLessonRows.length || 0;
   const status = entry.status;
-  const stopped = status === '已停课';
   const started = entry.attendance.started;
   const work = entry.homework;
   const rows = [
     ['上课时间', `${session.date} ${session.weekday || ''} ${time}`],
     ['上课地点', sessionRoomText(session, item)],
     ['授课教师', `${item.teacher}老师`],
-    ['出勤结果', stopped ? '本课次已停课，不考勤' : started ? entry.attendance.label : '未开始']
+    ['出勤结果', started ? entry.attendance.label : '未开始']
   ];
-  const homeworkBlock = stopped
-    ? '<p class="mp-muted">本课次已由教务停课，补课安排确认后会通过消息通知。</p>'
-    : !started
+  const homeworkBlock = !started
       ? '<p class="mp-muted">本节课尚未开始，暂无出勤与作业记录。</p>'
       : work
         ? `<section class="mp-dialog-section"><h3>课后作业</h3><dl class="mp-dialog-rows"><div><dt>作业</dt><dd>${esc(CLASS_DEMO_HOMEWORK.title)}</dd></div><div><dt>截止时间</dt><dd>${esc(CLASS_DEMO_HOMEWORK.deadline)}</dd></div><div><dt>提交状态</dt><dd>${esc(work.status)}</dd></div></dl><div class="mp-dialog-comment"><span>教师评语</span><p>${esc(work.status === '已提交' ? (work.feedback || '教师尚未完成批改') : '提交后可查看教师评语')}</p></div><a class="mp-button secondary full" href="/learner/pages/homework.html?courseId=${esc(item.id)}">${work.status === '已提交' ? '查看作业' : '去提交'}</a></section>`
@@ -1187,8 +1197,8 @@ function renderClassDetail(item, tab = params.get('tab') || 'overview') {
   // I1-CLASS-DETAIL-11：班级详情只对已报名当前学员开放；未报名走空态，不提供报名入口。
   if (!record) { renderEnrollmentRequiredEmpty(); return; }
   const sessions = classTimetableSessions(item.id);
-  const nextSession = sessions.find(session => !['已完成', '已上课', '已停课'].includes(sessionDisplayStatus(session))) || null;
-  const work = homeworkState();
+  const nextSession = sessions.find(session => !['已完成', '已上课'].includes(sessionDisplayStatus(session))) || null;
+  const work = homeworkState(item.id);
   // I1-CLASS-DETAIL-12（方案 A）：view=schedule 为「课表分享视图」——只输出日期/时间/教室/课次状态，
   // 不含出勤、作业、成果与当前学员姓名，供家长转发使用。
   const scheduleOnly = params.get('view') === 'schedule';
@@ -1233,29 +1243,129 @@ function renderClassDetail(item, tab = params.get('tab') || 'overview') {
   if (target === 'result' && record?.status !== 'ended') target = sessions.length ? 'lessons' : 'overview';
   if (target !== 'overview') setTimeout(() => scrollToSection?.(target), 120);
 }
-function homeworkView(item) { return `<h3>我的作业</h3><div class="mp-list" style="margin-top:10px"><div class="mp-item"><div><strong>课堂组合练习记录</strong><small>截止时间：2026-09-20 · 教师评语：动作衔接自然，继续保持。</small></div>${pill('已批改', 'green')}</div><div class="mp-item"><div><strong>节奏练习视频</strong><small>截止时间：2026-09-27 · 仅支持文字说明和附件。</small></div>${button('提交作业', `data-action="homework" data-course-id="${item.id}"`, 'secondary')}</div></div>`; }
+function homeworkView(item) {
+  const records = listHomework({ classId: item.id });
+  if (!records.length) return '<h3>我的作业</h3><p class="mp-muted">当前班级暂无作业。</p>';
+  return `<h3>我的作业</h3><div class="mp-list" style="margin-top:10px">${records.map((homework) => { const submission = getStudentSubmission(homework.id, state.currentStudentId, currentStudent()?.name); const status = submission?.status || '未提交'; return `<div class="mp-item"><div><strong>${esc(homework.title)}</strong><small>第${esc(homework.lessonIndex)}次课 · 截止时间：${esc(homework.deadline)}${submission?.review?.comment ? ` · 教师评语：${esc(submission.review.comment)}` : ''}</small></div><a class="mp-button secondary" href="/learner/pages/homework.html?homeworkId=${encodeURIComponent(homework.id)}&classId=${encodeURIComponent(item.id)}">${status === '未提交' || status === '草稿' ? '去提交' : '查看记录'}</a></div>`; }).join('')}</div>`;
+}
 function resultView(item = course('class-001'), record) {
   // I1-CLASS-DETAIL-06：成果区按教学阶段门控。未结课只说明「结课后才有成果」，不再显示「报告已发布／证书生成中」等假状态。
   if (record?.status !== 'ended') {
     return `<section class="mp-class-detail-block"><h3>我的成果</h3><div class="mp-class-result-status"><div><strong>尚未结课</strong><p>结业状态、结业评语、学习报告与结业证书会在本班课程结束后在这里展示。</p></div>${pill('未结课', 'gray')}</div></section>`;
   }
   const completion = state.completionStatus || '已结业';
-  const completionTone = completion === '已结业' ? 'green' : completion === '补课中' ? 'amber' : 'gray';
+  const completionTone = completion === '已结业' ? 'green' : ['补课中', '退回补课'].includes(completion) ? 'amber' : 'gray';
   const completionNote = completion === '已结业'
     ? '本班已结课，以下为当前学员的结业结论与成果。'
-    : '结业结论仅针对当前学员，与其他学员无关。';
+    : completion === '审核中'
+      ? '教务正在核对当前学员的考勤、作业与教师评语。'
+      : completion === '退回补课'
+        ? '结业审核未通过，需由教务登记补课安排后继续处理。'
+        : completion === '补课中'
+          ? '补课课次已安排，完成补课并补齐教学记录后重新复核。'
+          : '结业结论仅针对当前学员，与其他学员无关。';
   const report = reportState();
   const certificate = state.certificateStatus || '已生成';
   const reportText = report === '已发布' ? '学习报告已发布，包含课堂参与、作品练习和阶段展示成果。' : report === '已撤回' ? '报告暂不可查看，教务正在更新。' : '学习报告正在生成中，完成后会通过消息通知。';
   const certificateText = certificate === '已生成' ? '证书已生成，可在线查看。' : certificate === '生成异常' ? '证书生成异常，请联系教务。' : '证书将在结业通过后异步生成。';
   return `<section class="mp-class-detail-block"><h3>结业状态</h3><div class="mp-class-result-status"><div><strong>${esc(completion)}</strong><p>${completionNote}</p></div>${pill(completion, completionTone)}</div></section>${completion === '已结业' ? `<section class="mp-class-detail-block"><h3>结业评语</h3><p>综合评语：课堂参与积极，基本功和组合衔接持续进步。</p><p>成长建议：保持每周练习，关注动作细节和节奏稳定性。</p></section>` : ''}<section class="mp-class-detail-block"><div class="mp-section-head"><h3>学习报告</h3>${pill(report, report === '已发布' ? 'green' : report === '已撤回' ? 'gray' : 'amber')}</div><p>${reportText}</p>${report === '已发布' ? `<a class="mp-button secondary" href="/learner/pages/results.html?courseId=${esc(item.id)}">查看报告详情</a>` : ''}</section><section class="mp-class-detail-block"><div class="mp-section-head"><h3>结业证书</h3>${pill(certificate, certificate === '已生成' ? 'green' : certificate === '生成异常' ? 'gray' : 'amber')}</div><p>${certificateText}</p>${certificate === '已生成' ? `<a class="mp-button secondary" href="/learner/pages/results.html?courseId=${esc(item.id)}">查看证书</a>` : ''}</section>`;
 }
-function homeworkState() { return state.homework || { status: '未提交', text: '', fileName: '', feedback: '' }; }
-function renderHomeworkPage() { const item = course(params.get('courseId') || 'class-001'); const work = homeworkState(); layout(stack(card(`<div class="mp-pills">${pill('待提交', 'amber')}${pill('面授课程', 'gray')}</div><h2 style="margin-top:12px">节奏练习视频</h2><p>${esc(item.name)} · 截止时间：2026-09-27 23:59</p><div class="mp-divider"></div><p>请提交本周节奏练习记录，可以填写文字说明并附加图片、视频或音频文件。</p>`), card(`<form id="homework-form" class="mp-form"><div class="mp-field"><label for="homework-text">作业说明</label><textarea id="homework-text" placeholder="请输入本次作业说明">${esc(work.text)}</textarea></div><div class="mp-field"><label for="homework-file">附件</label><input id="homework-file" type="file" accept="image/*,video/*,audio/*"><small class="mp-muted">演示原型只记录文件名，不上传真实文件。</small><span id="homework-file-name" class="mp-muted">${work.fileName ? `已选择：${esc(work.fileName)}` : '尚未选择附件'}</span></div><p id="homework-error" class="mp-notice" hidden></p><div class="mp-actions"><button type="button" class="mp-button secondary" data-homework-action="save">保存草稿</button><button type="submit" class="mp-button">提交作业</button></div></form>`), work.status === '已提交' ? card(`<h3>教师评语</h3><p>${esc(work.feedback || '教师尚未完成批改。')}</p>`) : ''));
-  const fileInput = document.querySelector('#homework-file'); fileInput.addEventListener('change', event => { const file = event.target.files[0]; if (file) document.querySelector('#homework-file-name').textContent = `已选择：${file.name}`; });
-  document.querySelector('#homework-form').addEventListener('submit', event => submitHomework(event, false)); document.querySelector('[data-homework-action="save"]').addEventListener('click', () => submitHomework(null, true));
+function homeworkRecordsFor(classId = '') { return listHomework(classId ? { classId } : {}).filter((homework) => homeworkLifecycleStatus(homework) !== '已撤回').filter((homework) => { const expected = listSubmissions(homework.id); return !expected.length || expected.some((row) => row.studentId === state.currentStudentId || row.studentName === currentStudent()?.name); }).map((homework) => ({ homework, submission: getStudentSubmission(homework.id, state.currentStudentId, currentStudent()?.name) })); }
+function homeworkState(classId = '') { return homeworkRecordsFor(classId)[0]?.submission || { status: '未提交', content: '', text: '', attachments: [], fileName: '', review: { comment: '' } }; }
+// MVP 口径 3、7（2026-09-24 冻结）：截止后只读，不支持迟交；附件类型必须符合发布时选择的格式。
+const HOMEWORK_ACCEPT = { 视频: 'video/*', 图片: 'image/*', 音频: 'audio/*', 文档: '.pdf,.doc,.docx', PDF: '.pdf' };
+function homeworkAcceptAttr(homework) {
+  return (homework?.formats || []).map((item) => HOMEWORK_ACCEPT[item]).filter(Boolean).join(',');
 }
-function submitHomework(event, draft) { event?.preventDefault(); const text = document.querySelector('#homework-text').value.trim(); const file = document.querySelector('#homework-file').files[0]; const existingFile = homeworkState().fileName; if (!draft && !text && !file && !existingFile) { const error = document.querySelector('#homework-error'); error.hidden = false; error.textContent = '请填写作业说明或选择附件后再提交'; return; } state.homework = { status: draft ? '草稿' : '已提交', text, fileName: file?.name || existingFile, feedback: homeworkState().feedback }; saveState(); toast(draft ? '作业草稿已保存' : '作业已提交'); if (!draft) setTimeout(() => go(`/learner/pages/class-detail.html?courseId=${params.get('courseId') || 'class-001'}&tab=attendance`), 450); }
+function homeworkOverdue(homework) {
+  const due = demoDateTime(homework?.deadline);
+  if (Number.isNaN(due.getTime())) return false;
+  return demoDateTime(DEMO_NOW).getTime() > due.getTime();
+}
+function homeworkFileAllowed(homework, file) {
+  const accept = homeworkAcceptAttr(homework);
+  if (!accept) return false;
+  const name = String(file?.name || '').toLowerCase();
+  return accept.split(',').some((rule) => (rule.endsWith('/*')
+    ? String(file?.type || '').startsWith(rule.replace('/*', '/'))
+    : name.endsWith(rule.toLowerCase())));
+}
+function homeworkTextAllowed(homework) {
+  return (homework?.formats || []).includes('文字');
+}
+function renderHomeworkPage() {
+  const requestedClassId = params.get('classId') || (course(params.get('courseId'))?.id || '');
+  const records = homeworkRecordsFor(requestedClassId);
+  const requestedId = params.get('homeworkId');
+  const selected = records.find((row) => row.homework.id === requestedId) || records[0];
+  if (!selected) { layout(stack(card('<div class="mp-empty"><strong>暂无作业</strong><p>当前班级还没有发布作业。</p></div>'))); return; }
+  const { homework } = selected;
+  const storedSubmission = selected.submission;
+  // 正式提交后保存的草稿只回填输入区：对外仍展示上一次正式提交，教师侧不受草稿影响。
+  const submission = storedSubmission?.hasDraft
+    ? { ...storedSubmission, content: storedSubmission.draftContent, attachments: storedSubmission.draftAttachments || [], fileName: '' }
+    : storedSubmission;
+  const draftNotice = storedSubmission?.hasDraft && !homeworkOverdue(homework) ? '<p class="mp-notice">上次保存的草稿已回填，提交后才会生成新版本。</p>' : '';
+  // MVP 口径 6（2026-09-24 冻结）：学员只能查看本人已分班且在应交名单中的作业，禁止按 URL 跨班级访问。
+  const expectedRows = listSubmissions(homework.id);
+  const studentName = currentStudent()?.name || '';
+  if (expectedRows.length && !expectedRows.some((row) => row.studentId === state.currentStudentId || row.studentName === studentName)) {
+    layout(stack(card('<div class="mp-empty"><strong>无权查看该作业</strong><p>该作业不属于你所在班级，请返回作业列表。</p></div>'))); return;
+  }
+  const status = submission?.status || '未提交';
+  const statusTone = status === '已点评' ? 'green' : status === '已提交' ? 'brand' : status === '草稿' ? 'gray' : 'amber';
+  // 正式提交后保存的草稿只回填输入区，避免把教师已看到的正式提交覆盖成草稿。
+  const attachmentName = submission?.attachments?.[0]?.name || submission?.fileName || '';
+  const list = records.length > 1 ? card(`<div class="mp-section-head"><h3>本班作业</h3><span>${records.length} 项</span></div><div class="mp-list mp-homework-list">${records.map((row) => `<a class="mp-item" href="/learner/pages/homework.html?homeworkId=${encodeURIComponent(row.homework.id)}&classId=${encodeURIComponent(row.homework.classId)}"><div><strong>${esc(row.homework.title)}</strong><small>第${esc(row.homework.lessonIndex)}次课 · 截止 ${esc(row.homework.deadline)}</small></div>${pill(row.submission?.status || '未提交', row.submission?.status === '已点评' ? 'green' : row.submission?.status === '已提交' ? 'brand' : 'amber')}</a>`).join('')}</div>`) : '';
+  const acceptAttr = homeworkAcceptAttr(homework);
+  const overdue = homeworkOverdue(homework);
+  // 截止后只读（MVP 口径 3）；已点评后禁止重新提交（MVP 口径 4，补交需教师开启「允许补交」）。
+  const locked = overdue || status === '已点评';
+  const lockNote = overdue ? `已过截止时间（${esc(homework.deadline)}），本次作业只读，不支持迟交。` : '教师已点评，不能重新提交；如需补交请联系授课教师开启「允许补交」。';
+  const fileSpec = fileSpecSettings();
+  const fileLimitText = `图片${fileSpec.imageMb}MB、视频${fileSpec.videoMb}MB、文档${fileSpec.documentMb}MB`;
+  const history = Array.isArray(submission?.history) && submission.history.length ? card(`<div class="mp-section-head"><h3>提交记录</h3><span>${submission.history.length + 1} 次</span></div><div class="mp-list">${[...submission.history, submission].map((row, index) => `<div class="mp-item"><div><strong>第${row.version || index + 1}次提交</strong><small>${esc(row.submittedAt || row.updatedAt || '草稿')} · ${esc(row.status)}</small></div>${row.review?.comment ? `<span class="mp-muted">已点评</span>` : ''}</div>`).join('')}</div>`) : '';
+  layout(stack(list, card(`<div class="mp-pills">${pill(status, statusTone)}${pill(homework.required ? '必交' : '选交', 'gray')}</div><h2 style="margin-top:12px">${esc(homework.title)}</h2><p>${esc(homework.description)}</p><dl class="mp-homework-facts"><div><dt>所属班级</dt><dd>${esc(course(homework.classId)?.name || homework.classId)}</dd></div><div><dt>第几次课</dt><dd>第${esc(homework.lessonIndex)}次课</dd></div><div><dt>截止时间</dt><dd>${esc(homework.deadline)}</dd></div><div><dt>提交格式</dt><dd>${esc((homework.formats || []).join('、'))}</dd></div></dl></div>`), card(`<form id="homework-form" class="mp-form"><div class="mp-section-head"><h3>我的提交</h3><span>${status === '已提交' || status === '已点评' ? esc(submission.submittedAt || '已提交') : '尚未提交'}</span></div>${locked ? `<p class="mp-notice">${lockNote}</p>` : ''}<div class="mp-field"><label for="homework-text">文字说明</label><textarea id="homework-text" placeholder="请输入本次作业说明" ${locked || !homeworkTextAllowed(homework) ? 'disabled' : ''}>${esc(submission?.content || submission?.text || '')}</textarea></div><div class="mp-field"><label for="homework-file">附件</label><input id="homework-file" type="file" ${acceptAttr ? `accept="${acceptAttr}"` : ''} ${locked || !acceptAttr ? 'disabled' : ''}><small class="mp-muted">${acceptAttr ? `允许格式：${esc((homework.formats || []).join('、'))}；${fileLimitText}；演示原型只记录文件名，不上传真实文件。` : '本次作业仅接受文字说明，无需上传附件。'}</small><span id="homework-file-name" class="mp-muted">${attachmentName ? `已选择：${esc(attachmentName)}` : '尚未选择附件'}</span></div><p id="homework-error" class="mp-notice" hidden></p>${locked ? '' : `<div class="mp-actions"><button type="button" class="mp-button secondary" data-homework-action="save">保存草稿</button><button type="submit" class="mp-button">${status === '已提交' || status === '已点评' ? '重新提交' : '提交作业'}</button></div>`}</form>`), (status === '已提交' || status === '已点评') ? card(`<div class="mp-section-head"><h3>教师点评</h3>${pill(status === '已点评' ? '已点评' : '待点评', status === '已点评' ? 'green' : 'amber')}</div><p>${esc(submission?.review?.comment || '教师尚未完成批改。')}</p>`) : '', history));
+  const fileInput = document.querySelector('#homework-file'); fileInput?.addEventListener('change', event => { const file = event.target.files[0]; if (file) document.querySelector('#homework-file-name').textContent = `已选择：${file.name}`; });
+  document.querySelector('#homework-form')?.addEventListener('submit', event => submitLearnerHomework(event, false, homework, submission));
+  document.querySelector('[data-homework-action="save"]')?.addEventListener('click', () => submitLearnerHomework(null, true, homework, submission));
+  if (draftNotice) document.querySelector('#homework-form .mp-section-head')?.insertAdjacentHTML('afterend', draftNotice);
+}
+function submitLearnerHomework(event, draft, homework, existing) {
+  event?.preventDefault();
+  const showError = (text) => { const error = document.querySelector('#homework-error'); error.hidden = false; error.textContent = text; };
+  // 截止后只读（MVP 口径 3）；已点评后禁止重新提交（MVP 口径 4）。
+  if (homeworkOverdue(homework)) { showError(`已过截止时间（${homework.deadline}），本次作业只读，不支持迟交。`); return; }
+  if (!draft && existing?.status === '已点评') { showError('教师已点评，不能重新提交；如需补交请联系授课教师开启「允许补交」。'); return; }
+  const text = document.querySelector('#homework-text')?.value.trim() || '';
+  const file = document.querySelector('#homework-file')?.files[0];
+  const attachmentName = file?.name || existing?.attachments?.[0]?.name || existing?.fileName || '';
+  if (file) {
+    if (!homeworkFileAllowed(homework, file)) { showError(`附件格式不符合要求，本次作业仅允许：${(homework.formats || []).join('、')}。`); return; }
+    if (file.size > homeworkFileLimitMb(file) * 1024 * 1024) { showError(`附件大小超过当前文件类型的系统参数上限，请压缩后重新上传。`); return; }
+  }
+  if (!draft && !text && !attachmentName) { showError('请填写文字说明或选择附件后再提交'); return; }
+  if (!draft && text && !attachmentName && !homeworkTextAllowed(homework)) { showError(`本次作业要求提交${(homework.formats || []).join('或')}，仅填写文字说明不符合要求。`); return; }
+  const input = { homeworkId: homework.id, classId: homework.classId, lessonIndex: homework.lessonIndex, studentId: state.currentStudentId, studentName: currentStudent()?.name || '', content: text, attachments: file ? [{ name: attachmentName, type: file.type || '', size: file.size || 0 }] : (existing?.attachments || []) };
+  try {
+    if (draft) saveDraftSubmission(input); else submitHomeworkRecord(input);
+  } catch (error) {
+    const messages = {
+      HOMEWORK_DEADLINE_PASSED: `已过截止时间（${homework.deadline}），本次作业只读，不支持迟交。`,
+      HOMEWORK_WITHDRAWN: '作业已撤回，当前不可查看或提交。',
+      HOMEWORK_ALREADY_REVIEWED: '教师已点评，不能重新提交；如需补交请联系授课教师开启「允许补交」。',
+      HOMEWORK_FILE_FORMAT_INVALID: `附件格式不符合要求，本次作业仅允许：${(homework.formats || []).join('、')}。`,
+      HOMEWORK_FILE_TOO_LARGE: '附件大小超过当前文件类型的系统参数上限，请压缩后重新上传。',
+      HOMEWORK_TEXT_NOT_ALLOWED: `本次作业要求提交${(homework.formats || []).join('或')}，不接受文字说明。`,
+      HOMEWORK_STUDENT_NOT_ALLOWED: '该作业不属于当前学员，无法提交。',
+      HOMEWORK_EMPTY_SUBMISSION: '请填写文字说明或选择附件后再提交。'
+    };
+    showError(messages[error?.message] || '作业提交失败，请稍后重试。');
+    return;
+  }
+  toast(draft ? '作业草稿已保存' : '作业已提交');
+  setTimeout(renderHomeworkPage, 180);
+}
 function reportState() { return state.reportStatus || '已发布'; }
 function renderResultsPage() { const item = course(params.get('courseId') || 'class-mock-ended-finished-01'); const status = reportState(); const reportBody = status === '已发布' ? '<p>本报告记录当前学员在课堂参与、作品练习和阶段展示中的学习成果。</p>' : status === '已撤回' ? '<div class="mp-notice">报告暂不可查看，教务正在更新。已结业、结业评语和证书不受影响。</div>' : '<div class="mp-notice">学习报告正在生成中，完成后会通过消息通知学员。</div>'; layout(stack(card(`<div class="mp-pills">${pill('已结业', 'green')}${pill(currentStudent().name, 'gray')}</div><h2 style="margin-top:12px">${esc(item.className || item.name)} · 我的成果</h2><p>以下成果仅针对当前学员。</p>`), card(`<h3>结业评语</h3><p>综合评语：课堂参与积极，基本功和组合衔接持续进步。</p><p>成长建议：保持每周练习，关注动作细节和节奏稳定性。</p>`), card(`<div class="mp-section-head"><h3>学习报告</h3>${pill(status, status === '已发布' ? 'green' : status === '已撤回' ? 'gray' : 'amber')}</div><div style="margin-top:10px">${reportBody}</div><div class="mp-field" style="margin-top:14px"><label for="report-status">演示报告状态</label><select id="report-status"><option ${status === '已发布' ? 'selected' : ''}>已发布</option><option ${status === '已撤回' ? 'selected' : ''}>已撤回</option><option ${status === '生成中' ? 'selected' : ''}>生成中</option></select></div>`), card(`<div class="mp-section-head"><h3>结业证书</h3>${pill('已生成', 'green')}</div><p>证书编号：CERT-2026-0908-001 · 可在线查看。</p>`))); document.querySelector('#report-status').addEventListener('change', event => { state.reportStatus = event.target.value; saveState(); renderResultsPage(); }); }
 function paymentStatusLabel(order) { return order?.status === '已取消' && order.cancelType === 'timeout' ? '已取消（超时）' : order?.status || '待支付'; }
@@ -1609,6 +1719,7 @@ function learningRecords() {
     'class-mock-ended-finished-01': { completionStatus: '已结业' },
     'class-mock-ended-finished-02': { completionStatus: '补课中' },
     'class-mock-ended-finished-03': { completionStatus: '审核中' },
+    'class-mock-ended-finished-04': { completionStatus: '退回补课' },
   };
   const records = [
     { id: 'learning-video-001', courseId: 'COURSE-CR-2026-0002', studentIds: ['student-001', 'student-002'], type: 'video', status: 'ongoing', progress: videoProgress, lastPosition: '第3章 · 作品演唱 18:36' }
@@ -1653,21 +1764,21 @@ function learningRecords() {
     const source = item.type === 'class' ? (sharedClassById.get(item.courseId) || {}) : item.courseId ? course(item.courseId) : {};
     const activeOrderSnapshot = item.type === 'video' ? state.orders.find(order => !order.classId && order.courseId === item.courseId && order.status === '已支付')?.snapshot?.course : null;
     const accessRevoked = item.type === 'video' && !videoHasAccess;
-    return { ...source, ...(activeOrderSnapshot || {}), ...item, status: accessRevoked ? 'ended' : item.status, completionStatus: accessRevoked ? '已退款，学习记录保留' : item.completionStatus, name: item.name || item.className || source.name, href: accessRevoked ? '/learner/pages/orders.html' : (item.href || (item.type === 'video' ? `/learner/pages/video.html?courseId=${encodeURIComponent(source.id)}` : item.type === 'class' ? `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.classId || item.courseId)}` : courseLink(item))), accessRevoked };
+    const homeworkRows = item.type === 'class' ? homeworkRecordsFor(item.classId || item.courseId) : [];
+    const pendingHomework = homeworkRows.find(({ submission }) => !submission || ['未提交', '草稿'].includes(submission.status));
+    const reviewedHomework = homeworkRows.find(({ submission }) => submission?.status === '已点评');
+    return { ...source, ...(activeOrderSnapshot || {}), ...item, status: accessRevoked ? 'ended' : item.status, completionStatus: accessRevoked ? '已退款，学习记录保留' : item.completionStatus, homeworkStatus: pendingHomework ? (pendingHomework.submission?.status === '草稿' ? '草稿' : '待提交') : reviewedHomework ? '已点评' : homeworkRows.length ? '待教师点评' : item.homeworkStatus, homeworkId: pendingHomework?.homework.id || reviewedHomework?.homework.id || '', name: item.name || item.className || source.name, href: accessRevoked ? '/learner/pages/orders.html' : (item.href || (item.type === 'video' ? `/learner/pages/video.html?courseId=${encodeURIComponent(source.id)}` : item.type === 'class' ? `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.classId || item.courseId)}` : courseLink(item))), accessRevoked };
   });
 }
 function learningTasks() {
   // P1-3: tasks are derived from the current account + student instead of a fixed student-001 list.
   const records = learningRecords();
   const tasks = [];
-  records.filter(item => item.type === 'class' && item.status === 'ongoing' && item.nextLesson && !String(item.lessonStatus || '').includes('停课')).slice(0, 1).forEach(item => {
+  records.filter(item => item.type === 'class' && item.status === 'ongoing' && item.nextLesson).slice(0, 1).forEach(item => {
     tasks.push({ type: '上课提醒', title: '上课提醒', detail: `${item.className || item.name} · ${item.nextLesson}`, label: '查看课次', tone: 'green', href: `/learner/pages/class-detail.html?courseId=${item.courseId}` });
   });
-  records.filter(item => item.type === 'class' && item.status === 'ongoing' && Number(item.progress || 0) < 100).slice(0, 1).forEach(item => {
-    tasks.push({ type: '作业待提交', title: '作业待提交', detail: `${item.className || item.name} · 课后练习待提交`, label: '去提交', tone: 'amber', href: `/learner/pages/class-detail.html?courseId=${item.courseId}&tab=attendance` });
-  });
-  records.filter(item => item.type === 'class' && String(item.lessonStatus || '').includes('停课')).slice(0, 1).forEach(item => {
-    tasks.push({ type: '调课通知', title: '课次调整待确认', detail: `${item.className || item.name} · ${item.nextLesson || '时间待通知'}`, label: '查看详情', tone: 'amber', href: `/learner/pages/class-detail.html?courseId=${item.courseId}` });
+  records.filter(item => item.type === 'class' && item.homeworkStatus === '待提交').slice(0, 3).forEach(item => {
+    tasks.push({ type: '作业待提交', title: '作业待提交', detail: `${item.className || item.name} · 课后练习待提交`, label: '去提交', tone: 'amber', href: `/learner/pages/homework.html?homeworkId=${encodeURIComponent(item.homeworkId)}&classId=${encodeURIComponent(item.courseId)}` });
   });
   if (reportState() === '已发布' && records.some(item => item.type === 'class')) tasks.push({ type: '报告已发布', title: '报告已发布', detail: '学习报告可查看', label: '去查看', tone: 'green', href: `/learner/pages/results.html?courseId=${(records.find(item => item.type === 'class') || {}).courseId || 'class-001'}` });
   return tasks;
@@ -1678,7 +1789,7 @@ function learningCourseCard(item) {
   const statusLabels = { ongoing: '进行中', upcoming: '待开课', ended: '已结束' };
   const statusTones = { ongoing: 'green', upcoming: 'amber', ended: 'gray' };
   const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
-  const lessonTone = item.lessonStatus === '上课中' ? 'amber' : item.lessonStatus === '已完成' ? 'green' : item.lessonStatus === '已停课' ? 'gray' : '';
+  const lessonTone = item.lessonStatus === '上课中' ? 'amber' : item.lessonStatus === '已完成' ? 'green' : '';
   const totalLessons = item.lessons || item.totalLessons || 0;
   const completedLessons = item.completedLessons ?? Math.round((item.progress || 0) * totalLessons / 100);
   const courseStatus = item.status === 'ongoing' ? '' : pill(statusLabels[item.status], statusTones[item.status]);
@@ -1799,10 +1910,12 @@ function renderConsultationDetail() {
   layout(stack(card(`<div class="mp-section-head"><h2>咨询详情</h2>${pill(row.status, consultationStatusTone(row.status))}</div><p>${esc(item.name)} · ${esc(item.teacher)}老师</p><div class="mp-divider"></div><dl class="mp-consultation-detail-facts"><div><dt>提交时间</dt><dd>${esc(row.submittedAt || '待补充')}</dd></div><div><dt>当前进度</dt><dd>${esc(row.progress || '待跟进')}</dd></div></dl>`), card(`<h3>咨询内容</h3><p class="mp-consultation-question">${esc(row.text)}</p>`), card(`<h3>课程顾问回复</h3>${row.reply ? `<p class="mp-consultation-reply">${esc(row.reply)}</p><small class="mp-muted">回复时间：${esc(row.replyAt || '待补充')}</small>` : '<div class="mp-notice">课程顾问尚未回复，请耐心等待。</div>'}`), `<a class="mp-button secondary full" href="/learner/pages/consultation.html">返回我的咨询</a>`));
 }
 function renderMessages() {
-  mountMobileMessageList({ container: main, messages: state.messages, loggedIn: isLoggedIn(), link: relativePath, detailPath: '/learner/pages/message-detail.html', listPath: '/learner/pages/messages.html', loginUrl: `/login.html?redirect=${encodeURIComponent('/learner/pages/messages.html')}`, lockedCopy: '登录后可查看支付、上课、作业和学习成果等消息。', save: saveState, toast });
+  const messages = learnerMessageFeed();
+  mountMobileMessageList({ container: main, messages, loggedIn: isLoggedIn(), link: relativePath, detailPath: '/learner/pages/message-detail.html', listPath: '/learner/pages/messages.html', loginUrl: `/login.html?redirect=${encodeURIComponent('/learner/pages/messages.html')}`, lockedCopy: '登录后可查看支付、上课、作业和学习成果等消息。', save: saveLearnerMessageFeed, toast });
 }
 function renderMessageDetail() {
-  mountMobileMessageDetail({ container: main, messages: state.messages, loggedIn: isLoggedIn(), link: relativePath, detailPath: '/learner/pages/message-detail.html', listPath: '/learner/pages/messages.html', loginUrl: `/login.html?redirect=${encodeURIComponent('/learner/pages/messages.html')}`, lockedCopy: '登录后可查看支付、上课、作业和学习成果等消息。', save: saveState, toast });
+  const messages = learnerMessageFeed();
+  mountMobileMessageDetail({ container: main, messages, loggedIn: isLoggedIn(), link: relativePath, detailPath: '/learner/pages/message-detail.html', listPath: '/learner/pages/messages.html', loginUrl: `/login.html?redirect=${encodeURIComponent('/learner/pages/messages.html')}`, lockedCopy: '登录后可查看支付、上课、作业和学习成果等消息。', save: saveLearnerMessageFeed, toast });
 }
 function profileMetric(label, value, tone = '') { return `<span class="mp-profile-metric ${tone}"><strong>${value}</strong><small>${label}</small></span>`; }
 function renderProfile() {

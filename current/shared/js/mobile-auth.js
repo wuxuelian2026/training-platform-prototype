@@ -26,6 +26,8 @@ const fillDemoAccounts = role => {
   accountSelect.value = options.some(item => item.value === stored) ? stored : options[0]?.value || '';
 };
 const safeRedirect = (redirect, role) => {
+  // 教师登录后的统一首页是课表；课次、班级等深链仍可由教师从课表进入。
+  if (role === 'teacher') return relativePath('/teacher/index.html');
   const validPath = redirect && redirect.startsWith('/') && !redirect.startsWith('//');
   const rolePath = role === 'teacher' ? '/teacher/' : '/learner/';
   const target = validPath && redirect.startsWith(rolePath) ? redirect : role === 'teacher' ? '/teacher/index.html' : '/learner/index.html';

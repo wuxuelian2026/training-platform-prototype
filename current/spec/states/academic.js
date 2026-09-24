@@ -26,11 +26,6 @@ export const STATE_MACHINES = [
         "completed",
         "已完成",
         true
-      ],
-      [
-        "suspended",
-        "已停课",
-        false
       ]
     ],
     "transitions": [
@@ -45,18 +40,6 @@ export const STATE_MACHINES = [
         "结束上课",
         "已完成",
         "教师本人"
-      ],
-      [
-        "待上课",
-        "停课（填原因与补课安排）",
-        "已停课",
-        "教务主管"
-      ],
-      [
-        "已停课",
-        "恢复上课",
-        "待上课",
-        "教务主管"
       ],
       [
         "待上课",

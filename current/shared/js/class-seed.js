@@ -203,8 +203,8 @@ export const classSeed = [
 export function cloneClassSeed() {
   return classSeed.map(item => ({ ...item, weekdays: [...(item.weekdays || [])], sessions: (item.sessions || []).map(session => ({ ...session })) }));
 }
-// 三端同源（CR-2026-132）：教务在后台调课／停课后写入演示状态，教师端与学员端必须读同一份数据，
-// 否则会出现「学员端已显示停课、教师端仍显示待上课」的分叉。
+// 三端同源（CR-2026-132／CR-2026-138）：教务在后台课次调整后写入演示状态，教师端与学员端必须读同一份数据，
+// 否则会出现「学员端已显示调整后的日期、教师端仍显示原日期」的分叉。
 // 本模块不直接读演示状态，由调用方把演示状态里的班级记录传进来，避免与 demo-store 形成循环依赖。
 export function mergeClassSeed(overlay = []) {
   const byId = new Map(classSeed.map((item) => [item.id, { ...item }]));

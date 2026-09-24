@@ -9,6 +9,7 @@
 // 待考勤／作业记录落库后再把取数换成真实记录，页面无需改动。
 import { classRosterFor } from './class-roster.js';
 import { isSessionPast } from './class-lifecycle.js';
+import { homeworkForLesson, listSubmissions } from './homework-store.js';
 
 function hashSeed(text) {
   let hash = 2166136261;
@@ -18,9 +19,9 @@ function hashSeed(text) {
 function roll(seed) { return hashSeed(seed) % 100; }
 
 export function classSessionsOf(classItem) { return (classItem && classItem.sessions) || []; }
-// 计入统计的课次：已上过且未停课（停课不占时段也不计考勤）。
+// 计入统计的课次：已上过（CR-2026-138：课次只有待上课／上课中／已完成三态，统计只对已上课次聚合）。
 export function countedSessionsOf(classItem) {
-  return classSessionsOf(classItem).filter((session) => isSessionPast(session) && session.status !== '已停课');
+  return classSessionsOf(classItem).filter((session) => isSessionPast(session));
 }
 export function classRosterOfRecords(classItem) {
   // 班级人数取 students（教师端投影）或 enrolled（种子／学员端记录），两者都没有时只用报名分班记录。
@@ -40,8 +41,36 @@ export function lessonAttendanceStatus(classItem, sessionIndex, student) {
   return row ? row.status : '已到';
 }
 
-// 单课次作业：班级 demoHomework 决定整班口径（未提交／点评中／点评完成），其余按学员稳定派生。
+// 单课次作业：只统计必交作业（MVP 口径 2，2026-09-24 冻结）；选交作业展示但不进提交率分母。
+// countable=false 表示该课次存在作业但全为选交，不纳入提交率统计。
+// 班级无共享作业时仍按 demoHomework 派生演示值（countable=true，维持原型演示）。
 export function lessonHomework(classItem, sessionIndex) {
+  const shared = homeworkForLesson(classItem?.id, sessionIndex);
+  const required = shared.filter((item) => item.required !== false);
+  if (required.length) {
+    const rows = required.flatMap((item) => listSubmissions(item.id));
+    const submitted = rows.filter((row) => ['已提交', '已点评'].includes(row.status));
+    const graded = rows.filter((row) => row.status === '已点评').length;
+    return {
+      name: required.length > 1 ? `第${sessionIndex}次课作业（${required.length} 项必交）` : required[0].title,
+      title: required[0].title, published: true, total: rows.length,
+      submitted: submitted.length, graded,
+      mode: submitted.length === 0 ? '未提交' : graded === submitted.length ? '点评完成' : '点评中',
+      missing: rows.filter((row) => ['未提交', '草稿'].includes(row.status)).map((row) => row.studentName).slice(0, 4),
+      homeworkId: required[0].id, countable: true
+    };
+  }
+  if (shared.length) {
+    const rows = shared.flatMap((item) => listSubmissions(item.id));
+    const submitted = rows.filter((row) => ['已提交', '已点评'].includes(row.status));
+    return {
+      name: shared[0].title, title: shared[0].title, published: true, total: rows.length,
+      submitted: submitted.length, graded: rows.filter((row) => row.status === '已点评').length,
+      mode: submitted.length === 0 ? '未提交' : '点评中',
+      missing: rows.filter((row) => ['未提交', '草稿'].includes(row.status)).map((row) => row.studentName).slice(0, 4),
+      homeworkId: shared[0].id, countable: false
+    };
+  }
   const roster = classRosterOfRecords(classItem);
   const mode = classItem.demoHomework || '';
   const submittedStudents = roster.filter((student) => (mode === '未提交' ? false : roll(`${classItem.id}#${sessionIndex}#homework#${student.name}`) < 80));
@@ -49,10 +78,19 @@ export function lessonHomework(classItem, sessionIndex) {
   return {
     name: `第${sessionIndex}次课作业`, published: true, total: roster.length,
     submitted: submittedStudents.length, graded, mode,
-    missing: roster.filter((student) => !submittedStudents.includes(student)).map((student) => student.name).slice(0, 4)
+    missing: roster.filter((student) => !submittedStudents.includes(student)).map((student) => student.name).slice(0, 4),
+    countable: true
   };
 }
 export function lessonHomeworkSubmitted(classItem, sessionIndex, student) {
+  const required = homeworkForLesson(classItem?.id, sessionIndex).filter((item) => item.required !== false);
+  // 课次维度：该课次全部必交作业均已提交才算已提交；课次内只有选交作业时不计入。
+  if (required.length) {
+    return required.every((item) => {
+      const row = listSubmissions(item.id).find((entry) => entry.studentId === student?.id || entry.studentName === student?.name);
+      return ['已提交', '已点评'].includes(row?.status);
+    });
+  }
   const mode = classItem.demoHomework || '';
   if (mode === '未提交') return false;
   return roll(`${classItem.id}#${sessionIndex}#homework#${student.name}`) < 80;
@@ -67,11 +105,13 @@ export function classAttendanceSummary(classItem) {
   return { lessons: lessons.length, expected, present, rate: expected ? Math.round((present / expected) * 100) : null };
 }
 export function classHomeworkSummary(classItem) {
-  const lessons = countedSessionsOf(classItem);
-  const roster = classRosterOfRecords(classItem);
-  const expected = lessons.length * roster.length;
-  const submitted = lessons.reduce((sum, session) => sum + lessonHomework(classItem, session.index).submitted, 0);
-  return { lessons: lessons.length, expected, submitted, rate: expected ? Math.round((submitted / expected) * 100) : null };
+  // MVP 口径 2：分母 = 各课次「必交作业应交人数」之和，选交作业课次不进分母。
+  const stats = countedSessionsOf(classItem)
+    .map((session) => lessonHomework(classItem, session.index))
+    .filter((item) => item.countable !== false);
+  const expected = stats.reduce((sum, item) => sum + item.total, 0);
+  const submitted = stats.reduce((sum, item) => sum + item.submitted, 0);
+  return { lessons: stats.length, expected, submitted, rate: expected ? Math.round((submitted / expected) * 100) : null };
 }
 
 // 学员级聚合：分母为已上课次（请假计入应出勤但不计有效出勤，与页面口径说明一致）。
@@ -84,6 +124,14 @@ export function studentAttendanceRate(classItem, student) {
 export function studentHomeworkRate(classItem, student) {
   const lessons = countedSessionsOf(classItem);
   if (!lessons.length) return null;
+  const required = lessons.flatMap((session) => homeworkForLesson(classItem?.id, session.index).filter((item) => item.required !== false));
+  if (required.length) {
+    const submitted = required.filter((item) => {
+      const row = listSubmissions(item.id).find((entry) => entry.studentId === student?.id || entry.studentName === student?.name);
+      return ['已提交', '已点评'].includes(row?.status);
+    }).length;
+    return Math.round((submitted / required.length) * 100);
+  }
   const submitted = lessons.filter((session) => lessonHomeworkSubmitted(classItem, session.index, student)).length;
   return Math.round((submitted / lessons.length) * 100);
 }

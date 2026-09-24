@@ -82,8 +82,8 @@ export const LEARNER_APP_FIELD_SPEC = {
       groups: [
         { heading: '作业提交字段', fields: [
           { id: 'FD-LAPP-018', label: '作业说明', type: '文本', length: '≤ 500 字', required: '条件必填', note: '与附件至少填写一项；与附件同时为空时不可提交', constraints: { maxLength: 500 } },
-          { id: 'FD-LAPP-019', label: '附件', type: '文件', length: '图片 / 视频 / 音频', required: '条件必填', note: '与作业说明至少填写一项；原型只记录文件名，不上传真实文件', constraints: { fileTypes: ['图片', '视频', '音频'] } },
-          { id: 'FD-LAPP-020', label: '提交状态', type: '只读', length: '未提交 / 草稿 / 已提交', required: '系统展示', note: '保存草稿不进入批阅；提交后进入教师批阅队列', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-019', label: '附件', type: '文件', length: '按发布时选择的提交格式（图片 / 视频 / 音频 / PDF）', required: '条件必填', note: '与作业说明至少填写一项；可选格式以本次作业发布的提交格式为准；原型只记录文件名，不上传真实文件', constraints: { fileTypes: ['图片', '视频', '音频', 'PDF'], sourceField: 'FD-TAPP-009' } },
+          { id: 'FD-LAPP-020', label: '提交状态', type: '只读', length: '未提交 / 草稿 / 已提交 / 已点评', required: '系统展示', note: '保存草稿不进入批阅；提交后进入教师批阅队列；教师点评后为已点评且学员端不可再编辑', constraints: { readOnly: true, system: true } },
           { id: 'FD-LAPP-021', label: '教师评语', type: '只读', length: '≤ 500 字', required: '系统展示', note: '批阅完成后展示，学员端不提供编辑入口', constraints: { readOnly: true, system: true } }
         ] }
       ],

@@ -12,6 +12,21 @@
 .sales-page .table-empty .empty { padding: 52px 20px; }
 .sales-page .metric-progress { height: 5px; margin-top: 12px; overflow: hidden; border-radius: 3px; background: #f0f0f0; }
 .sales-page .metric-progress span { display: block; height: 100%; background: var(--brand); }
+.crm-lead-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.crm-lead-tag { display: inline-flex; align-items: center; padding: 2px 7px; border: 1px solid #d9e2f3; border-radius: 10px; background: #f3f7fd; color: #315a91; font-size: 11px; line-height: 1.4; white-space: nowrap; }
+.crm-funnel { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.crm-funnel-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.crm-funnel-title h3 { margin: 0; font-size: 15px; }
+.crm-funnel-title span, .crm-funnel > p, .crm-funnel-step small { color: var(--muted); font-size: 12px; }
+.crm-funnel > p { margin: 5px 0 14px; }
+.crm-funnel-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.crm-funnel-head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.crm-funnel-head span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.crm-funnel-bar { height: 8px; margin: 8px 0 4px; overflow: hidden; border-radius: 4px; background: #edf0f5; }
+.crm-funnel-bar span { display: block; height: 100%; border-radius: inherit; background: var(--brand); }
+.crm-tag-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 6px; }
+.crm-tag-picker legend { padding: 0 5px; color: var(--muted); font-size: 12px; }
+.crm-tag-picker label { display: flex; gap: 8px; align-items: center; font-size: 13px; }
 .sales-dialog { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 0; border-radius: 8px; background: transparent; box-shadow: var(--shadow); }
 .sales-dialog::backdrop { background: rgba(31,31,31,.42); }
 .sales-dialog-card { max-height: calc(100vh - 32px); overflow: auto; padding: 24px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
@@ -93,7 +108,7 @@
 .sales-class-roster th, .sales-class-roster td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
 .sales-class-roster th { color: var(--muted); font-weight: 500; }
 @media (max-width: 900px) { .sales-page .sales-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .sales-page .sales-filter-grid { grid-template-columns: 1fr; } .sales-page .sales-filter-grid .wide { grid-column: auto; } .sales-dialog-card { padding: 18px; } .sales-dialog-summary, .sales-dialog-grid { grid-template-columns: 1fr; } .sales-dialog-grid .wide { grid-column: auto; } .sales-switch-field { grid-template-columns: 1fr; align-items: start; gap: 6px; } .sales-workspace-dialog { width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; } .sales-workspace-dialog .sales-dialog-card { border: 0; border-radius: 0; padding: 0; } .sales-workspace-dialog .sales-dialog-header { padding: 16px; } .sales-workspace-tabs { padding-left: 10px; padding-right: 10px; } .sales-workspace-panel { padding: 18px 16px; } .sales-section-head { display: grid; gap: 8px; } .sales-section-head p { text-align: left; } .sales-course-readonly, .sales-display-readonly { grid-template-columns: 1fr; } .sales-display-readonly > div.wide { grid-column: auto; } .sales-workspace-dialog .sales-dialog-actions { padding: 12px 16px; } }
+@media (max-width: 640px) { .sales-page .sales-filter-grid { grid-template-columns: 1fr; } .sales-page .sales-filter-grid .wide { grid-column: auto; } .sales-dialog-card { padding: 18px; } .sales-dialog-summary, .sales-dialog-grid, .crm-funnel-grid, .crm-tag-picker { grid-template-columns: 1fr; } .sales-dialog-grid .wide { grid-column: auto; } .sales-switch-field { grid-template-columns: 1fr; align-items: start; gap: 6px; } .sales-workspace-dialog { width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; } .sales-workspace-dialog .sales-dialog-card { border: 0; border-radius: 0; padding: 0; } .sales-workspace-dialog .sales-dialog-header { padding: 16px; } .sales-workspace-tabs { padding-left: 10px; padding-right: 10px; } .sales-workspace-panel { padding: 18px 16px; } .sales-section-head { display: grid; gap: 8px; } .sales-section-head p { text-align: left; } .sales-course-readonly, .sales-display-readonly { grid-template-columns: 1fr; } .sales-display-readonly > div.wide { grid-column: auto; } .sales-workspace-dialog .sales-dialog-actions { padding: 12px 16px; } }
 
 /* CR-2026-012：发布商品 / 发布班级表单里的课程展示信息（课程级存储）区块。 */
 .sales-display-section { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: #fafafa; }
