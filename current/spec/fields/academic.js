@@ -86,7 +86,7 @@ export const ACADEMIC_FIELD_SPEC = {
     'academic/homework': {
       groups: [{ heading: '作业监管列表字段', fields: [
         { id: 'FD-ACADEMIC-065', label: '班级', type: '下拉', length: '可选班级', required: '否', note: '按作业所属班级筛选' },
-        { id: 'FD-ACADEMIC-066', label: '作业状态', type: '下拉', length: '进行中 / 已结束 / 已撤回', required: '否', note: '取作业状态字典' },
+        { id: 'FD-ACADEMIC-066', label: '作业状态', type: '下拉', length: '草稿 / 进行中 / 已结束 / 已撤回', required: '否', note: '取 SM-HOMEWORK 状态字典' },
         { id: 'FD-ACADEMIC-067', label: '作业标题', type: '文本', length: '≤ 100 字', required: '否', note: '按作业标题关键词筛选', constraints: { maxLength: 100 } },
         { id: 'FD-ACADEMIC-068', label: '提交进度', type: '统计（只读）', length: '已提交 / 应交人数', required: '系统派生', note: '应交名单在发布时冻结，发布后退出学员从提交率分母剔除', constraints: { readOnly: true, derived: true } },
         { id: 'FD-ACADEMIC-069', label: '发布时间', type: '日期时间（只读）', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '作业发布成功时间', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD HH:mm' } },

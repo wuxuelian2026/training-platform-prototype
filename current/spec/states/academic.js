@@ -477,5 +477,69 @@ export const STATE_MACHINES = [
         "教务主管/超级管理员"
       ]
     ]
+  },
+  {
+    "id": "SM-HOMEWORK",
+    "object": "作业",
+    "diagram": false,
+    "pages": [
+      "academic/homework",
+      "teacher/homework",
+      "learner/homework"
+    ],
+    "states": [
+      [
+        "draft",
+        "草稿",
+        false
+      ],
+      [
+        "in_progress",
+        "进行中",
+        false
+      ],
+      [
+        "closed",
+        "已结束",
+        true
+      ],
+      [
+        "withdrawn",
+        "已撤回",
+        false
+      ]
+    ],
+    "transitions": [
+      [
+        "草稿",
+        "发布",
+        "进行中",
+        "教师本人"
+      ],
+      [
+        "进行中",
+        "截止时间到达",
+        "已结束",
+        "系统"
+      ],
+      [
+        "进行中",
+        "撤回（须无学员提交或点评）",
+        "已撤回",
+        "教师本人"
+      ],
+      [
+        "已结束",
+        "撤回（须无学员提交或点评）",
+        "已撤回",
+        "教师本人"
+      ],
+      [
+        "已撤回",
+        "修订后重新发布（延长截止时间）",
+        "进行中",
+        "教师本人"
+      ]
+    ]
   }
 ];
