@@ -1726,7 +1726,7 @@ body:has(.is-schedule-share) .page-help-trigger { display: none; }
 .mp-class-detail-group + .mp-class-detail-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid #f0ece8; }
 .mp-class-detail-group h4 { margin: 0 0 10px; color: var(--muted); font-size: 11px; font-weight: 600; }
 .mp-class-lesson-more { margin-top: 8px; }
-.mp-class-lesson-list.is-collapsed li:nth-child(n+4) { display: none; }
+.mp-class-lesson-list.is-collapsed li.is-outside { display: none; }
 .mp-class-lesson.is-next { border-color: var(--brand); background: #fffaf6; }
 .mp-fast-detail-hero { min-width: 0; overflow: hidden; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
 .mp-fast-detail-cover { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #7b4f39; }
