@@ -73,6 +73,48 @@ export const ACADEMIC_FIELD_SPEC = {
         '考勤监控集中处理教师端上传的待补录与超时考勤流水。',
         '已确认的历史考勤再次变更需走补录流程，不直接覆盖。'
       ]
+    },
+    'academic/graduation': {
+      groups: [{ heading: '结业审核列表字段', fields: [
+        { id: 'FD-ACADEMIC-060', label: '班级结业状态', type: '下拉', length: '预置结业状态', required: '否', note: '按班级结业处理状态筛选' },
+        { id: 'FD-ACADEMIC-061', label: '授课教师', type: '下拉', length: '在职或历史授课教师', required: '否', note: '按班级授课教师筛选' },
+        { id: 'FD-ACADEMIC-062', label: '结课时间', type: '日期区间', length: 'YYYY-MM-DD', required: '否', note: '按班级结课日期筛选', constraints: { format: 'YYYY-MM-DD' } },
+        { id: 'FD-ACADEMIC-063', label: '关键词', type: '文本', length: '≤ 50 字', required: '否', note: '匹配班级名称或编号', constraints: { maxLength: 50 } },
+        { id: 'FD-ACADEMIC-064', label: '学员结业判定', type: '状态（只读）', length: '建议结业 / 待补课 / 待复核 / 已确认', required: '系统派生', note: '按学员逐个审核，列表展示汇总人数', constraints: { readOnly: true, derived: true } }
+      ] }], notes: ['结业审核以学员为粒度，班级列表仅展示汇总结果。']
+    },
+    'academic/homework': {
+      groups: [{ heading: '作业监管列表字段', fields: [
+        { id: 'FD-ACADEMIC-065', label: '班级', type: '下拉', length: '可选班级', required: '否', note: '按作业所属班级筛选' },
+        { id: 'FD-ACADEMIC-066', label: '作业状态', type: '下拉', length: '进行中 / 已结束 / 已撤回', required: '否', note: '取作业状态字典' },
+        { id: 'FD-ACADEMIC-067', label: '作业标题', type: '文本', length: '≤ 100 字', required: '否', note: '按作业标题关键词筛选', constraints: { maxLength: 100 } },
+        { id: 'FD-ACADEMIC-068', label: '提交进度', type: '统计（只读）', length: '已提交 / 应交人数', required: '系统派生', note: '应交名单在发布时冻结，发布后退出学员从提交率分母剔除', constraints: { readOnly: true, derived: true } },
+        { id: 'FD-ACADEMIC-069', label: '发布时间', type: '日期时间（只读）', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '作业发布成功时间', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD HH:mm' } },
+        { id: 'FD-ACADEMIC-070', label: '截止时间', type: '日期时间（只读）', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '学员提交截止时间', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD HH:mm' } }
+      ] }], notes: ['后台作业页只做监管与查看，不代替教师批改。']
+    },
+    'academic/reports': {
+      groups: [{ heading: '学习报告列表字段', fields: [
+        { id: 'FD-ACADEMIC-071', label: '报告状态', type: '下拉', length: '草稿 / 已发布 / 已撤回', required: '否', note: '按学员端可见性筛选' },
+        { id: 'FD-ACADEMIC-072', label: '课程名称', type: '文本', length: '≤ 50 字', required: '否', note: '按课程名称筛选', constraints: { maxLength: 50 } },
+        { id: 'FD-ACADEMIC-073', label: '学员姓名', type: '文本', length: '≤ 30 字', required: '否', note: '按学员姓名筛选', constraints: { maxLength: 30 } },
+        { id: 'FD-ACADEMIC-074', label: '更新时间', type: '日期区间', length: 'YYYY-MM-DD', required: '否', note: '按报告更新时间筛选', constraints: { format: 'YYYY-MM-DD' } },
+        { id: 'FD-ACADEMIC-075', label: '报告编号', type: '文本（只读）', length: '系统生成', required: '系统生成', note: '报告唯一编号', constraints: { readOnly: true, system: true } },
+        { id: 'FD-ACADEMIC-076', label: '生成状态', type: '状态（只读）', length: '待生成 / 生成中 / 已生成 / 生成失败', required: '系统派生', note: '生成失败允许重试', constraints: { readOnly: true, derived: true } },
+        { id: 'FD-ACADEMIC-077', label: '报告版本', type: '整数（只读）', length: '正整数', required: '系统生成', note: '内容变更生成新版本，历史版本保留', constraints: { readOnly: true, derived: true, integer: true } }
+      ] }], notes: ['未确认结业的学员不生成正式报告；撤回只影响学员端可见性。']
+    },
+    'academic/timetable': {
+      groups: [{ heading: '课表筛选与视图字段', fields: [
+        { id: 'FD-ACADEMIC-078', label: '视图', type: '页签', length: '课次列表 / 教室视图 / 教师视图 / 班级视图', required: '是', note: '四种视图共用同一份课次数据源' },
+        { id: 'FD-ACADEMIC-079', label: '日期范围', type: '日期范围', length: '日 / 周 / 月', required: '是', note: '控制课次展示范围' },
+        { id: 'FD-ACADEMIC-080', label: '学期', type: '下拉', length: '批次管理中的学期', required: '否', note: '取批次管理的学期起止日期' },
+        { id: 'FD-ACADEMIC-081', label: '校区', type: '下拉', length: '启用校区', required: '否', note: '按课次所属校区筛选' },
+        { id: 'FD-ACADEMIC-082', label: '授课教师', type: '下拉', length: '可选教师', required: '否', note: '按课次授课教师筛选' },
+        { id: 'FD-ACADEMIC-083', label: '班级', type: '下拉', length: '已建班级', required: '否', note: '按关联班级筛选' },
+        { id: 'FD-ACADEMIC-084', label: '课次状态', type: '下拉', length: '待上课 / 上课中 / 已完成', required: '否', note: '取 SM-LESSON 三态', constraints: { options: ['待上课', '上课中', '已完成'] } },
+        { id: 'FD-ACADEMIC-085', label: '排课提示', type: '状态（只读）', length: '无冲突 / 冲突提示', required: '系统派生', note: '汇总教师、教室、学员时间、转场和容量风险', constraints: { readOnly: true, derived: true } }
+      ] }], notes: ['时间轴固定为 08:00–21:00，每 15 分钟一个刻度，共 52 格，不作为系统参数配置。']
     }
   }
 };

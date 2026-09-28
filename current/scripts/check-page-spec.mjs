@@ -170,7 +170,13 @@ for (const relative of devPrdFiles) {
 
 const specKeys = new Set(Object.keys(PAGE_FIELD_TABLES));
 const pageKeys = new Set(pages.map((page) => page.key));
-const uncovered = pages.map((page) => page.key).filter((key) => !specKeys.has(key));
+// 纯跳转占位页不承载字段规格；它们的目标页面负责实际说明与输入约束。
+const redirectPageFiles = new Set(pages
+  .filter((page) => /http-equiv="refresh"|location\.replace\(/.test(readFileSync(page.file, 'utf8')))
+  .map((page) => page.key));
+const uncovered = pages
+  .map((page) => page.key)
+  .filter((key) => !specKeys.has(key) && !redirectPageFiles.has(key));
 // 端页面（teacher/、learner/）与根目录 login.html 也算已实现，避免误报孤儿规格。
 for (const page of endPages) pageKeys.add(page.key);
 if (existsSync(path.join(root, 'login.html'))) pageKeys.add('learner/login');

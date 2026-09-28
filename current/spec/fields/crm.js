@@ -147,6 +147,17 @@ export const CRM_FIELD_SPEC = {
         ,'试听取消必须填写取消原因，取消记录保留且不恢复；再次试听需新建记录。'
         ,'转报名按线索幂等，只展示当前可报名班级；存在待支付、已支付或退款中的面授订单时禁止重复创建待支付订单。'
       ]
+    },
+    'crm/batches': {
+      groups: [{ heading: '招生批次列表字段', fields: [
+        { id: 'FD-CRM-084', label: '招生季', type: '下拉', length: '春季 / 暑假 / 秋季 / 寒假', required: '否', note: '按固定年度招生季筛选' },
+        { id: 'FD-CRM-085', label: '批次状态', type: '下拉', length: '未开始 / 进行中 / 已结束', required: '否', note: '按起止日期实时派生，不提供人工流转' },
+        { id: 'FD-CRM-086', label: '关键词', type: '文本', length: '≤ 50 字', required: '否', note: '匹配批次名称', constraints: { maxLength: 50 } },
+        { id: 'FD-CRM-087', label: '开始日期', type: '日期（只读）', length: 'YYYY-MM-DD', required: '系统记录', note: '批次起始日期', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD' } },
+        { id: 'FD-CRM-088', label: '结束日期', type: '日期（只读）', length: 'YYYY-MM-DD', required: '系统记录', note: '批次结束日期', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD' } },
+        { id: 'FD-CRM-089', label: '关联班级数', type: '统计（只读）', length: '非负整数', required: '系统派生', note: '按班级归属实时统计', constraints: { readOnly: true, derived: true, integer: true } },
+        { id: 'FD-CRM-090', label: '待排课班级数', type: '统计（只读）', length: '非负整数', required: '系统派生', note: '按关联班级排课状态实时统计', constraints: { readOnly: true, derived: true, integer: true } }
+      ] }], notes: ['批次固定为年度四季，由系统生成，不提供新增、删除或人工改状态。']
     }
   }
 };

@@ -82,6 +82,38 @@ export const INVENTORY_FIELD_SPEC = {
         '已被物资引用的分类不允许直接删除，需先停用或迁移物资。',
         '分类层级不宜超过两级，避免台账统计口径分裂。'
       ]
+    },
+    'inventory/inbound-records': {
+      groups: [{ heading: '入库记录查询字段', fields: [
+        { id: 'FD-INVENTORY-032', label: '物资名称', type: '下拉', length: '已有物资', required: '否', note: '按入库物资筛选' },
+        { id: 'FD-INVENTORY-033', label: '入库类型', type: '下拉', length: '采购入库 / 其他', required: '否', note: '按入库来源筛选' },
+        { id: 'FD-INVENTORY-034', label: '供应商', type: '文本', length: '≤ 50 字', required: '否', note: '按供应商关键词筛选', constraints: { maxLength: 50 } },
+        { id: 'FD-INVENTORY-035', label: '经办人', type: '下拉', length: '后台用户', required: '否', note: '按流水经办人筛选' },
+        { id: 'FD-INVENTORY-036', label: '入库单号', type: '文本（只读）', length: 'RKYYYYMMDDxxxx', required: '系统生成', note: '提交时生成且不可修改', constraints: { readOnly: true, system: true } },
+        { id: 'FD-INVENTORY-037', label: '入库数量', type: '数字（只读）', length: '正整数', required: '系统记录', note: '入库流水数量', constraints: { readOnly: true, integer: true } },
+        { id: 'FD-INVENTORY-038', label: '入库日期', type: '日期（只读）', length: 'YYYY-MM-DD', required: '系统记录', note: '入库流水日期', constraints: { readOnly: true, format: 'YYYY-MM-DD' } }
+      ] }], notes: ['流水只读，登记错误通过新增反向流水冲销。']
+    },
+    'inventory/ledger': {
+      groups: [{ heading: '库存台账字段', fields: [
+        { id: 'FD-INVENTORY-039', label: '物资名称', type: '文本', length: '≤ 50 字', required: '否', note: '按物资名称关键词筛选', constraints: { maxLength: 50 } },
+        { id: 'FD-INVENTORY-040', label: '物资分类', type: '下拉', length: '预置分类', required: '否', note: '按物资分类筛选' },
+        { id: 'FD-INVENTORY-041', label: '库存状态', type: '下拉', length: '正常 / 库存不足 / 无库存', required: '否', note: '按当前库存与预警阈值派生' },
+        { id: 'FD-INVENTORY-042', label: '当前库存', type: '整数（只读）', length: '非负整数', required: '系统派生', note: '入库数量减出库数量，不支持直接编辑', constraints: { readOnly: true, derived: true, integer: true } },
+        { id: 'FD-INVENTORY-043', label: '预警阈值', type: '整数（只读）', length: '非负整数', required: '台账记录', note: '来自物资档案', constraints: { readOnly: true, derived: true, integer: true } },
+        { id: 'FD-INVENTORY-044', label: '单位', type: '文本（只读）', length: '预置单位', required: '系统记录', note: '来自物资档案', constraints: { readOnly: true, derived: true } }
+      ] }], notes: ['台账库存只由入库和出库流水计算，不提供手工调库存。']
+    },
+    'inventory/outbound-records': {
+      groups: [{ heading: '出库记录查询字段', fields: [
+        { id: 'FD-INVENTORY-045', label: '物资名称', type: '下拉', length: '已有物资', required: '否', note: '按出库物资筛选' },
+        { id: 'FD-INVENTORY-046', label: '出库类型', type: '下拉', length: '教学领用 / 其他', required: '否', note: '按出库用途筛选' },
+        { id: 'FD-INVENTORY-047', label: '领用人', type: '文本', length: '2–30 字', required: '否', note: '按领用人关键词筛选', constraints: { minLength: 2, maxLength: 30 } },
+        { id: 'FD-INVENTORY-048', label: '经办人', type: '下拉', length: '后台用户', required: '否', note: '按流水经办人筛选' },
+        { id: 'FD-INVENTORY-049', label: '出库单号', type: '文本（只读）', length: 'CKYYYYMMDDxxxx', required: '系统生成', note: '提交时生成且不可修改', constraints: { readOnly: true, system: true } },
+        { id: 'FD-INVENTORY-050', label: '出库数量', type: '数字（只读）', length: '正整数', required: '系统记录', note: '出库流水数量', constraints: { readOnly: true, integer: true } },
+        { id: 'FD-INVENTORY-051', label: '用途说明', type: '文本（只读）', length: '≤ 200 字', required: '系统记录', note: '出库登记用途说明', constraints: { readOnly: true, maxLength: 200 } }
+      ] }], notes: ['出库数量不得超过当时可用库存；流水只读，错误通过反向流水冲销。']
     }
   }
 };

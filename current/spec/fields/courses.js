@@ -167,6 +167,16 @@ export const COURSE_FIELD_SPEC = {
         'CR-2026-034：课程档案用停用日期表达“能否再发布”，不新增课程生命周期状态；停用只拦新的发布动作，不自动下架在售商品、不关停已发布班级、不回收已购学习权限、不改写历史订单与计薪。',
         'CR-2026-034：仅“后台新增”来源且未被任何售卖单元引用的课程可物理删除；教师申报课程有来源追溯要求，只能停用。'
       ]
+    },
+    'courses/applications': {
+      groups: [{ heading: '课程申报列表字段', fields: [
+        { id: 'FD-COURSE-075', label: '申报状态', type: '页签', length: '全部 / 待审核 / 已通过 / 已驳回 / 已撤销', required: '是', note: '取课程申报状态字典，页签控制状态筛选' },
+        { id: 'FD-COURSE-076', label: '申报教师', type: '下拉', length: '可选教师', required: '否', note: '按申报教师筛选' },
+        { id: 'FD-COURSE-077', label: '所属专业', type: '下拉', length: '启用专业', required: '否', note: '按申报专业筛选' },
+        { id: 'FD-COURSE-078', label: '关键词', type: '文本', length: '≤ 50 字', required: '否', note: '匹配课程名称或申报编号', constraints: { maxLength: 50 } },
+        { id: 'FD-COURSE-079', label: '申报时间', type: '日期时间（只读）', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '待审核按申报时间升序，其余按倒序', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD HH:mm' } },
+        { id: 'FD-COURSE-080', label: '编排状态', type: '状态（只读）', length: '待编排 / 编排中 / 已完成 / —', required: '系统派生', note: '已通过且尚未生成课程主体或未通过时显示“—”', constraints: { readOnly: true, derived: true } }
+      ] }], notes: ['操作列按状态与权限只保留“审批”或“查看”一个入口，二者指向同一申报审核页。']
     }
   }
 };

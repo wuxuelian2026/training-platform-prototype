@@ -5,6 +5,34 @@
 export const FINANCE_FIELD_SPEC = {
   module: '财务中心',
   pages: {
+    'finance/salary': {
+      groups: [
+        { heading: '工资查询字段', fields: [
+          { id: 'FD-FINANCE-013', label: '工资状态', type: '下拉', length: '全部 / 草稿 / 已发布', required: '否', note: '按工资单状态筛选' },
+          { id: 'FD-FINANCE-014', label: '工资月份', type: '月份', length: 'YYYY-MM', required: '否', note: '默认当前工资月份', constraints: { format: 'YYYY-MM' } },
+          { id: 'FD-FINANCE-015', label: '教师姓名', type: '文本', length: '2–30 字', required: '否', note: '支持模糊搜索', constraints: { minLength: 2, maxLength: 30 } },
+          { id: 'FD-FINANCE-016', label: '所属专业', type: '级联下拉', length: '系统目录', required: '否', note: '按专业筛选工资记录' }
+        ] },
+        { heading: '工资详情与调整字段', fields: [
+          { id: 'FD-FINANCE-017', label: '教师姓名', type: '只读文本', length: '2–30 字', required: '系统', note: '工资单所属教师', constraints: { readOnly: true, system: true } },
+          { id: 'FD-FINANCE-018', label: '工资月份', type: '只读文本', length: 'YYYY-MM', required: '系统', note: '工资归属月份', constraints: { readOnly: true, system: true } },
+          { id: 'FD-FINANCE-019', label: '课次明细', type: '只读表格', length: '系统生成', required: '系统', note: '展示课程、课次数、课次费标准和小计', constraints: { readOnly: true, system: true } },
+          { id: 'FD-FINANCE-020', label: '合计课次', type: '只读数字', length: '非负整数', required: '系统', note: '有效计薪课次总数', constraints: { readOnly: true, system: true, integer: true, min: 0 } },
+          { id: 'FD-FINANCE-021', label: '应发工资', type: '只读金额', length: '金额', required: '系统', note: '按有效课次与生效合同费率计算', constraints: { readOnly: true, system: true } },
+          { id: 'FD-FINANCE-022', label: '调整金额', type: '金额', length: '金额', required: '否', note: '正数为补贴，负数为扣款；有值时必须填写调整原因' },
+          { id: 'FD-FINANCE-023', label: '调整原因', type: '文本', length: '≤ 200 字', required: '有调整金额时必填', note: '说明补贴或扣款依据', constraints: { maxLength: 200 } },
+          { id: 'FD-FINANCE-024', label: '实发工资', type: '只读金额', length: '金额', required: '系统', note: '应发工资加调整金额', constraints: { readOnly: true, system: true } },
+          { id: 'FD-FINANCE-025', label: '备注', type: '文本', length: '≤ 200 字', required: '否', note: '财务补充说明', constraints: { maxLength: 200 } },
+          { id: 'FD-FINANCE-026', label: '工资状态', type: '只读标签', length: '草稿 / 已发布', required: '系统', note: '发布后主单金额锁定', constraints: { readOnly: true, system: true } }
+        ] }
+      ],
+      notes: [
+        '每月 1 日生成上月工资草稿；工资按有效课次和课次结束时生效的合同费率计算。',
+        '发布前必须通过考勤、教学记录、合同费率和工资差异校验；阻断原因在列表与详情展示。',
+        '已发布工资不可直接覆盖，后续补差必须形成独立调整记录并保留审计。',
+        '教师端仅可查询已发布且属于本人的工资记录。'
+      ]
+    },
     'finance/payments': {
       groups: [
         { heading: '登记收款字段', fields: [
@@ -36,8 +64,8 @@ export const FINANCE_FIELD_SPEC = {
         ] },
         // CR-2026-036：线下退款登记（登记的是已发生的线下退款事实，不是发起退款申请）。
         { heading: '线下退款登记字段', fields: [
-          { id: 'FD-FINANCE-035', label: '关联订单', type: '下拉', length: '待退金额大于 0 的订单', required: '是', note: '订单必须存在且已收款；已取消订单不出现也不可登记；已退款订单未退足时可继续登记', constraints: { dictionary: '订单' } },
-          { id: 'FD-FINANCE-036', label: '退款金额', type: '数字', length: '0 < 金额 ≤ 待退金额', required: '是', note: '待退金额 = 订单实收金额（收款记录合计，不用订单金额）− 已退金额；同一订单可多次登记，累计不得超过实收金额', constraints: { min: 0, max: '待退金额' } },
+          { id: 'FD-FINANCE-035', label: '关联订单', type: '下拉', length: '已收款且无终结退款的订单', required: '是', note: '订单必须存在且已收款；已取消、退款中、已退款或已有退款记录的订单不可登记', constraints: { dictionary: '订单' } },
+          { id: 'FD-FINANCE-036', label: '退款金额', type: '数字', length: '等于订单实收金额', required: '是', note: 'MVP 仅支持一单一次全额终结退款，退款金额必须等于本次可退实收金额', constraints: { min: 0, max: '订单实收金额' } },
           { id: 'FD-FINANCE-037', label: '退款方式', type: '下拉', length: '银行转账 / 现金 / 微信支付 / 支付宝', required: '是', note: '登记的是实际退款渠道' },
           { id: 'FD-FINANCE-038', label: '退款原因', type: '文本', length: '≤ 200 字', required: '是', note: '填写线下退款原因', constraints: { maxLength: 200 } },
           { id: 'FD-FINANCE-039', label: '退款时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '否', note: '默认登记时间；用于与银行流水核对', constraints: { format: 'YYYY-MM-DD HH:mm' } },
