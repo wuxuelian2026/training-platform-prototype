@@ -1,9 +1,19 @@
 import { toCanonicalCourseId } from './course-seed.js';
-import { DEMO_NOW } from './demo-clock.js';
+import { DEMO_NOW, DEMO_TODAY } from './demo-clock.js';
 
 const STORAGE_KEY = 'hbyx-iteration1-demo-v1';
 // v2 (CR-2026-003 / I1-DEC-19): retire the legacy parallel course numbering; demo data restarts from seed.
 const SCHEMA_VERSION = 2;
+const HISTORICAL_EXECUTION_STUDENTS = ['林知夏', '周予安', '陈一诺', '赵明月', '许星辰', '刘思源', '孙艺涵', '黄可欣', '郑雨桐', '吴清越', '何安然', '高语彤', '罗子墨', '彭佳宁', '蒋依然', '宋嘉禾', '唐若溪', '邓舒雅', '谢景行', '曹心悦'];
+const TEACHER_IDS_BY_NAME = { 王玥: 'teacher-wang', 林悦: 'teacher-linyue', 李青: 'teacher-liqing', 唐雯: 'teacher-tangwen', 徐帆: 'teacher-xufan' };
+const HISTORICAL_EXECUTION_SESSIONS = [
+  { classId: 'class-mock-ready-01', teacherName: '王玥', dates: ['2026-09-03', '2026-09-10', '2026-09-17', '2026-09-24'] },
+  { classId: 'class-mock-ready-02', teacherName: '王玥', dates: ['2026-09-03', '2026-09-10', '2026-09-17', '2026-09-24'] },
+  { classId: 'class-mock-ready-03', teacherName: '王玥', dates: ['2026-09-10', '2026-09-17', '2026-09-24'] },
+  { classId: 'class-mock-ended-teaching-01', teacherName: '林悦', dates: ['2026-09-03', '2026-09-10', '2026-09-17', '2026-09-24'] },
+  { classId: 'class-mock-ended-teaching-02', teacherName: '林悦', dates: ['2026-09-03', '2026-09-10', '2026-09-17', '2026-09-24'] },
+  { classId: 'class-mock-ended-teaching-03', teacherName: '林悦', dates: ['2026-09-03', '2026-09-10', '2026-09-17', '2026-09-24'] }
+];
 // CR-2026-054：仅清理本轮已经废弃的固定班级演示记录，不重置用户后来新建的班级。
 const LEGACY_CLASS_DEMO_IDS = new Set(['class-001', 'class-002', 'class-003', 'class-004']);
 const TEACHING_DEMO_CLASS_IDS = ['pending', 'teaching', 'finished'].flatMap(stage =>
@@ -27,6 +37,12 @@ const enrollingDemoEnrollments = () => ENROLLING_DEMO_CLASS_IDS.map((classId) =>
   id: `account-001-student-001-${classId}`,
   accountId: 'account-001', studentId: 'student-001', classId, status: '已分班',
   enrolledAt: '2026-09-12 09:30'
+}));
+// CR-2026-145：教师端王玥的芭蕾班与学员端林知夏共用同一条在读分班记录，避免教师名册有人、学员学习中心无班级。
+const balletDemoEnrollments = () => ['class-mock-ready-01', 'class-mock-ready-02', 'class-mock-ready-03'].map((classId, index) => ({
+  id: `account-001-student-001-${classId}`,
+  accountId: 'account-001', studentId: 'student-001', classId, status: '已分班',
+  enrolledAt: `2026-08-${String(20 + index).padStart(2, '0')} 10:01`
 }));
 
 // I1-DEF-008: data written before I1-DEC-19 still points at the retired course numbering, which made
@@ -121,7 +137,47 @@ function migrateTeachingDemoLinks(state) {
     state[collection] = rows;
   };
   appendMissing('orders', teachingDemoOrders());
-  appendMissing('enrollments', [...teachingDemoEnrollments(), ...enrollingDemoEnrollments()]);
+  appendMissing('enrollments', [...teachingDemoEnrollments(), ...enrollingDemoEnrollments(), ...balletDemoEnrollments()]);
+  return changed;
+}
+
+// 2026-09-28：为 9 月已过去课次补齐共享执行事实，避免三端只显示计划完成而缺少教师考勤／教学记录。
+// 这些是明确标记的演示记录，真实执行数据接入后由后端事实覆盖，不与计划状态混存。
+function migrateHistoricalLessonExecutions(state) {
+  const rows = Array.isArray(state.lessonExecutions) ? state.lessonExecutions : [];
+  const known = new Set(rows.map((row) => row.id));
+  let changed = false;
+  rows.forEach((row) => {
+    const definition = HISTORICAL_EXECUTION_SESSIONS.find((item) => item.classId === row.classId);
+    const sessionDate = definition?.dates[Number(row.sessionIndex) - 1];
+    if (!sessionDate || sessionDate < '2026-09-01' || sessionDate >= DEMO_TODAY) return;
+    const attendance = Object.fromEntries(Object.keys(row.attendance || {}).map((name) => [name, '已到']));
+    if (JSON.stringify(row.attendance || {}) !== JSON.stringify(attendance) || Object.keys(row.attendanceNotes || {}).length) {
+      row.attendance = attendance;
+      row.attendanceNotes = {};
+      changed = true;
+    }
+  });
+  HISTORICAL_EXECUTION_SESSIONS.forEach((definition) => {
+    definition.dates.filter((date) => date >= '2026-09-01' && date < DEMO_TODAY).forEach((date, index) => {
+      const session = { date, index: index + 1, startTime: '09:00', endTime: '10:30' };
+      const id = `${definition.classId}#${session.index}`;
+      if (known.has(id)) return;
+      const count = HISTORICAL_EXECUTION_STUDENTS.length;
+      const attendance = Object.fromEntries(HISTORICAL_EXECUTION_STUDENTS.slice(0, count).map((name) => [name, '已到']));
+      rows.push({
+        id, classId: definition.classId, sessionIndex: Number(session.index), teacherId: TEACHER_IDS_BY_NAME[definition.teacherName] || '', teacherName: definition.teacherName,
+        started: true, executionEnded: true,
+        startedAt: `${session.date} ${session.startTime}`, endedAt: `${session.date} ${session.endTime}`,
+        attendanceSaved: true, attendanceSynced: true, teachingRecord: `已完成第${session.index}次课教学，完成本次课程重点练习与课堂反馈。`,
+        teachingContent: `已完成第${session.index}次课教学，完成本次课程重点练习与课堂反馈。`, teachingRecordSaved: true,
+        attendance, attendanceNotes: {}, recordSource: 'demo_seed', isDemo: true, updatedAt: DEMO_NOW
+      });
+      known.add(id);
+      changed = true;
+    });
+  });
+  state.lessonExecutions = rows;
   return changed;
 }
 
@@ -189,11 +245,12 @@ const defaultState = () => ({
   homeworkNotifications: [],
   // CR-2026-138 CR138-04：教务课次调整产生的教师/学员通知，与作业通知同源结构（audience + recipientId）。
   lessonNotifications: [],
+  lessonExecutions: [],
   homeworkAudits: [],
   // CR-2026-作业链路：新作业截止时间默认取参数配置，默认发布后 72 小时。
   homeworkDeadlineHours: 72,
   orders: teachingDemoOrders(),
-  enrollments: [...teachingDemoEnrollments(), ...enrollingDemoEnrollments()],
+  enrollments: [...teachingDemoEnrollments(), ...enrollingDemoEnrollments(), ...balletDemoEnrollments()],
   videoEntitlements: [],
   progress: {},
   // CR-2026-052：视频退款规则由后台参数配置，客户端与财务端读取同一份演示状态。
@@ -201,10 +258,7 @@ const defaultState = () => ({
   // 2026-09-24：面授退款策略只对新申请生效；退款单创建时保存策略快照。
   classRefundSettings: {
     windowDays: 0,
-    selfMaxCompletedPercent: 100,
-    includeBonusLessons: false,
-    handlingFeePercent: 0,
-    minAmount: 1
+    selfMaxCompletedPercent: 100
   },
   // CR-2026-104：待支付订单支付时限由「参数配置」维护（默认 30 分钟）。
   orderSettings: { paymentTimeoutMinutes: 30 },
@@ -241,7 +295,11 @@ const DICTIONARY_FALLBACK = {
 function readStored() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (!stored) return defaultState();
+    if (!stored) {
+      const initial = defaultState();
+      migrateHistoricalLessonExecutions(initial);
+      return initial;
+    }
     // Only a *newer/older declared* schema is discarded. Payloads written by hand (e.g. a tester switching
     // currentAccountId from the console) carry no schemaVersion and are migrated instead of silently reset,
     // otherwise demo-account isolation checks appear to fail.
@@ -258,7 +316,8 @@ function readStored() {
     const displayMigrated = migrateCourseDisplayToSaleUnits(merged);
     const legacyClassDemoMigrated = migrateLegacyClassDemoData(merged);
     const teachingDemoLinksMigrated = migrateTeachingDemoLinks(merged);
-    if (courseReferencesMigrated || arrangeStatusMigrated || applicationStatusMigrated || displayMigrated || legacyClassDemoMigrated || teachingDemoLinksMigrated || lessonDurationMigrated) {
+    const historicalExecutionsMigrated = migrateHistoricalLessonExecutions(merged);
+    if (courseReferencesMigrated || arrangeStatusMigrated || applicationStatusMigrated || displayMigrated || legacyClassDemoMigrated || teachingDemoLinksMigrated || historicalExecutionsMigrated || lessonDurationMigrated) {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* private mode: in-memory migration still applies. */ }
     }
     return merged;
@@ -297,15 +356,12 @@ export function videoRefundSettings() {
   };
 }
 
-// 面授退款参数：0 天表示不限制申请时间；金额和比例读取时统一归一化，避免脏配置扩散。
+// 面授退款参数只决定资格；MVP 退款金额固定为订单实收全额。
 export function classRefundSettings() {
   const settings = readStored().classRefundSettings || {};
   return {
     windowDays: clampInt(settings.windowDays ?? 0, 0, 365, 0),
-    selfMaxCompletedPercent: clampInt(settings.selfMaxCompletedPercent ?? 100, 0, 100, 100),
-    includeBonusLessons: settings.includeBonusLessons === true,
-    handlingFeePercent: clampInt(settings.handlingFeePercent ?? 0, 0, 100, 0),
-    minAmount: clampInt(settings.minAmount ?? 1, 0, 1000, 1)
+    selfMaxCompletedPercent: clampInt(settings.selfMaxCompletedPercent ?? 100, 0, 100, 100)
   };
 }
 
