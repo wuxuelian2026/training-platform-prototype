@@ -14,12 +14,33 @@ const DEMO_ROSTER = [
   ['唐若溪', 80, 70, '需关注'], ['邓舒雅', 98, 100, '正常'], ['谢景行', 85, 80, '正常'], ['曹心悦', 92, 90, '正常']
 ].map(([name, attendance, homework, status], index) => ({ id: `student-${String(index + 1).padStart(3, '0')}`, name, attendance, homework, status }));
 
+// 2026-09-24 结算：报名记录只有处于「在读」状态才进名册；退班／转班／退学／取消报名一律移出当前名册，
+// 已发布的作业仍保留这些学员的应交记录，由作业侧标记为「发布后已退出」。
+// 「已退款」仅兼容旧演示数据；新链路保持学籍主状态为已退班／已退学等，退款结果写 refundRelationStatus。
+export const ENROLLMENT_EXIT_STATUSES = ['已取消', '已退班', '已转班', '已退学', '已退款'];
+export function isEnrollmentActive(status) {
+  return !ENROLLMENT_EXIT_STATUSES.includes(String(status || ''));
+}
+/** 返回该学员在班级报名记录中的退出状态；在读或查不到记录时返回空字符串。 */
+export function enrollmentExitStatus(classId, studentId) {
+  const row = (readDemoState().enrollments || []).find((item) => item.classId === classId && item.studentId === studentId);
+  return row && !isEnrollmentActive(row.status) ? row.status : '';
+}
+/** 班级下仍在读的报名分班记录（退出记录不在其中）。 */
+export function activeEnrollmentsOf(classId) {
+  return (readDemoState().enrollments || []).filter((item) => item.classId === classId && isEnrollmentActive(item.status));
+}
+/** 学员姓名（用于名册漂移提示）。 */
+export function studentNameOf(studentId) {
+  return (readDemoState().students || []).find((item) => item.id === studentId)?.name || studentId;
+}
+
 // 报名分班记录里的学员：以演示状态为准（account-001 等账号下的学员）。
 function enrolledStudentsOf(classId) {
   const state = readDemoState();
   const studentById = new Map((state.students || []).map((student) => [student.id, student]));
   return (state.enrollments || [])
-    .filter((item) => item.classId === classId && item.status !== '已取消')
+    .filter((item) => item.classId === classId && isEnrollmentActive(item.status))
     .map((item) => {
       const student = studentById.get(item.studentId) || {};
       const fallback = DEMO_ROSTER.find((row) => row.name === student.name);

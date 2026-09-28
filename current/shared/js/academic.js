@@ -10,8 +10,8 @@ import { TEACHER_FACTS } from './teacher-facts.js';
 import { explainTeacherCapacity } from './teacher-capacity.js';
 import { mountRichEditor, richTextValue } from './rich-editor.js';
 import { defaultLessonDuration, lessonDurationValues, TIMELINE_END, TIMELINE_START, TIMELINE_STEP_MINUTES, TIMELINE_TICK_COUNT, isWithinTimeline, lessonDurationOptions, lessonEndTime, snapToStep, toMinutes, toTime } from './timetable-settings.js';
-import { classEnrollmentCondition, classScheduleStatus, classTeachingStatus } from './class-lifecycle.js';
-import { homeworkLifecycleStatus, listHomework, listSubmissions, submissionSummary } from './homework-store.js';
+import { classEnrollmentCondition, classScheduleStatus, classTeachingStatus, lessonStatusOf } from './class-lifecycle.js';
+import { homeworkLifecycleStatus, homeworkRosterDrift, listHomework, listSubmissions, submissionSummary } from './homework-store.js';
 
 const academicRoot = document.querySelector('[data-academic-page]');
 const academicPage = academicRoot?.dataset.academicPage;
@@ -378,12 +378,33 @@ function saveSchedulePlanner(mode, dialog, preview) {
 // 课次调整只允许调整演示当天及以后的课次；日期与班级阶段派生同取演示当天，不另立一套今天。
 const SESSION_ADJUST_TODAY = DEMO_TODAY;
 function sessionCanAdjust(session) {
-  // CR-2026-138：课次状态固定为待上课／上课中／已完成三态。
-  return Boolean(session && String(session.date || '') >= SESSION_ADJUST_TODAY && !['上课中', '已完成', '已上课'].includes(session.status));
+  // CR-2026-142：可调整性读取三端共用的计划状态，不依赖可能过期的种子 status。
+  return Boolean(session && String(session.date || '') >= SESSION_ADJUST_TODAY && lessonStatusOf(session) === '待上课');
 }
-function sessionAdjustmentConflicts(classRecord, sessionIndex, candidate) {
+function sessionDateTime(session, edge = 'start') {
+  const time = edge === 'end' ? (session.endTime || session.end) : (session.startTime || session.start);
+  return new Date(`${session.date}T${time || '00:00'}:00`).getTime();
+}
+function shiftSessionByMilliseconds(session, milliseconds) {
+  const startAt = new Date(sessionDateTime(session, 'start') + milliseconds);
+  const endAt = new Date(sessionDateTime(session, 'end') + milliseconds);
+  const date = toLocalDateString(startAt);
+  const start = `${String(startAt.getHours()).padStart(2, '0')}:${String(startAt.getMinutes()).padStart(2, '0')}`;
+  const end = `${String(endAt.getHours()).padStart(2, '0')}:${String(endAt.getMinutes()).padStart(2, '0')}`;
+  return { ...session, date, weekday: plannerWeekday(date), startTime: start, endTime: end, start, end, adjusted: true };
+}
+function sessionOrderImpact(sessions, targetIndex, candidate) {
+  const previous = sessions[targetIndex - 1];
+  const next = sessions[targetIndex + 1];
+  const candidateStart = sessionDateTime(candidate, 'start');
+  const candidateEnd = sessionDateTime(candidate, 'end');
+  if (previous && candidateStart <= sessionDateTime(previous, 'end')) return { kind: 'previous', previous };
+  if (next && candidateEnd >= sessionDateTime(next, 'start')) return { kind: 'following', next };
+  return { kind: 'single' };
+}
+function sessionAdjustmentConflicts(classRecord, sessionIndex, candidate, ignoredSessionIndexes = [sessionIndex]) {
   return schedulingClasses().flatMap(item => (item.sessions || []).map(session => ({ classRecord: item, session }))).filter(({ classRecord: item, session }) => {
-    if (item.id === classRecord.id && Number(session.index) === Number(sessionIndex)) return false;
+    if (item.id === classRecord.id && ignoredSessionIndexes.includes(Number(session.index))) return false;
     if (session.date !== candidate.date) return false;
     const overlap = plannerOverlap({ start: session.startTime || session.start, end: session.endTime || session.end }, candidate);
     if (!overlap) return false;
@@ -402,7 +423,7 @@ export function openSessionAdjustment(prefill = {}) {
   const initial = adjustable.find(session => Number(session.index) === Number(prefill.sessionIndex)) || adjustable[0];
   const roomOptions = venues.filter(room => venueAvailable(room) && room.campus === classRecord.campus);
   const initialRoomId = sessionRoomId(classRecord, initial);
-  const body = `<form id="session-adjustment-form" class="academic-dialog-grid"><label class="form-field wide"><span>调整课次 <b class="required-mark">*</b></span><select name="sessionIndex" required>${adjustable.map(session => `<option value="${session.index}" ${session.index === initial.index ? 'selected' : ''}>第 ${session.index} 次 · ${escapeHtml(session.date)} ${escapeHtml(session.startTime || session.start)}-${escapeHtml(session.endTime || session.end)}</option>`).join('')}</select></label><label class="form-field"><span>代课教师 <b class="required-mark">*</b></span><select name="teacher">${TEACHER_FACTS.map(item => `<option value="${escapeHtml(item.name)}" ${item.name === (initial.teacher || classRecord.teacher) ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label><label class="form-field"><span>上课日期 <b class="required-mark">*</b></span><input name="date" type="date" min="${SESSION_ADJUST_TODAY}" required value="${escapeHtml(initial.date)}"></label><label class="form-field"><span>开始时间 <b class="required-mark">*</b></span><input name="startTime" type="time" step="900" min="${TIMELINE_START}" max="${TIMELINE_END}" required value="${escapeHtml(initial.startTime || initial.start)}"></label><label class="form-field"><span>结束时间</span><input name="endTime" class="readonly-field" readonly value="${escapeHtml(initial.endTime || initial.end)}"></label><label class="form-field"><span>教室 <b class="required-mark">*</b></span><select name="roomId" required>${roomOptions.map(room => `<option value="${escapeHtml(room.id)}" ${room.id === initialRoomId ? 'selected' : ''}>${escapeHtml(room.name)} · ${room.capacity}人</option>`).join('')}</select></label><label class="form-field wide"><span>调整原因 <b class="required-mark">*</b></span><textarea name="reason" maxlength="200" required placeholder="如：授课教师请假，由其他教师代课"></textarea></label><label class="form-field wide academic-checkbox"><input name="notify" type="checkbox" checked>通知授课教师与已报名学员</label><div class="academic-status-callout wide" data-session-adjustment-impact></div></form>`;
+  const body = `<form id="session-adjustment-form" class="academic-dialog-grid"><label class="form-field wide"><span>调整课次 <b class="required-mark">*</b></span><select name="sessionIndex" required>${adjustable.map(session => `<option value="${session.index}" ${session.index === initial.index ? 'selected' : ''}>第 ${session.index} 次 · ${escapeHtml(session.date)} ${escapeHtml(session.startTime || session.start)}-${escapeHtml(session.endTime || session.end)}</option>`).join('')}</select></label><label class="form-field"><span>代课教师 <b class="required-mark">*</b></span><select name="teacher">${TEACHER_FACTS.map(item => `<option value="${escapeHtml(item.name)}" ${item.name === (initial.teacher || classRecord.teacher) ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label><label class="form-field"><span>上课日期 <b class="required-mark">*</b></span><input name="date" type="date" min="${SESSION_ADJUST_TODAY}" required value="${escapeHtml(initial.date)}"></label><label class="form-field"><span>开始时间 <b class="required-mark">*</b></span><input name="startTime" type="time" step="900" min="${TIMELINE_START}" max="${TIMELINE_END}" required value="${escapeHtml(initial.startTime || initial.start)}"></label><label class="form-field"><span>结束时间</span><input name="endTime" class="readonly-field" readonly value="${escapeHtml(initial.endTime || initial.end)}"></label><label class="form-field"><span>教室 <b class="required-mark">*</b></span><select name="roomId" required>${roomOptions.map(room => `<option value="${escapeHtml(room.id)}" ${room.id === initialRoomId ? 'selected' : ''}>${escapeHtml(room.name)} · ${room.capacity}人</option>`).join('')}</select></label><label class="form-field wide"><span>调整原因 <b class="required-mark">*</b></span><textarea name="reason" maxlength="200" required placeholder="如：授课教师请假，由其他教师代课"></textarea></label><label class="form-field wide academic-checkbox" data-shift-following-row hidden><input name="shiftFollowing" type="checkbox">同步顺延后续课次并保持课次序号不变</label><label class="form-field wide academic-checkbox"><input name="notify" type="checkbox" checked>通知授课教师与已报名学员</label><div class="academic-status-callout wide" data-session-adjustment-impact></div></form>`;
   const dialog = openDialog('课次调整', `${classRecord.name} · 仅允许调整未开始课次`, body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="session-adjustment-form" class="button primary">确认调整</button>', 'academic-session-adjustment-dialog');
   const form = dialog.querySelector('#session-adjustment-form');
   const field = name => form.elements[name];
@@ -416,7 +437,18 @@ export function openSessionAdjustment(prefill = {}) {
     }
     const duration = Number(selected.lessonDuration || classRecord.lessonDuration || defaultLessonDuration());
     field('endTime').value = lessonEndTime(field('startTime').value || selected.startTime || selected.start, duration);
-    dialog.querySelector('[data-session-adjustment-impact]').textContent = `仅调整第 ${selected.index} 次课，不改变班级整体排班规则。`;
+    const sessions = (classRecord.sessions || []).map(session => ({ ...session }));
+    const selectedPosition = sessions.findIndex(session => Number(session.index) === Number(selected.index));
+    const candidate = { ...selected, date: field('date').value || selected.date, startTime: field('startTime').value || selected.startTime || selected.start, endTime: field('endTime').value, start: field('startTime').value || selected.startTime || selected.start, end: field('endTime').value };
+    const impact = sessionOrderImpact(sessions, selectedPosition, candidate);
+    const shiftRow = dialog.querySelector('[data-shift-following-row]');
+    shiftRow.hidden = impact.kind !== 'following';
+    if (impact.kind !== 'following') field('shiftFollowing').checked = false;
+    dialog.querySelector('[data-session-adjustment-impact]').textContent = impact.kind === 'previous'
+      ? `调整时间早于或衔接第 ${impact.previous.index} 次课，不能保存。`
+      : impact.kind === 'following'
+        ? `目标时间越过第 ${impact.next.index} 次课；继续保存须同步顺延第 ${impact.next.index} 次及后续课次。`
+        : `仅调整第 ${selected.index} 次课，课次序号和后续排班不变。`;
     const suggestionHost = dialog.querySelector('[data-session-adjustment-impact]');
     suggestionHost.insertAdjacentHTML('beforeend', sessionSuggestionButtons(classRecord, { ...selected, index: selected.index, date: field('date').value || selected.date, startTime: field('startTime').value || selected.startTime || selected.start, start: field('startTime').value || selected.startTime || selected.start }));
     suggestionHost.addEventListener('click', (event) => {
@@ -457,16 +489,63 @@ export function openSessionAdjustment(prefill = {}) {
       if (capacity.status === 'blocked') { showToast(`所选教师不可授课：${capacity.blocks.map(item => item.text).join('；')}`, 'error'); return; }
       if (!date || date < SESSION_ADJUST_TODAY || !start || !isWithinTimeline(start, duration)) { showToast(`调整后的日期不得早于 ${SESSION_ADJUST_TODAY}，时间需在 ${TIMELINE_START}-${TIMELINE_END} 内。`, 'error'); return; }
       if (!room || Number(room.capacity || 0) < Number(classRecord.capacity || 0)) { showToast('所选教室未启用或容量不足。', 'error'); return; }
-      const conflicts = sessionAdjustmentConflicts(classRecord, selectedIndex, { date, start, end, teacher, roomId: room.id });
-      if (conflicts.length) { const conflict = conflicts[0]; showToast(`冲突校验未通过：${conflict.teacherConflict ? '教师' : '教室'}与“${conflict.className}”课次冲突。`, 'error'); return; }
-      const adjustStudentConflicts = studentConflictsWithOthers(classRecord, [sessions[targetIndex]]);
+      const candidate = { ...target, date, startTime: start, endTime: end, start, end, teacher, roomId: room.id };
+      const orderImpact = sessionOrderImpact(sessions, targetIndex, candidate);
+      if (orderImpact.kind === 'previous') { showToast(`调整时间必须晚于第 ${orderImpact.previous.index} 次课结束时间，课次顺序不能打乱。`, 'error'); return; }
+      const shiftFollowing = data.get('shiftFollowing') === 'on';
+      if (orderImpact.kind === 'following' && !shiftFollowing) { showToast(`目标时间越过第 ${orderImpact.next.index} 次课，请勾选“同步顺延后续课次”或修改时间。`, 'warning'); return; }
+      const affectedIndexes = [selectedIndex];
+      sessions[targetIndex] = { ...candidate, weekday: plannerWeekday(date), status: '待上课', adjusted: true };
+      if (orderImpact.kind === 'following') {
+        const shiftMilliseconds = sessionDateTime(candidate, 'start') - sessionDateTime(target, 'start');
+        for (let index = targetIndex + 1; index < sessions.length; index += 1) {
+          if (!sessionCanAdjust(sessions[index])) { showToast(`第 ${sessions[index].index} 次课已开始或完成，不能整体顺延。`, 'error'); return; }
+          sessions[index] = shiftSessionByMilliseconds(sessions[index], shiftMilliseconds);
+          affectedIndexes.push(Number(sessions[index].index));
+        }
+      }
+      for (const affectedIndex of affectedIndexes) {
+        const affected = sessions.find(session => Number(session.index) === affectedIndex);
+        const conflicts = sessionAdjustmentConflicts(classRecord, affectedIndex, { date: affected.date, start: affected.startTime || affected.start, end: affected.endTime || affected.end, teacher: affected.teacher || classRecord.teacher, roomId: sessionRoomId(classRecord, affected) }, affectedIndexes);
+        if (conflicts.length) { const conflict = conflicts[0]; showToast(`第 ${affectedIndex} 次课冲突：${conflict.teacherConflict ? '教师' : '教室'}与“${conflict.className}”课次冲突，未保存任何调整。`, 'error'); return; }
+      }
+      const adjustStudentConflicts = studentConflictsWithOthers(classRecord, affectedIndexes.map(index => sessions.find(session => Number(session.index) === index)));
       if (adjustStudentConflicts.length) { showToast(`${studentConflictText(adjustStudentConflicts[0])}${sessionSuggestionText(classRecord, sessions[targetIndex])}。`, 'error'); return; }
-      sessions[targetIndex] = { ...target, date, weekday: plannerWeekday(date), startTime: start, endTime: end, start, end, teacher, roomId: room.id, status: '待上课', adjusted: true };
       log.after = { date, startTime: start, endTime: end, teacher, roomId: room.id, status: '待上课' };
+      log.shiftFollowing = orderImpact.kind === 'following';
+      log.affectedSessionIndexes = affectedIndexes;
+      log.shiftedSessions = affectedIndexes.slice(1).map(index => { const session = sessions.find(item => Number(item.index) === index); return { sessionIndex: index, date: session.date, startTime: session.startTime || session.start, endTime: session.endTime || session.end }; });
     }
     const record = { ...classRecord, sessions, adjustmentLogs: [...(classRecord.adjustmentLogs || []), log], updatedAt: demoTime() };
     upsertDemoRecord('classes', record);
-    if (notify) upsertDemoRecord('notifications', { id: demoId('notice'), type: '调课通知', classId: classRecord.id, sessionIndex: selectedIndex, recipients: Number(classRecord.enrolled || 0) + 1, status: '发送成功', createdAt: demoTime(), reason });
+    if (notify) {
+      const enrolledLearners = (readDemoState().enrollments || []).filter((item) => item.classId === classRecord.id && item.status === '已分班' && item.studentId);
+      upsertDemoRecord('notifications', { id: demoId('notice'), type: '调课通知', classId: classRecord.id, sessionIndex: selectedIndex, recipients: enrolledLearners.length + 1, status: '发送成功', createdAt: demoTime(), reason });
+      // CR-2026-138 CR138-04：调整通知写入教师端与学员端共用的消息集合，两端按 audience/recipientId 读取。
+      const before = log.before;
+      const after = log.after || {};
+      const beforeText = [before.date, `${before.startTime || ''}-${before.endTime || ''}`].filter(Boolean).join(' ');
+      const afterText = [after.date, `${after.startTime || ''}-${after.endTime || ''}`].filter(Boolean).join(' ');
+      const roomName = (venues.find(item => item.id === after.roomId) || {}).name || '';
+      const teacherName = after.teacher || classRecord.teacher;
+      const teacherId = (TEACHER_FACTS.find(item => item.name === teacherName) || {}).id || '';
+      const shiftedIndexes = (log.affectedSessionIndexes || []).slice(1);
+      const shiftedText = shiftedIndexes.length ? `；第 ${shiftedIndexes[0]} 至 ${shiftedIndexes[shiftedIndexes.length - 1]} 次课已同步顺延` : '';
+      const baseNotice = {
+        type: '课次调整通知',
+        title: `${classRecord.name}第${selectedIndex}次课时间已调整`,
+        summary: `调整前 ${beforeText}，调整后 ${afterText}${shiftedText}。`,
+        body: `教务已将「${classRecord.name}」第 ${selectedIndex} 次课调整为 ${afterText}${roomName ? `，教室调整为${roomName}` : ''}${shiftedText}。调整原因：${reason}。请按调整后的时间与地点上课。`,
+        createdAt: demoTime(),
+        read: false,
+        classId: classRecord.id,
+        lessonIndex: selectedIndex,
+        classTeacher: teacherName,
+        adjustmentId: log.id
+      };
+      upsertDemoRecord('lessonNotifications', { ...baseNotice, id: demoId('lesson-notice'), audience: 'teacher', recipientId: teacherId, target: `/teacher/pages/class-detail.html?class=${encodeURIComponent(classRecord.id)}&lesson=${encodeURIComponent(selectedIndex)}` });
+      enrolledLearners.forEach((enrollment) => upsertDemoRecord('lessonNotifications', { ...baseNotice, id: demoId('lesson-notice'), audience: 'learner', recipientId: enrollment.studentId, accountId: enrollment.accountId || '', target: `/learner/pages/class-detail.html?courseId=${encodeURIComponent(classRecord.id)}` }));
+    }
     closeDialog();
     if (academicPage === 'timetable') renderTimetable();
     showToast(`${type}已保存${notify ? '，通知记录已生成' : ''}。`);
@@ -655,6 +734,23 @@ const attendance = [
   { id: 'att-4', className: '成人声乐班', session: '第7次课', date: '2026-09-07', student: '刘女士', status: '请假', process: '已补录', time: '13:45', teacher: '陈晨' },
   { id: 'att-5', className: '成人声乐班', session: '第7次课', date: '2026-09-07', student: '陈一诺', status: '已到', process: '正常', time: '13:51', teacher: '陈晨' }
 ];
+function sharedAttendanceRows() {
+  const shared = readDemoState();
+  const classes = mergeClassSeed(shared.classes || []);
+  const actualRows = (shared.lessonExecutions || []).flatMap((execution) => {
+    const classItem = classes.find((item) => item.id === execution.classId);
+    const session = classItem?.sessions?.find((item) => Number(item.index) === Number(execution.sessionIndex));
+    return Object.entries(execution.attendance || {}).filter(([, status]) => status).map(([student, status]) => ({
+      id: `${execution.id}:${student}`, executionId: execution.id, className: classItem?.name || execution.classId,
+      session: `第${execution.sessionIndex}次课`, date: session?.date || '', student, status,
+      process: execution.attendanceSynced ? '正常' : '待补录', time: execution.startedAt || '—',
+      teacher: execution.teacherName || classItem?.teacher || '—', source: execution.recordSource || 'teacher_action', demo: false
+    }));
+  });
+  const actualKeys = new Set(actualRows.map((row) => `${row.className}#${row.session}#${row.student}`));
+  const demoRows = attendance.filter((row) => !actualKeys.has(`${row.className}#${row.session}#${row.student}`)).map((row) => ({ ...row, source: 'demo', demo: true }));
+  return [...actualRows, ...demoRows];
+}
 // MVP 口径 8（2026-09-24 冻结）：后台与教师端、学员端读取同一作业数据源，不再使用独立静态数组。
 function homeworkRows() {
   const classes = mergeClassSeed(readDemoState().classes || []);
@@ -1263,7 +1359,7 @@ function openTimetableSessionDialog(session) {
     isOutsideTimeline(session) ? `<span class="tag amber">超出 ${TIMELINE_START}–${TIMELINE_END} 时间轴</span>` : ''
   ].filter(Boolean).join(' ') || '无';
   const logList = shown.length
-    ? `<ul class="academic-adjustment-log">${shown.map((log) => `<li><strong>第 ${escapeHtml(String(log.sessionIndex || '—'))} 次 · ${escapeHtml(log.type || '调整课次')}</strong><span>${escapeHtml(log.before?.date || '—')} ${escapeHtml(log.before?.startTime || '')} → ${escapeHtml(log.after?.date || '—')} ${escapeHtml(log.after?.startTime || '')}</span><small>${escapeHtml(log.reason || '未填写原因')} · ${escapeHtml(log.operator || '教务')} · ${escapeHtml(log.adjustedAt || '')}</small></li>`).join('')}</ul>`
+    ? `<ul class="academic-adjustment-log">${shown.map((log) => { const affected = log.affectedSessionIndexes || []; const scope = affected.length > 1 ? ` · 已顺延第 ${affected[1]} 至 ${affected[affected.length - 1]} 次课` : ''; return `<li><strong>第 ${escapeHtml(String(log.sessionIndex || '—'))} 次 · ${escapeHtml(log.type || '调整课次')}${escapeHtml(scope)}</strong><span>${escapeHtml(log.before?.date || '—')} ${escapeHtml(log.before?.startTime || '')} → ${escapeHtml(log.after?.date || '—')} ${escapeHtml(log.after?.startTime || '')}</span><small>${escapeHtml(log.reason || '未填写原因')} · ${escapeHtml(log.operator || '教务')} · ${escapeHtml(log.adjustedAt || '')}</small></li>`; }).join('')}</ul>`
     : '<p class="academic-subnote">该课次暂无调整记录。</p>';
   const body = `<div class="academic-detail-list"><div><span>班级名称</span><strong>${escapeHtml(session.className)}</strong></div><div><span>课程名称</span><strong>${escapeHtml(session.course)}</strong></div><div><span>授课教师</span><strong>${escapeHtml(session.teacher)}</strong></div><div><span>校区 / 教室</span><strong>${escapeHtml(session.campus)} / ${escapeHtml(room?.name || '—')}</strong></div><div><span>上课日期</span><strong>${escapeHtml(session.date || '—')} ${escapeHtml(session.weekday || '')}</strong></div><div><span>上课时间</span><strong>${escapeHtml(session.start)}–${escapeHtml(session.end)}</strong></div><div><span>课次状态</span><strong>${tag(session.status)}</strong></div><div><span>考勤处理</span><strong>${session.attendanceProcess && session.attendanceProcess !== '—' ? escapeHtml(session.attendanceProcess) : '待补录'}</strong></div></div>`
     + `<section class="academic-session-block"><strong>风险提示</strong><div class="academic-session-risks">${riskList}</div></section>`
@@ -1369,9 +1465,9 @@ function printTimetable(hideEmpty) {
   window.print();
 }
 function renderAttendance() {
-  academicData = attendance;
-  pageFrame('考勤监控', '', '<button class="button" data-academic-action="attendance-export">导出考勤</button>', metrics([['今日记录', attendance.length, '实时打卡流水'], ['可计入统计', attendance.filter((a) => a.process !== '待补录').length, '待补录不计入结业判定'], ['待补录', attendance.filter((a) => a.process === '待补录').length, '需要教务处理'], ['异常状态', attendance.filter((a) => ['迟到', '缺勤'].includes(a.status)).length, '请核对教师记录']]) + filterPanel('attendance-filter', select('班级', 'className', ['少儿舞蹈基础班', '成人声乐班']) + `<label class="form-field"><span>课次日期</span><div class="date-range"><input type="date" name="from" value="2026-09-01"><span>至</span><input type="date" name="to" value="2026-09-30"></div></label>` + select('考勤状态', 'status', ['已到', '迟到', '请假', '缺勤']) + select('考勤处理状态', 'process', ['正常', '待补录', '已补录']) + field('学员姓名', 'student', 'text', '模糊搜索') + select('授课教师', 'teacher', ['王玥', '陈晨'], true)) + '<p class="academic-note warning">“待补录”记录暂不参与出勤率、缺勤率和结业判定；超过教师补录时限后由教务主管处理，并填写处理说明。</p>' + table('<thead><tr><th>班级 / 课次</th><th>上课日期</th><th>学员</th><th>考勤状态</th><th>处理状态</th><th>打卡时间</th><th>授课教师</th><th>操作</th></tr></thead>'));
-  const row = (item) => `<td>${item.className}<br><span class="muted">${item.session}</span></td><td>${item.date}</td><td>${item.student}</td><td>${tag(item.status)}</td><td>${tag(item.process)}</td><td>${item.time}</td><td>${item.teacher}</td><td class="action-cell"><button class="text-button" data-academic-action="attendance-view">查看详情</button>${item.process === '待补录' ? '<button class="text-button" data-academic-action="attendance-supplement">补录处理</button>' : ''}</td>`;
+  academicData = sharedAttendanceRows();
+  pageFrame('考勤监控', '', '<button class="button" data-academic-action="attendance-export">导出考勤</button>', metrics([['当前记录', academicData.length, '教师执行记录与演示样例'], ['可计入统计', academicData.filter((a) => !a.demo && a.process !== '待补录').length, '仅真实已同步记录'], ['待补录', academicData.filter((a) => !a.demo && a.process === '待补录').length, '需要教师或教务处理'], ['演示数据', academicData.filter((a) => a.demo).length, '不进入真实统计']]) + filterPanel('attendance-filter', select('班级', 'className', ['少儿舞蹈基础班', '成人声乐班']) + `<label class="form-field"><span>课次日期</span><div class="date-range"><input type="date" name="from" value="2026-09-01"><span>至</span><input type="date" name="to" value="2026-09-30"></div></label>` + select('考勤状态', 'status', ['已到', '迟到', '请假', '缺勤']) + select('考勤处理状态', 'process', ['正常', '待补录', '已补录']) + field('学员姓名', 'student', 'text', '模糊搜索') + select('授课教师', 'teacher', ['王玥', '陈晨'], true)) + '<p class="academic-note warning">真实考勤来自教师端共享课次执行记录；标记“演示”的样例不参与真实出勤、结业或工资统计。</p>' + table('<thead><tr><th>班级 / 课次</th><th>上课日期</th><th>学员</th><th>考勤状态</th><th>处理状态</th><th>打卡时间</th><th>授课教师</th><th>操作</th></tr></thead>'));
+  const row = (item) => `<td>${item.className} ${item.demo ? tag('演示') : ''}<br><span class="muted">${item.session}</span></td><td>${item.date}</td><td>${item.student}</td><td>${tag(item.status)}</td><td>${tag(item.process)}</td><td>${item.time}</td><td>${item.teacher}</td><td class="action-cell"><button class="text-button" data-academic-action="attendance-view">查看详情</button>${!item.demo && item.process === '待补录' ? '<button class="text-button" data-academic-action="attendance-supplement">补录处理</button>' : ''}</td>`;
   renderRows(academicData, row);
   applyFilter('attendance-filter', academicData, (form) => { const { className, status, process, student, teacher } = form; return (item) => (!className.value || item.className === className.value) && (!status.value || item.status === status.value) && (!process.value || item.process === process.value) && (!student.value.trim() || item.student.includes(student.value.trim())) && (!teacher.value || item.teacher === teacher.value); }, row);
 }
@@ -1631,15 +1727,21 @@ function handleAction(action, row) {
   if (action === 'venue-delete') return deleteVenue(row);
   if (action === 'venue-schedule') return detailDialog(`${row.name} · 排课查看`, '已按校区和教室筛选课表。', [['所属校区', row.campus], ['教学楼', row.building], ['场地类型', row.type], ['容量', `${row.capacity}人`], ['本周排课', row.status === '启用' ? '周六 09:00 · 少儿舞蹈基础班' : '暂无有效排课'], ['状态', tag(row.status)]]);
   if (action === 'attendance-view') return detailDialog('考勤打卡详情', '展示教师端上传的最终考勤状态。', [['班级 / 课次', `${row.className} / ${row.session}`], ['学员', row.student], ['上课日期', row.date], ['考勤状态', tag(row.status)], ['处理状态', tag(row.process)], ['打卡时间', row.time], ['授课教师', row.teacher], ['统计口径', row.process === '待补录' ? '待补录完成前不计入统计和结业判定' : '纳入出勤统计和结业判定']]);
-  if (action === 'attendance-supplement') return openSimpleForm('补录 / 修正考勤', '当前记录为待补录；教师需填写原因，超时处理需填写教务处理说明。', select('最终考勤状态', 'status', ['已到', '迟到', '请假', '缺勤'], false, false) + field('补录原因', 'reason', 'text', '必填：说明漏记或迟记原因', true) + field('教务处理说明', 'note', 'text', '超时处理时必填', true), (form) => { row.status = form.get('status'); row.process = '已补录'; row.time = '教务补录'; renderAttendance(); showToast('考勤已补录，已纳入统计并同步相关端。'); });
+  if (action === 'attendance-supplement') return openSimpleForm('补录 / 修正考勤', '当前记录为待补录；教师需填写原因，超时处理需填写教务处理说明。', select('最终考勤状态', 'status', ['已到', '迟到', '请假', '缺勤'], false, false) + field('补录原因', 'reason', 'text', '必填：说明漏记或迟记原因', true) + field('教务处理说明', 'note', 'text', '超时处理时必填', true), (form) => { const execution = (readDemoState().lessonExecutions || []).find((item) => item.id === row.executionId); if (execution) upsertDemoRecord('lessonExecutions', { ...execution, attendance: { ...(execution.attendance || {}), [row.student]: form.get('status') }, attendanceSaved: true, attendanceSynced: true, recordSource: 'authorized_supplement', supplementedBy: '当前教务账号', supplementedAt: demoTime() }); renderAttendance(); showToast('考勤已补录，已纳入统计并同步相关端。'); });
   if (action === 'homework-view') {
     // MVP 口径 8：详情读取与教师端、学员端同源的提交记录，展示学员级状态、提交内容、点评结果与未交名单。
     const submissions = listSubmissions(row.id);
     const missing = submissions.filter((item) => ['未提交', '草稿'].includes(item.status));
     const pending = submissions.filter((item) => item.status === '已提交');
     const reviewed = submissions.filter((item) => item.status === '已点评');
-    const body = `<div class="academic-detail-list"><div><span>作业内容</span><strong>${escapeHtml(row.content)}</strong></div><div><span>提交情况</span><strong>${row.submitted} / ${row.total} 人</strong></div><div><span>批阅进度</span><strong>${row.reviewed} / ${row.submitted} 份</strong></div><div><span>批阅规则</span><strong>仅文本评语，可选批注文件；无分数、无等级</strong></div><div><span>提交规则</span><strong>${row.required ? '必交，计入作业提交率' : '选交，不计入提交率'}</strong></div></div>`
+    const exited = submissions.filter((item) => item.rosterExited);
+    const drift = homeworkRosterDrift(row.id);
+    const rosterText = drift.frozen
+      ? `发布时冻结 ${drift.frozenSize} 人，当前计入提交率 ${drift.countedSize} 人${exited.length ? `；发布后退出 ${exited.length} 人（保留记录，不计入提交率）` : ''}${drift.addedAfterPublish.length ? `；发布后新增 ${drift.addedAfterPublish.length} 人不补入本作业` : ''}`
+      : '未记录冻结快照';
+    const body = `<div class="academic-detail-list"><div><span>作业内容</span><strong>${escapeHtml(row.content)}</strong></div><div><span>提交情况</span><strong>${row.submitted} / ${row.total} 人</strong></div><div><span>批阅进度</span><strong>${row.reviewed} / ${row.submitted} 份</strong></div><div><span>提交规则</span><strong>${row.required ? '必交，计入作业提交率' : '选交，不计入提交率'}</strong></div><div><span>应交名册</span><strong>${rosterText}</strong></div><div><span>批阅规则</span><strong>仅文本评语，可选批注文件；无分数、无等级</strong></div></div>`
       + (missing.length ? `<div class="form-section"><h3>未提交名单（${missing.length} 人）</h3><div class="academic-report-content">${escapeHtml(missing.map((item) => item.studentName).join('、'))}</div></div>` : '')
+      + (exited.length ? `<div class="form-section"><h3>发布后已退出（${exited.length} 人）</h3><div class="academic-report-content">${escapeHtml(exited.map((item) => `${item.studentName}（${item.rosterExitNote || '已退出'}）`).join('、'))}</div></div>` : '')
       + (pending.length ? `<div class="form-section"><h3>待点评（${pending.length} 份）</h3><div class="academic-report-content">${escapeHtml(pending.map((item) => item.studentName).join('、'))}</div></div>` : '')
       + (reviewed.length ? `<div class="form-section"><h3>已点评记录（${reviewed.length} 份）</h3>${reviewed.slice(0, 5).map((item) => `<div class="academic-report-content"><strong>${escapeHtml(item.studentName)}</strong>：${escapeHtml(item.content || '（未填写文字说明）')}<br>评语：${escapeHtml(item.review?.comment || '—')}</div>`).join('')}${reviewed.length > 5 ? `<div class="academic-report-content">其余 ${reviewed.length - 5} 份评语可在导出记录中查看。</div>` : ''}</div>` : '');
     return openDialog(`${row.title} · 作业详情`, '监督提交和文本批阅进度（数据源与教师端、学员端同源）。', body);

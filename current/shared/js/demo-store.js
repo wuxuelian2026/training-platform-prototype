@@ -177,10 +177,18 @@ const defaultState = () => ({
   buildings: [],
   venues: [],
   classes: [],
+  // 2026-09-24 结算：学籍异动（退班／转班／退学）登记记录，班级名册与作业应交名单据此判定在读状态。
+  enrollmentChanges: [],
+  // 退款拒绝等需要教务人工确认的异常事项；业务记录不因待办处理而被自动回滚。
+  academicTodos: [],
+  // 2026-09-24 结算：退款单为交易中心与学员端唯一审批对象，学员自助申请、学籍异动、线下登记三处共用同一集合。
+  refunds: [],
   // CR-2026-作业链路：作业定义与学员提交记录分离，教师端与学员端共用同源演示集合。
   homeworks: [],
   homeworkSubmissions: [],
   homeworkNotifications: [],
+  // CR-2026-138 CR138-04：教务课次调整产生的教师/学员通知，与作业通知同源结构（audience + recipientId）。
+  lessonNotifications: [],
   homeworkAudits: [],
   // CR-2026-作业链路：新作业截止时间默认取参数配置，默认发布后 72 小时。
   homeworkDeadlineHours: 72,
@@ -190,6 +198,14 @@ const defaultState = () => ({
   progress: {},
   // CR-2026-052：视频退款规则由后台参数配置，客户端与财务端读取同一份演示状态。
   videoRefundSettings: { windowDays: 7, maxLessons: 3 },
+  // 2026-09-24：面授退款策略只对新申请生效；退款单创建时保存策略快照。
+  classRefundSettings: {
+    windowDays: 0,
+    selfMaxCompletedPercent: 100,
+    includeBonusLessons: false,
+    handlingFeePercent: 0,
+    minAmount: 1
+  },
   // CR-2026-104：待支付订单支付时限由「参数配置」维护（默认 30 分钟）。
   orderSettings: { paymentTimeoutMinutes: 30 },
   // CR-2026-104：文件上传规格由「参数配置」维护（图片／文档／视频 MB，教学资源库 GB）。
@@ -278,6 +294,18 @@ export function videoRefundSettings() {
   return {
     windowDays: clampInt(settings.windowDays ?? 7, 1, 30, 7),
     maxLessons: clampInt(settings.maxLessons ?? 3, 0, 999, 3)
+  };
+}
+
+// 面授退款参数：0 天表示不限制申请时间；金额和比例读取时统一归一化，避免脏配置扩散。
+export function classRefundSettings() {
+  const settings = readStored().classRefundSettings || {};
+  return {
+    windowDays: clampInt(settings.windowDays ?? 0, 0, 365, 0),
+    selfMaxCompletedPercent: clampInt(settings.selfMaxCompletedPercent ?? 100, 0, 100, 100),
+    includeBonusLessons: settings.includeBonusLessons === true,
+    handlingFeePercent: clampInt(settings.handlingFeePercent ?? 0, 0, 100, 0),
+    minAmount: clampInt(settings.minAmount ?? 1, 0, 1000, 1)
   };
 }
 

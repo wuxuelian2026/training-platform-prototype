@@ -11,6 +11,8 @@ import { classCapacityStatus, classDisplayStatus, classEnrollmentCondition, clas
 import { mergeVenues, resolveVenueId } from './venue-seed.js';
 import { defaultLessonDuration, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions as buildLessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
 import { openSchedulePlanner, openSessionAdjustment } from './academic.js';
+import { isEnrollmentActive } from './class-roster.js';
+import { REFUND_ORIGIN, classRefundSuggestion, createRefundRequest, openRefundForOrder } from './refund-store.js';
 
 const businessRoot = document.querySelector('[data-business-page]');
 const businessPage = businessRoot?.dataset.businessPage;
@@ -60,6 +62,29 @@ const dataSets = {
         { at: '2026-09-05 11:08', role: '学员端', from: '—', to: '待支付', reason: '学员提交报名' },
         { at: '2026-09-05 11:10', role: '支付渠道', from: '待支付', to: '已支付', reason: '支付成功' },
         { at: '2026-09-05 11:12', role: '系统', from: '已支付', to: '退款中', reason: '名额占用失败，已发起全额原路退款' }
+      ]
+    },
+    {
+      id: 'order-refunded', number: 'OD202608300015', name: '少儿美术启蒙班', type: '面授课程', account: '演示家长C', accountPhone: '137****3130', student: '何安',
+      amount: '1980.00', status: '已退款', fulfillment: '已取消', linked: '已释放名额', time: '2026-08-30 09:40',
+      payment: { channel: '微信支付', amount: '1980.00', status: '支付成功', time: '2026-08-30 09:42' },
+      refund: { number: 'RF202609010021', amount: '1980.00', status: '已退款', reason: '学员申请课程调整，全额原路退款', expectedAt: '2026-09-03', method: '原路退回' },
+      fulfillmentDetail: { 班级: '少儿美术启蒙班', 校区: '南湖校区', 分班结果: '退款完成，名额已释放', 名额占用: '已释放（退款成功后释放）' },
+      logs: [
+        { at: '2026-08-30 09:40', role: '学员端', from: '—', to: '待支付', reason: '学员提交报名' },
+        { at: '2026-08-30 09:42', role: '支付渠道', from: '待支付', to: '已支付', reason: '支付成功' },
+        { at: '2026-09-01 14:00', role: '学员端', from: '已支付', to: '退款中', reason: '学员申请课程调整' },
+        { at: '2026-09-03 10:00', role: '支付渠道', from: '退款中', to: '已退款', reason: '退款成功，原路退回' }
+      ]
+    },
+    {
+      id: 'order-cancelled', number: 'OD202609020020', name: '中国画基础', type: '面授课程', account: '演示家长D', accountPhone: '136****7192', student: '孙先生',
+      amount: '1580.00', status: '已取消', fulfillment: '未分班', linked: '未占用名额', time: '2026-09-02 16:10',
+      payment: null, refund: null,
+      fulfillmentDetail: { 班级: '中国画基础周末班', 校区: '龙泉校区', 分班结果: '未支付已取消，未触发分班', 名额占用: '未占用' },
+      logs: [
+        { at: '2026-09-02 16:10', role: '学员端', from: '—', to: '待支付', reason: '学员提交报名' },
+        { at: '2026-09-02 16:55', role: '系统', from: '待支付', to: '已取消', reason: '支付时限超时，订单自动取消' }
       ]
     }
   ],
@@ -848,6 +873,7 @@ function openClassDetail(row) {
   dialog.querySelector('[data-business-action="class-edit-detail"]')?.addEventListener('click', () => { closeBusinessDialog(); openClassForm(row); });
   dialog.querySelectorAll('[data-class-schedule-mode]').forEach(button => button.addEventListener('click', () => { closeBusinessDialog(); openSchedulePlanner({ classId: row.id, mode: button.dataset.classScheduleMode }); }));
   initWorkspace(dialog, 'overview');
+  mountClassEnrollmentPanel(dialog, row, shared);
 }
 
 function openDetail(row, kind) {
@@ -906,6 +932,165 @@ function openLeadDetail(row) {
 function openSimpleForm(title, subtitle, fields, onSubmitMessage, onSubmit) {
   const dialog = openBusinessDialog(title, subtitle, `<form id="business-dialog-form" class="sales-dialog-grid">${fields}</form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">确认</button>');
   dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const result = onSubmit ? onSubmit(data, event.currentTarget) : true; if (result === false) return; closeBusinessDialog(); showToast(onSubmitMessage); });
+}
+
+// 2026-09-24 结算：学籍异动（退班／转班／退学）是班级名册的唯一变更入口。
+// 名册与作业应交名单都按报名分班记录判定在读状态，因此这里落库后：
+// 班级名册自动剔除该学员，已发布作业保留应交记录但不计入提交率分母，转班学员在新班级重新起算。
+const ENROLLMENT_CHANGE_STATUS = { 退班: '已退班', 转班: '已转班', 退学: '已退学' };
+
+// 班级池以演示状态为准（seed 兜底），避免异动时读到被覆盖前的旧报名人数。
+function classPoolOf(shared) {
+  const pool = new Map(cloneClassSeed().map(item => [item.id, item]));
+  (shared.classes || []).forEach(item => pool.set(item.id, { ...(pool.get(item.id) || {}), ...item }));
+  return [...pool.values()];
+}
+
+function mountClassEnrollmentPanel(dialog, row, shared) {
+  const panel = dialog.querySelector('[data-workspace-panel="students"]');
+  if (!panel) return;
+  const students = shared.students || [];
+  const classNames = new Map(classPoolOf(shared).map(item => [item.id, item.name]));
+  const enrollments = (shared.enrollments || []).filter(item => item.classId === row.id)
+    .sort((a, b) => Number(isEnrollmentActive(b.status)) - Number(isEnrollmentActive(a.status)) || String(b.enrolledAt || '').localeCompare(String(a.enrolledAt || '')));
+  const activeCount = enrollments.filter(item => isEnrollmentActive(item.status)).length;
+  const exitedCount = enrollments.length - activeCount;
+  const roster = enrollments.length ? enrollments.map(item => {
+    const student = students.find(entry => entry.id === item.studentId);
+    const active = isEnrollmentActive(item.status);
+    const transfer = item.transferToClassId ? `<span class="sub-cell">转入 ${escapeHtml(classNames.get(item.transferToClassId) || item.transferToClassId)}</span>` : '';
+    const changeAt = !active && item.changeAt ? `<span class="sub-cell">${escapeHtml(item.changeAt)}</span>` : '';
+    const refundRelation = item.refundRelationStatus ? `<span class="sub-cell">退款：${escapeHtml(item.refundRelationStatus)}</span>` : '';
+    return `<tr><td>${escapeHtml(student?.name || item.studentId)}</td><td>${escapeHtml(item.enrolledAt || '—')}</td><td>${tag(item.status)}${refundRelation}${transfer}${changeAt}</td><td>${active ? `<button class="text-button" data-enrollment-change="${escapeHtml(item.id)}">学籍异动</button>` : '—'}</td></tr>`;
+  }).join('') : '<tr><td colspan="4">暂无学员报名</td></tr>';
+  const changes = (shared.enrollmentChanges || []).filter(item => item.classId === row.id)
+    .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+  const changeRows = changes.length ? changes.map(item => `<tr><td>${escapeHtml(item.at || '—')}</td><td>${escapeHtml(item.studentName || item.studentId)}</td><td>${escapeHtml(item.type || '—')}</td><td>${escapeHtml(item.reason || '—')}</td><td>${escapeHtml(item.targetClassName || '—')}</td><td>${item.refundNo ? `${escapeHtml(item.refundNo)}<br><span class="sub-cell">${escapeHtml(item.refundStatus || '待审批')}</span>` : '—'}</td><td>${escapeHtml(item.operator || '—')}</td></tr>`).join('')
+    : '<tr><td colspan="7">暂无学籍异动记录</td></tr>';
+  const refundTodos = (shared.academicTodos || []).filter(item => item.classId === row.id && item.status === '待处理');
+  const todoPanel = refundTodos.length ? `<div class="sales-roster-meta"><strong>教务待办 ${refundTodos.length} 项</strong>${refundTodos.map(item => `<div>${escapeHtml(item.title)}：${escapeHtml(item.detail)}</div>`).join('')}</div>` : '';
+  panel.innerHTML = `<div class="sales-dialog-summary"><div><span>在读学员</span><strong>${activeCount}</strong></div><div><span>已退出</span><strong>${exitedCount}</strong></div><div><span>招生容量</span><strong>${Number(row.capacity || 0)}</strong></div><div><span>剩余名额</span><strong>${Math.max(0, Number(row.capacity || 0) - activeCount)}</strong></div></div>
+    <p class="sales-roster-meta">学籍异动只改变本班名册：已发布作业保留应交记录，退出学员不再计入作业提交率分母；转班学员在新班级重新起算。登记后班级名册、教师端与后台作业统计立即同源更新。</p>
+    <div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>学籍状态</th><th>操作</th></tr></thead><tbody>${roster}</tbody></table></div>
+    ${todoPanel}<div class="sales-table-wrap" style="margin-top:12px"><table><thead><tr><th>异动时间</th><th>学员</th><th>异动类型</th><th>原因</th><th>转入班级</th><th>退款单 / 状态</th><th>操作人</th></tr></thead><tbody>${changeRows}</tbody></table></div>`;
+  panel.querySelectorAll('[data-enrollment-change]').forEach(button => button.addEventListener('click', () => {
+    const enrollment = enrollments.find(item => item.id === button.dataset.enrollmentChange);
+    if (enrollment) openEnrollmentChangeForm(row, enrollment);
+  }));
+}
+
+function openEnrollmentChangeForm(row, enrollment) {
+  const shared = readDemoState();
+  const student = (shared.students || []).find(item => item.id === enrollment.studentId);
+  const targets = classPoolOf(shared)
+    .filter(item => item.id !== row.id)
+    .filter(item => !(shared.enrollments || []).some(entry => entry.classId === item.id && entry.studentId === enrollment.studentId && isEnrollmentActive(entry.status)));
+  const targetOptions = targets.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('');
+  // 退班／退学可同步发起退费：金额按订单实收 × 未消课课时比例估算，最终以财务审批为准。
+  const paidOrders = enrollmentRefundCandidates(row, enrollment.studentId);
+  const suggestedTotal = paidOrders.reduce((sum, item) => sum + item.suggested, 0);
+  const refundFields = paidOrders.length
+    ? `<label class="form-field wide"><span>同步发起退费</span><span class="sales-inline-check"><input type="checkbox" name="withRefund" value="是" checked>本班已支付订单 ${paidOrders.length} 笔，预计退款 ${suggestedTotal} 元（${paidOrders[0].rule}）</span><small class="sub-cell">取消勾选则本次异动不发起退费，可由学员在「我的订单」自助申请，或由财务线下登记。</small></label>`
+    : '<p class="sales-roster-meta">本班暂无可退费的已支付订单，本次异动只变更学籍。</p>';
+  const fields = `<label class="form-field"><span>异动类型 <b class="required-mark">*</b></span><select name="type" required><option value="">请选择</option><option>退班</option><option>转班</option><option>退学</option></select></label>
+    <label class="form-field"><span>转入班级</span><select name="targetClassId"><option value="">转班时必填</option>${targetOptions}</select></label>
+    <label class="form-field wide"><span>异动原因 <b class="required-mark">*</b></span><textarea name="reason" maxlength="200" required placeholder="填写退班／转班／退学原因，将写入异动记录"></textarea></label>
+    ${refundFields}`;
+  const dialog = openBusinessDialog('学员学籍异动', `${student?.name || enrollment.studentId} · ${row.name}`, `<form id="enrollment-change-form" class="sales-dialog-grid">${fields}</form><p class="sales-roster-meta">登记后：本班名册立即剔除该学员；已发布作业保留其应交记录，但从作业提交率分母中剔除；转班学员在转入班级重新起算。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="enrollment-change-form" class="button primary">确认登记</button>');
+  dialog.querySelector('#enrollment-change-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const type = String(data.get('type') || '').trim();
+    const reason = String(data.get('reason') || '').trim();
+    const targetClassId = String(data.get('targetClassId') || '').trim();
+    if (!type) return showToast('请选择异动类型。', 'warning');
+    if (!reason) return showToast('请填写异动原因。', 'warning');
+    if (type === '转班' && !targetClassId) return showToast('转班需要选择转入班级。', 'warning');
+    const withRefund = String(data.get('withRefund') || '') === '是' && type !== '转班';
+    const outcome = applyEnrollmentChange(row, enrollment, { type, reason, targetClassId: type === '转班' ? targetClassId : '', withRefund, refundOrders: withRefund ? paidOrders : [] });
+    closeBusinessDialog();
+    renderClasses();
+    if (outcome?.refunds?.length) showToast(`${type}已登记：${student?.name || enrollment.studentId}；已同步发起 ${outcome.refunds.length} 张退款单（待审批）。`);
+    else if (withRefund && !paidOrders.length) showToast(`${type}已登记：${student?.name || enrollment.studentId}；本班无可退订单，未发起退费。`, 'warning');
+    showToast(`已登记${type}：${student?.name || enrollment.studentId}；班级名册与作业统计口径已同步。`);
+  });
+}
+
+// 学籍异动可退费的订单：本班该学员的已支付订单，且当前没有未结退款单。
+// 建议金额按面授退款参数计算；学籍异动不是学员自助入口，不受自助窗口与消课比例上限拦截。
+function enrollmentRefundCandidates(row, studentId) {
+  const shared = readDemoState();
+  return (shared.orders || [])
+    .filter(order => order.classId === row.id && order.studentId === studentId && order.status === '已支付')
+    .map(order => {
+      const suggestion = classRefundSuggestion({ order, classRecord: row, selfService: false });
+      return { order, suggested: suggestion.suggested, rule: suggestion.rule, total: suggestion.total, completed: suggestion.completed };
+    })
+    .filter(item => item.suggested > 0 && !openRefundForOrder(item.order.id));
+}
+
+function applyEnrollmentChange(row, enrollment, { type, reason, targetClassId, withRefund = false, refundOrders = [] }) {
+  const shared = readDemoState();
+  const now = demoTime();
+  const student = (shared.students || []).find(item => item.id === enrollment.studentId);
+  const studentName = student?.name || enrollment.studentId;
+  const classPool = classPoolOf(shared);
+  upsertDemoRecord('enrollments', {
+    ...enrollment,
+    status: ENROLLMENT_CHANGE_STATUS[type],
+    changeAt: now,
+    changeReason: reason,
+    changeType: type,
+    ...(targetClassId ? { transferToClassId: targetClassId } : {})
+  });
+  if (type === '转班' && targetClassId) {
+    upsertDemoRecord('enrollments', {
+      id: `${enrollment.accountId || 'account-001'}-${enrollment.studentId}-${targetClassId}`,
+      accountId: enrollment.accountId || 'account-001',
+      studentId: enrollment.studentId,
+      classId: targetClassId,
+      status: '已分班',
+      enrolledAt: now,
+      transferredFromClassId: row.id
+    });
+    const target = classPool.find(item => item.id === targetClassId);
+    if (target) upsertDemoRecord('classes', { ...target, enrolled: Number(target.enrolled || 0) + 1 });
+  }
+  upsertDemoRecord('classes', { ...row, enrolled: Math.max(0, Number(row.enrolled || 0) - 1) });
+  const changeId = demoId('ENRCHG');
+  // 同步发起退费：学籍异动已在上方退出名册并释放名额；退款完成只更新退款关联状态，不再次减员。
+  const refunds = [];
+  if (withRefund) {
+    refundOrders.forEach(item => {
+      const result = createRefundRequest({
+        orderId: item.order.id,
+        origin: REFUND_ORIGIN.ENROLLMENT,
+        requestedBy: '教务异动登记',
+        amount: item.suggested,
+        reason: `${type}退费：${reason}`,
+        channel: item.order.payMethod || '原路退回',
+        classChangeId: changeId,
+        remark: `学籍异动发起：${item.rule}`
+      });
+      if (result.ok) refunds.push(result.refund);
+    });
+  }
+  upsertDemoRecord('enrollmentChanges', {
+    id: changeId,
+    classId: row.id,
+    enrollmentId: enrollment.id,
+    studentId: enrollment.studentId,
+    studentName,
+    type,
+    reason,
+    targetClassId: targetClassId || '',
+    targetClassName: targetClassId ? (classPool.find(item => item.id === targetClassId)?.name || targetClassId) : '',
+    refundNo: refunds.map(item => item.no).join('、'),
+    refundStatus: refunds.length ? '待审批' : '',
+    operator: '当前账号',
+    at: now
+  });
+  return { refunds };
 }
 
 function openClassDeadlineForm(row) {

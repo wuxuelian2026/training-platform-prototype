@@ -33,7 +33,7 @@ export function lessonAttendance(classItem, sessionIndex) {
   return classRosterOfRecords(classItem).map((student) => {
     const value = roll(`${classItem.id}#${sessionIndex}#${student.name}`);
     const status = value < 84 ? '已到' : value < 92 ? '迟到' : value < 96 ? '请假' : '缺勤';
-    return { id: student.id, name: student.name, status, counted: status === '已到' || status === '迟到', student };
+    return { id: student.id, name: student.name, status, counted: status === '已到' || status === '迟到', student, demo: true };
   });
 }
 export function lessonAttendanceStatus(classItem, sessionIndex, student) {
@@ -49,26 +49,29 @@ export function lessonHomework(classItem, sessionIndex) {
   const required = shared.filter((item) => item.required !== false);
   if (required.length) {
     const rows = required.flatMap((item) => listSubmissions(item.id));
-    const submitted = rows.filter((row) => ['已提交', '已点评'].includes(row.status));
-    const graded = rows.filter((row) => row.status === '已点评').length;
+    // 2026-09-24 结算：发布后退班／转班／退学的学员保留记录，但不计入提交率分母。
+    const counted = rows.filter((row) => !row.rosterExited);
+    const submitted = counted.filter((row) => ['已提交', '已点评'].includes(row.status));
+    const graded = counted.filter((row) => row.status === '已点评').length;
     return {
       name: required.length > 1 ? `第${sessionIndex}次课作业（${required.length} 项必交）` : required[0].title,
-      title: required[0].title, published: true, total: rows.length,
+      title: required[0].title, published: true, total: counted.length,
       submitted: submitted.length, graded,
       mode: submitted.length === 0 ? '未提交' : graded === submitted.length ? '点评完成' : '点评中',
-      missing: rows.filter((row) => ['未提交', '草稿'].includes(row.status)).map((row) => row.studentName).slice(0, 4),
-      homeworkId: required[0].id, countable: true
+      missing: counted.filter((row) => ['未提交', '草稿'].includes(row.status)).map((row) => row.studentName).slice(0, 4),
+      homeworkId: required[0].id, countable: true, demo: false
     };
   }
   if (shared.length) {
     const rows = shared.flatMap((item) => listSubmissions(item.id));
-    const submitted = rows.filter((row) => ['已提交', '已点评'].includes(row.status));
+    const counted = rows.filter((row) => !row.rosterExited);
+    const submitted = counted.filter((row) => ['已提交', '已点评'].includes(row.status));
     return {
-      name: shared[0].title, title: shared[0].title, published: true, total: rows.length,
-      submitted: submitted.length, graded: rows.filter((row) => row.status === '已点评').length,
+      name: shared[0].title, title: shared[0].title, published: true, total: counted.length,
+      submitted: submitted.length, graded: counted.filter((row) => row.status === '已点评').length,
       mode: submitted.length === 0 ? '未提交' : '点评中',
-      missing: rows.filter((row) => ['未提交', '草稿'].includes(row.status)).map((row) => row.studentName).slice(0, 4),
-      homeworkId: shared[0].id, countable: false
+      missing: counted.filter((row) => ['未提交', '草稿'].includes(row.status)).map((row) => row.studentName).slice(0, 4),
+      homeworkId: shared[0].id, countable: false, demo: false
     };
   }
   const roster = classRosterOfRecords(classItem);
@@ -79,7 +82,7 @@ export function lessonHomework(classItem, sessionIndex) {
     name: `第${sessionIndex}次课作业`, published: true, total: roster.length,
     submitted: submittedStudents.length, graded, mode,
     missing: roster.filter((student) => !submittedStudents.includes(student)).map((student) => student.name).slice(0, 4),
-    countable: true
+    countable: true, demo: true
   };
 }
 export function lessonHomeworkSubmitted(classItem, sessionIndex, student) {

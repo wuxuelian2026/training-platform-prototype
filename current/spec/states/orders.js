@@ -150,6 +150,11 @@ export const STATE_MACHINES = [
         false
       ],
       [
+        "exception",
+        "退款异常",
+        false
+      ],
+      [
         "completed",
         "已退款",
         true
@@ -181,7 +186,13 @@ export const STATE_MACHINES = [
       ],
       [
         "退款中",
-        "失败或超时后重试",
+        "渠道失败、超时或结果不明",
+        "退款异常",
+        "系统/财务"
+      ],
+      [
+        "退款异常",
+        "人工核对后复用原退款单重试",
         "退款中",
         "系统"
       ]

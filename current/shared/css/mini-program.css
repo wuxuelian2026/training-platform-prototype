@@ -917,6 +917,8 @@ body { background: #f7f7f5; }
 .teacher-student-detail-record span { margin-top: 3px; color: var(--muted); font-size: 9px; }
 .teacher-student-detail-record > div:last-child { display: flex; flex: none; align-items: center; gap: 5px; }
 .teacher-student-detail-record .mp-pill { min-height: 21px; padding: 0 6px; font-size: 8px; }
+/* CR138-08：学员档案的考勤/作业记录回链课次详情。 */
+.teacher-student-detail-link { display: inline-flex; flex: none; align-items: center; gap: 2px; color: var(--brand); font-size: 10px; }
 @media (max-width: 360px) {
   .teacher-student-detail-identity { grid-template-columns: 36px minmax(0, 1fr); }
   .teacher-student-detail-avatar { width: 36px; height: 36px; font-size: 16px; }

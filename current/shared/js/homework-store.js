@@ -1,7 +1,7 @@
 // 作业链路共享演示存储。
 // 作业定义和学员提交记录分离；两端只通过 demo-store 的 localStorage 交换数据，
 // 页面级 sessionStorage 仅保留登录和筛选等会话状态，不再承载业务作业记录。
-import { classRosterFor } from './class-roster.js';
+import { activeEnrollmentsOf, classRosterFor, enrollmentExitStatus, studentNameOf } from './class-roster.js';
 import { mergeClassSeed } from './class-seed.js';
 import { demoId, demoTime, fileSpecSettings, readDemoState, writeDemoState } from './demo-store.js';
 import { DEMO_NOW, demoDateTime } from './demo-clock.js';
@@ -137,7 +137,15 @@ export function getHomework(homeworkId) {
 }
 
 export function listSubmissions(homeworkId) {
-  return mergeRows('homeworkSubmissions').filter((item) => item.homeworkId === homeworkId);
+  const rows = mergeRows('homeworkSubmissions').filter((item) => item.homeworkId === homeworkId);
+  const homework = getHomework(homeworkId);
+  if (!homework || !rows.length) return rows;
+  // 2026-09-24 结算：应交名单发布时冻结；发布后退班／转班／退学的学员，记录保留但从提交率分母中剔除。
+  // 退出以报名分班记录为准（与班级名册同一数据源），避免用派生名册猜测。
+  return rows.map((row) => {
+    const exitStatus = enrollmentExitStatus(homework.classId, row.studentId);
+    return exitStatus ? { ...row, rosterExited: true, rosterExitNote: exitStatus } : row;
+  });
 }
 
 export function getStudentSubmission(homeworkId, studentId, studentName = '') {
@@ -151,10 +159,13 @@ function getStoredStudentSubmission(homeworkId, studentId, studentName = '') {
   return listSubmissions(homeworkId).find((item) => item.studentId === studentId || (!studentId && item.studentName === studentName)) || null;
 }
 
+// 截止判定（2026-09-24 结算）：按分钟粒度比较，到达截止时刻的当分钟仍可提交（含），
+// 超过该分钟即只读；原型内所有时间均为 Asia/Shanghai 本地时间字符串，秒位不参与判定。
 export function homeworkIsOverdue(homework, now = DEMO_NOW) {
   const deadline = demoDateTime(homework?.deadline);
   const current = demoDateTime(now);
-  return Number.isFinite(deadline.getTime()) && Number.isFinite(current.getTime()) && current.getTime() > deadline.getTime();
+  if (!Number.isFinite(deadline.getTime()) || !Number.isFinite(current.getTime())) return false;
+  return Math.floor(current.getTime() / 60000) > Math.floor(deadline.getTime() / 60000);
 }
 
 export function homeworkFormatAllowed(homework, attachment = {}) {
@@ -175,6 +186,8 @@ function validateSubmission(homework, input, existing) {
   if (!homework) throw new Error('HOMEWORK_NOT_FOUND');
   if (homeworkLifecycleStatus(homework) === '已撤回') throw new Error('HOMEWORK_WITHDRAWN');
   if (homeworkIsOverdue(homework)) throw new Error('HOMEWORK_DEADLINE_PASSED');
+  // 2026-09-24 结算：学籍异动登记后，退出学员保留应交记录但不能再提交本次作业。
+  if (enrollmentExitStatus(homework.classId, input.studentId)) throw new Error('HOMEWORK_STUDENT_EXITED');
   if (existing?.status === '已点评' && !input.allowResubmit) throw new Error('HOMEWORK_ALREADY_REVIEWED');
   const expected = listSubmissions(homework.id);
   if (expected.length && !expected.some((row) => row.studentId === input.studentId || row.studentName === input.studentName)) {
@@ -192,22 +205,51 @@ function validateSubmission(homework, input, existing) {
 
 export function submissionSummary(homeworkId) {
   const rows = listSubmissions(homeworkId);
+  // 发布后退班／转班／退学的学员不计入应交分母，只保留记录与提示。
+  const counted = rows.filter((row) => !row.rosterExited);
   return {
-    total: rows.length,
-    submitted: rows.filter((row) => ['已提交', '已点评'].includes(row.status)).length,
-    pendingReview: rows.filter((row) => row.status === '已提交').length,
-    reviewed: rows.filter((row) => row.status === '已点评').length,
-    missing: rows.filter((row) => ['未提交', '草稿'].includes(row.status)).length
+    total: counted.length,
+    exited: rows.length - counted.length,
+    submitted: counted.filter((row) => ['已提交', '已点评'].includes(row.status)).length,
+    pendingReview: counted.filter((row) => row.status === '已提交').length,
+    reviewed: counted.filter((row) => row.status === '已点评').length,
+    missing: counted.filter((row) => ['未提交', '草稿'].includes(row.status)).length
+  };
+}
+
+/**
+ * 应交名单冻结与漂移（2026-09-24 结算）：
+ * - 发布时按班级当前名册生成 `rosterSnapshot`（studentId/studentName）并记录 `rosterFrozenAt`、`rosterSize`；
+ * - 再次发布同一作业沿用原快照，发布后新增学员不补入应交名单；
+ * - 发布后退班／转班／退学的学员保留应交记录，但不计入提交率分母，后台可见人数差。
+ */
+export function homeworkRosterDrift(homeworkId) {
+  const homework = getHomework(homeworkId);
+  const snapshot = Array.isArray(homework?.rosterSnapshot) ? homework.rosterSnapshot : [];
+  const snapshotIds = new Set(snapshot.map((row) => row.studentId));
+  const exited = snapshot
+    .map((row) => ({ ...row, exitStatus: enrollmentExitStatus(homework?.classId, row.studentId) }))
+    .filter((row) => row.exitStatus);
+  const added = homework
+    ? activeEnrollmentsOf(homework.classId).filter((row) => !snapshotIds.has(row.studentId)).map((row) => ({ studentId: row.studentId, studentName: studentNameOf(row.studentId) }))
+    : [];
+  return {
+    frozen: Boolean(snapshot.length),
+    frozenAt: homework?.rosterFrozenAt || '',
+    frozenSize: snapshot.length,
+    countedSize: submissionSummary(homeworkId).total,
+    addedAfterPublish: added,
+    exitedAfterPublish: exited
   };
 }
 
 // MVP 口径 1（2026-09-24 冻结）：发布时按班级名册冻结应交名单，为每位学员生成一条「未提交」记录。
 // 记录 id 沿用种子规则 SUB-{作业id}-{学员id}，保证重复发布时幂等、不产生第二条应交记录。
-function expectedSubmissionRows(homework, now) {
-  return roster(homework.classId).map((student) => ({
+function expectedSubmissionRows(homework, now, students = null) {
+  return (students || roster(homework.classId)).map((student) => ({
     id: `SUB-${homework.id}-${student.id}`,
     homeworkId: homework.id, classId: homework.classId, lessonIndex: homework.lessonIndex,
-    studentId: student.id, studentName: student.name,
+    studentId: student.id, studentName: student.name || student.studentName,
     status: '未提交', content: '', attachments: [], submittedAt: '', updatedAt: now,
     review: { status: '未点评', comment: '', reviewedAt: '', reviewerId: '', reviewerName: '' }
   }));
@@ -219,12 +261,24 @@ export function publishHomework(input) {
   if (!input.publishedBy) throw new Error('HOMEWORK_OPERATOR_FORBIDDEN');
   assertTeacherOwnsClass(input.classId, input.publishedBy);
   if (!Number.isFinite(deadline.getTime()) || deadline.getTime() <= demoDateTime(now).getTime()) throw new Error('HOMEWORK_DEADLINE_INVALID');
-  const record = { ...input, id: input.id || demoId('HW'), status: '已发布', publishedAt: input.publishedAt || now, createdAt: input.createdAt || now, updatedAt: now, publishedBy: input.publishedBy || 'teacher-demo' };
+  const homeworkId = input.id || demoId('HW');
+  const existingHomework = getHomework(homeworkId);
+  // 应交名单发布时冻结：同一作业再次发布沿用原快照，发布后新报名学员不补入。
+  const frozenStudents = Array.isArray(existingHomework?.rosterSnapshot) && existingHomework.rosterSnapshot.length
+    ? existingHomework.rosterSnapshot.map((row) => ({ id: row.studentId, name: row.studentName }))
+    : roster(input.classId);
+  const record = {
+    ...input, id: homeworkId, status: '已发布', publishedAt: input.publishedAt || now, createdAt: input.createdAt || now, updatedAt: now,
+    publishedBy: input.publishedBy || 'teacher-demo',
+    rosterFrozenAt: existingHomework?.rosterFrozenAt || now,
+    rosterSize: frozenStudents.length,
+    rosterSnapshot: frozenStudents.map((student) => ({ studentId: student.id, studentName: student.name }))
+  };
   writeDemoState((next) => {
     next.homeworks = [...(next.homeworks || []).filter((item) => item.id !== record.id), record];
     // 只补充缺失的应交记录，不覆盖已存在的提交／点评（种子记录或学员已提交的内容）。
     const existing = new Set((next.homeworkSubmissions || []).filter((row) => row.homeworkId === record.id).map((row) => row.id));
-    const pending = expectedSubmissionRows(record, now).filter((row) => !existing.has(row.id));
+    const pending = expectedSubmissionRows(record, now, frozenStudents).filter((row) => !existing.has(row.id));
     next.homeworkSubmissions = [...(next.homeworkSubmissions || []), ...pending];
     const notifications = Array.isArray(next.homeworkNotifications) ? next.homeworkNotifications : [];
     pending.forEach((row) => {
@@ -358,6 +412,8 @@ export function syncHomeworkNotificationReads(rows = []) {
   if (!readById.size) return;
   writeDemoState((next) => {
     next.homeworkNotifications = (next.homeworkNotifications || []).map((row) => readById.has(row.id) ? { ...row, read: readById.get(row.id) } : row);
+    // CR138-04：课次调整通知与作业通知共用已读回写，两者都来自演示状态通知集合。
+    next.lessonNotifications = (next.lessonNotifications || []).map((row) => readById.has(row.id) ? { ...row, read: readById.get(row.id) } : row);
     return next;
   });
 }

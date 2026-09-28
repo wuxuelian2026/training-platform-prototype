@@ -9,8 +9,9 @@ import { DEMO_NOW, DEMO_TODAY, demoDateTime } from './demo-clock.js';
 import { classSeed, mergeClassSeed } from './class-seed.js';
 import { venueSeed } from './venue-seed.js';
 import { classRosterFor } from './class-roster.js';
+import { lessonStatusOf, sessionsInScheduleOrder } from './class-lifecycle.js';
 import { classAttendanceSummary, classHomeworkSummary, countedSessionsOf, lessonAttendance, lessonHomework, studentAttendanceHistory, studentAttendanceRate, studentHomeworkHistory, studentHomeworkRate } from './lesson-records.js';
-import { getHomework, homeworkForLesson, homeworkLifecycleStatus, listHomework, listSubmissions, publishHomework, reviewSubmission, submissionSummary, syncHomeworkNotificationReads, updateHomeworkDeadline, withdrawHomework } from './homework-store.js';
+import { getHomework, homeworkForLesson, homeworkLifecycleStatus, homeworkRosterDrift, listHomework, listSubmissions, publishHomework, reviewSubmission, submissionSummary, syncHomeworkNotificationReads, updateHomeworkDeadline, withdrawHomework } from './homework-store.js';
 import { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } from './course-seed.js';
 import { courseAgesText } from './course-display.js';
 import { teacherFactsById } from './teacher-facts.js';
@@ -38,7 +39,8 @@ const currentTeacherAvatar = () => (currentTeacherAccount().name || '师').slice
 // I1-DEMO-03：我的班级与课表取当前教师任教的已发布班级（与学员端同一份班级库）。
 function teacherClassFromSeed(seed) {
   const sessions = seed.sessions || [];
-  const completed = sessions.filter((session) => isSessionPast(session)).length;
+  // CR-2026-141：已完成的判定与课次状态同源，按计划时间派生。
+  const completed = sessions.filter((session) => plannedLessonStatus(session) === '已完成').length;
   const total = sessions.length || Number(seed.lessons || 0);
   // 注意：这里在模块初始化阶段也会被调用，不能引用后面才声明的 calendarToday（TDZ）。
   const status = !sessions.length ? '待开课' : completed >= total ? '已结束' : (seed.firstLessonDate > DEMO_TODAY ? '待开课' : '进行中');
@@ -55,7 +57,7 @@ function teacherClassFromSeed(seed) {
     next: (() => {
       // 未排课班级没有课次，不能因为「总课时>0」就显示成全部完成（CR-2026-134）。
       if (!sessions.length) return '待教务排课';
-      const upcoming = sessions.find((session) => session.date >= DEMO_TODAY);
+      const upcoming = lessonsInOrder(sessions).find((session) => plannedLessonStatus(session) !== '已完成');
       if (!upcoming) return total ? '全部课次已完成' : '待教务排课';
       return `${upcoming.date.slice(5)} ${upcoming.weekday || ''} ${upcoming.startTime || ''}-${upcoming.endTime || ''}`;
     })()
@@ -65,19 +67,11 @@ function teacherClassFromSeed(seed) {
 function currentTeacherClasses() {
   return mergeClassSeed(readDemoState().classes || []).filter((seed) => seed.teacher === currentTeacherName()).map(teacherClassFromSeed);
 }
-function isSessionPast(session) {
-  return Boolean(session && session.date && session.date < DEMO_TODAY);
-}
-// CR-2026-139：课次计划状态只由计划日期和起止时间派生；教师操作写入执行事实，不改计划状态。
-function plannedLessonStatus(session) {
-  if (!session?.date) return '待上课';
-  const start = demoDateTime(`${session.date} ${session.startTime || session.start || '00:00'}`);
-  const end = demoDateTime(`${session.date} ${session.endTime || session.end || '23:59'}`);
-  const now = demoDateTime(DEMO_NOW);
-  if (now < start) return '待上课';
-  if (now < end) return '上课中';
-  return '已完成';
-}
+// CR-2026-141：课次计划状态只由计划日期和起止时间派生；教师操作写入执行事实，不改计划状态。
+// 三端同源：与后台课表、学员端共用 class-lifecycle 的 lessonStatusOf 判定。
+function plannedLessonStatus(session) { return lessonStatusOf(session); }
+// CR-2026-138 CR138-05：课次调整后按最新日期 + 开始时间排序派生「下一节课」与列表顺序。
+function lessonsInOrder(sessions) { return sessionsInScheduleOrder(sessions); }
 // 教师端课表课次：由当前教师的班级课次派生，与学员端班级详情同一份数据。
 function sessionVenueOf(session, classItem) {
   const room = venueSeed.find((entry) => entry.id === (session && session.roomId));
@@ -144,8 +138,8 @@ function demoLocalize(value) {
   if (Array.isArray(value)) return value.map(demoLocalize);
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, demoLocalize(item)]));
   return value;
-}
 
+}
 // I1-DEMO-09：教师端「我的证书／我的合同」取事实库（teacher-facts），与后台证书/合同同源，条数一致。
 // 编号／颁发机构／签署日期等事实库未提供的字段按专业与状态生成演示值，不改事实库本身。
 function certificateRowsFromFacts() {
@@ -250,7 +244,7 @@ const teacherMessageDefaults = [
 ];
 // I1-DEMO-10：不再把王玥口径的证书/合同/结业/消息数组塞进默认状态，
 // 否则「状态里已有数组」分支永远成立，事实库（teacher-facts）与按教师归位都不生效。
-const teacherDefaults = { lesson: teacherLessonDefaults, lessonHomeworks: {}, application: '待审核', applicationUpdates: {}, graduation: '可申请', salary: '已发布', profile: teacherProfileDefaults };
+const teacherDefaults = { lesson: teacherLessonDefaults, lessonHomeworks: {}, lessonExecutions: {}, application: '待审核', applicationUpdates: {}, graduation: '可申请', salary: '已发布', profile: teacherProfileDefaults };
 let teacherState;
 try { teacherState = { ...teacherDefaults, ...JSON.parse(sessionStorage.getItem(teacherKey) || '{}') }; } catch { teacherState = { ...teacherDefaults }; }
 teacherState.profile = { ...teacherProfileDefaults, ...(teacherState.profile || {}) };
@@ -261,6 +255,14 @@ teacherState.lesson.attendanceSaved = storedTeacherLesson.attendanceSaved ?? sto
 teacherState.lesson.attendanceSynced = storedTeacherLesson.attendanceSynced ?? (storedTeacherLesson.status === '已完成' && Boolean(storedTeacherLesson.attendanceSubmitted));
 delete teacherState.lesson.attendanceSubmitted;
 teacherState.lessonHomeworks = { ...(teacherState.lessonHomeworks || {}) };
+teacherState.lessonExecutions = { ...(teacherState.lessonExecutions || {}) };
+// CR-2026-143：清理旧版“计划结束即自动补齐”的模板执行记录；教师真实填写内容不受影响。
+Object.entries(teacherState.lessonExecutions).forEach(([key, execution]) => {
+  if (execution?.executionEnded && /课堂执行情况已记录/.test(execution.teachingRecord || '')) delete teacherState.lessonExecutions[key];
+});
+if (/课堂执行情况已记录/.test(teacherState.lesson.teachingRecord || '')) {
+  teacherState.lesson = { ...teacherLessonDefaults, lessonKey: teacherState.lesson.lessonKey || '', attendance: Object.fromEntries(Object.keys(teacherState.lesson.attendance || {}).map((name) => [name, ''])), attendanceNotes: {} };
+}
   if (storedTeacherLesson.lessonKey && storedTeacherLesson.homework) {
   teacherState.lessonHomeworks[storedTeacherLesson.lessonKey] = Array.isArray(storedTeacherLesson.homework) ? storedTeacherLesson.homework : [storedTeacherLesson.homework];
 }
@@ -329,11 +331,32 @@ const additionalTeacherMessages = storedTeacherMessages.filter(item => !teacherM
 const isLegacyClassMessage = (item) => ['class-001', 'class-002', 'class-003', 'class-004'].some(id => String(item?.target || '').includes(`class=${id}`));
 teacherState.messages = demoLocalize([...knownTeacherMessages, ...additionalTeacherMessages]).filter(item => !isLegacyClassMessage(item));
 teacherState.applicationUpdates = { ...(teacherState.applicationUpdates || {}) };
-function saveTeacher() { sessionStorage.setItem(teacherKey, JSON.stringify(teacherState)); }
+function saveTeacher() { persistCurrentLessonExecution(); sessionStorage.setItem(teacherKey, JSON.stringify(teacherState)); }
+// CR-2026-141：教师操作只落「实际执行事实」，按课次留档；课次计划状态始终由课表时间派生。
+function persistCurrentLessonExecution() {
+  const lesson = teacherState.lesson;
+  if (!lesson || !lesson.lessonKey) return;
+  teacherState.lessonExecutions = teacherState.lessonExecutions || {};
+  const execution = {
+    started: Boolean(lesson.started),
+    executionEnded: Boolean(lesson.executionEnded),
+    startedAt: lesson.startedAt || '', startedAtMs: lesson.startedAtMs || 0, endedAt: lesson.endedAt || '',
+    attendanceSaved: Boolean(lesson.attendanceSaved), attendanceSynced: Boolean(lesson.attendanceSynced),
+    teachingRecord: lesson.teachingRecord || '', teachingContent: lesson.teachingContent || '', teachingRecordSaved: Boolean(lesson.teachingRecordSaved),
+    attendance: { ...(lesson.attendance || {}) }, attendanceNotes: { ...(lesson.attendanceNotes || {}) }
+  };
+  teacherState.lessonExecutions[lesson.lessonKey] = execution;
+  const hasExecutionFact = Boolean(execution.startedAt || execution.endedAt || execution.attendanceSaved || execution.teachingRecord);
+  if (hasExecutionFact) {
+    const [classId, sessionIndex] = lesson.lessonKey.split('#');
+    upsertDemoRecord('lessonExecutions', { id: lesson.lessonKey, classId, sessionIndex: Number(sessionIndex), teacherId: sessionStorage.getItem('hbyx-teacher-id') || defaultTeacherId(), teacherName: currentTeacherName(), ...execution, recordSource: 'teacher_action', isDemo: false, updatedAt: demoTime() });
+  }
+}
 let sharedTeacherHomeworkMessages = [];
 function teacherMessageFeed() {
   const teacherId = sessionStorage.getItem('hbyx-teacher-id') || defaultTeacherId();
-  sharedTeacherHomeworkMessages = (readDemoState().homeworkNotifications || [])
+  const sharedState = readDemoState();
+  sharedTeacherHomeworkMessages = [...(sharedState.homeworkNotifications || []), ...(sharedState.lessonNotifications || [])]
     .filter((item) => item.audience === 'teacher' && (!item.recipientId || item.recipientId === teacherId))
     .map((item) => ({ ...item }));
   return [...teacherState.messages, ...sharedTeacherHomeworkMessages].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
@@ -409,7 +432,8 @@ function renderMobileCalendar() {
   }).join('');
   return `<section class="mp-calendar ${calendarExpanded ? 'is-expanded' : 'is-collapsed'}" aria-label="课表日历"><header class="mp-calendar-header"><button type="button" class="mp-calendar-icon" data-calendar-action="prev" aria-label="上个月">‹</button><strong>${calendarYear}年${calendarMonth + 1}月</strong><button type="button" class="mp-calendar-icon" data-calendar-action="next" aria-label="下个月">›</button><button type="button" class="mp-calendar-today" data-calendar-action="today">今天</button></header><div class="mp-calendar-weekdays" aria-hidden="true">${['日', '一', '二', '三', '四', '五', '六'].map(day => `<span>${day}</span>`).join('')}</div><div class="mp-calendar-grid">${cells}</div><footer class="mp-calendar-footer"><span class="mp-calendar-event-key"><i></i>有课</span><button type="button" class="mp-calendar-toggle" data-calendar-action="toggle" aria-expanded="${calendarExpanded}">${calendarExpanded ? '收起日历' : '展开日历'}<span aria-hidden="true">${calendarExpanded ? '⌃' : '⌄'}</span></button><span>点击日期查看课次</span></footer></section>`;
 }
-function lessonStatus(lesson) { return lesson.id === 'current' ? plannedLessonStatus(lesson.session) : lesson.status; }
+// CR-2026-141：课表卡片状态直接取计划时间派生结果，教师操作不写入课表状态。
+function lessonStatus(lesson) { return lesson.status; }
 function lessonTone(status) { return status === '上课中' ? 'amber' : status === '已完成' ? 'green' : status === '待上课' ? '' : 'gray'; }
 function scheduleLessonCard(lesson) {
   const status = lessonStatus(lesson);
@@ -472,21 +496,22 @@ function renderLessonExecution(classItem, session) {
   const plannedStatus = teacherSessionStatus(session);
   const active = lesson.started && !lesson.executionEnded;
   const completed = Boolean(lesson.executionEnded) || plannedStatus === '已完成';
+  const executionRecorded = Boolean(lesson.startedAt || lesson.endedAt || lesson.executionEnded || lesson.teachingRecord);
   const attendanceDone = Object.values(lesson.attendance).every(Boolean) && Object.entries(lesson.attendance).every(([name, status]) => status !== '请假' || lesson.attendanceNotes[name]?.trim());
-  const attendancePill = completed && lesson.attendanceSynced ? tPill('已同步', 'green') : lesson.attendanceSaved ? tPill('已保存', 'green') : tPill('待保存', 'amber');
+  const attendancePill = completed && lesson.attendanceSynced ? tPill('已同步', 'green') : completed && !executionRecorded ? tPill('待补录', 'amber') : lesson.attendanceSaved ? tPill('已保存', 'green') : tPill('待保存', 'amber');
   const homeworkRecords = sharedHomeworkRecords(classItem, session.index);
   const completedHomeworkAction = completed ? '<div class="teacher-lesson-tabbar"><button type="button" class="teacher-lesson-tab-action" data-lesson-action="open-homework">发布作业</button></div>' : '';
   const operationPanel = active || completed ? `<section class="teacher-lesson-workspace"><nav class="teacher-lesson-tabs" aria-label="课中工作区"><button type="button" class="${teacherLessonTab === 'attendance' ? 'active' : ''}" data-lesson-tab="attendance">考勤</button><button type="button" class="${teacherLessonTab === 'homework' ? 'active' : ''}" data-lesson-tab="homework">作业${homeworkRecords.length ? `（${homeworkRecords.length}）` : ''}</button><button type="button" class="${teacherLessonTab === 'record' ? 'active' : ''}" data-lesson-tab="record">教学记录</button></nav><div class="teacher-lesson-tab-content">${tStack(
     `<section class="teacher-lesson-section" data-lesson-panel="attendance"><div class="teacher-lesson-section-head"><div><span>01</span><h2>学员考勤</h2></div>${attendancePill}</div><div class="teacher-attendance-toolbar"><div class="teacher-attendance-summary">${lessonAttendanceSummary()}</div>${completed ? '' : '<div class="teacher-attendance-batch"><button type="button" data-lesson-action="all-present">全部标记为出勤</button><button type="button" data-lesson-action="batch-status">批量设置</button></div>'}</div><p class="teacher-attendance-help">课中保存考勤，结束上课时统一推送至学员端和后台。</p><div class="teacher-lesson-student-list">${Object.entries(lesson.attendance).map(([name, status]) => lessonAttendanceStudent(name, status, active)).join('')}</div>${completed ? '' : '<p class="teacher-attendance-help">登记完成后，使用页面底部「保存考勤」保存本课次考勤。</p>'}</section>`,
-    completed ? `<section class="teacher-lesson-section" data-lesson-panel="record"><div class="teacher-lesson-section-head"><div><span>03</span><h2>教学记录</h2></div>${tPill('已完成', 'green')}</div><div class="teacher-static-lesson-record"><p>${tEsc(lesson.teachingRecord || '教学记录已随结束上课提交。')}</p></div></section>` : `<section class="teacher-lesson-section" data-lesson-panel="record"><div class="teacher-lesson-section-head"><div><span>03</span><h2>教学记录</h2></div>${tPill('未开始', 'gray')}</div><p class="mp-muted">教学记录在结束上课时填写，填写后可在此处查看。</p></section>`,
+    completed ? `<section class="teacher-lesson-section" data-lesson-panel="record"><div class="teacher-lesson-section-head"><div><span>03</span><h2>教学记录</h2></div>${lesson.teachingRecord ? tPill('已记录', 'green') : tPill('未记录', 'amber')}</div><div class="teacher-static-lesson-record"><p>${tEsc(lesson.teachingRecord || '未记录')}</p></div></section>` : `<section class="teacher-lesson-section" data-lesson-panel="record"><div class="teacher-lesson-section-head"><div><span>03</span><h2>教学记录</h2></div>${tPill('未开始', 'gray')}</div><p class="mp-muted">教学记录在结束上课时填写，填写后可在此处查看。</p></section>`,
     `<section class="teacher-lesson-section" data-lesson-panel="homework">${homeworkRecords.length ? homeworkRecords.map((item) => `<div class="teacher-homework-published"><div><strong>${tEsc(item.title)}</strong><p>${tEsc(item.type)} · ${tEsc((item.formats || []).join('、'))}</p><span>截止 ${tEsc(item.deadline)} · ${item.required ? '必交' : '选交'} · ${homeworkSubmissionText(item)}</span></div><button type="button" data-lesson-action="homework-submissions" data-homework-id="${tEsc(item.id)}">查看提交</button></div>`).join('') : `<div class="teacher-homework-empty"><p>${active ? '本课次尚未发布作业，可使用页面底部「发布作业」发布；一个课次可发布多项作业，发布后推送至学员端作业本。' : '本课次已结束，未发布作业。'}</p></div>`}${completedHomeworkAction}</section>`
   )}</div></section>` : `<section class="teacher-lesson-locked"><strong>开始上课后登记课堂信息</strong><p>保存学员考勤后，可结束本课次并填写教学记录。</p><ol><li>登记并保存学员考勤</li><li>结束上课时填写教学记录并同步</li><li>课后作业（可选）</li></ol></section>`;
   tLayout(`<div class="teacher-lesson-page ${active ? 'has-bottom-action' : ''}">${tStack(
     `<section class="teacher-lesson-hero"><div class="teacher-lesson-hero-head"><div><span>${tEsc(classItem.course)}</span><h2><a class="teacher-lesson-class-link" href="${relativePath(`/teacher/pages/class-overview.html?class=${encodeURIComponent(classItem.id)}`)}" aria-label="查看${tEsc(classItem.name)}班级详情">${tEsc(classItem.name)}</a> · 第 ${tEsc(session.index)} 次课</h2><small>共 ${tEsc((classItem.sessions || []).length || classItem.total)} 次课 · 本节课为第 ${tEsc(session.index)} 次</small></div>${tPill(plannedStatus, lessonTone(plannedStatus))}</div><dl><div><dt>上课时间</dt><dd>${tEsc(session.date)} ${tEsc(session.weekday || '')} ${tEsc(session.startTime || session.start || '')}–${tEsc(session.endTime || session.end || '')}</dd></div><div><dt>上课地点</dt><dd>${tEsc(sessionVenueOf(session, classItem).campus)} · ${tEsc(sessionVenueOf(session, classItem).room)}</dd></div></dl></section>`,
-    `<section class="teacher-lesson-clock"><div class="teacher-lesson-clock-main"><span>${active ? '已上课时长' : completed ? '教师考勤' : '等待开始上课'}</span><strong data-lesson-timer>${lessonTimeLabel()}</strong><small>本课次计 1 次有效课次</small></div><dl><div><dt>开始上课</dt><dd>${tEsc(lesson.startedAt || '--:--')}</dd></div><div><dt>结束上课</dt><dd>${tEsc(lesson.endedAt || '--:--')}</dd></div></dl>${plannedStatus === '待上课' && !lesson.started ? '<button type="button" class="mp-button full" data-lesson-action="start">开始上课</button>' : ''}</section>`,
+    `<section class="teacher-lesson-clock"><div class="teacher-lesson-clock-main"><span>${active ? '已上课时长' : completed ? '教师考勤' : plannedStatus === '上课中' ? '本课次上课中' : '等待开始上课'}</span><strong data-lesson-timer>${completed && !executionRecorded ? '待补录' : lessonTimeLabel()}</strong><small>计划状态与执行记录分别展示</small></div><dl><div><dt>开始上课</dt><dd>${tEsc(lesson.startedAt || (completed ? '待补录' : '--:--'))}</dd></div><div><dt>结束上课</dt><dd>${tEsc(lesson.endedAt || (completed ? '待补录' : '--:--'))}</dd></div></dl>${plannedStatus === '上课中' && !lesson.started && !lesson.executionEnded ? '<button type="button" class="mp-button full" data-lesson-action="start">开始上课</button>' : ''}</section>`,
     active ? `<section class="teacher-lesson-readiness"><div><strong>${lesson.attendanceSaved ? '1/1' : '0/1'}</strong><span>上课中必做事项</span></div><ul><li class="${lesson.attendanceSaved ? 'done' : ''}"><i aria-hidden="true">${lesson.attendanceSaved ? '✓' : ''}</i>学员考勤</li></ul></section>` : '',
     operationPanel,
-    completed ? `<section class="teacher-lesson-complete-note"><strong>本课次已计入工资</strong><p>${tEsc(lesson.endedAt)} 结束上课，本课次已按 1 次有效课次进入工资核算。</p></section>` : ''
+    completed ? executionRecorded ? `<section class="teacher-lesson-complete-note"><strong>执行记录已保存</strong><p>${tEsc(lesson.endedAt || '待补录')} 结束上课，本课次执行事实已按课次留档。</p></section>` : `<section class="teacher-lesson-complete-note"><strong>计划课次已完成，执行事实待补录</strong><p>尚未记录教师实际开始、结束时间和教学记录，不得据此判断教学闭环已完成。</p>${lessonSupplementAllowed(session) ? '<button type="button" class="mp-button secondary" data-lesson-action="supplement">补录执行记录</button>' : '<small>已超过教师补录时限，请联系教务主管处理。</small>'}</section>` : ''
   )}${active ? `<div class="teacher-lesson-bottom-action">${teacherLessonTab === 'homework' ? '<button type="button" class="mp-button secondary" data-lesson-action="open-homework">发布作业</button>' : teacherLessonTab === 'attendance' ? '<button type="button" class="mp-button secondary" data-lesson-action="save-attendance">保存考勤</button>' : ''}<button type="button" class="mp-button" data-lesson-action="end">结束上课</button></div>` : ''}</div>`);
 }
 // I1-TEACHER-CLASS-03：课次详情按课次查看作业（提交与批改情况、未提交名单）。
@@ -515,7 +540,7 @@ function lessonAttendanceSection(classItem, lessonNumber, completed) {
   if (!completed) return `<section class="teacher-lesson-section"><div class="teacher-lesson-section-head"><div><span>01</span><h2>学员考勤</h2></div>${tPill('未开始', 'gray')}</div><p class="mp-muted">开始上课后登记本课次学员考勤。</p></section>`;
   const rows = lessonAttendanceRows(classItem, lessonNumber);
   const count = (status) => rows.filter((row) => row.lessonStatus === status).length;
-  return `<section class="teacher-lesson-section"><div class="teacher-lesson-section-head"><div><span>01</span><h2>学员考勤</h2></div>${tPill(`已到 ${count('已到')}/${rows.length}`, 'green')}</div><dl class="teacher-lesson-homework-rows"><div><dt>已到</dt><dd>${count('已到')} 人</dd></div><div><dt>迟到</dt><dd>${count('迟到')} 人</dd></div><div><dt>请假</dt><dd>${count('请假')} 人</dd></div><div><dt>缺勤</dt><dd>${count('缺勤')} 人</dd></div></dl><div class="teacher-lesson-attendance-list">${rows.map((row) => `<div><span class="teacher-lesson-student-avatar" aria-hidden="true">${tEsc(row.name.slice(0, 1))}</span><strong>${tEsc(row.name)}</strong>${tPill(row.lessonStatus, row.lessonStatus === '已到' ? 'green' : row.lessonStatus === '迟到' ? 'amber' : row.lessonStatus === '请假' ? 'amber' : 'gray')}</div>`).join('')}</div></section>`;
+  return `<section class="teacher-lesson-section"><div class="teacher-lesson-section-head"><div><span>01</span><h2>学员考勤</h2></div><div class="mp-pills">${tPill(`已到 ${count('已到')}/${rows.length}`, 'green')}${tPill('演示', 'gray')}</div></div><dl class="teacher-lesson-homework-rows"><div><dt>已到</dt><dd>${count('已到')} 人</dd></div><div><dt>迟到</dt><dd>${count('迟到')} 人</dd></div><div><dt>请假</dt><dd>${count('请假')} 人</dd></div><div><dt>缺勤</dt><dd>${count('缺勤')} 人</dd></div></dl><div class="teacher-lesson-attendance-list">${rows.map((row) => `<div><span class="teacher-lesson-student-avatar" aria-hidden="true">${tEsc(row.name.slice(0, 1))}</span><strong>${tEsc(row.name)}</strong>${tPill(row.lessonStatus, row.lessonStatus === '已到' ? 'green' : row.lessonStatus === '迟到' ? 'amber' : row.lessonStatus === '请假' ? 'amber' : 'gray')}</div>`).join('')}</div></section>`;
 }
 // CR-2026-136：学员近期出勤读课次考勤记录（与课次详情名单一致）。
 function studentAttendanceRecords(student) {
@@ -527,9 +552,6 @@ function studentAttendanceRecords(student) {
 // 进度显示第 N 次／共 M 次，授课地点取该课次教室，教师考勤沿用「开始上课／结束上课」口径（CR-2026-130）。
 function teacherSessionStatus(session) {
   return plannedLessonStatus(session);
-}
-function lessonTeachingRecordText(classItem, session) {
-  return `完成${classItem.course}第 ${session.index} 次课训练要点，课堂执行情况已记录。`;
 }
 // 调整留痕：教务在后台课次调整后写入班级记录，教师端只读展示最近一次。
 function lessonAdjustmentOf(classItem, sessionIndex) {
@@ -551,14 +573,14 @@ function renderStaticClassLesson(classItem, session) {
   const head = `<section class="teacher-lesson-hero"><div class="teacher-lesson-hero-head"><div><span>${tEsc(classItem.course)}</span><h2><a class="teacher-lesson-class-link" href="${relativePath(`/teacher/pages/class-overview.html?class=${encodeURIComponent(classItem.id)}`)}" aria-label="查看${tEsc(classItem.name)}班级详情">${tEsc(classItem.name)}</a> · 第 ${tEsc(session.index)} 次课</h2><small>共 ${tEsc(total)} 次课 · 本节课为第 ${tEsc(session.index)} 次</small></div>${tPill(status, lessonTone(status))}</div><dl><div><dt>上课时间</dt><dd>${tEsc(session.date)} ${tEsc(session.weekday || '')} ${tEsc(session.startTime || session.start || '-')}–${tEsc(session.endTime || session.end || '-')}</dd></div><div><dt>上课地点</dt><dd>${tEsc(venue.campus)} · ${tEsc(venue.room)}</dd></div></dl></section>`;
   // 待上课课次只展示状态，不展示尚未可执行的考勤、作业或调整说明。
   if (!completed) {
-    tLayout(tStack(head, '<section class="teacher-lesson-locked"><strong>课次尚未开始</strong></section>'));
+    tLayout(tStack(head, lessonAdjustmentSection(classItem, session), '<section class="teacher-lesson-locked"><strong>课次尚未开始</strong></section>'));
     return;
   }
   const clock = completed
-    ? `<section class="teacher-lesson-clock"><div class="teacher-lesson-clock-main"><span>教师考勤</span><strong>本课次已完成</strong><small>本课次计 1 次有效课次</small></div><dl><div><dt>开始上课</dt><dd>${tEsc(session.startTime || session.start || '—')}</dd></div><div><dt>结束上课</dt><dd>${tEsc(session.endTime || session.end || '—')}</dd></div></dl></section>`
+    ? '<section class="teacher-lesson-clock"><div class="teacher-lesson-clock-main"><span>教师考勤</span><strong>待补录</strong><small>计划状态与执行记录分别展示</small></div><dl><div><dt>开始上课</dt><dd>待补录</dd></div><div><dt>结束上课</dt><dd>待补录</dd></div></dl></section>'
     : `<section class="teacher-lesson-clock"><div class="teacher-lesson-clock-main"><span>教师考勤</span><strong>尚未开始</strong><small>本课次计 1 次有效课次</small></div><dl><div><dt>开始上课</dt><dd>--:--</dd></div><div><dt>结束上课</dt><dd>--:--</dd></div></dl></section>`;
   const recordSection = completed
-    ? `<section class="teacher-lesson-section"><div class="teacher-lesson-section-head"><div><span>02</span><h2>教学记录</h2></div>${tPill('已完成', 'green')}</div><div class="teacher-static-lesson-record"><p>${tEsc(lessonTeachingRecordText(classItem, session))}</p><footer><span>教学记录已保存</span></footer></div></section>`
+    ? `<section class="teacher-lesson-section"><div class="teacher-lesson-section-head"><div><span>02</span><h2>教学记录</h2></div>${tPill('未记录', 'amber')}</div><div class="teacher-static-lesson-record"><p>未记录</p></div></section>`
     : '';
   tLayout(tStack(head, clock, lessonAdjustmentSection(classItem, session), lessonAttendanceSection(classItem, session.index, completed), recordSection, lessonHomeworkSection(classItem, session.index, completed)));
 }
@@ -571,31 +593,22 @@ function ensureTeacherLessonState(classItem, session) {
     persistCurrentLessonHomework();
     const roster = classRosterOf(classItem);
     const homework = homeworkRecordsOf(teacherState.lessonHomeworks[key]);
-    teacherState.lesson = { ...teacherLessonDefaults, lessonKey: key, homework: homework.length ? homework : null, attendance: Object.fromEntries(roster.map((student) => [student.name, ''])), attendanceNotes: {} };
+    const saved = teacherState.lessonExecutions?.[key] || null;
+    teacherState.lesson = {
+      ...teacherLessonDefaults, ...(saved || {}), lessonKey: key,
+      homework: homework.length ? homework : null,
+      attendance: saved?.attendance ? { ...saved.attendance } : Object.fromEntries(roster.map((student) => [student.name, ''])),
+      attendanceNotes: { ...(saved?.attendanceNotes || {}) }
+    };
   }
   return key;
-}
-function ensureCompletedLessonState(classItem, session) {
-  ensureTeacherLessonState(classItem, session);
-  if (teacherState.lesson.executionEnded) return;
-  const rows = lessonAttendanceRows(classItem, session.index);
-  teacherState.lesson.started = false;
-  teacherState.lesson.executionEnded = true;
-  teacherState.lesson.startedAt = session.startTime || session.start || '';
-  teacherState.lesson.endedAt = session.endTime || session.end || '';
-  teacherState.lesson.attendance = Object.fromEntries(rows.map((row) => [row.name, row.lessonStatus || '已到']));
-  teacherState.lesson.attendanceSaved = true;
-  teacherState.lesson.attendanceSynced = true;
-  teacherState.lesson.teachingRecord = lessonTeachingRecordText(classItem, session);
-  teacherState.lesson.teachingContent = teacherState.lesson.teachingRecord;
-  teacherState.lesson.teachingRecordSaved = true;
-  saveTeacher();
 }
 function startLessonFromSchedule(lessonId) {
   const [classId, lessonNo] = String(lessonId).split('#');
   const classItem = currentTeacherClasses().find((item) => item.id === classId);
   const session = classItem && (classItem.sessions || []).find((item) => String(item.index) === String(lessonNo));
   if (!classItem || !session) { tToast('未找到该课次，请刷新页面后重试'); return; }
+  if (plannedLessonStatus(session) !== '上课中') { tToast('未到计划开始时间，不能提前开始上课'); return; }
   ensureTeacherLessonState(classItem, session);
   const now = new Date();
   teacherState.lesson.started = true;
@@ -620,22 +633,16 @@ function renderLesson() {
   const lessonNumber = params.get('lesson') || defaultLessonNumberOf(classItem);
   const session = (classItem.sessions || []).find((item) => String(item.index) === String(lessonNumber));
   if (!session) { tLayout(tStack(tCard(`<h2>课次不存在</h2><p>第 ${tEsc(lessonNumber)} 次课不在「${tEsc(classItem.name)}」的课表内，请从课表进入。</p><a class="mp-button secondary" href="${relativePath('/teacher/pages/classes.html')}">返回我的班级</a>`))); return; }
-  // CR-2026-134：演示数据里状态为「上课中」的课次，打开即进入上课执行视图（可登记考勤并结束上课）。
-  if (plannedLessonStatus(session) === '上课中' && teacherState.lesson.lessonKey !== teacherLessonKeyOf(classItem, session)) {
-    ensureTeacherLessonState(classItem, session);
-    teacherState.lesson.started = true;
-    teacherState.lesson.startedAt = session.startTime || session.start || '';
-    saveTeacher();
-  }
-  if (teacherSessionStatus(session) === '已完成') ensureCompletedLessonState(classItem, session);
-  // 从课表点了「开始上课」的课次进入执行视图；其余课次按状态只读展示。
-  if (teacherState.lesson.lessonKey === teacherLessonKeyOf(classItem, session) && (teacherState.lesson.started || teacherState.lesson.executionEnded || plannedLessonStatus(session) === '已完成')) { renderLessonExecution(classItem, session); return; }
+  // CR-2026-141：计划状态按课表时间派生；教师是否开始/结束只决定执行视图与操作按钮，不改变计划状态。
+  const planned = plannedLessonStatus(session);
+  if (teacherState.lesson.lessonKey !== teacherLessonKeyOf(classItem, session)) ensureTeacherLessonState(classItem, session);
+  if (teacherState.lesson.lessonKey === teacherLessonKeyOf(classItem, session) && (teacherState.lesson.started || teacherState.lesson.executionEnded || planned === '上课中' || planned === '已完成')) { renderLessonExecution(classItem, session); return; }
   renderStaticClassLesson(classItem, session);
 }
 // 无 lesson 参数时落在「下一次课」（CR-2026-138：三态下只需跳过已开始的课次）；全部结束则取最后一节。
 function defaultLessonNumberOf(classItem) {
-  const sessions = classItem.sessions || [];
-  const upcoming = sessions.find((session) => session.date >= DEMO_TODAY);
+  const sessions = lessonsInOrder(classItem.sessions);
+  const upcoming = sessions.find((session) => plannedLessonStatus(session) !== '已完成');
   if (upcoming) return String(upcoming.index);
   const last = [...sessions].reverse().find(() => true);
   return String((last || sessions[sessions.length - 1] || {}).index || 1);
@@ -713,7 +720,7 @@ function teacherClassRecentAdjustment(classItem) {
 // I1-TEACHER-CLASS-01：教师考勤＝开始上课时间／结束上课时间／教学记录文本，并入课次行（对齐学员端「一课一行」）。
 function teacherClassOverview(classItem) {
   const metrics = teacherClassMetrics(classItem);
-  const upcoming = (classItem.sessions || []).filter((session) => !isSessionPast(session));
+  const upcoming = lessonsInOrder(classItem.sessions).filter((session) => plannedLessonStatus(session) !== '已完成');
   const nextSession = upcoming[0] || null;
   // CR-2026-133：下一节课卡直接给行动入口（开始上课／进入课次），教师从班级进来即可开课；
   // CR-2026-138：三态下「下一节课」＝未开始课次中按日期时间排序的第一节，末次课全部完成后给结课文案。
@@ -740,7 +747,7 @@ function teacherClassOverview(classItem) {
   const attendanceMetric = metrics.attendance === null ? '—' : `${metrics.attendance}<small>%</small>`;
   const homeworkMetric = metrics.homework === null ? '—' : `${metrics.homework}<small>%</small>`;
   const metricsNote = metrics.attendanceDetail.expected || metrics.homeworkDetail.expected
-    ? `<p class="teacher-class-metrics-note">按已上课次统计：有效出勤 ${metrics.attendanceDetail.present}/${metrics.attendanceDetail.expected} 次（迟到计出勤）· 已提交作业 ${metrics.homeworkDetail.submitted}/${metrics.homeworkDetail.expected} 份。</p>`
+    ? `<p class="teacher-class-metrics-note">演示数据 · 按已上课次统计：有效出勤 ${metrics.attendanceDetail.present}/${metrics.attendanceDetail.expected} 次（迟到计出勤）· 已提交作业 ${metrics.homeworkDetail.submitted}/${metrics.homeworkDetail.expected} 份。</p>`
     : '<p class="teacher-class-metrics-note">首次上课后生成出勤率与作业提交率。</p>';
   const teachingProgress = `<section class="teacher-class-teaching-progress"><div class="teacher-class-detail-section-head"><h3>班级教学进度</h3><span>${completedLessons}/${totalLessons || '—'} 次</span></div><dl class="teacher-class-core-metrics"><div><dt>学员人数</dt><dd>${classItem.students}<small>人</small></dd></div><div><dt>平均出勤率</dt><dd>${attendanceMetric}</dd></div><div><dt>作业提交率</dt><dd>${homeworkMetric}</dd></div></dl>${metricsNote}${teacherClassProgress(classItem)}</section>`;
   const arrangement = `<section class="teacher-class-arrange"><div class="teacher-class-detail-section-head"><h3>上课安排</h3><button type="button" class="teacher-class-section-link" data-class-detail-tab="lessons">查看全部课次 <span aria-hidden="true">›</span></button></div><dl class="teacher-class-arrange-rows"><div class="wide"><dt>上课安排</dt><dd>${tEsc([classItem.schedule, [classItem.campus, classItem.classroom].filter(Boolean).join(' · ')].filter(Boolean).join(' · ') || '以班级通知为准')}</dd></div><div><dt>${completedLessons >= totalLessons && totalLessons > 0 ? '结课日期' : '预计结课'}</dt><dd>${tEsc([...(classItem.sessions || [])].reverse()[0]?.date || '以排课结果为准')}</dd></div></dl>${teacherClassRecentAdjustment(classItem)}</section>`;
@@ -782,31 +789,33 @@ function classSessionHomeworkText(classItem, session) {
   return '';
 }
 function teacherClassSessionRow(classItem, session) {
-  const completed = isSessionPast(session);
-  const status = completed ? '已完成' : '待上课';
+  const status = plannedLessonStatus(session);
+  const completed = status === '已完成';
   const venue = sessionVenueOf(session, classItem);
+  const execution = teacherState.lessonExecutions?.[teacherLessonKeyOf(classItem, session)] || null;
   // CR-2026-133：未开始课次不再渲染「—／—／未填写」三行空考勤。
   const facts = completed
-    ? `<dl class="teacher-class-session-attendance"><div><dt>开始上课</dt><dd>${tEsc(session.startTime || '—')}</dd></div><div><dt>结束上课</dt><dd>${tEsc(session.endTime || '—')}</dd></div><div class="wide"><dt>教学记录</dt><dd>${tEsc(`第${session.index}次课教学记录：完成${classItem.course}第${session.index}阶段训练要点，课堂执行情况已同步。`)}</dd></div>${classItem.demoHomework ? `<div class="wide"><dt>作业</dt><dd>${tEsc(classSessionHomeworkText(classItem, session))}</dd></div>` : ''}</dl>`
-    : `<p class="teacher-class-session-hint">课次尚未开始，开始上课后登记考勤与教学记录。</p>`;
+    ? `<dl class="teacher-class-session-attendance"><div><dt>开始上课</dt><dd>${tEsc(execution?.startedAt || '待补录')}</dd></div><div><dt>结束上课</dt><dd>${tEsc(execution?.endedAt || '待补录')}</dd></div><div class="wide"><dt>教学记录</dt><dd>${tEsc(execution?.teachingRecord || '未记录')}</dd></div>${classItem.demoHomework ? `<div class="wide"><dt>作业</dt><dd>${tEsc(`${classSessionHomeworkText(classItem, session)}（演示）`)}</dd></div>` : ''}</dl>`
+    : `<p class="teacher-class-session-hint">${status === '上课中' ? '本课次上课中，请登记考勤与教学记录。' : '课次尚未开始，开始上课后登记考勤与教学记录。'}</p>`;
   return `<article class="teacher-class-session${completed ? ' is-done' : ''}"><div class="teacher-class-session-head"><div><strong>第 ${session.index} 次 · ${tEsc(session.date)} ${tEsc(session.weekday || '')}</strong><small>${tEsc(session.startTime || '—')}–${tEsc(session.endTime || '—')} · ${tEsc(venue.room)}</small></div>${tPill(status, lessonTone(status))}</div>${facts}<a class="teacher-class-session-link" href="${relativePath(`/teacher/pages/class-detail.html?class=${classItem.id}&lesson=${session.index}`)}">${completed ? '查看课次' : '进入课次'}<span aria-hidden="true">›</span></a></article>`;
 }
 // CR-2026-133：课次段加状态筛选与折叠（默认展示前 3 条），避免授课中／已结课班一次铺开十几次课。
 let teacherLessonFilter = '全部';
 let teacherLessonsExpanded = false;
 function classSessionMatchesFilter(session, filter) {
-  const completed = isSessionPast(session);
-  if (filter === '未开始') return !completed;
+  // CR-2026-141：课次状态按计划时间派生；「未完成」含待上课与上课中，避免把进行中的课次误判为未开始。
+  const completed = plannedLessonStatus(session) === '已完成';
+  if (filter === '未完成') return !completed;
   if (filter === '已完成') return completed;
   return true;
 }
 function teacherClassLessonsPanel(classItem, { historyOnly = false } = {}) {
-  const sessions = [...(classItem.sessions || [])];
-  const source = historyOnly ? sessions.filter(isSessionPast) : sessions;
-  const done = source.filter(isSessionPast).length;
-  const pending = source.filter((session) => classSessionMatchesFilter(session, '未开始')).length;
+  const sessions = lessonsInOrder(classItem.sessions);
+  const source = historyOnly ? sessions.filter((session) => plannedLessonStatus(session) === '已完成') : sessions;
+  const done = source.filter((session) => plannedLessonStatus(session) === '已完成').length;
+  const pending = source.filter((session) => classSessionMatchesFilter(session, '未完成')).length;
   const filter = historyOnly ? '全部' : teacherLessonFilter;
-  const counts = [['全部', source.length], ['未开始', pending], ['已完成', done]];
+  const counts = [['全部', source.length], ['未完成', pending], ['已完成', done]];
   const chips = historyOnly ? '' : `<nav class="teacher-class-filters teacher-class-lesson-filters" aria-label="课次筛选">${counts.map(([name, count]) => `<button type="button" class="${filter === name ? 'active' : ''}" data-class-lesson-filter="${name}" aria-pressed="${filter === name}">${name}<span>${count}</span></button>`).join('')}</nav>`;
   const visible = source.filter((session) => classSessionMatchesFilter(session, filter));
   const collapsed = !teacherLessonsExpanded && visible.length > 3;
@@ -850,7 +859,9 @@ function teacherClassGraduationPanel(classItem) {
     : allLessonsDone && !pending.length
       ? '<p class="teacher-class-graduation-note">本班学员均已提交结业申请，等待教务复核结果。</p>'
       : '<p class="teacher-class-graduation-note">全部课次完成后可发起结业申请。</p>';
-  return `<section class="teacher-class-graduation-panel" id="teacher-class-section-graduation" data-class-section="graduation"><div class="teacher-class-detail-section-head"><h3>本班结业申请</h3><span>${records.length} 条</span></div>${list}${applyEntry}</section>`;
+  // CR138-08：班级「已结束」只表示课次完成，与学员结业相互独立；本条说明避免把两者混为一个状态。
+  const scopeNote = '<p class="teacher-class-graduation-note">班级「已结束」只表示全部课次完成，不代表每位学员已结业；学员结业按人复核，状态可为审核中／需补课／补课中／已结业。</p>';
+  return `<section class="teacher-class-graduation-panel" id="teacher-class-section-graduation" data-class-section="graduation"><div class="teacher-class-detail-section-head"><h3>本班结业申请</h3><span>${records.length} 条</span></div>${scopeNote}${list}${applyEntry}</section>`;
 }
 function openClassGraduationDialog(classItem) {
   const { pending } = classGraduationState(classItem);
@@ -1004,14 +1015,17 @@ function teacherStudentDetailBasic(classItem, student) {
 function teacherStudentDetailAttendance(classItem, student) {
   const records = studentAttendanceHistory(classItem, student, 50);
   const counts = records.reduce((map, row) => { map[row.status] = (map[row.status] || 0) + 1; return map; }, {});
-  const list = records.length ? records.map(row => `<article class="teacher-student-detail-record"><div><strong>第 ${row.index} 次课</strong><span>${tEsc(row.date)}</span></div>${tPill(row.status, row.status === '已到' ? 'green' : row.status === '缺勤' ? 'gray' : 'amber')}</article>`).join('') : '<p class="mp-muted">暂无已完成课次的考勤记录。</p>';
-  return `<section class="teacher-student-detail-section"><div class="teacher-student-detail-section-head"><h3>学员考勤</h3><span>${records.length} 次已记录</span></div><p class="teacher-student-detail-counts">已到 ${counts['已到'] || 0} · 迟到 ${counts['迟到'] || 0} · 请假 ${counts['请假'] || 0} · 缺勤 ${counts['缺勤'] || 0}</p><div class="teacher-student-detail-record-list">${list}</div></section>`;
+  // CR138-08：学员档案的考勤与作业记录可回链到对应课次详情，形成「按学员看 → 按课次看」的闭环。
+  const lessonHref = (index) => relativePath(`/teacher/pages/class-detail.html?class=${encodeURIComponent(classItem.id)}&lesson=${encodeURIComponent(index)}`);
+  const list = records.length ? records.map(row => `<article class="teacher-student-detail-record"><div><strong>第 ${row.index} 次课</strong><span>${tEsc(row.date)}</span></div>${tPill(row.status, row.status === '已到' ? 'green' : row.status === '缺勤' ? 'gray' : 'amber')}<a class="teacher-student-detail-link" href="${lessonHref(row.index)}">课次详情<span aria-hidden="true">›</span></a></article>`).join('') : '<p class="mp-muted">暂无已完成课次的考勤记录。</p>';
+  return `<section class="teacher-student-detail-section"><div class="teacher-student-detail-section-head"><h3>学员考勤</h3><span>演示 · ${records.length} 次记录</span></div><p class="teacher-student-detail-counts">已到 ${counts['已到'] || 0} · 迟到 ${counts['迟到'] || 0} · 请假 ${counts['请假'] || 0} · 缺勤 ${counts['缺勤'] || 0}</p><div class="teacher-student-detail-record-list">${list}</div></section>`;
 }
 function teacherStudentDetailHomework(classItem, student) {
   const records = studentHomeworkHistory(classItem, student, 50);
   const submitted = records.filter(row => row.submitted).length;
-  const list = records.length ? records.map(row => `<article class="teacher-student-detail-record teacher-student-detail-homework-record"><div><strong>第 ${row.lesson} 次课作业</strong><span>${tEsc(row.date)}</span></div><div>${tPill(row.submitted ? '已提交' : '未提交', row.submitted ? 'green' : 'gray')}${row.submitted ? tPill(classItem.demoHomework === '点评完成' ? '点评完成' : '待点评', classItem.demoHomework === '点评完成' ? 'green' : 'amber') : ''}</div></article>`).join('') : '<p class="mp-muted">本班暂无已完成课次。</p>';
-  return `<section class="teacher-student-detail-section"><div class="teacher-student-detail-section-head"><h3>学员作业</h3><span>${submitted}/${records.length} 份已提交</span></div><p class="teacher-student-detail-counts">已提交 ${submitted} · 未提交 ${records.length - submitted}</p><div class="teacher-student-detail-record-list">${list}</div></section>`;
+  const lessonHref = (index) => relativePath(`/teacher/pages/class-detail.html?class=${encodeURIComponent(classItem.id)}&lesson=${encodeURIComponent(index)}`);
+  const list = records.length ? records.map(row => `<article class="teacher-student-detail-record teacher-student-detail-homework-record"><div><strong>第 ${row.lesson} 次课作业</strong><span>${tEsc(row.date)}</span></div><div>${tPill(row.submitted ? '已提交' : '未提交', row.submitted ? 'green' : 'gray')}${row.submitted ? tPill(classItem.demoHomework === '点评完成' ? '点评完成' : '待点评', classItem.demoHomework === '点评完成' ? 'green' : 'amber') : ''}</div><a class="teacher-student-detail-link" href="${lessonHref(row.lesson)}">课次详情<span aria-hidden="true">›</span></a></article>`).join('') : '<p class="mp-muted">本班暂无已完成课次。</p>';
+  return `<section class="teacher-student-detail-section"><div class="teacher-student-detail-section-head"><h3>学员作业</h3><span>演示 · ${submitted}/${records.length} 份已提交</span></div><p class="teacher-student-detail-counts">已提交 ${submitted} · 未提交 ${records.length - submitted}</p><div class="teacher-student-detail-record-list">${list}</div></section>`;
 }
 function renderTeacherStudentDetail() {
   const { classItem, student } = currentTeacherStudentContext();
@@ -1682,16 +1696,16 @@ function contractStatusTone(status) {
   if (status === '待学校签署') return 'brand';
   if (status === '已到期') return 'red';
   return 'gray';
-}
 
+}
 // 合同期限状态按字典 §4.2 由起止日期派生（有效／即将到期／已到期），不写进签署状态字段。
 function contractTermStatusOf(contract, today = DEMO_TODAY) {
   if (!contract?.endAt) return '有效';
   if (contract.endAt < today) return '已到期';
   if (contract.startAt && contract.startAt > today) return '有效';
   return Math.round((new Date(`${contract.endAt}T00:00:00`) - new Date(`${today}T00:00:00`)) / 86400000) <= 30 ? '即将到期' : '有效';
-}
 
+}
 function teacherContractCard(contract) {
   const action = contract.status === '待教师签署' ? '下载并上传签署件' : '查看详情';
   // I1-DEF-012：签署态与期限态分列，期限状态不替换签署状态。
@@ -1959,6 +1973,7 @@ function openLessonSubmissionsDialog(homeworkId) {
   dialog.addEventListener('close', () => dialog.remove());
   dialog.querySelectorAll('[data-lesson-dialog-close]').forEach(button => button.addEventListener('click', () => dialog.close()));
   dialog.querySelector('[data-submission-id]')?.addEventListener('click', event => { dialog.close(); openLessonReviewDialog(event.currentTarget.dataset.homeworkId, event.currentTarget.dataset.submissionId); });
+  annotateExitedHomeworkRows(dialog.querySelector('.teacher-submission-list'), rows, 'article');
   dialog.showModal();
 }
 function openLessonReviewDialog(homeworkId, submissionId) {
@@ -2016,6 +2031,45 @@ function confirmEndLesson() {
   });
   dialog.showModal();
 }
+function lessonSupplementAllowed(session) {
+  const endedAt = new Date(`${session.date}T${session.endTime || session.end || '00:00'}:00`).getTime();
+  const now = demoDateTime(DEMO_NOW).getTime();
+  return Number.isFinite(endedAt) && now >= endedAt && now - endedAt <= 24 * 60 * 60 * 1000;
+}
+function openLessonSupplementDialog() {
+  const params = new URLSearchParams(location.search);
+  const classItem = currentTeacherClasses().find((item) => item.id === params.get('class'));
+  const session = classItem?.sessions?.find((item) => String(item.index) === String(params.get('lesson')));
+  if (!classItem || !session || plannedLessonStatus(session) !== '已完成') { tToast('仅已完成且未记录的课次可以补录'); return; }
+  if (!lessonSupplementAllowed(session)) { tToast('已超过教师补录时限，请联系教务主管处理'); return; }
+  const start = session.startTime || session.start || '';
+  const end = session.endTime || session.end || '';
+  const dialog = document.createElement('dialog');
+  dialog.className = 'mp-dialog teacher-lesson-dialog';
+  dialog.innerHTML = `<form class="mp-dialog-card" id="lesson-supplement-form"><div class="teacher-lesson-dialog-head"><div><span>课后补录</span><h2>补录执行记录</h2></div><button type="button" data-supplement-cancel aria-label="关闭">×</button></div><p class="mp-dialog-copy">教师可在计划结束后 24 小时内补录；超过时限由教务主管处理。补录不改变课次计划状态。</p><div class="teacher-certificate-form-grid"><div class="mp-field"><label for="supplement-start">实际开始时间 <b>*</b></label><input id="supplement-start" type="time" required value="${tEsc(start)}"></div><div class="mp-field"><label for="supplement-end">实际结束时间 <b>*</b></label><input id="supplement-end" type="time" required value="${tEsc(end)}"></div></div><div class="mp-field"><label for="supplement-record">教学记录 <b>*</b></label><textarea id="supplement-record" required maxlength="1000" placeholder="填写本节实际教学内容"></textarea></div><p class="mp-form-error" data-supplement-error hidden></p><div class="teacher-lesson-dialog-actions"><button type="button" class="mp-button secondary" data-supplement-cancel>取消</button><button type="submit" class="mp-button">确认补录</button></div></form>`;
+  document.body.appendChild(dialog);
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.querySelectorAll('[data-supplement-cancel]').forEach((button) => button.addEventListener('click', () => dialog.close()));
+  dialog.querySelector('form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const actualStart = dialog.querySelector('#supplement-start').value;
+    const actualEnd = dialog.querySelector('#supplement-end').value;
+    const record = dialog.querySelector('#supplement-record').value.trim();
+    const error = dialog.querySelector('[data-supplement-error]');
+    if (!actualStart || !actualEnd || actualEnd <= actualStart) { error.textContent = '实际结束时间必须晚于实际开始时间'; error.hidden = false; return; }
+    if (!record) { error.textContent = '请填写教学记录'; error.hidden = false; return; }
+    teacherState.lesson.started = false;
+    teacherState.lesson.executionEnded = true;
+    teacherState.lesson.startedAt = actualStart;
+    teacherState.lesson.endedAt = actualEnd;
+    teacherState.lesson.teachingRecord = record;
+    teacherState.lesson.teachingContent = record;
+    teacherState.lesson.teachingRecordSaved = true;
+    saveTeacher();
+    dialog.close(); renderLesson(); bindLessonEvents(); tToast('执行记录已补录，学员考勤仍需单独补齐');
+  });
+  dialog.showModal();
+}
 let lessonTimerId;
 let teacherHomeworkEditing = false;
 function bindLessonEvents() {
@@ -2030,7 +2084,12 @@ function bindLessonEvents() {
   if (teacherState.lesson.started && !teacherState.lesson.executionEnded) lessonTimerId = window.setInterval(() => { const timer = document.querySelector('[data-lesson-timer]'); if (timer) timer.textContent = lessonTimeLabel(); }, 1000);
   document.querySelectorAll('[data-lesson-action]').forEach(button => button.addEventListener('click', () => {
     const action = button.dataset.lessonAction;
+    if (action === 'supplement') { openLessonSupplementDialog(); return; }
     if (action === 'start') {
+      const pageParams = new URLSearchParams(location.search);
+      const classItem = currentTeacherClasses().find((item) => item.id === pageParams.get('class'));
+      const session = classItem?.sessions?.find((item) => String(item.index) === String(pageParams.get('lesson')));
+      if (!session || plannedLessonStatus(session) !== '上课中') { tToast('未到计划开始时间，不能提前开始上课'); return; }
       const now = new Date();
       teacherState.lesson.started = true; teacherState.lesson.executionEnded = false; teacherState.lesson.startedAtMs = Date.now();
       teacherState.lesson.startedAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -2084,6 +2143,24 @@ function bindLessonEvents() {
 }
 function teacherHomeworkClass(homework) {
   return currentTeacherClasses().find((item) => item.id === homework?.classId) || mergeClassSeed(readDemoState().classes || []).find((item) => item.id === homework?.classId) || {};
+}
+// 2026-09-24 结算：应交名单发布时冻结；发布后退班／转班／退学的学员保留记录，但不计入提交率分母。
+function annotateExitedHomeworkRows(container, rows, selector) {
+  if (!container) return;
+  const articles = [...container.querySelectorAll(selector)];
+  rows.forEach((row, index) => {
+    if (!row?.rosterExited || !articles[index]) return;
+    const info = articles[index].querySelector('small');
+    if (info && !info.textContent.includes('不计入提交率')) info.textContent += ` · ${row.rosterExitNote || '发布后已退出'}（不计入提交率）`;
+  });
+}
+function homeworkRosterFactMarkup(homeworkId) {
+  const drift = homeworkRosterDrift(homeworkId);
+  if (!drift.frozen) return '';
+  const notes = [`发布时冻结 ${drift.frozenSize} 人，当前计入提交率 ${drift.countedSize} 人`];
+  if (drift.exitedAfterPublish.length) notes.push(`发布后退出 ${drift.exitedAfterPublish.length} 人`);
+  if (drift.addedAfterPublish.length) notes.push(`发布后新增 ${drift.addedAfterPublish.length} 人不补入本作业`);
+  return `<div class="wide"><dt>应交名册</dt><dd>${tEsc(notes.join('；'))}</dd></div>`;
 }
 function openHomeworkLifecycleDialog(homework, classItem) {
   const dialog = document.createElement('dialog');
@@ -2139,6 +2216,8 @@ function renderTeacherHomeworkLibrary() {
     tLayout(`<div class="teacher-homework-page">${tStack(`<section class="teacher-homework-page-head"><a class="mp-button secondary" href="${relativePath('/teacher/pages/homework.html')}">返回作业列表</a><div><span>作业详情</span><h2>${tEsc(homework.title)}</h2><p>${tEsc(classItem.name || homework.classId)} · 第 ${tEsc(homework.lessonIndex)} 次课</p></div></section>`, `<section class="teacher-homework-page-card"><div class="teacher-homework-page-card-head"><div><span>${tEsc(homework.type)} · ${tEsc((homework.formats || []).join('、'))}</span><h3>作业要求</h3></div><div class="mp-pills">${tPill(lifecycle, lifecycleTone)}<button type="button" class="mp-button secondary" data-homework-manage>管理作业</button></div></div><p class="teacher-homework-detail-description">${tEsc(homework.description)}</p><dl class="teacher-homework-detail-facts"><div><dt>截止时间</dt><dd>${tEsc(homework.deadline)}</dd></div><div><dt>提交规则</dt><dd>${homework.required ? '必交，计入作业提交率' : '选交'}</dd></div><div><dt>已发布</dt><dd>${tEsc(homework.publishedAt || '—')}</dd></div><div><dt>参考资料</dt><dd>${tEsc((homework.resources || []).join('、') || '无')}</dd></div>${homework.deadlineExtendedAt ? `<div><dt>最近延期</dt><dd>${tEsc(homework.deadlineExtendedAt)}${homework.deadlineExtensionReason ? ` · ${tEsc(homework.deadlineExtensionReason)}` : ''}</dd></div>` : ''}${homework.withdrawalReason ? `<div class="wide"><dt>撤回原因</dt><dd>${tEsc(homework.withdrawalReason)}</dd></div>` : ''}</dl></section>`, `<section class="teacher-homework-page-card"><div class="teacher-homework-page-card-head"><div><span>提交概览</span><h3>学员提交</h3></div><span class="mp-pill gray">${summary.submitted}/${summary.total} 已提交</span></div><div class="teacher-submission-summary"><div><strong>${summary.submitted}</strong><span>已提交</span></div><div><strong>${summary.pendingReview}</strong><span>待点评</span></div><div><strong>${summary.reviewed}</strong><span>已点评</span></div></div><div class="teacher-homework-page-submissions">${rows.map((row) => `<article><div><strong>${tEsc(row.studentName)}</strong><small>${row.submittedAt ? tEsc(row.submittedAt) : '尚未提交'} · 第${tEsc(row.version || 1)}次提交 · ${row.status}</small>${row.content ? `<p>${tEsc(row.content)}</p>` : ''}${row.review?.attachments?.length ? `<small>批注文件：${tEsc(row.review.attachments[0].name)}</small>` : ''}</div>${['已提交', '已点评'].includes(row.status) ? `<button type="button" class="teacher-submission-review" data-homework-review="${tEsc(row.id)}" data-homework-id="${tEsc(homework.id)}">${row.status === '已点评' ? '修改点评' : '去点评'}</button>` : tPill(row.status, 'gray')}</article>`).join('')}</div><p class="teacher-submission-note">点评只记录文本评语，可选批注文件，不设置分数或等级。</p></section>`)}</div>`);
     document.querySelectorAll('[data-homework-review]').forEach((button) => button.addEventListener('click', () => openLessonReviewDialog(button.dataset.homeworkId, button.dataset.homeworkReview)));
     document.querySelector('[data-homework-manage]')?.addEventListener('click', () => openHomeworkLifecycleDialog(homework, classItem));
+    document.querySelector('.teacher-homework-detail-facts')?.insertAdjacentHTML('beforeend', homeworkRosterFactMarkup(homework.id));
+    annotateExitedHomeworkRows(document.querySelector('.teacher-homework-page-submissions'), rows, 'article');
     return;
   }
   const records = listHomework({ publishedBy: sessionStorage.getItem('hbyx-teacher-id') || defaultTeacherId() });

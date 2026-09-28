@@ -63,11 +63,33 @@ export function classLessonProgress(record, now = DEMO_NOW) {
 
 // 课次是否已结束：种子与排课结果里的 status 可能仍是占位的「待上课」，
 // 后台课表按日期派生状态，学员端沿用同一判定，避免课表与上课记录各算一套。
-// ZK-B-14：课次不设「已取消」状态（4 态口径，见 CR-2026-099），不再保留该状态的防御分支。
+// ZK-B-14：课次不设「已取消」状态；现行三态口径见 CR-2026-138／141，不再保留该状态的防御分支。
 export function isSessionPast(session, now = DEMO_NOW) {
   if (['已完成', '已上课', 'completed'].includes(session?.status)) return true;
   const endAt = asDate(`${session?.date || ''} ${session?.endTime || session?.end || '23:59'}`);
   return endAt ? now >= endAt : false;
+}
+
+// CR-2026-141：课次状态三端同源——按计划日期与计划起止时间派生，不由教师操作改写。
+// 待上课：未到计划开始时间；上课中：处于计划起止区间；已完成：已过计划结束时间。
+export function lessonStatusOf(session, now = DEMO_NOW) {
+  if (!session?.date) return '待上课';
+  const startAt = asDate(`${session.date} ${session.startTime || session.start || '00:00'}`);
+  const endAt = asDate(`${session.date} ${session.endTime || session.end || '23:59'}`);
+  if (!startAt || !endAt) return '待上课';
+  if (now < startAt) return '待上课';
+  if (now < endAt) return '上课中';
+  return '已完成';
+}
+
+// CR-2026-138 CR138-05：课次调整后，课次数组不再保持日期顺序；
+// 「下一节课」「课次列表」等展示与派生统一按调整后的日期 + 开始时间排序，旧日期不重复出现。
+export function sessionsInScheduleOrder(sessions) {
+  return [...(sessions || [])].sort((a, b) => {
+    const left = `${a?.date || ''} ${a?.startTime || a?.start || ''}`;
+    const right = `${b?.date || ''} ${b?.startTime || b?.start || ''}`;
+    return left.localeCompare(right);
+  });
 }
 
 export function classStageProjection(record, now = DEMO_NOW) {

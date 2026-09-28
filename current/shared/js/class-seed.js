@@ -171,7 +171,8 @@ const completedEnrollmentEndedFinished = [1, 2, 3].map(index => {
 // CR-2026-134：王玥的「进行中」场景演示班，覆盖课次与作业的不同状态（默认演示账号一进来就能看到差异）。
 // 场景：上课中（今天有一节正在上）／下一课即将开始（明天）／作业未提交／作业点评中／作业点评完成／有课次待上课。
 const SCENE_CLASSES = [
-  { id: 'class-mock-scene-01', name: '秋季中国舞启蒙1班', courseId: 'COURSE-MOCK-1003', course: '中国舞进阶训练', major: '中国舞', roomId: 'venue-201', startTime: '15:00', endTime: '16:30', firstDate: '2026-08-01', weekday: '周六', enrolled: 16, scene: '上课中', demoHomework: '' },
+  // CR-2026-141：课次状态按计划时间派生，演示「上课中」的课次时间窗须覆盖演示基准时间 2026-09-12 10:00。
+  { id: 'class-mock-scene-01', name: '秋季中国舞启蒙1班', courseId: 'COURSE-MOCK-1003', course: '中国舞进阶训练', major: '中国舞', roomId: 'venue-201', startTime: '09:30', endTime: '11:00', firstDate: '2026-08-01', weekday: '周六', enrolled: 16, scene: '上课中', demoHomework: '' },
   { id: 'class-mock-scene-02', name: '秋季芭蕾舞启蒙1班', courseId: 'COURSE-MOCK-1063', course: '芭蕾舞进阶训练', major: '芭蕾舞', roomId: 'venue-302', startTime: '09:00', endTime: '10:30', firstDate: '2026-08-02', weekday: '周日', enrolled: 15, scene: '下一课即将开始', demoHomework: '' },
   { id: 'class-mock-scene-03', name: '秋季中国舞进阶2班', courseId: 'COURSE-MOCK-1003', course: '中国舞进阶训练', major: '中国舞', roomId: 'venue-302', startTime: '09:00', endTime: '10:30', firstDate: '2026-08-07', weekday: '周五', enrolled: 14, scene: '作业未提交', demoHomework: '未提交' },
   { id: 'class-mock-scene-04', name: '秋季中国舞进阶3班', courseId: 'COURSE-MOCK-1003', course: '中国舞进阶训练', major: '中国舞', roomId: 'venue-art201', startTime: '10:45', endTime: '12:15', firstDate: '2026-08-07', weekday: '周五', enrolled: 14, scene: '作业点评中', demoHomework: '点评中' },

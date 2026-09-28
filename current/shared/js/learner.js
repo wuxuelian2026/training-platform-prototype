@@ -7,17 +7,19 @@ import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messa
 import { accountStudents, demoId, demoTime, fileSpecSettings, getCurrentAccountId, paymentTimeoutSettings, readDemoState, subscribeDemoState, transitionVideoEntitlement, upsertDemoRecord, updateDemoRecord, videoRefundSettings, writeDemoState } from './demo-store.js';
 import { DEMO_NOW, DEMO_TODAY, demoDateTime } from './demo-clock.js';
 import { classSeed } from './class-seed.js';
+import { isEnrollmentActive } from './class-roster.js';
 import { venueSeed } from './venue-seed.js';
 import { lessonAttendanceStatus } from './lesson-records.js';
 import { getHomework, listHomework, getStudentSubmission, homeworkFileLimitMb, homeworkLifecycleStatus, listSubmissions, saveDraftSubmission, submitHomework as submitHomeworkRecord, syncHomeworkNotificationReads } from './homework-store.js';
 import { resolveHomeBanners } from './banner-seed.js';
 import { isLearnerPublicPage, isMiniLoggedIn, isMiniRole, miniPageName, redirectMiniLogin } from './mobile-guard.js';
 import { toCanonicalCourseId } from './course-seed.js';
+import { REFUND_ORIGIN, classRefundSuggestion, createRefundRequest, openRefundForOrder, refundsForOrder } from './refund-store.js';
 import { allProducts, productForCourse } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseArchiveSeed, courseArchiveVersionFor, saleUnitDisplay, VIDEO_DEMO_COURSES } from './course-display.js';
 import { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } from './teacher-facts.js';
 import { isRichMarkup, richTextToHtml, sanitizeRichText } from './rich-editor.js';
-import { classLessonProgress, classSalesProjection, classTeachingStatus, isSessionPast } from './class-lifecycle.js';
+import { classLessonProgress, classSalesProjection, classTeachingStatus, lessonStatusOf, sessionsInScheduleOrder } from './class-lifecycle.js';
 
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
@@ -333,7 +335,8 @@ function saveState() { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)
 let sharedLearnerHomeworkMessages = [];
 function learnerMessageFeed() {
   const studentId = state.currentStudentId || currentStudent()?.id || '';
-  sharedLearnerHomeworkMessages = (readDemoState().homeworkNotifications || [])
+  const sharedState = readDemoState();
+  sharedLearnerHomeworkMessages = [...(sharedState.homeworkNotifications || []), ...(sharedState.lessonNotifications || [])]
     .filter((item) => item.audience === 'learner' && (!item.recipientId || item.recipientId === studentId))
     .map((item) => ({ ...item }));
   return [...state.messages, ...sharedLearnerHomeworkMessages].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
@@ -1034,9 +1037,8 @@ const CLASS_DEMO_HOMEWORK = { title: '节奏练习视频', deadline: '2026-09-27
 // 出勤按课次状态派生。真实考勤记录接入后替换本函数，聚合布局不用动。
 // 种子里的「待上课」是占位值，已过时间的课次按共享判定显示为已完成，与后台课表口径一致。
 function sessionDisplayStatus(session) {
-  const stored = session?.status || '待上课';
-  if (stored === '待上课' && isSessionPast(session)) return '已完成';
-  return stored;
+  // CR-2026-141：与后台课表、教师端同源，按计划时间派生待上课／上课中／已完成。
+  return lessonStatusOf(session);
 }
 // 课次是否已经上过（用于区分「出勤/作业状态」与「尚未开始」）。
 function sessionHasHappened(session) { return ['已完成', '已上课'].includes(sessionDisplayStatus(session)); }
@@ -1044,15 +1046,15 @@ function sessionHasHappened(session) { return ['已完成', '已上课'].include
 // 未到时间的课次不再标「待签到」，避免家长误读成「该签到没签」。
 function deriveAttendance(item, session) {
   const status = sessionDisplayStatus(session);
-  if (status === '上课中') return { label: '进行中', tone: 'green', counted: false, started: true };
+  if (status === '上课中') return { label: '进行中', tone: 'green', counted: false, started: true, demo: false };
   if (status === '已完成' || status === '已上课') {
     const record = lessonAttendanceStatus(item, session.index, currentStudent());
-    if (record === '已到') return { label: '已签到', tone: 'green', counted: true, started: true };
-    if (record === '迟到') return { label: '迟到', tone: 'amber', counted: true, started: true };
-    if (record === '请假') return { label: '请假', tone: 'amber', counted: false, started: true };
-    return { label: '缺勤', tone: 'gray', counted: false, started: true };
+    if (record === '已到') return { label: '已签到', tone: 'green', counted: true, started: true, demo: true };
+    if (record === '迟到') return { label: '迟到', tone: 'amber', counted: true, started: true, demo: true };
+    if (record === '请假') return { label: '请假', tone: 'amber', counted: false, started: true, demo: true };
+    return { label: '缺勤', tone: 'gray', counted: false, started: true, demo: true };
   }
-  return { label: '未开始', tone: 'gray', counted: false, started: false };
+  return { label: '未开始', tone: 'gray', counted: false, started: false, demo: false };
 }
 function homeworkPill(work) {
   if (!work) return '';
@@ -1076,14 +1078,14 @@ function classLessonsView(item, sessions, work, nextSession, { scheduleOnly = fa
   const counted = rows.filter((row) => ['已完成', '已上课'].includes(row.status));
   const attended = counted.filter((row) => row.attendance.counted);
   const summary = scheduleOnly ? '' : counted.length
-    ? `<p class="mp-class-summary">有效出勤 ${attended.length}/${counted.length} 次 · 出勤率 ${Math.round(attended.length / counted.length * 100)}%</p><p class="mp-class-summary-note">已上过的课次才计入出勤；迟到计出勤，请假与待补录不计入。</p>`
+    ? `<p class="mp-class-summary">有效出勤 ${attended.length}/${counted.length} 次 · 出勤率 ${Math.round(attended.length / counted.length * 100)}%</p><p class="mp-class-summary-note">演示数据 · 已上过的课次才计入出勤；迟到计出勤，请假与待补录不计入。</p>`
     : '<p class="mp-class-summary">尚未开课，出勤率会在首次课后统计。</p>';
   const statusTone = (value) => (value === '已完成' || value === '已上课' ? 'gray' : 'green');
   const row = (entry) => {
     const session = entry.session;
     const time = `${esc(session.startTime || session.start || '—')}–${esc(session.endTime || session.end || '—')}`;
     // 未开始的课次只给课次状态，不挂出勤结果与作业标签。
-    const metaTags = scheduleOnly || !entry.attendance.started ? '' : `${pill(entry.attendance.label, entry.attendance.tone)}${homeworkPill(entry.homework)}`;
+    const metaTags = scheduleOnly || !entry.attendance.started ? '' : `${pill(entry.attendance.label, entry.attendance.tone)}${entry.attendance.demo ? pill('演示', 'gray') : ''}${homeworkPill(entry.homework)}`;
     const homeworkCard = !scheduleOnly && entry.homework
       ? `<div class="mp-class-record-hw"><div><strong>${esc(CLASS_DEMO_HOMEWORK.title)}</strong><small>截止 ${esc(CLASS_DEMO_HOMEWORK.deadline)}${entry.homework.status === '已提交' && entry.homework.feedback ? ` · 教师评语：${esc(entry.homework.feedback)}` : ''}</small></div><a class="mp-button secondary" href="/learner/pages/homework.html?courseId=${esc(item.id)}">${entry.homework.status === '已提交' ? '查看作业' : '去提交'}</a></div>`
       : '';
@@ -1105,7 +1107,8 @@ function classNextSessionView(item, session) {
   // 已结课或全部课次完成时才没有下一次课；课表本身在报名前已发布，不写「课表发布后」的等待语义。
   if (!session) return `<section class="mp-class-next is-empty">${kicker}<strong>暂无下一次课</strong><p>本班课次已全部完成。</p></section>`;
   const time = `${esc(session.startTime || session.start || '—')}–${esc(session.endTime || session.end || '—')}`;
-  return `<section class="mp-class-next">${kicker}<div class="mp-class-next-head"><strong>${esc(session.date)} ${esc(session.weekday || '')} ${time}</strong>${pill(session.status || '待上课', 'green')}</div><p>${esc(roomText(item, '教室待定'))} · ${esc(item.teacher)}老师</p><button type="button" class="mp-button secondary" data-class-jump="lessons">查看课表</button></section>`;
+  // CR-2026-141：下次上课的状态与课次表同源，按计划时间派生（待上课／上课中），不读种子占位状态。
+  return `<section class="mp-class-next">${kicker}<div class="mp-class-next-head"><strong>${esc(session.date)} ${esc(session.weekday || '')} ${time}</strong>${pill(lessonStatusOf(session), 'green')}</div><p>${esc(roomText(item, '教室待定'))} · ${esc(item.teacher)}老师</p><button type="button" class="mp-button secondary" data-class-jump="lessons">查看课表</button></section>`;
 }
 // CR-2026-102：班级课表从班级主体（种子 + demo state）读取正式课次，与后台课表同一份数据；
 // 家长／学员可查看每次课的日期、时间、教室与状态，并通过「分享给家长」生成分享链接。
@@ -1113,7 +1116,8 @@ function classTimetableSessions(classId) {
   const shared = readDemoState();
   const seed = classSeed.find((entry) => entry.id === classId) || {};
   const stored = (shared.classes || []).find((entry) => entry.id === classId) || {};
-  return (stored.sessions || seed.sessions || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  // CR-2026-138 CR138-05：调整后按最新日期 + 开始时间排序，旧日期不再重复出现。
+  return sessionsInScheduleOrder(stored.sessions || seed.sessions || []);
 }
 function shareClassTimetable(item) {
   const link = `${location.origin}/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.id)}&tab=lessons&view=schedule`;
@@ -1270,7 +1274,22 @@ function resultView(item = course('class-001'), record) {
   const certificateText = certificate === '已生成' ? '证书已生成，可在线查看。' : certificate === '生成异常' ? '证书生成异常，请联系教务。' : '证书将在结业通过后异步生成。';
   return `<section class="mp-class-detail-block"><h3>结业状态</h3><div class="mp-class-result-status"><div><strong>${esc(completion)}</strong><p>${completionNote}</p></div>${pill(completion, completionTone)}</div></section>${completion === '已结业' ? `<section class="mp-class-detail-block"><h3>结业评语</h3><p>综合评语：课堂参与积极，基本功和组合衔接持续进步。</p><p>成长建议：保持每周练习，关注动作细节和节奏稳定性。</p></section>` : ''}<section class="mp-class-detail-block"><div class="mp-section-head"><h3>学习报告</h3>${pill(report, report === '已发布' ? 'green' : report === '已撤回' ? 'gray' : 'amber')}</div><p>${reportText}</p>${report === '已发布' ? `<a class="mp-button secondary" href="/learner/pages/results.html?courseId=${esc(item.id)}">查看报告详情</a>` : ''}</section><section class="mp-class-detail-block"><div class="mp-section-head"><h3>结业证书</h3>${pill(certificate, certificate === '已生成' ? 'green' : certificate === '生成异常' ? 'gray' : 'amber')}</div><p>${certificateText}</p>${certificate === '已生成' ? `<a class="mp-button secondary" href="/learner/pages/results.html?courseId=${esc(item.id)}">查看证书</a>` : ''}</section>`;
 }
-function homeworkRecordsFor(classId = '') { return listHomework(classId ? { classId } : {}).filter((homework) => homeworkLifecycleStatus(homework) !== '已撤回').filter((homework) => { const expected = listSubmissions(homework.id); return !expected.length || expected.some((row) => row.studentId === state.currentStudentId || row.studentName === currentStudent()?.name); }).map((homework) => ({ homework, submission: getStudentSubmission(homework.id, state.currentStudentId, currentStudent()?.name) })); }
+// 2026-09-24 结算：学员端作业列表只保留「当前学员仍在读，且在应交名单内」的作业。
+// 学籍异动（退班／转班／退学）后，已发布作业仍保留历史应交记录，但不再对退出学员展示与开放提交。
+function homeworkRecordsFor(classId = '') {
+  const shared = readDemoState();
+  return listHomework(classId ? { classId } : {})
+    .filter((homework) => homeworkLifecycleStatus(homework) !== '已撤回')
+    .filter((homework) => {
+      const enrollment = (shared.enrollments || []).find((row) => row.classId === homework.classId && row.studentId === state.currentStudentId);
+      return !enrollment || isEnrollmentActive(enrollment.status);
+    })
+    .filter((homework) => {
+      const expected = listSubmissions(homework.id);
+      return !expected.length || expected.some((row) => row.studentId === state.currentStudentId || row.studentName === currentStudent()?.name);
+    })
+    .map((homework) => ({ homework, submission: getStudentSubmission(homework.id, state.currentStudentId, currentStudent()?.name) }));
+}
 function homeworkState(classId = '') { return homeworkRecordsFor(classId)[0]?.submission || { status: '未提交', content: '', text: '', attachments: [], fileName: '', review: { comment: '' } }; }
 // MVP 口径 3、7（2026-09-24 冻结）：截止后只读，不支持迟交；附件类型必须符合发布时选择的格式。
 const HOMEWORK_ACCEPT = { 视频: 'video/*', 图片: 'image/*', 音频: 'audio/*', 文档: '.pdf,.doc,.docx', PDF: '.pdf' };
@@ -1358,6 +1377,7 @@ function submitLearnerHomework(event, draft, homework, existing) {
       HOMEWORK_FILE_TOO_LARGE: '附件大小超过当前文件类型的系统参数上限，请压缩后重新上传。',
       HOMEWORK_TEXT_NOT_ALLOWED: `本次作业要求提交${(homework.formats || []).join('或')}，不接受文字说明。`,
       HOMEWORK_STUDENT_NOT_ALLOWED: '该作业不属于当前学员，无法提交。',
+      HOMEWORK_STUDENT_EXITED: '你已退班／转班，不能再提交该班级的作业；如需继续学习请联系教务。',
       HOMEWORK_EMPTY_SUBMISSION: '请填写文字说明或选择附件后再提交。'
     };
     showError(messages[error?.message] || '作业提交失败，请稍后重试。');
@@ -1396,23 +1416,51 @@ function syncVideoEntitlementForRefund(order, item, nextStatus, reason) {
     refundKey: order.refundBusinessKey || `video_refund:${order.paymentRecordId || order.id}`
   });
 }
-// 学员端申请退款：列表与详情共用同一入口；视频订单在进入「退款中」的同时冻结学习授权。
+// 学员端自助申请退款（2026-09-24 定案：面授与视频都允许学员自助发起）：
+// 列表与详情共用同一入口，统一生成共享退款单进入后台交易中心审批；
+// 面授金额按未消课课时比例估算，视频沿用全额规则；同一订单已有未结退款单时直接复用，不重复生成。
 function applyRefundApplication(orderId) {
   const order = state.orders.find(row => row.id === orderId);
   const item = order ? orderCourse(order) : null;
-  const eligibility = item && item.type === 'video' ? videoRefundEligibility(order, item) : { eligible: Boolean(order?.status === '已支付') };
-  if (!order || !eligibility.eligible) { toast(eligibility.reason || '当前订单不满足退款条件', 'error'); return false; }
+  if (!order) { toast('未找到该订单', 'error'); return false; }
+  const openRefund = openRefundForOrder(order.id);
+  if (openRefund) { toast(`该订单已有退款单（${openRefund.status}），无需重复申请`); return false; }
+  const isClass = item?.type === 'class';
+  const eligibility = !isClass && item ? videoRefundEligibility(order, item) : { eligible: order.status === '已支付' };
+  if (!eligibility.eligible) { toast(eligibility.reason || '当前订单不满足退款条件', 'error'); return false; }
+  const classRecord = isClass ? course(order.classId || item?.id) : null;
+  const suggestion = isClass ? classRefundSuggestion({ order, classRecord }) : null;
+  const classRefundMessages = {
+    CLASS_REFUND_FULLY_CONSUMED: '本班付费课次已全部消耗，无可退金额；如需特殊处理请联系教务',
+    CLASS_REFUND_WINDOW_EXCEEDED: '已超过面授课程自助退款申请期限，请联系教务处理',
+    CLASS_REFUND_COMPLETED_PERCENT_EXCEEDED: '已消课比例超过自助退款上限，请联系教务处理',
+    CLASS_REFUND_BELOW_MIN_AMOUNT: '预计退款金额低于系统最低退款金额，无法自助申请'
+  };
+  if (suggestion && !suggestion.eligible) { toast(classRefundMessages[suggestion.ineligibleReason] || '当前订单不满足面授退款条件', 'error'); return false; }
+  const result = createRefundRequest({
+    orderId: order.id,
+    origin: REFUND_ORIGIN.LEARNER,
+    requestedBy: '学员自助申请',
+    reason: item?.type === 'video'
+      ? `视频课程退款：购课${Math.floor(eligibility.ageDays || 0)}日，已观看${eligibility.watchedLessons}课时`
+      : `学员自助申请面授退款：${suggestion?.rule || ''}`,
+    channel: order.payMethod || '原路退回'
+  });
+  if (!result.ok) {
+    toast(result.reason === 'REFUND_ALREADY_OPEN' ? '该订单已有未结退款单，请等待后台处理' : (classRefundMessages[result.reason] || '退款申请提交失败，请联系客服'), 'error');
+    return false;
+  }
+  // 订单的演示态与共享态保持一致，订单详情页继续读取同一份状态。
   order.status = '退款中';
-  order.refundAt = order.refundAt || demoTime();
-  order.refundStatus = order.refundStatus || '待审核';
-  order.refundNo = order.refundNo || `RF-${order.id}`;
-  order.refundAmount = Number(order.amount || 0);
-  order.refundMethod = order.refundMethod || '微信支付原路退回';
-  order.refundExpectedAt = order.refundExpectedAt || '预计 3 个工作日';
-  order.refundReason = order.refundReason || (item.type === 'video' ? `视频课程退款：购课${Math.floor(eligibility.ageDays || 0)}日，已观看${eligibility.watchedLessons}课时` : '用户申请退款');
-  order.refundBusinessKey = order.refundBusinessKey || `${item.type === 'video' ? 'video' : 'class'}_refund:${order.paymentRecordId || order.id}`;
+  order.refundAt = result.order.refundAt;
+  order.refundStatus = result.order.refundStatus;
+  order.refundNo = result.refund.no;
+  order.refundAmount = result.order.refundAmount;
+  order.refundMethod = result.order.refundMethod;
+  order.refundExpectedAt = result.order.refundExpectedAt;
+  order.refundReason = result.order.refundReason;
+  order.refundBusinessKey = result.order.refundBusinessKey;
   syncVideoEntitlementForRefund(order, item, '冻结', '视频退款审核期间学习授权冻结');
-  upsertDemoRecord('orders', order);
   saveState();
   return true;
 }
@@ -1600,7 +1648,10 @@ function orderCard(order) {
       : videoRefund.eligible
         ? `<button class="mp-button secondary mp-order-action" type="button" data-order-action="refund" data-order-id="${order.id}">申请全额退款</button>`
       : '';
-  const hint = orderPendingHint(order);
+  // 学籍异动或退款完成后，订单卡片同步说明该班学籍状态，避免「已退班但订单显示正常」的误读。
+  const enrollment = isClass ? (readDemoState().enrollments || []).find(row => row.classId === order.classId && row.studentId === order.studentId) : null;
+  const exitHint = enrollment && !isEnrollmentActive(enrollment.status) ? `学籍状态：${enrollment.status}${enrollment.changeReason ? ` · ${enrollment.changeReason}` : ''}` : '';
+  const hint = [orderPendingHint(order), exitHint].filter(Boolean).join('；');
   return `<article class="mp-order-card"><div class="mp-order-card-head"><div><strong>${esc(item.name)}</strong><small>${isClass ? '面授课程' : '视频课程'} · ${esc(order.id)}</small></div>${pill(paymentStatusLabel(order), orderTone(order.status))}</div>${hint ? `<p class="mp-order-card-hint">${esc(hint)}</p>` : ''}<div class="mp-order-card-facts">${subjectFact}<div><span>${isClass ? '班级' : '课程类型'}</span><strong>${esc(isClass ? item.className : '视频课程')}</strong></div>${isClass ? `<div><span>上课安排</span><strong>${esc(item.campus)} · ${esc(item.schedule)}</strong></div>` : `<div><span>下单时间</span><strong>${esc(times.createdAt)}</strong></div>`}<div><span>${times.paidAt ? '支付时间' : '订单时间'}</span><strong>${esc(times.paidAt || times.createdAt)}</strong></div>${order.paymentReason ? `<div><span>支付说明</span><strong>${esc(order.paymentReason)}</strong></div>` : ''}</div><div class="mp-order-card-footer"><span>实付 <b>${money2(order.amount || item.price)}</b></span><div class="mp-actions">${primary}<a class="mp-button secondary mp-order-action" href="${detailLink}">${order.status === '退款中' ? '查看退款进度' : '查看详情'}</a></div></div></article>`;
 }
 function renderOrders() {
@@ -1627,7 +1678,12 @@ function renderOrders() {
       }).join('');
     }
     list.querySelectorAll('[data-order-action="pay"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); go(`/learner/pages/payment.html?${order?.classId ? `classId=${encodeURIComponent(order.classId)}` : `courseId=${encodeURIComponent(node.dataset.courseId)}`}&orderId=${encodeURIComponent(node.dataset.orderId)}`); }));
-    list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => { if (applyRefundApplication(node.dataset.orderId)) { draw(); toast('退款申请已提交，等待后台审核'); } }));
+    list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => {
+      if (!applyRefundApplication(node.dataset.orderId)) return;
+      const refund = refundsForOrder(node.dataset.orderId).find(row => row.status === '待审批');
+      draw();
+      toast(refund ? `退款申请已提交，申请金额 ¥${refund.amount}，等待后台审核` : '退款申请已提交，等待后台审核');
+    }));
   };
   document.querySelectorAll('[data-order-tab]').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('[data-order-tab]').forEach(item => item.classList.remove('active')); tab.classList.add('active'); draw(); }));
   draw();
@@ -1641,7 +1697,7 @@ function orderAssociation(order, item, isClass) {
     const line = `${item.teacher}老师 · ${item.schedule || '上课时间以班级详情为准'}`;
     if (status === '已支付') return { title, line, label: '查看班级', href: `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.id)}` };
     if (status === '待支付' || status === '已取消') return { title, line, label: '去快速报名', href: `/learner/pages/fast-registration-detail.html?classId=${encodeURIComponent(item.id)}` };
-    // 已退款与退款中：报名已释放或正在释放，不再提供班级报名入口，只回课程详情。
+    if (status === '退款中') return { title, line, label: '查看班级', href: `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.id)}` };
     return { title: item.courseName || item.name, line: `${item.teacher}老师 · ${item.professional || item.category || '面授课程'}`, label: '查看课程', href: `/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.courseId || item.id)}` };
   }
   const videoLine = `${item.teacher}老师 · 共${item.hours}课时`;
@@ -1653,7 +1709,7 @@ function orderStatusGuidance(order, isClass) {
   const credentials = orderCredentials(order);
   if (order.status === '待支付') return `${ORDER_PAY_WINDOW_HINT}超时后订单自动关闭，未产生课程授权与面授分班。`;
   if (order.status === '已支付') return '支付已确认，订单交易完成；课程学习与面授报名结果以关联卡片为准。';
-  if (order.status === '退款中') return `${credentials.refundExpectedAt ? `退款申请已受理，预计 ${credentials.refundExpectedAt} 到账；` : '退款申请已受理，等待后台审核；'}审核期间${isClass ? '面授报名资格' : '课程学习权限'}暂时冻结。`;
+  if (order.status === '退款中') return `${credentials.refundExpectedAt ? `退款申请已受理，${credentials.refundExpectedAt}；` : '退款申请已受理，等待后台审核；'}${isClass ? '退款完成前学籍仍为在读，可继续查看班级并正常上课。' : '视频课程学习权限在审核期间暂时冻结。'}`;
   if (order.status === '已退款') return `退款已完成，${isClass ? '原面授班级名额已释放' : '课程学习权限已关闭'}。`;
   if (order.status === '已取消') return `${order.paymentReason || '订单已取消'}。本次未授权、不分班、不扣减面授名额，可继续支付复用当前订单号。`;
   return '订单状态以系统记录为准。';
@@ -1690,7 +1746,7 @@ function renderOrderDetail() {
     card(`<div class="mp-order-detail-status">${pill(displayStatus, orderTone(order.status))}<span class="mp-muted">${isClass ? '面授课程订单' : '视频课程订单'}</span></div><div class="mp-order-status-copy">${esc(orderStatusGuidance(order, isClass))}</div>`),
     card(`<div class="mp-section-head"><h3>关联课程</h3><span class="mp-muted">${isClass ? '面授班级' : '视频课程'}</span></div><div class="mp-order-association"><div><strong>${esc(association.title)}</strong><span>${esc(association.line)}</span></div><a class="mp-button secondary" href="${association.href}">${association.label}</a></div><p class="mp-order-association-note">教师、上课时间、教室与学习进度在班级详情与学习页维护，订单详情不重复展开。</p>`),
     card(`<div class="mp-section-head"><h3>金额与支付</h3><span class="mp-muted">交易凭证</span></div><dl class="mp-order-detail-facts"><div><dt>实付金额</dt><dd><strong class="mp-price">${money2(order.amount || item.price)}</strong></dd></div><div><dt>支付方式</dt><dd>${esc(credentials.payMethod)}</dd></div><div><dt>支付流水号</dt><dd>${esc(credentials.paymentNo || '未产生支付流水')}</dd></div><div><dt>支付时间</dt><dd>${esc(credentials.paidAt || '未完成支付')}</dd></div></dl>`),
-    refundable ? card(`<div class="mp-section-head"><h3>退款信息</h3>${pill(credentials.refundStatus || '处理中', order.status === '已退款' ? 'green' : 'amber')}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(credentials.refundNo || '—')}</dd></div><div><dt>退款金额</dt><dd>${money2(credentials.refundAmount)}</dd></div><div><dt>退款方式</dt><dd>${esc(credentials.refundMethod)}</dd></div><div><dt>退款状态</dt><dd>${esc(credentials.refundStatus || '处理中')}</dd></div><div><dt>${order.status === '已退款' ? '实际到账时间' : '预计到账时间'}</dt><dd>${esc(credentials.refundExpectedAt || '以渠道回执为准')}</dd></div><div class="wide"><dt>退款原因</dt><dd>${esc(credentials.refundReason)}</dd></div></dl>${order.status === '退款中' ? '<div class="mp-actions"><button class="mp-button secondary" type="button" data-action="refund-retry-fail" data-order-id="' + esc(order.id) + '">模拟退款失败/超时</button><button class="mp-button" type="button" data-action="refund-success" data-order-id="' + esc(order.id) + '">模拟退款成功回调</button></div>' : ''}`) : '',
+    refundable ? card(`<div class="mp-section-head"><h3>退款信息</h3>${pill(credentials.refundStatus || '处理中', order.status === '已退款' ? 'green' : 'amber')}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(credentials.refundNo || '—')}</dd></div><div><dt>退款金额</dt><dd>${money2(credentials.refundAmount)}</dd></div><div><dt>退款方式</dt><dd>${esc(credentials.refundMethod)}</dd></div><div><dt>退款状态</dt><dd>${esc(credentials.refundStatus || '处理中')}</dd></div><div><dt>${order.status === '已退款' ? '实际到账时间' : '预计到账时间'}</dt><dd>${esc(credentials.refundExpectedAt || '以渠道回执为准')}</dd></div><div class="wide"><dt>退款原因</dt><dd>${esc(credentials.refundReason)}</dd></div></dl>${order.status === '退款中' ? '<p class="mp-notice">退款结果由后台根据支付渠道回执更新，学员端仅展示进度。</p>' : ''}`) : '',
     card(`<div class="mp-section-head"><h3>订单信息</h3><span class="mp-muted">交易记录</span></div><dl class="mp-order-detail-facts"><div><dt>订单号</dt><dd class="mp-order-no"><span>${esc(order.id)}</span><button class="mp-button secondary" type="button" data-action="copy-order-no" data-order-no="${esc(order.id)}">复制</button></dd></div><div><dt>下单时间</dt><dd>${esc(times.createdAt)}</dd></div>${isClass ? `<div><dt>报名学员</dt><dd>${esc(student.name)}</dd></div>` : `<div><dt>购买账号</dt><dd>${esc(purchaseAccount().name)}${purchaseAccount().phone ? `（${esc(purchaseAccount().phone)}）` : ''}</dd></div>`}<div><dt>订单类型</dt><dd>${isClass ? '面授课程' : '视频课程'}</dd></div>${!isClass && isPaid ? `<div class="wide"><dt>退款资格</dt><dd>${esc(videoRefund.reason)}${videoRefund.eligible ? ' 申请后将按实付金额全额退款。' : ''}</dd></div>` : ''}${order.paymentReason ? `<div class="wide"><dt>状态说明</dt><dd>${esc(order.paymentReason)}</dd></div>` : ''}</dl>`),
     primaryAction || secondaryAction ? `<div class="mp-order-detail-actions">${primaryAction}${secondaryAction ? `<div class="mp-actions">${secondaryAction}</div>` : ''}</div>` : '',
     `<a class="mp-button secondary full" href="/learner/pages/orders.html">返回我的订单</a>`
@@ -1739,7 +1795,7 @@ function learningRecords() {
     const learningStatus = teachingStatus === '已结课' ? 'ended' : teachingStatus === '授课中' ? 'ongoing' : 'upcoming';
     const totalLessons = progress.total || Number(record.lessons || 0);
     const completedLessons = progress.completed;
-    const nextSession = (record.sessions || []).find(session => session.status !== '已完成' && session.status !== '已上课');
+    const nextSession = sessionsInScheduleOrder(record.sessions).find(session => lessonStatusOf(session) !== '已完成');
     const classItem = classToLearnerItem(record);
     return {
       ...classItem,
@@ -1755,7 +1811,7 @@ function learningRecords() {
       classroom: `${record.campus || ''} · ${record.classroom || ''}`.replace(/^ · | · $/g, ''),
       nextLesson: nextSession ? `${nextSession.date} ${nextSession.startTime || nextSession.start || ''}`.trim() : (learningStatus === 'ended' ? '课程已结束' : '待定'),
       lessonNo: Math.min(completedLessons + 1, totalLessons || 1),
-      lessonStatus: learningStatus === 'ended' ? '已完成' : learningStatus === 'ongoing' ? '待上课' : '',
+      lessonStatus: nextSession ? lessonStatusOf(nextSession) : (learningStatus === 'ended' ? '已完成' : ''),
       lessonNote: nextSession ? `${nextSession.date} ${nextSession.startTime || nextSession.start || ''}-${nextSession.endTime || nextSession.end || ''}` : '',
       ...(demoLearningState[enrollment.classId] || {}),
     };
@@ -1779,6 +1835,15 @@ function learningTasks() {
   });
   records.filter(item => item.type === 'class' && item.homeworkStatus === '待提交').slice(0, 3).forEach(item => {
     tasks.push({ type: '作业待提交', title: '作业待提交', detail: `${item.className || item.name} · 课后练习待提交`, label: '去提交', tone: 'amber', href: `/learner/pages/homework.html?homeworkId=${encodeURIComponent(item.homeworkId)}&classId=${encodeURIComponent(item.courseId)}` });
+  });
+  // CR-2026-138 CR138-08：学员端补齐结业过程的待办动作（审核中／退回补课／补课中），与班级详情「结业状态」同源。
+  records.filter(item => item.type === 'class' && ['审核中', '退回补课', '补课中'].includes(item.completionStatus)).forEach(item => {
+    const detail = item.completionStatus === '审核中'
+      ? '结业材料已提交，教务复核中'
+      : item.completionStatus === '退回补课'
+        ? '结业复核未通过，等待教务登记补课'
+        : '补课进行中，完成教学记录后重新复核';
+    tasks.push({ type: '结业进度', title: `结业${item.completionStatus}`, detail: `${item.className || item.name} · ${detail}`, label: '查看成果', tone: 'amber', href: `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.courseId)}&tab=result` });
   });
   if (reportState() === '已发布' && records.some(item => item.type === 'class')) tasks.push({ type: '报告已发布', title: '报告已发布', detail: '学习报告可查看', label: '去查看', tone: 'green', href: `/learner/pages/results.html?courseId=${(records.find(item => item.type === 'class') || {}).courseId || 'class-001'}` });
   return tasks;
