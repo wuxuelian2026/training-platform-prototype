@@ -10,6 +10,7 @@
 import { classRosterFor } from './class-roster.js';
 import { isSessionPast } from './class-lifecycle.js';
 import { homeworkForLesson, listSubmissions } from './homework-store.js';
+import { readDemoState } from './demo-store.js';
 
 function hashSeed(text) {
   let hash = 2166136261;
@@ -30,7 +31,10 @@ export function classRosterOfRecords(classItem) {
 
 // 单课次考勤：按 班级#课次#学员 稳定派生，分布约 已到 84%／迟到 8%／请假 4%／缺勤 4%。
 export function lessonAttendance(classItem, sessionIndex) {
+  const execution = (readDemoState().lessonExecutions || []).find((item) => item.classId === classItem?.id && Number(item.sessionIndex) === Number(sessionIndex));
   return classRosterOfRecords(classItem).map((student) => {
+    const recordedStatus = execution?.attendance?.[student.name];
+    if (recordedStatus) return { id: student.id, name: student.name, status: recordedStatus, counted: recordedStatus === '已到' || recordedStatus === '迟到', student, demo: Boolean(execution.isDemo) };
     const value = roll(`${classItem.id}#${sessionIndex}#${student.name}`);
     const status = value < 84 ? '已到' : value < 92 ? '迟到' : value < 96 ? '请假' : '缺勤';
     return { id: student.id, name: student.name, status, counted: status === '已到' || status === '迟到', student, demo: true };

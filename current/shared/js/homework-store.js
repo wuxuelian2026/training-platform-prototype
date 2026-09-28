@@ -16,6 +16,27 @@ const formatRules = {
 };
 
 const seedHomeworks = [
+  // CR-2026-146：王玥的芭蕾班 1–4 次课演示作业写入共享作业库，教师端、学员端和后台均按班级 ID + 课次序号读取。
+  {
+    id: 'HW-DEMO-BALLET-01-01', classId: 'class-mock-ready-02', lessonIndex: 1, courseId: 'COURSE-MOCK-1063',
+    title: '芭蕾基础动作练习', description: '完成本节课基本动作练习，记录动作感受与需要改进的地方。', type: '练习视频', formats: ['视频', '文字'], required: true,
+    deadline: '2026-09-10 23:59', resources: ['芭蕾基础动作参考.jpg'], status: '已发布', publishedAt: '2026-09-03 12:00', publishedBy: 'teacher-wang', createdAt: '2026-09-03 12:00', updatedAt: '2026-09-03 12:00'
+  },
+  {
+    id: 'HW-DEMO-BALLET-02-01', classId: 'class-mock-ready-02', lessonIndex: 2, courseId: 'COURSE-MOCK-1063',
+    title: '脚位与重心练习', description: '复习脚位转换和重心控制，提交练习视频并补充文字说明。', type: '练习视频', formats: ['视频', '文字'], required: true,
+    deadline: '2026-09-17 23:59', resources: ['芭蕾基础动作参考.jpg'], status: '已发布', publishedAt: '2026-09-10 12:00', publishedBy: 'teacher-wang', createdAt: '2026-09-10 12:00', updatedAt: '2026-09-10 12:00'
+  },
+  {
+    id: 'HW-DEMO-BALLET-03-01', classId: 'class-mock-ready-02', lessonIndex: 3, courseId: 'COURSE-MOCK-1063',
+    title: '跳跃基础练习', description: '完成跳跃基础练习，重点记录起跳、落地和身体控制。', type: '练习视频', formats: ['视频'], required: true,
+    deadline: '2026-09-24 23:59', resources: ['芭蕾基础动作参考.jpg'], status: '已发布', publishedAt: '2026-09-17 12:00', publishedBy: 'teacher-wang', createdAt: '2026-09-17 12:00', updatedAt: '2026-09-17 12:00'
+  },
+  {
+    id: 'HW-DEMO-BALLET-04-01', classId: 'class-mock-ready-02', lessonIndex: 4, courseId: 'COURSE-MOCK-1063',
+    title: '组合动作复盘', description: '完成本阶段组合动作复盘，提交练习片段并说明一处需要继续练习的细节。', type: '文字报告', formats: ['文字'], required: false,
+    deadline: '2026-10-01 23:59', resources: [], status: '已发布', publishedAt: '2026-09-24 12:00', publishedBy: 'teacher-wang', createdAt: '2026-09-24 12:00', updatedAt: '2026-09-24 12:00'
+  },
   {
     id: 'HW-DEMO-TEACHING-01-03', classId: 'class-mock-ended-teaching-01', lessonIndex: 3, courseId: 'COURSE-MOCK-1033',
     title: '钢琴基本功练习记录', description: '完成本周音阶与分解和弦练习，上传练习说明或演奏片段。', type: '练习记录', formats: ['视频', '文字'], required: true,

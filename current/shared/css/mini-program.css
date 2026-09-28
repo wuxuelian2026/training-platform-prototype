@@ -539,8 +539,10 @@ body { background: #f7f7f5; }
 .teacher-homework-empty { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding-top: 13px; }
 .teacher-homework-empty p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .teacher-homework-empty .mp-button { min-width: 94px; flex: none; padding: 0 10px; }
-.teacher-homework-published { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding-top: 13px; }
+.teacher-homework-published { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 12px; border: 1px solid #e8e2dc; border-radius: 6px; background: #fff; }
 .teacher-homework-published > div { min-width: 0; }
+.teacher-homework-published-title { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.teacher-homework-published-title .mp-pill { flex: none; }
 .teacher-homework-published strong, .teacher-homework-published p, .teacher-homework-published span { display: block; }
 .teacher-homework-published strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .teacher-homework-published p { margin: 4px 0 0; color: #655d58; font-size: 10px; }
@@ -561,9 +563,10 @@ body { background: #f7f7f5; }
 .teacher-homework-page-form .teacher-homework-form { padding: 14px 0 0; }
 .teacher-homework-page-actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 9px; padding-top: 2px; }
 .teacher-homework-page-actions .mp-button { width: 100%; }
-.teacher-homework-detail-description { margin: 14px 0 0; color: #514943; font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
+.teacher-homework-detail-description { color: #514943; font-size: 10px; line-height: 1.7; white-space: pre-wrap; }
 .teacher-homework-detail-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0 0; }
 .teacher-homework-detail-facts div { min-width: 0; padding-top: 9px; border-top: 1px solid #eee9e5; }
+.teacher-homework-detail-facts .wide { grid-column: 1 / -1; }
 .teacher-homework-detail-facts dt { color: var(--muted); font-size: 9px; }
 .teacher-homework-detail-facts dd { margin: 4px 0 0; color: #514943; font-size: 10px; line-height: 1.45; }
 .teacher-homework-library-list, .teacher-homework-page-submissions { display: grid; border-top: 1px solid #eee9e5; }
@@ -729,11 +732,13 @@ body { background: #f7f7f5; }
 .teacher-class-detail-title > span { display: block; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .teacher-class-detail-title h2 { margin: 4px 0 0; overflow: hidden; font-size: 18px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 .teacher-class-detail-head > .mp-pill { align-self: start; margin: 14px 14px 0 0; }
-.teacher-class-detail-head > dl { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; border-top: 1px solid #eee9e5; }
+.teacher-class-detail-head > dl { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border-top: 1px solid #eee9e5; }
 .teacher-class-detail-head > dl div { min-width: 0; padding: 10px 12px; }
-.teacher-class-detail-head > dl div + div { border-left: 1px solid #eee9e5; }
+.teacher-class-detail-head > dl div:not(:nth-child(3n + 1)) { border-left: 1px solid #eee9e5; }
+.teacher-class-detail-head > dl div:nth-child(n + 4) { border-top: 1px solid #eee9e5; }
 .teacher-class-detail-head dt { color: var(--muted); font-size: 9px; }
-.teacher-class-detail-head dd { margin: 3px 0 0; overflow: hidden; color: #514943; font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.teacher-class-detail-head dd { margin: 3px 0 0; color: #514943; font-size: 11px; font-weight: 700; line-height: 1.45; overflow-wrap: anywhere; }
+.teacher-class-detail-head > .teacher-class-adjustment { grid-column: 1 / -1; margin: 0 12px 12px; }
 .teacher-class-detail-tabs { position: sticky; top: 54px; z-index: 4; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 0; overflow: hidden; border: 1px solid #e5dfda; border-radius: 7px; background: rgba(255,255,255,.98); box-shadow: 0 3px 10px rgba(44,32,25,.04); }
 .teacher-class-detail-tabs button { position: relative; min-width: 0; min-height: 46px; padding: 0 2px; border: 0; background: transparent; color: var(--muted); font-size: 10px; }
 .teacher-class-detail-tabs button.active { color: var(--brand); font-weight: 700; }
@@ -782,8 +787,9 @@ body { background: #f7f7f5; }
 .teacher-class-todos span { grid-row: 1 / span 2; color: #a79e96; font-size: 18px; }
 .teacher-class-lesson-filters, .teacher-class-student-filters { margin: 10px 0; }
 .teacher-class-student-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.teacher-class-student-sort { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 8px 0 0; color: var(--muted); font-size: 11px; }
-.teacher-class-student-sort select { min-height: 34px; padding: 0 8px; border: 1px solid #e2dad3; border-radius: 6px; background: #fff; font-size: 11px; }
+.teacher-class-student-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #eee9e5; }
+.teacher-class-student-sort { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 5px; color: var(--muted); font-size: 10px; }
+.teacher-class-student-sort select { width: 142px; min-height: 42px; padding: 0 7px; border: 1px solid #e2dad3; border-radius: 6px; background: #fff; font-size: 10px; }
 .teacher-class-detail-section-head { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #eee9e5; }
 .teacher-class-detail-section-head h3 { margin: 0; font-size: 14px; }
 .teacher-class-detail-section-head > span:not(.mp-pill) { color: var(--muted); font-size: 9px; }
@@ -801,9 +807,7 @@ body { background: #f7f7f5; }
 .teacher-class-next-lesson > a > div:nth-child(2) p { margin: 5px 0 0; color: var(--muted); font-size: 9px; }
 .teacher-class-next-lesson > a > span { color: #a79e96; font-size: 20px; }
 .teacher-class-next-lesson.is-empty > p { margin: 13px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
-/* CR-2026-133：下一节课的行动入口、未开始课次提示、结业申请入口与判定依据。 */
-.teacher-class-next-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-.teacher-class-next-actions .mp-button { min-height: 40px; }
+/* CR-2026-133：未开始课次提示、结业申请入口与判定依据。 */
 .teacher-class-session-hint { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
 .teacher-class-graduation-facts { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
 .teacher-class-graduation-apply { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #eee7e0; }
@@ -818,8 +822,8 @@ body { background: #f7f7f5; }
 .teacher-class-recent-record > small { display: block; margin-top: 7px; color: var(--muted); font-size: 9px; }
 .teacher-class-students-panel, .teacher-class-schedule-panel, .teacher-class-records-panel { margin-top: 0; }
 .teacher-class-students-more { margin-top: 10px; }
-.teacher-class-student-search { position: relative; padding: 12px 0; border-bottom: 1px solid #eee9e5; }
-.teacher-class-student-search > span { position: absolute; top: 26px; left: 12px; width: 11px; height: 11px; border: 1.5px solid #8c817a; border-radius: 50%; }
+.teacher-class-student-search { position: relative; min-width: 0; }
+.teacher-class-student-search > span { position: absolute; top: 14px; left: 12px; width: 11px; height: 11px; border: 1.5px solid #8c817a; border-radius: 50%; }
 .teacher-class-student-search > span::after { position: absolute; right: -5px; bottom: -3px; width: 6px; height: 1.5px; background: #8c817a; content: ''; transform: rotate(45deg); }
 .teacher-class-student-search input { width: 100%; min-height: 42px; padding: 0 12px 0 34px; border: 1px solid #ddd8d2; border-radius: 6px; background: #f8f7f5; color: var(--ink); font-size: 11px; outline: 0; }
 .teacher-class-student-search input:focus { border-color: var(--brand); background: #fff; box-shadow: 0 0 0 3px rgba(139,2,2,.08); }
@@ -928,6 +932,9 @@ body { background: #f7f7f5; }
   .teacher-class-detail-head > dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .teacher-class-detail-head > dl div:nth-child(3) { border-top: 1px solid #eee9e5; border-left: 0; }
   .teacher-class-detail-head > dl div:nth-child(4) { border-top: 1px solid #eee9e5; }
+  .teacher-class-student-toolbar { gap: 7px; }
+  .teacher-class-student-sort > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .teacher-class-student-sort select { width: 128px; }
   .teacher-class-student-row { grid-template-columns: 30px minmax(0, 1fr) 36px 36px 10px; gap: 6px; }
 }
 .teacher-application-header { display: flex; min-width: 0; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 2px 2px 4px; }
@@ -1470,6 +1477,7 @@ body { background: #f7f7f5; }
 .mp-learning-task small { margin-top: 4px; color: var(--muted); font-size: 11px; }
 .mp-learning-task .mp-pill { flex: none; }
 .mp-learning-task-more { display: block; padding-top: 5px; color: var(--brand); font-size: 11px; text-align: right; }
+button.mp-learning-task-more { width: 100%; background: none; border: 0; font: inherit; cursor: pointer; }
 .mp-learning-empty { padding: 24px 12px; }
 .mp-learning-section { min-width: 0; }
 .mp-learning-tabs { grid-auto-columns: 1fr; gap: 0; padding-right: 0; padding-left: 0; }
@@ -1797,6 +1805,7 @@ body:has(.is-schedule-share) .page-help-trigger { display: none; }
 .mp-dialog-comment { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #faf7f4; }
 .mp-dialog-comment span { color: var(--muted); font-size: 11px; }
 .mp-dialog-comment p { margin: 4px 0 0; font-size: 13px; line-height: 1.6; }
+.mp-dialog-record { margin: 0; color: #3f3935; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
 /* 关闭为次要动作，右对齐；主行动（去提交／查看作业）留在作业区。 */
 .mp-dialog-actions { justify-content: flex-end; margin-top: 16px; }
 .mp-class-lesson-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
