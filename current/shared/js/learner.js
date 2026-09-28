@@ -984,13 +984,13 @@ function classLearningRecord(item) { return learningRecords().find(record => rec
 // CR-2026-044／CR-2026-047：班级详情区分两个维度——报名条件取班级招生投影（与课程详情、快速报名同源），
 // 学习状态取当前学员自己的学习记录；两者并列展示，不再用学习状态冒充招生状态。
 function classLearningLabel(record) { return record?.status === 'ended' ? '已结束' : record?.status === 'upcoming' ? '待开课' : record ? '学习中' : ''; }
-const classEnrollmentTone = (value) => (value === '可报名' ? 'green' : value === '已满员' || value === '即将开放' ? 'amber' : 'gray');
 const classLearningTone = (value) => (value === '学习中' ? 'green' : value === '待开课' ? 'amber' : 'gray');
 function classInfoView(item, record, sessions) {
-  const status = item.learnerStatus || item.classStatus || '招生中';
-  const statusTone = classEnrollmentTone(status);
   const learningStatus = classLearningLabel(record);
-  const statusPills = `${pill(status, statusTone)}${learningStatus ? pill(`我的学习：${learningStatus}`, classLearningTone(learningStatus)) : ''}`;
+  // 头部只留一个状态胶囊：班级详情只对已报名学员开放（进页前已校验），
+  // 「招生中／可报名」是售前信息，挂在在读页会和「我的学习」打架，且相关数据未录入时恒为兜底值。
+  // 授课形式是静态属性，降级到「班级信息」事实区，不占状态位。
+  const statusPills = learningStatus ? pill(`我的学习：${learningStatus}`, classLearningTone(learningStatus)) : '';
   // 事实区拆两组：家长先关心「什么时候、在哪上」，再看班级规模等基本信息。
   // I1-CLASS-DETAIL-04：课表发布后展示「上课进度」；「班级人数」改用真实已报人数，剩余名额单独成项。
   const doneCount = (sessions || []).filter(sessionHasHappened).length;
@@ -1006,15 +1006,37 @@ function classInfoView(item, record, sessions) {
     ? `<div><dt>剩余名额</dt><dd>${remaining} / ${capacity}</dd></div>`
     : '';
   const scheduleFacts = `<div class="mp-class-detail-group"><h4>上课安排</h4><dl class="mp-class-detail-facts"><div><dt>授课教师</dt><dd>${esc(item.teacher)}老师</dd></div>${progressField}<div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule || '以开课通知为准')}</dd></div><div class="wide"><dt>上课教室</dt><dd>${esc(roomText(item, '待定'))}</dd></div></dl></div>`;
-  const classFacts = `<div class="mp-class-detail-group"><h4>班级信息</h4><dl class="mp-class-detail-facts"><div><dt>总课时</dt><dd>${esc(item.lessons || item.hours)}课时</dd></div><div><dt>已报人数</dt><dd>${enrolledNow} 人</dd></div>${remainingField}<div><dt>适合年龄</dt><dd>${esc(item.age || '不限')}</dd></div></dl></div>`;
+  // 授课形式原本是头部的一个「面授课程」胶囊；它是静态属性不是状态，挪进事实区更合口径（属性走字段、状态走胶囊）。
+  const classFacts = `<div class="mp-class-detail-group"><h4>班级信息</h4><dl class="mp-class-detail-facts"><div><dt>授课形式</dt><dd>面授</dd></div><div><dt>总课时</dt><dd>${esc(item.lessons || item.hours)}课时</dd></div><div><dt>已报人数</dt><dd>${enrolledNow} 人</dd></div>${remainingField}<div><dt>适合年龄</dt><dd>${esc(item.age || '不限')}</dd></div></dl></div>`;
   // I1-CLASS-DETAIL-14：班级身份区与课程信息合并为一张卡——顶部给班级名称、状态胶囊、面授标签、
   // 课程名称与当前学员，下方直接接「上课安排」「班级信息」；课程简介与课程大纲仍各自成卡（客户 2026-09-23 口径）。
   return `<section class="mp-class-detail-block mp-class-section" id="class-section-overview" data-class-section="overview">`
     + `<div class="mp-class-detail-head"><h2>${esc(item.className || item.name)}</h2>`
-    + `<div class="mp-pills">${pill('面授课程', 'light')}${statusPills}</div>`
+    + `<div class="mp-pills">${statusPills}</div>`
     + `<p class="mp-class-detail-head-meta">${esc(item.courseName || item.name)} · 当前学员：${esc(currentStudent().name)}</p></div>`
-    + `${scheduleFacts}${classFacts}</section>`
-    + `${introSection}${outline}`;
+    + `${scheduleFacts}${classFacts}</section>`;
+}
+// 课程资料：简介与大纲是报名前看的售前内容，已报名学员低频，因此沉到课次之后，不再排在前面。
+function classMaterialView(item) {
+  // I1-CLASS-DETAIL-03：简介与大纲带入课程档案/班级数据，不再只显示兜底句。
+  const archive = courseArchiveFor(item.courseId) || {};
+  const copy = learnerCourseCopy[item.courseId] || learnerClassCopy[item.id] || {};
+  // I1-CLASS-DETAIL-15：课程简介只渲染后台录入的内容（课程/班级展示信息），缺失时用占位文案；
+  // 不在前端拼装或改写简介文字（客户 2026-09-23 口径）。
+  const introBody = item.detailHtml
+    ? richTextBody(item.detailHtml)
+    : (item.detail || [item.intro || copy.intro || CLASS_INTRO_PLACEHOLDER]).map(text => `<p>${esc(text)}</p>`).join('');
+  const outlineSource = Array.isArray(item.outline) && item.outline.length
+    ? item.outline
+    : (copy.outline || []).length
+      ? copy.outline
+      : (archive.chapters || []).map(chapter => ({ title: chapter.name, note: `${(chapter.lessons || []).length}课时` }));
+  if (!introBody && !outlineSource.length) return '';
+  // I1-CLASS-DETAIL-21：课程简介为后台录入内容（缺省用约 200 字占位文本），含课程图片占位；默认收起。
+  const introSection = `<section class="mp-class-detail-block"><div class="mp-section-head"><h3>课程简介</h3><div class="mp-class-fold-actions"><button type="button" class="mp-class-fold-toggle" data-class-fold="intro" aria-expanded="false">展开</button></div></div><div class="mp-class-fold-body is-collapsed" id="class-fold-intro"><div class="mp-class-fold-clamp mp-rich-content mp-class-detail-intro">${introBody}</div><div class="mp-class-intro-figure mp-class-fold-hide" role="img" aria-label="课程图片占位，实际图片由后台录入"><span>课程图片（后台录入）</span></div></div></section>`;
+  // I1-CLASS-DETAIL-21：课程大纲同样默认收起。
+  const outline = outlineSource.length ? `<section class="mp-class-detail-block"><div class="mp-section-head"><h3>课程大纲</h3><div class="mp-class-fold-actions"><span class="mp-muted">共${outlineSource.length}章</span><button type="button" class="mp-class-fold-toggle" data-class-fold="outline" aria-expanded="false">展开</button></div></div><div class="mp-class-fold-body is-collapsed" id="class-fold-outline"><div class="mp-course-detail-outline mp-class-fold-hide">${outlineSource.map((chapter, index) => `<div class="mp-course-detail-chapter"><span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></div>`).join('')}</div></div></section>` : '';
+  return `${introSection}${outline}`;
 }
 // 演示作业口径集中一处：学员端作业记录尚未接入教务作业表，接入后只改这里。
 // 课程简介占位：后台未录入简介时展示，仅作占位，不代表课程内容。
@@ -1038,27 +1060,21 @@ function deriveAttendance(item, session) {
     if (record === '已到') return { label: '已签到', tone: 'green', counted: true, started: true, demo: true };
     if (record === '迟到') return { label: '迟到', tone: 'amber', counted: true, started: true, demo: true };
     if (record === '请假') return { label: '请假', tone: 'amber', counted: false, started: true, demo: true };
-    return { label: '缺勤', tone: 'gray', counted: false, started: true, demo: true };
+    // 缺勤是负面结果，不与「已完成／未开始」共用中性灰。
+    return { label: '缺勤', tone: 'red', counted: false, started: true, demo: true };
   }
   return { label: '未开始', tone: 'gray', counted: false, started: false, demo: false };
-}
-function homeworkPill(work) {
-  if (!work) return '';
-  if (work.status === '已点评') return pill('作业已点评', 'green');
-  if (work.status === '已提交') return pill('作业已提交', 'green');
-  return pill(work.status === '草稿' ? '作业草稿' : '作业待提交', 'amber');
 }
 // 上课记录：按课次把出勤与作业聚合成一行一课，家长一屏读完一课。
 // I1-CLASS-DETAIL-12（方案 A）：班级课表与上课记录合并为一个「课次」段——一课一行，
 // 行内先给课次状态，已上过的课次再补出勤与作业；分享视图只输出课表字段。
-function classLessonsView(item, sessions, nextSession, { scheduleOnly = false, ended = false } = {}) {
+function classLessonsView(item, sessions, { scheduleOnly = false, ended = false } = {}) {
   // I1-CLASS-DETAIL-16：课表在报名前已发布，报名学员的班级必有正式课次；
   // 0 课次属异常数据，不渲染课次段，也不再输出「课表尚未发布」这类不存在的场景文案（客户 2026-09-23 口径）。
   if (!sessions.length) return '';
   // 作业按课次序号聚合：不能用班级的第一条作业状态代替所有课次（会导致教师已发布 1–4 次作业，学员端却显示未布置）。
   const homeworkByLesson = new Map(homeworkRecordsFor(item.id).map((row) => [Number(row.homework.lessonIndex), row]));
   const rows = sessions.map((session, index) => ({ session, index, status: sessionDisplayStatus(session), attendance: deriveAttendance(item, session), homework: homeworkByLesson.get(Number(session.index)) || null }));
-  classLessonRows = rows;
   // 结课后只撤下未提交与草稿作业（待提交作业只对在读班级有意义），已提交与已点评保留为只读回看。
   if (ended) rows.forEach((row) => {
     if (row.homework && !['已提交', '已点评'].includes(row.homework.submission?.status)) row.homework = null;
@@ -1083,13 +1099,20 @@ function classLessonsView(item, sessions, nextSession, { scheduleOnly = false, e
   const row = (entry) => {
     const session = entry.session;
     const time = `${esc(session.startTime || session.start || '—')}–${esc(session.endTime || session.end || '—')}`;
-    // 未开始的课次只给课次状态，不挂出勤结果与作业标签。
-    const metaTags = scheduleOnly || !entry.attendance.started ? '' : `${pill(entry.attendance.label, entry.attendance.tone)}${homeworkPill(entry.homework?.submission)}`;
+    // 未开始的课次只给课次状态，不挂出勤结果。
+    // 课次行只保留「课次状态 + 出勤」两个标签：作业状态由下方作业条的行动文案表达，不再重复一个胶囊。
+    const metaTags = scheduleOnly || !entry.attendance.started ? '' : pill(entry.attendance.label, entry.attendance.tone);
+    const label = entry.homework ? homeworkEntryLabel(entry.homework.submission?.status) : '';
+    // 课次行整体已经是「进课次详情」的大点击区，行尾再放一个齐平按钮会形成两个相邻且权重接近的点击目标；
+    // 作业改成独立浅底行动条并整条可点，用底色把「课次」和「这份作业」分成两层。
     const homeworkCard = !scheduleOnly && entry.homework
-      ? `<div class="mp-class-record-hw"><div><strong>${esc(entry.homework.homework.title)}</strong><small>截止 ${esc(entry.homework.homework.deadline)}${entry.homework.submission?.review?.comment ? ` · 教师评语：${esc(entry.homework.submission.review.comment)}` : ''}</small></div><a class="mp-button secondary" href="${homeworkDetailHref(entry.homework.homework.id, item.id)}">${homeworkEntryLabel(entry.homework.submission?.status)}</a></div>`
+      ? `<a class="mp-class-lesson-hw" href="${homeworkDetailHref(entry.homework.homework.id, item.id)}" aria-label="作业 ${esc(entry.homework.homework.title)}，${esc(label)}"><span class="mp-class-lesson-hw-body"><strong>${esc(entry.homework.homework.title)}</strong><small>课后作业 · 截止 ${esc(entry.homework.homework.deadline)}${entry.homework.submission?.review?.comment ? ` · 教师评语：${esc(entry.homework.submission.review.comment)}` : ''}</small></span><span class="mp-class-lesson-hw-go">${esc(label)} ›</span></a>`
       : '';
     // I1-CLASS-DETAIL-20：课次行可点，打开课次详情独立页（含课次状态、出勤结果、作业与教师评语）。
-    return `<li class="mp-class-lesson${session === nextSession ? ' is-next' : ''}${inWindow(entry.index) ? '' : ' is-outside'}"><button type="button" class="mp-class-lesson-main" data-lesson-open="${entry.index}" aria-haspopup="dialog" aria-label="第 ${entry.index + 1} 次课 ${esc(session.date)} ${esc(entry.status)}，查看课次详情"><div class="mp-class-lesson-head"><div><strong>第 ${entry.index + 1} 次 · ${esc(session.date)} ${esc(session.weekday || '')}</strong><small>${time} · ${esc(roomText(item, '教室待定'))}</small></div><div class="mp-class-record-tags">${pill(entry.status, statusTone(entry.status))}${metaTags}</div></div><span class="mp-class-lesson-chevron" aria-hidden="true">›</span></button>${homeworkCard}</li>`;
+    // I1-CLASS-DETAIL-20：课次行整体可点，进课次详情独立页（含课次状态、出勤结果、作业与教师评语）。
+    // 用链接而非按钮：可中键新开、可长按复制地址，且不依赖 JS。
+    // 下一次课不再单独高亮——首屏结论卡已完整讲了下一次课，课次段再强调一次会分散注意力。
+    return `<li class="mp-class-lesson${inWindow(entry.index) ? '' : ' is-outside'}"><a class="mp-class-lesson-main" href="${relativePath(lessonDetailHref(item, entry))}" aria-label="第 ${entry.index + 1} 次课 ${esc(session.date)} ${esc(entry.status)}，查看课次详情"><div class="mp-class-lesson-head"><div><strong>第 ${entry.index + 1} 次 · ${esc(session.date)} ${esc(session.weekday || '')}</strong><small>${time} · ${esc(roomText(item, '教室待定'))}</small></div><div class="mp-class-record-tags">${pill(entry.status, statusTone(entry.status))}${metaTags}</div></div><span class="mp-class-lesson-chevron" aria-hidden="true">›</span></a>${homeworkCard}</li>`;
   };
   // 默认只展示锚定窗口内的课次；作业入口跟随课次行，不额外展开整段。
   const collapsed = (windowStart > 0 || windowEnd < rows.length - 1) && !scheduleOnly;
@@ -1099,14 +1122,36 @@ function classLessonsView(item, sessions, nextSession, { scheduleOnly = false, e
     : '<div class="mp-class-timetable-actions"><button type="button" class="mp-button secondary" data-class-share>分享给家长</button><small class="mp-muted">分享链接只展示本班课表（日期、时间、教室与课次状态），不含学员个人信息；打开需先登录。</small></div>';
   return `<section class="mp-class-detail-block mp-class-section" id="class-section-lessons" data-class-section="lessons">${head}${summary}${list}${action}</section>`;
 }
-// 首屏结论：家长打开页面最想知道的是「下次什么时候上课」。
-function classNextSessionView(item, session) {
+// 首屏结论：家长打开页面最想知道的是「还有多久上课」。倒计时是这张卡的主体，日期时间降为次要。
+function classNextSessionView(item, session, sessions = []) {
   const kicker = '<span class="mp-class-hero-kicker">下次上课</span>';
   // 已结课或全部课次完成时才没有下一次课；课表本身在报名前已发布，不写「课表发布后」的等待语义。
   if (!session) return `<section class="mp-class-next is-empty">${kicker}<strong>暂无下一次课</strong><p>本班课次已全部完成。</p></section>`;
   const time = `${esc(session.startTime || session.start || '—')}–${esc(session.endTime || session.end || '—')}`;
+  const comment = latestTeacherComment(item, sessions);
   // CR-2026-141：下次上课的状态与课次表同源，按计划时间派生（待上课／上课中），不读种子占位状态。
-  return `<section class="mp-class-next">${kicker}<div class="mp-class-next-head"><strong>${esc(session.date)} ${esc(session.weekday || '')} ${time}</strong>${pill(lessonStatusOf(session), 'green')}</div><p>${esc(roomText(item, '教室待定'))} · ${esc(item.teacher)}老师</p><button type="button" class="mp-button secondary" data-class-jump="lessons">查看课表</button></section>`;
+  return `<section class="mp-class-next">${kicker}<div class="mp-class-next-head"><strong class="mp-class-next-countdown">${esc(lessonCountdown(session))}</strong>${pill(lessonStatusOf(session), 'green')}</div><p class="mp-class-next-when">${esc(session.date)} ${esc(session.weekday || '')} ${time}</p><p>${esc(roomText(item, '教室待定'))} · ${esc(item.teacher)}老师</p>${comment ? `<p class="mp-class-next-comment"><span>上次课后评语</span>${esc(comment.comment)}</p>` : ''}<button type="button" class="mp-button secondary" data-class-jump="lessons">查看课表</button></section>`;
+}
+// 倒计时按演示时钟与课次日期比较，不用真实系统时间，避免演示数据随系统日期漂移。
+function lessonCountdown(session) {
+  const target = demoDateTime(`${session.date} 00:00`);
+  const today = demoDateTime(`${DEMO_TODAY} 00:00`);
+  if (!target || !today) return '即将上课';
+  const days = Math.round((target.getTime() - today.getTime()) / 86400000);
+  if (days <= 0) return '今天上课';
+  if (days === 1) return '明天上课';
+  return `${days} 天后上课`;
+}
+// 上次课后教师评语：取最近一次已上课次的作业评语，家长打开就知道老师最近说了什么。
+function latestTeacherComment(item, sessions) {
+  const done = (sessions || []).filter((session) => ['已完成', '已上课'].includes(sessionDisplayStatus(session)));
+  if (!done.length) return null;
+  const rows = homeworkRecordsFor(item.id);
+  for (let index = done.length - 1; index >= 0; index -= 1) {
+    const row = rows.find((entry) => Number(entry.homework.lessonIndex) === Number(done[index].index));
+    if (row?.submission?.review?.comment) return { comment: row.submission.review.comment, lesson: Number(done[index].index) + 1 };
+  }
+  return null;
 }
 // CR-2026-102：班级课表从班级主体（种子 + demo state）读取正式课次，与后台课表同一份数据；
 // 家长／学员可查看每次课的日期、时间、教室与状态，并通过「分享给家长」生成分享链接。
@@ -1160,7 +1205,6 @@ function resultSection(item, record) {
 // 课次详情弹层：不新增独立页面（独立课次详情页属迭代2 范围）。
 // CR-2026-132：课次身份用「第 N 次 / 共 M 次」讲清进度，上课地点取该课次教室，
 // 未开始课次只展示安排，已上课次展示出勤结果、课后作业与教师评语。
-let classLessonRows = [];
 function lessonStatusTone(value) { return value === '已完成' || value === '已上课' ? 'gray' : 'green'; }
 function sessionRoomText(session, item, fallback = '教室待定') {
   const room = venueSeed.find((entry) => entry.id === (session && session.roomId));
@@ -1168,11 +1212,6 @@ function sessionRoomText(session, item, fallback = '教室待定') {
 }
 function lessonDetailHref(item, entry) {
   return `/learner/pages/lesson-detail.html?courseId=${encodeURIComponent(item.id)}&lesson=${encodeURIComponent(entry.index + 1)}`;
-}
-// 课次行整体可点：跳课次详情独立页（原弹层实现已下线，独立页便于分享与返回定位）。
-function openLessonDetail(item, entry) {
-  if (!entry) return;
-  location.href = relativePath(lessonDetailHref(item, entry));
 }
 function renderLessonDetail(item) {
   if (classDeepLinkUnavailable(item)) { renderDeepLinkEmpty('/learner/pages/learning.html', '返回学习'); return; }
@@ -1206,7 +1245,7 @@ function renderClassDetail(item, tab = params.get('tab') || 'overview') {
   const scheduleOnly = params.get('view') === 'schedule';
   if (scheduleOnly) {
     const shareHead = card('<div class="mp-section-head"><h2>' + esc(item.className || item.name) + '</h2>' + pill('课表分享视图', 'gray') + '</div><p>' + esc(item.courseName || item.name) + ' · ' + esc(item.teacher) + '老师 · ' + esc(roomText(item, '教室待定')) + '</p><p class="mp-muted">' + esc(item.schedule || '以开课通知为准') + ' · 共 ' + esc(item.lessons || sessions.length) + ' 课时</p>', 'mp-fast-detail-section');
-    layout(stack(shareHead, classLessonsView(item, sessions, nextSession, { scheduleOnly: true }), '<a class="mp-button secondary full" href="/learner/pages/class-detail.html?courseId=' + esc(item.id) + '">返回班级详情</a>'));
+    layout(stack(shareHead, classLessonsView(item, sessions, { scheduleOnly: true }), '<a class="mp-button secondary full" href="/learner/pages/class-detail.html?courseId=' + esc(item.id) + '">返回班级详情</a>'));
     document.querySelector('.mobile-page')?.classList.add('is-schedule-share');
     document.title = '班级课表 · ' + (item.className || item.name);
     return;
@@ -1218,10 +1257,10 @@ function renderClassDetail(item, tab = params.get('tab') || 'overview') {
   // I1-CLASS-DETAIL-22：本页不设底部操作条（咨询走线下联系老师；分享只在课次段一处；进入学习改由学习中心进入）。
   // I1-CLASS-DETAIL-17：作业入口只保留在课次行内，取消顶部「待提交作业」卡（客户 2026-09-23 口径）。
   // I1-CLASS-DETAIL-19：已结课班不渲染空的「下次上课」卡（无下一次课对结课班是噪音）。
-  const nextCard = record?.status === 'ended' ? '' : classNextSessionView(item, nextSession);
-  layout(stack(nav, nextCard, classInfoView(item, record, sessions), classLessonsView(item, sessions, nextSession, { ended: record?.status === 'ended' }), resultSection(item, record)));
+  const nextCard = record?.status === 'ended' ? '' : classNextSessionView(item, nextSession, sessions);
+  // 阅读顺序：结论 → 班级信息 → 课次（当前进度）→ 课程资料（售前内容沉底）→ 成果。
+  layout(stack(nav, nextCard, classInfoView(item, record, sessions), classLessonsView(item, sessions, { ended: record.status === 'ended' }), classMaterialView(item), resultSection(item, record)));
   document.querySelectorAll('[data-class-share]').forEach(button => button.addEventListener('click', () => shareClassTimetable(item)));
-  document.querySelectorAll('[data-lesson-open]').forEach(button => button.addEventListener('click', () => openLessonDetail(item, classLessonRows[Number(button.dataset.lessonOpen)])));
   document.querySelectorAll('[data-class-fold]').forEach(button => button.addEventListener('click', () => {
     const body = document.getElementById(`class-fold-${button.dataset.classFold}`);
     if (!body) return;

@@ -1646,13 +1646,13 @@ button.mp-learning-task-more { width: 100%; background: none; border: 0; font: i
 .mp-linear-icon-share::after { top: 1px; left: 1px; width: 4px; height: 4px; border: 1.4px solid currentColor; border-radius: 50%; box-shadow: 9px 5px 0 -1.4px #fff, 9px 5px 0 0 currentColor, 0 11px 0 -1.4px #fff, 0 11px 0 0 currentColor; }
 /* I1-CLASS-DETAIL-14：班级身份区与课程信息合并为一张卡后的头部样式。 */
 .mp-class-detail-head { padding-bottom: 12px; border-bottom: 1px solid #f0ece8; }
-.mp-class-detail-head h2 { margin: 0; font-size: 18px; line-height: 1.4; }
+.mp-class-detail-head h2 { margin: 0; font-size: 20px; line-height: 1.35; }
 .mp-class-detail-head .mp-pills { margin-top: 8px; }
 .mp-class-detail-head-meta { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
 .mp-class-detail-summary h2 { margin: 0; font-size: 19px; line-height: 1.4; }
 .mp-class-detail-summary p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
 .mp-class-detail-block { min-width: 0; padding: 16px; background: #fff; border: 1px solid #e9e4df; border-radius: 8px; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
-.mp-class-detail-block h3 { margin: 0; font-size: 15px; }
+.mp-class-detail-block h3 { margin: 0; font-size: 14px; }
 .mp-class-detail-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px 18px; margin: 0; }
 .mp-class-detail-facts .wide { grid-column: 1 / -1; }
 .mp-class-detail-facts div { min-width: 0; }
@@ -1691,9 +1691,14 @@ body:has(.is-schedule-share) .page-help-trigger { display: none; }
 .mp-class-section { scroll-margin-top: 106px; }
 .mp-class-result-group { display: grid; gap: 12px; }
 .mp-class-hero-kicker { display: block; color: var(--muted); font-size: 11px; }
-.mp-class-next { display: grid; gap: 6px; padding: 14px 16px; background: #fff; border: 1px solid #e9e4df; border-left: 3px solid var(--brand); border-radius: 8px; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
+.mp-class-next { display: grid; gap: 6px; padding: 14px 16px; background: var(--brand-soft); border: 1px solid #f0d8d4; border-left: 4px solid var(--brand); border-radius: 8px; box-shadow: 0 3px 12px rgba(62, 39, 25, .05); }
 .mp-class-next strong { font-size: 16px; }
+.mp-class-next-countdown { font-size: 22px; line-height: 1.25; }
 .mp-class-next p { margin: 0; color: var(--muted); font-size: 12px; }
+.mp-class-next p.mp-class-next-when { color: var(--ink); font-size: 13px; }
+.mp-class-next p.mp-class-next-comment { display: grid; gap: 3px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0d8d4; color: #5b4038; font-size: 12px; line-height: 1.6; }
+.mp-class-next-comment span { color: var(--muted); font-size: 11px; }
+.mp-class-next.is-empty { background: #fff; border-color: #e9e4df; border-left-color: #d9d3cc; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
 .mp-class-next-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .mp-class-next .mp-button { justify-self: start; min-height: 34px; margin-top: 4px; padding: 0 12px; font-size: 12px; }
 /* I1-CLASS-DETAIL-17：顶部「待提交作业」卡已下线，作业入口只保留在课次行内。 */
@@ -1709,7 +1714,7 @@ body:has(.is-schedule-share) .page-help-trigger { display: none; }
 .mp-class-record-head strong { display: block; font-size: 13px; }
 .mp-class-record-head small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
 .mp-class-record-tags { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: 4px; }
-.mp-class-record-hw { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #eee7e0; }
+.mp-class-record-hw { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f2ece7; }
 .mp-class-record-hw > div { min-width: 0; }
 .mp-class-record-hw strong { display: block; font-size: 12px; }
 .mp-class-record-hw small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }

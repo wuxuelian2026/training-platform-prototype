@@ -16,7 +16,11 @@ import { DEMO_TODAY } from './demo-clock.js';
 // 同一教室、同一时段而在课表上整片报冲突；同一教师同时段不再出现无意重叠。
 const slotMinutes = (start, end) => (Number(end.slice(0, 2)) * 60 + Number(end.slice(3, 5))) - (Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5)));
 const publishedSessions = (firstDate, { total = 8, roomId = 'venue-302', startTime = '09:00', endTime = '10:30' } = {}) => Array.from({ length: total }, (_, index) => {
-  const date = new Date(`${firstDate}T00:00:00+08:00`);
+  const sourceDate = new Date(`${firstDate}T00:00:00+08:00`);
+  // 2026-09-28：旧演示数据的 6–8 月课次整体迁到未来月份，避免教师课表首屏出现历史课程。
+  // 9 月及以后日期保持原排课，用于展示真实已完成课次与跨端记录。
+  if (sourceDate.getMonth() < 8) sourceDate.setMonth(sourceDate.getMonth() + 6);
+  const date = new Date(sourceDate);
   date.setDate(date.getDate() + index * 7);
   const localDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   return {
@@ -133,7 +137,7 @@ const CLASS_SLOTS = {
 const slotOf = (slots, index) => slots[(index - 1) % slots.length];
 
 const completedEnrollmentNotStarted = [1, 2, 3].map(index => {
-  // 芭蕾舞（王玥，CR-2026-134 演示场景重构）：1 班 招生已结束、首课 2026-11-05 → 待开课（后台教学阶段「待开课」样班）；
+  // 芭蕾舞（王玥，CR-2026-134 演示场景重构）：1 班招生已结束、首课 2026-11-05 → 待开课（后台教学阶段「待开课」样班）；
   // 2／3 班 首课已过、末课未到 → 进行中。
   const plan = [
     { firstDate: '2026-11-05', enrolled: 12, name: '秋季芭蕾舞待开课1班' },
@@ -151,7 +155,7 @@ const completedEnrollmentOngoing = [1, 2, 3].map(index => {
 });
 
 const completedEnrollmentEndedPending = [1, 2, 3].map(index => {
-  // 中国舞（王玥）：暑期批次 12 次课全部完成（首课 2026-06-18、末课 2026-09-03）→ 已结束。
+  // 中国舞（王玥）：原暑期批次课次已整体迁到未来月份，避免 6–8 月历史日期继续出现在课表。
   // 保留组内 15 分钟跨校区衔接，继续用于演示教师转场提示。
   const sessions = publishedSessions('2026-06-18', { ...slotOf(CLASS_SLOTS.dance, index), total: courseTotalHours('COURSE-MOCK-1003') });
   return classRecord({ id: `class-mock-ended-pending-${String(index).padStart(2, '0')}`, name: `暑期中国舞基础${index}班`, courseId: 'COURSE-MOCK-1003', course: '中国舞进阶训练', major: '中国舞', teacher: '王玥', scheduleStatus: '已发布', enrollStart: '2026-05-01 09:00', deadline: '2026-06-10 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 12, demoHomework: '点评完成', weekdays: ['周四'], updatedAt: '2026-09-10 10:00' });
@@ -164,7 +168,7 @@ const completedEnrollmentEndedTeaching = [1, 2, 3].map(index => {
 });
 
 const completedEnrollmentEndedFinished = [1, 2, 3].map(index => {
-  // 少儿绘画（唐雯）：暑期批次，12 次课（课程库总课时 12）在 2026-08-20 结束，演示基准日 2026-09-12 前已全部完成。
+  // 少儿绘画（唐雯）：原暑期批次课次已整体迁到未来月份。
     const sessions = publishedSessions('2026-06-04', { ...slotOf(CLASS_SLOTS.sketch, index), total: courseTotalHours('COURSE-MOCK-1053') });
   return classRecord({ id: `class-mock-ended-finished-${String(index).padStart(2, '0')}`, name: `暑期少儿绘画已结课${index}班`, courseId: 'COURSE-MOCK-1053', course: '少儿绘画进阶训练', major: '少儿绘画', teacher: '唐雯', batch: '暑假', scheduleStatus: '已发布', enrollStart: '2026-06-01 09:00', deadline: '2026-08-10 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 18, weekdays: ['周四'], updatedAt: '2026-08-30 10:00' });
 });
