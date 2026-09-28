@@ -772,11 +772,12 @@ const messages = [
   { id: 'message-2', title: '秋季班开课提醒', type: '上课提醒', audience: '学员', className: '成人声乐班', time: '2026-09-07 16:00', status: '部分失败', fail: '2 位学员小程序订阅失效' },
 ];
 const graduation = [{
-  id: 'graduation-dance', className: '少儿舞蹈基础班', course: '舞蹈基本功', teacher: '王玥', operational: '已结束', classStatus: '待复核', endDate: '2026-09-08', learners: [
-    { id: 'learner-lin', name: '林知夏', attendance: '100%', homework: '100%', comment: '动作完成度高，能够主动复盘。', suggestion: '继续保持练习习惯。', status: '待复核' },
-    { id: 'learner-zhao', name: '赵思远', attendance: '89%', homework: '100%', comment: '课堂参与积极，但有效出勤率未达到结业阈值。', suggestion: '完成补课后再申请结业。', status: '待复核' },
-    { id: 'learner-zhou', name: '周子涵', attendance: '78%', homework: '65%', comment: '阶段性练习完成度不足。', suggestion: '完成补课后再申请结业。', status: '需补课' },
-    { id: 'learner-he', name: '何安', attendance: '—', homework: '—', comment: '已办理退学。', suggestion: '', status: '已取消结业' }
+  id: 'graduation-dance', className: '暑期中国舞基础1班', course: '中国舞进阶训练', teacher: '王玥', operational: '已结束', classStatus: '复核中', endDate: '2026-09-08', learners: [
+    { id: 'learner-lin', name: '林知夏', attendance: '80%', homework: '80%', comment: '课堂参与积极，基本功和组合衔接持续进步。', suggestion: '保持每周练习，关注动作细节和节奏稳定性。', status: '待复核' },
+    { id: 'learner-zhou', name: '周予安', attendance: '80%', homework: '90%', comment: '基本动作掌握较稳，组合衔接仍需加强。', suggestion: '补齐缺勤课次后重点练习身韵连接和重心转换。', status: '补课中' },
+    { id: 'learner-chen', name: '陈一诺', attendance: '85%', homework: '75%', comment: '课堂参与积极，基础动作完成度较好。', suggestion: '补交缺失作业，并针对转身稳定性进行集中练习。', status: '需补课' },
+    { id: 'learner-zhao', name: '赵明月', attendance: '100%', homework: '100%', comment: '身韵表达自然，能够准确完成课程组合并形成稳定的舞台表现。', suggestion: '可继续进行进阶组合训练，提升动作细节与呼吸配合。', status: '已通过' },
+    { id: 'learner-wu', name: '吴桐', attendance: '50%', homework: '40%', comment: '已完成前半段基础训练。', suggestion: '如后续恢复学习，建议从柔韧与力量基础重新衔接。', status: '已取消结业' }
   ]
 }, {
   id: 'graduation-vocal', className: '成人声乐班', course: '声乐基础', teacher: '陈晨', operational: '已结束', classStatus: '已归档', endDate: '2026-09-07', learners: [
@@ -785,7 +786,7 @@ const graduation = [{
   ]
 }];
 const reports = [
-  { id: 'report-1', number: 'RP20260908001', student: '林知夏', course: '舞蹈基本功', className: '少儿舞蹈基础班', semester: '2026秋季', status: '草稿', version: 'v1', generation: '已生成', updated: '2026-09-08 10:02', comment: '动作完成度高，能够主动复盘。', reason: '' },
+  { id: 'report-1', number: 'RP20260908001', student: '林知夏', course: '中国舞进阶训练', className: '暑期中国舞基础1班', semester: '2026秋季', status: '已发布', version: 'v1', generation: '已生成', updated: '2026-09-08 10:02', comment: '课堂参与积极，基本功和组合衔接持续进步。', reason: '' },
   { id: 'report-2', number: 'RP20260907012', student: '刘女士', course: '声乐基础', className: '成人声乐班', semester: '2026秋季', status: '已发布', version: 'v1', generation: '已生成', updated: '2026-09-07 16:28', comment: '声音控制稳定，完成度良好。', reason: '' },
   { id: 'report-3', number: 'RP20260906004', student: '赵子涵', course: '中国画基础', className: '国画入门工作坊', semester: '2026秋季', status: '草稿', version: 'v1', generation: '生成失败', updated: '2026-09-06 19:10', comment: '报告生成任务失败，需重试。', reason: '' }
 ];
@@ -1502,7 +1503,7 @@ function renderGraduation() {
 }
 function renderReports() {
   academicData = reports;
-  pageFrame('学习报告管理', '', '<button class="button" data-academic-action="report-export">导出报告清单</button>', metrics([['草稿', reports.filter((r) => r.status === '草稿').length, '发布前仅后台可见'], ['已发布', reports.filter((r) => r.status === '已发布').length, '学员端可查看'], ['已撤回', reports.filter((r) => r.status === '已撤回').length, '修订后可再次发布'], ['生成失败', reports.filter((r) => r.generation === '生成失败').length, '结业状态不受影响']]) + filterPanel('report-filter', select('报告状态', 'status', ['草稿', '已发布', '已撤回']) + select('课程名称', 'course', ['舞蹈基本功', '声乐基础', '中国画基础']) + field('学员姓名', 'student', 'text', '姓名') + field('更新时间', 'date', 'date')) + table('<thead><tr><th>报告编号</th><th>学员</th><th>课程 / 班级</th><th>结业状态</th><th>报告状态</th><th>生成状态</th><th>版本 / 更新时间</th><th>操作</th></tr></thead>'));
+  pageFrame('学习报告管理', '', '<button class="button" data-academic-action="report-export">导出报告清单</button>', metrics([['草稿', reports.filter((r) => r.status === '草稿').length, '发布前仅后台可见'], ['已发布', reports.filter((r) => r.status === '已发布').length, '学员端可查看'], ['已撤回', reports.filter((r) => r.status === '已撤回').length, '修订后可再次发布'], ['生成失败', reports.filter((r) => r.generation === '生成失败').length, '结业状态不受影响']]) + filterPanel('report-filter', select('报告状态', 'status', ['草稿', '已发布', '已撤回']) + select('课程名称', 'course', ['中国舞进阶训练', '舞蹈基本功', '声乐基础', '中国画基础']) + field('学员姓名', 'student', 'text', '姓名') + field('更新时间', 'date', 'date')) + table('<thead><tr><th>报告编号</th><th>学员</th><th>课程 / 班级</th><th>结业状态</th><th>报告状态</th><th>生成状态</th><th>版本 / 更新时间</th><th>操作</th></tr></thead>'));
   const row = (item) => `<td>${item.number}</td><td>${item.student}</td><td>${item.course}<br><span class="muted">${item.className}</span></td><td>${tag('已通过')}</td><td>${tag(item.status)}</td><td>${tag(item.generation)}</td><td>${item.version}<br><span class="muted">${item.updated}</span></td><td class="action-cell"><button class="text-button" data-academic-action="report-preview">预览</button>${['草稿', '已撤回'].includes(item.status) ? '<button class="text-button" data-academic-action="report-publish">发布</button>' : ''}${item.status === '已发布' ? '<button class="text-button" data-academic-action="report-recall">撤回</button>' : ''}${item.generation === '生成失败' ? '<button class="text-button" data-academic-action="report-retry">重试</button>' : ''}${['草稿', '已撤回'].includes(item.status) ? '<button class="text-button danger-link" data-academic-action="report-delete">删除</button>' : ''}</td>`;
   renderRows(academicData, row);
   applyFilter('report-filter', academicData, (form) => { const { status, course, student } = form; return (item) => (!status.value || item.status === status.value) && (!course.value || item.course === course.value) && (!student.value.trim() || item.student.includes(student.value.trim())); }, row);

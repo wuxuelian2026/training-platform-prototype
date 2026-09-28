@@ -1,9 +1,9 @@
-// 原型演示统一使用固定业务日期，避免教师端、后台与学员端因运行机器日期不同而分叉。
-// 演示时钟与本地实际日期保持一致，避免课表“今天”、课次状态和执行事实各自使用不同日期。
-const now = new Date();
+// 原型演示统一使用固定业务日期 2026-09-12（演示基准日）。
+// 与课次状态派生（CR-2026-141 上课中=09-12）、场景设计（CR-2026-147 下一课=09-13 即“明天”）对齐；
+// 不用运行机实时日期，避免教师端／后台／学员端因日期不同分叉，也避免已结课班级因动态日期而丢失“已结束／已结课”派生。
+export const DEMO_TODAY = '2026-09-12';
 const pad = (value) => String(value).padStart(2, '0');
-export const DEMO_TODAY = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-export const DEMO_NOW = `${DEMO_TODAY} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+export const DEMO_NOW = `${DEMO_TODAY} ${pad(10)}:${pad(0)}`;
 
 export function demoDateTime(value = DEMO_TODAY) {
   return new Date(String(value).replace(' ', 'T'));

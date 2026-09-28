@@ -17,9 +17,8 @@ import { DEMO_TODAY } from './demo-clock.js';
 const slotMinutes = (start, end) => (Number(end.slice(0, 2)) * 60 + Number(end.slice(3, 5))) - (Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5)));
 const publishedSessions = (firstDate, { total = 8, roomId = 'venue-302', startTime = '09:00', endTime = '10:30' } = {}) => Array.from({ length: total }, (_, index) => {
   const sourceDate = new Date(`${firstDate}T00:00:00+08:00`);
-  // 2026-09-28：旧演示数据的 6–8 月课次整体迁到未来月份，避免教师课表首屏出现历史课程。
-  // 9 月及以后日期保持原排课，用于展示真实已完成课次与跨端记录。
-  if (sourceDate.getMonth() < 8) sourceDate.setMonth(sourceDate.getMonth() + 6);
+  // 演示基准日固定为 2026-09-12：暑期（6–8 月）班级的课次保留在历史区间，使全部课次早于基准日、可稳定派生“已结束／已结课”；
+  // 不再整体迁到未来，否则“已结课”状态无法成立、结业演示数据无入口。9 月及以后日期天然晚于基准日，按原排课展示。
   const date = new Date(sourceDate);
   date.setDate(date.getDate() + index * 7);
   const localDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -155,7 +154,7 @@ const completedEnrollmentOngoing = [1, 2, 3].map(index => {
 });
 
 const completedEnrollmentEndedPending = [1, 2, 3].map(index => {
-  // 中国舞（王玥）：原暑期批次课次已整体迁到未来月份，避免 6–8 月历史日期继续出现在课表。
+  // 中国舞（王玥）：暑期批次课次保留在历史区间（6 月），全部课次早于演示基准日 2026-09-12，稳定派生「已结课」。
   // 保留组内 15 分钟跨校区衔接，继续用于演示教师转场提示。
   const sessions = publishedSessions('2026-06-18', { ...slotOf(CLASS_SLOTS.dance, index), total: courseTotalHours('COURSE-MOCK-1003') });
   return classRecord({ id: `class-mock-ended-pending-${String(index).padStart(2, '0')}`, name: `暑期中国舞基础${index}班`, courseId: 'COURSE-MOCK-1003', course: '中国舞进阶训练', major: '中国舞', teacher: '王玥', scheduleStatus: '已发布', enrollStart: '2026-05-01 09:00', deadline: '2026-06-10 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 12, demoHomework: '点评完成', weekdays: ['周四'], updatedAt: '2026-09-10 10:00' });
@@ -168,7 +167,7 @@ const completedEnrollmentEndedTeaching = [1, 2, 3].map(index => {
 });
 
 const completedEnrollmentEndedFinished = [1, 2, 3].map(index => {
-  // 少儿绘画（唐雯）：原暑期批次课次已整体迁到未来月份。
+  // 少儿绘画（唐雯）：暑期批次课次保留在历史区间（6 月），全部课次早于演示基准日，派生「已结课」。
     const sessions = publishedSessions('2026-06-04', { ...slotOf(CLASS_SLOTS.sketch, index), total: courseTotalHours('COURSE-MOCK-1053') });
   return classRecord({ id: `class-mock-ended-finished-${String(index).padStart(2, '0')}`, name: `暑期少儿绘画已结课${index}班`, courseId: 'COURSE-MOCK-1053', course: '少儿绘画进阶训练', major: '少儿绘画', teacher: '唐雯', batch: '暑假', scheduleStatus: '已发布', enrollStart: '2026-06-01 09:00', deadline: '2026-08-10 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 18, weekdays: ['周四'], updatedAt: '2026-08-30 10:00' });
 });
