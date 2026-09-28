@@ -1707,18 +1707,16 @@ body:has(.is-schedule-share) .page-help-trigger { display: none; }
 .mp-class-result-hint { margin: 2px 0 0; padding: 0 2px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 /* I1-CLASS-DETAIL-08：出勤口径单独一行小字，说明迟到/请假/补录怎么算。 */
 .mp-class-summary-note { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
-.mp-class-record-list { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
-.mp-class-record { padding: 10px 12px; border: 1px solid #eee7e0; border-radius: 8px; }
-.mp-class-record-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.mp-class-record-head > div:first-child { min-width: 0; }
-.mp-class-record-head strong { display: block; font-size: 13px; }
-.mp-class-record-head small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
 .mp-class-record-tags { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: 4px; }
-.mp-class-record-hw { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f2ece7; }
-.mp-class-record-hw > div { min-width: 0; }
-.mp-class-record-hw strong { display: block; font-size: 12px; }
-.mp-class-record-hw small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
-.mp-class-record-hw .mp-button { flex: none; min-height: 32px; padding: 0 10px; font-size: 11px; }
+/* CR-2026-148：作业从「行尾小按钮」改为整条可点的浅底行动条。
+   课次行是一个大点击区（白底→课次详情），作业是它下面挂着的另一件事；
+   两者用底色分层，避免同一张卡里出现两个相邻且权重接近的目标。 */
+.mp-class-lesson-hw { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 9px 10px; border-radius: 6px; background: #faf6f2; color: inherit; text-decoration: none; }
+.mp-class-lesson-hw-body { min-width: 0; }
+.mp-class-lesson-hw strong { display: block; font-size: 12px; }
+.mp-class-lesson-hw small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.mp-class-lesson-hw-go { flex: none; color: var(--brand); font-size: 12px; white-space: nowrap; }
+.mp-class-lesson-hw:focus-visible { outline: 3px solid rgba(139, 2, 2, .18); outline-offset: 2px; border-radius: 6px; }
 .mp-class-detail-head + .mp-class-detail-group { margin-top: 12px; }
 /* I1-CLASS-DETAIL-21：课程简介与课程大纲默认收起，可展开／收起；简介含课程图片占位。 */
 .mp-class-fold-actions { display: flex; align-items: center; gap: 10px; }
@@ -1732,7 +1730,6 @@ body:has(.is-schedule-share) .page-help-trigger { display: none; }
 .mp-class-detail-group h4 { margin: 0 0 10px; color: var(--muted); font-size: 11px; font-weight: 600; }
 .mp-class-lesson-more { margin-top: 8px; }
 .mp-class-lesson-list.is-collapsed li.is-outside { display: none; }
-.mp-class-lesson.is-next { border-color: var(--brand); background: #fffaf6; }
 .mp-fast-detail-hero { min-width: 0; overflow: hidden; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
 .mp-fast-detail-cover { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #7b4f39; }
 .mp-fast-detail-cover::after { position: absolute; right: 18px; bottom: -8px; color: rgba(255,255,255,.14); content: attr(data-cover-mark); font-size: 112px; font-weight: 700; line-height: 1; }
@@ -1793,7 +1790,7 @@ body:has(.is-schedule-share) .page-help-trigger { display: none; }
 .mp-class-lesson-list { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
 .mp-class-lesson { padding: 10px 12px; border: 1px solid #eee7e0; border-radius: 8px; background: #fff; }
 /* I1-CLASS-DETAIL-20：课次行整体可点，行首为按钮，右侧给可点提示。 */
-.mp-class-lesson-main { display: flex; width: 100%; align-items: flex-start; gap: 8px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.mp-class-lesson-main { display: flex; width: 100%; align-items: flex-start; gap: 8px; padding: 0; border: 0; background: transparent; color: inherit; text-decoration: none; text-align: left; }
 .mp-class-lesson-main .mp-class-lesson-head { flex: 1; min-width: 0; }
 .mp-class-lesson-main:focus-visible { outline: 3px solid rgba(139, 2, 2, .18); outline-offset: 3px; border-radius: 6px; }
 .mp-class-lesson-chevron { flex: none; align-self: center; color: var(--muted); font-size: 16px; line-height: 1; }

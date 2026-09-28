@@ -1257,7 +1257,7 @@ function renderClassDetail(item, tab = params.get('tab') || 'overview') {
   // I1-CLASS-DETAIL-22：本页不设底部操作条（咨询走线下联系老师；分享只在课次段一处；进入学习改由学习中心进入）。
   // I1-CLASS-DETAIL-17：作业入口只保留在课次行内，取消顶部「待提交作业」卡（客户 2026-09-23 口径）。
   // I1-CLASS-DETAIL-19：已结课班不渲染空的「下次上课」卡（无下一次课对结课班是噪音）。
-  const nextCard = record?.status === 'ended' ? '' : classNextSessionView(item, nextSession, sessions);
+  const nextCard = record.status === 'ended' ? '' : classNextSessionView(item, nextSession, sessions);
   // 阅读顺序：结论 → 班级信息 → 课次（当前进度）→ 课程资料（售前内容沉底）→ 成果。
   layout(stack(nav, nextCard, classInfoView(item, record, sessions), classLessonsView(item, sessions, { ended: record.status === 'ended' }), classMaterialView(item), resultSection(item, record)));
   document.querySelectorAll('[data-class-share]').forEach(button => button.addEventListener('click', () => shareClassTimetable(item)));
