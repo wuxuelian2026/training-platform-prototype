@@ -57,7 +57,15 @@ export const CRM_FIELD_SPEC = {
         { heading: '排课工作台 · 第 4 步 冲突校验', fields: [
           { id: 'FD-ACADEMIC-037', label: '教师时间冲突', type: '只读', length: '无冲突 / 冲突', required: '系统计算', note: '校验所选教师在全部课次上是否已有排课', constraints: { readOnly: true, system: true } },
           { id: 'FD-ACADEMIC-038', label: '教室时间冲突', type: '只读', length: '无冲突 / 冲突', required: '系统计算', note: '校验所选教室在全部课次上是否已被占用', constraints: { readOnly: true, system: true } }
-        ] }
+        ] },
+        { heading: '学籍异动', fields: [
+          { id: 'FD-CRM-091', label: '异动类型', type: '枚举', length: '退班 / 转班 / 退学', required: '是', note: '班级名册唯一变更入口；转班需选转入班级', constraints: { enum: ['退班','转班','退学'] } },
+          { id: 'FD-CRM-092', label: '异动原因', type: '多行文本', length: '≤ 200 字', required: '是', note: '写入异动记录，必填', constraints: { maxLength: 200 } },
+          { id: 'FD-CRM-093', label: '转入班级', type: '下拉', length: '转班时必填', required: '转班时必填', note: '目标班级 class_id；退班/退学不填', constraints: { requiredIf: "type='转班'" } },
+          { id: 'FD-CRM-094', label: '同步退费', type: '开关', length: '是 / 否', required: '否', note: '退班/退学可开启；金额等于订单实收全额（全额终结口径，申请窗口与最大已消课比例仅作资格判定、不参与金额计算），财务审批为准；不受自助窗口与消课上限拦截', constraints: { enum: ['是','否'] } },
+          { id: 'FD-CRM-095', label: '异动记录', type: '列表（只读）', length: 'enrollmentChanges', required: '系统生成', note: '含类型/原因/转入班级/退费关联/操作人与时间', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-096', label: '名册异动后状态', type: '派生状态', length: '已退班 / 已转班 / 已退学', required: '系统派生', note: 'isEnrollmentActive=false 者不计入名册与作业提交率分母', constraints: { readOnly: true, derived: true } }
+        ] },
       ],
       notes: [
         '创建和编辑面授班级使用“关联课程／班级与招生／展示信息”三段式工作台，保存后生成唯一 class_id 并进入“待排课”。',
