@@ -161,7 +161,7 @@ function mountClassRefundSettingsCard() {
   const card = document.createElement('section');
   card.className = 'card settings-card';
   card.dataset.classRefundSettings = 'true';
-  card.innerHTML = `<h2>面授退款参数</h2><p class="ops-form-help">按实付金额与未消付费课时比例计算，金额向下取整到元；参数只影响新申请，已受理退款保留申请时快照。</p><div class="form-grid">${field('申请窗口（自然日，0=不限）', 'classRefundWindowDays', 'number', '0-365', false, current.windowDays)}${field('自助退款最大已消课比例（%）', 'classRefundSelfMaxCompletedPercent', 'number', '0-100', false, current.selfMaxCompletedPercent)}${field('手续费比例（%）', 'classRefundHandlingFeePercent', 'number', '0-100', false, current.handlingFeePercent)}${field('最低退款金额（元）', 'classRefundMinAmount', 'number', '0-1000', false, current.minAmount)}</div><div class="settings-switches"><label class="settings-switch"><span>赠课计入退款课时分母</span><span class="switch"><input type="checkbox" name="classRefundIncludeBonusLessons" ${current.includeBonusLessons ? 'checked' : ''}><i class="switch-track"></i></span></label></div><p class="ops-form-help">同一订单只允许一张未结退款单；退款处理中保留上课资格；默认原路退回，预计 3 个工作日。</p>`;
+  card.innerHTML = `<h2>面授退款参数</h2><p class="ops-form-help">参数只用于判定自助退款资格，不参与金额计算；通过资格校验后固定退订单实收全额。</p><div class="form-grid">${field('申请窗口（自然日，0=不限）', 'classRefundWindowDays', 'number', '0-365', false, current.windowDays)}${field('自助退款最大已消课比例（%）', 'classRefundSelfMaxCompletedPercent', 'number', '0-100', false, current.selfMaxCompletedPercent)}</div><p class="ops-form-help">同一订单只允许一次全额终结退款；退款处理中保留上课资格；默认原路退回，预计 3 个工作日。</p>`;
   layout.append(card);
 }
 // CR-2026-101：固定规则不进参数配置——课表时间轴等由业务口径直接冻结，
@@ -269,20 +269,15 @@ function renderSettings() {
     const payTimeout = Number(form.get('paymentTimeoutMinutes'));
     const classRefund = {
       windowDays: Number(form.get('classRefundWindowDays')),
-      selfMaxCompletedPercent: Number(form.get('classRefundSelfMaxCompletedPercent')),
-      includeBonusLessons: form.get('classRefundIncludeBonusLessons') === 'on',
-      handlingFeePercent: Number(form.get('classRefundHandlingFeePercent')),
-      minAmount: Number(form.get('classRefundMinAmount'))
+      selfMaxCompletedPercent: Number(form.get('classRefundSelfMaxCompletedPercent'))
     };
     const fileSpec = { imageMb: Number(form.get('imageSpecMb')), documentMb: Number(form.get('documentSpecMb')), videoMb: Number(form.get('videoSpecMb')), resourceGb: Number(form.get('resourceSpecGb')) };
     const retryAttempts = Number(form.get('messageRetryAttempts'));
     const retryIntervals = [...new Set(String(form.get('messageRetryIntervals') || '').split(/[，,\s]+/).map((value) => Math.round(Number(value))).filter((value) => Number.isFinite(value) && value > 0 && value <= 1440))].sort((a, b) => a - b);
     const classRefundValid = inRange(classRefund.windowDays, 0, 365)
-      && inRange(classRefund.selfMaxCompletedPercent, 0, 100)
-      && inRange(classRefund.handlingFeePercent, 0, 100)
-      && inRange(classRefund.minAmount, 0, 1000);
+      && inRange(classRefund.selfMaxCompletedPercent, 0, 100);
     if (!inRange(deadline, 1, 720) || !inRange(attendance, 0, 100) || !inRange(homeworkRate, 0, 100) || !inRange(refundLessons, 0, 999) || !inRange(refundWindow, 1, 30) || !inRange(payTimeout, 1, 1440) || !classRefundValid || !inRange(fileSpec.imageMb, 1, 1024) || !inRange(fileSpec.documentMb, 1, 1024) || !inRange(fileSpec.videoMb, 1, 10240) || !inRange(fileSpec.resourceGb, 1, 10240) || !inRange(retryAttempts, 1, 5) || !retryIntervals.length) {
-      showToast('请检查参数范围；面授退款窗口 0–365 天、消课与手续费 0–100%、最低退款金额 0–1000 元。');
+      showToast('请检查参数范围；面授退款窗口 0–365 天、最大已消课比例 0–100%。');
       return;
     }
     settings.platform = form.get('platform');
@@ -295,7 +290,7 @@ function renderSettings() {
     settings.classRefund = classRefund;
     settings.fileSpec = fileSpec;
     settings.messageRetry = { maxAttempts: retryAttempts, intervalsMinutes: retryIntervals };
-    writeDemoState((next) => ({ ...next, homeworkDeadlineHours: Math.round(deadline), videoRefundSettings: { windowDays: Math.round(refundWindow), maxLessons: Math.round(refundLessons) }, classRefundSettings: { ...classRefund, windowDays: Math.round(classRefund.windowDays), selfMaxCompletedPercent: Math.round(classRefund.selfMaxCompletedPercent), handlingFeePercent: Math.round(classRefund.handlingFeePercent), minAmount: Math.round(classRefund.minAmount) }, orderSettings: { paymentTimeoutMinutes: Math.round(payTimeout) }, fileSpecSettings: fileSpec, messageRetrySettings: { maxAttempts: Math.round(retryAttempts), intervalsMinutes: retryIntervals } }));
+    writeDemoState((next) => ({ ...next, homeworkDeadlineHours: Math.round(deadline), videoRefundSettings: { windowDays: Math.round(refundWindow), maxLessons: Math.round(refundLessons) }, classRefundSettings: { windowDays: Math.round(classRefund.windowDays), selfMaxCompletedPercent: Math.round(classRefund.selfMaxCompletedPercent) }, orderSettings: { paymentTimeoutMinutes: Math.round(payTimeout) }, fileSpecSettings: fileSpec, messageRetrySettings: { maxAttempts: Math.round(retryAttempts), intervalsMinutes: retryIntervals } }));
     Object.keys(settings.switches).forEach((key) => { settings.switches[key] = form.get(key) === 'on'; });
     showToast('参数配置已保存，变更将记录审计日志。');
   });

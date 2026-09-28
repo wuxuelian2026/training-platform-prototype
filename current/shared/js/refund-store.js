@@ -85,7 +85,7 @@ function notifyRefundAccount(refund, event, title, summary, body = summary) {
   });
 }
 
-/** 在途退款金额（待审批＋退款中），用于计算「待退金额」时防止重复退款。 */
+/** 在途退款金额，仅用于兼容旧页面展示；MVP 不支持累计或分批退款。 */
 export function pendingRefundTotalForOrder(orderId) {
   return refundsForOrder(orderId).filter((row) => OPEN_STATUSES.includes(row.status)).reduce((sum, row) => sum + numberOr(row.amount), 0);
 }
@@ -158,30 +158,19 @@ function createRefundExceptionTodo(refund, reason, now) {
 }
 
 /**
- * 面授退款建议金额：实收 × 未消课课时 ÷ 总课时，向下取整。
- * 无课时数据（未排课）时按订单金额全额；全部课次已完成时为 0，不可退。
+ * 面授退款资格判定：申请窗口和已消课比例只决定是否可退。
+ * 通过资格校验后固定退订单实收全额，不计算部分退款。
  */
 export function classRefundSuggestion({ order, classRecord, requestedAt = demoTime(), selfService = true } = {}) {
   const policy = classRefundSettings();
   const paid = numberOr(order?.amount);
   const progress = classLessonProgress(classRecord || {});
   const allLessons = numberOr(progress.total);
-  const bonusLessons = Math.min(numberOr(classRecord?.bonusLessons), allLessons);
-  const completedBonusLessons = Math.min(numberOr(classRecord?.completedBonusLessons), bonusLessons);
-  // 演示数据没有付费／赠课拆分时全部视为付费课时；生产实现按学员考勤记录计算消课。
-  const total = policy.includeBonusLessons ? allLessons : Math.max(0, allLessons - bonusLessons);
-  const completed = Math.min(
-    policy.includeBonusLessons ? numberOr(progress.completed) : Math.max(0, numberOr(progress.completed) - completedBonusLessons),
-    total
-  );
+  const total = allLessons;
+  const completed = Math.min(numberOr(progress.completed), total);
   const remaining = Math.max(0, total - completed);
-  const ratio = total > 0 ? remaining / total : 1;
   const completedPercent = total > 0 ? (completed / total) * 100 : 0;
-  const grossRaw = Math.max(0, paid * ratio);
-  const handlingFeeRaw = grossRaw * policy.handlingFeePercent / 100;
-  const gross = Math.floor(grossRaw);
-  const handlingFee = Math.floor(handlingFeeRaw);
-  const suggested = Math.max(0, Math.floor(grossRaw - handlingFeeRaw));
+  const refundAmount = paid;
   const orderAt = new Date(String(order?.paidAt || order?.createdAt || '').replace(' ', 'T'));
   const requestDate = new Date(String(requestedAt || '').replace(' ', 'T'));
   const elapsedDays = Number.isNaN(orderAt.getTime()) || Number.isNaN(requestDate.getTime())
@@ -191,13 +180,12 @@ export function classRefundSuggestion({ order, classRecord, requestedAt = demoTi
   if (total > 0 && remaining === 0) ineligibleReason = 'CLASS_REFUND_FULLY_CONSUMED';
   else if (selfService && policy.windowDays > 0 && elapsedDays > policy.windowDays) ineligibleReason = 'CLASS_REFUND_WINDOW_EXCEEDED';
   else if (selfService && completedPercent > policy.selfMaxCompletedPercent) ineligibleReason = 'CLASS_REFUND_COMPLETED_PERCENT_EXCEEDED';
-  else if (suggested < policy.minAmount) ineligibleReason = 'CLASS_REFUND_BELOW_MIN_AMOUNT';
   return {
-    paid, total, completed, remaining, ratio, completedPercent, elapsedDays,
-    gross, handlingFee, suggested, eligible: !ineligibleReason, ineligibleReason, policy,
+    paid, total, completed, remaining, completedPercent, elapsedDays,
+    refundAmount, eligible: !ineligibleReason, ineligibleReason, policy,
     rule: total > 0
-      ? `按未消付费课时比例（未消课 ${remaining}/${total}，手续费 ${policy.handlingFeePercent}%）`
-      : `未排课，按订单实收金额（手续费 ${policy.handlingFeePercent}%）`
+      ? `资格校验通过（已消课 ${completed}/${total}），退订单实收全额`
+      : '未排课，退订单实收全额'
   };
 }
 
@@ -222,10 +210,9 @@ export function createRefundRequest(input = {}) {
   const isSelfService = (input.origin || REFUND_ORIGIN.SYSTEM) === REFUND_ORIGIN.LEARNER;
   const suggestion = isClass ? classRefundSuggestion({ order, classRecord, requestedAt: now, selfService: isSelfService }) : null;
   if (suggestion && !suggestion.eligible) return { ok: false, reason: suggestion.ineligibleReason, suggestion };
-  const amount = input.origin === REFUND_ORIGIN.OFFLINE
-    ? numberOr(input.amount, numberOr(order.amount))
-    : suggestion ? suggestion.suggested : numberOr(input.amount, numberOr(order.amount));
-  if (!(amount > 0)) return { ok: false, reason: 'REFUND_AMOUNT_EMPTY', suggestion };
+  // MVP 只支持全额终结退款；面授退款资格仍沿用消课规则校验，但不拆分退款金额。
+  const amount = numberOr(order.amount);
+  if (!(amount > 0) || amount !== numberOr(order.amount)) return { ok: false, reason: 'REFUND_MUST_BE_FULL', suggestion };
 
   const student = sharedRows('students').find((row) => row.id === order.studentId) || null;
   const businessKey = `refund:${order.id}`;
@@ -278,7 +265,7 @@ export function createRefundRequest(input = {}) {
     refundExpectedAt: record.expectedAt,
     refundReason: record.reason,
     refundAt: order.refundAt || now,
-    refundType: isClass ? '面授按未消课课时比例退款' : '视频全额退款',
+    refundType: isClass ? '面授全额终结退款' : '视频全额终结退款',
     refundBusinessKey: businessKey
   };
   upsertDemoRecord('orders', nextOrder);
@@ -423,7 +410,7 @@ export function registerCompletedOfflineRefund(input = {}) {
   if (!order) return { ok: false, reason: 'ORDER_NOT_FOUND' };
   const paidAmount = numberOr(order.amount);
   const amount = numberOr(input.amount, paidAmount);
-  if (!(paidAmount > 0) || !(amount > 0) || amount > paidAmount) return { ok: false, reason: 'REFUND_AMOUNT_INVALID' };
+  if (!(paidAmount > 0) || amount !== paidAmount) return { ok: false, reason: 'REFUND_AMOUNT_INVALID' };
   const created = createRefundRequest({
     ...input,
     amount,

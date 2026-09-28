@@ -21,7 +21,13 @@ function showToast(message, kind = 'success') { const el = document.querySelecto
 function closeDialog() { document.querySelector('[data-ops-dialog]')?.remove(); }
 function openDialog(title, subtitle, body, actions = '<button type="button" class="button" data-dialog-close>关闭</button>') { closeDialog(); const dialog = document.createElement('dialog'); dialog.className = 'ops-dialog'; dialog.dataset.opsDialog = 'true'; dialog.innerHTML = `<div class="ops-dialog-card"><div class="ops-dialog-header"><div><h2>${esc(title)}</h2><p>${esc(subtitle)}</p></div><button type="button" class="icon-button" data-dialog-close title="关闭" aria-label="关闭">×</button></div>${body}<div class="ops-dialog-actions">${actions}</div></div>`; document.body.append(dialog); dialog.showModal(); return dialog; }
 function pageFrame(title, description, controls, content) { if (!opsRoot) return; opsRoot.innerHTML = `<div class="ops-page"><div class="page-head"><div><h1>${title}</h1>${description ? `<p>${description}</p>` : ''}</div>${controls || ''}</div>${content}<div class="toast" data-ops-toast role="status" aria-live="polite" hidden></div></div>`; }
-function field(label, name, type = 'text', placeholder = '', wide = false) { return `<label class="form-field${wide ? ' wide' : ''}"><span>${label}</span><input type="${type}" name="${name}" placeholder="${placeholder}"></label>`; }
+function field(label, name, type = 'text', placeholder = '', wide = false) {
+  const textLimits = { orderNo: 50, teacher: 30, student: 30, course: 50, reason: 200, remark: 200, deductionReason: 200, voucher: 100, failureReason: 200 };
+  const attrs = type === 'number'
+    ? ' min="0" step="0.01"'
+    : (textLimits[name] ? ` maxlength="${textLimits[name]}"` : '');
+  return `<label class="form-field${wide ? ' wide' : ''}"><span>${label}</span><input type="${type}" name="${name}" placeholder="${placeholder}"${attrs}></label>`;
+}
 function select(label, name, options, wide = false, all = true) { return `<label class="form-field${wide ? ' wide' : ''}"><span>${label}</span><select name="${name}">${all ? `<option value="">全部${label}</option>` : ''}${options.map((item) => `<option value="${esc(item)}">${esc(item)}</option>`).join('')}</select></label>`; }
 function filterPanel(id, fields) { return `<div class="filter-panel" data-filter-drawer-shell="${id}"><button type="button" class="button filter-drawer-trigger" data-filter-drawer-trigger="${id}" aria-expanded="false" aria-controls="${id}"><span class="filter-trigger-icon" aria-hidden="true"></span>筛选条件</button><div class="filter-drawer-backdrop" data-filter-drawer-backdrop="${id}" hidden></div><form class="card filter-form" id="${id}"><div class="filter-head"><strong>筛选条件</strong><button type="button" class="icon-button filter-drawer-close" data-filter-drawer-close="${id}" title="关闭筛选条件" aria-label="关闭筛选条件">×</button></div><div class="filter-grid ops-filter-grid">${fields}</div><div class="filter-actions"><button type="reset" class="button">重置</button><button type="submit" class="button primary">查询</button></div></form></div>`; }
 function table(head, className = '') { return `<div class="table-wrap ops-table ${className}"><table>${head}<tbody class="table-body"></tbody></table></div><div class="pagination-bar"><span class="result-count">—</span><button class="button" disabled>上一页</button><button class="button primary">1</button><button class="button" disabled>下一页</button></div>`; }
@@ -41,10 +47,10 @@ const salaryBatches = [
   { id: 'PAY20260906002', month: '2026-08', salaryIds: ['salary-liu'], method: '银行代发', createdAt: '2026-09-06 09:10', operator: '周财务', paidAt: '', status: '发放失败', success: 0, failed: 1, voucher: '' }
 ];
 const payments = [
-  { id: 'payment-1', receiptNo: 'RC202609080001', orderNo: 'OD202609080001', student: '林知夏', course: '声乐演唱技巧', source: '视频课程', channel: '微信支付', amount: 1280, time: '2026-09-08 10:18', status: '已到账', refundable: false },
-  { id: 'payment-2', receiptNo: 'RC202609070006', orderNo: 'OD202609060008', student: '周子涵', course: '少儿中国舞基础班', source: '面授课程', channel: '银行转账', amount: 1680, time: '2026-09-07 15:42', status: '待确认', refundable: true },
-  { id: 'payment-3', receiptNo: 'RC202609050002', orderNo: 'OD202609050003', student: '刘女士', course: '成人声乐班', source: '面授课程', channel: '现金', amount: 2280, time: '2026-09-05 11:08', status: '异常', refundable: true },
-  { id: 'payment-4', receiptNo: 'RC202609040001', orderNo: 'OD202609040001', student: '何安', course: '艺术歌曲示范课', source: '视频课程', channel: '支付宝', amount: 680, time: '2026-09-04 09:20', status: '已到账', refundable: false }
+  { id: 'payment-1', receiptNo: 'RC202609080001', orderNo: 'OD202609080001', student: '林知夏', course: '声乐演唱技巧', source: '视频课程', channel: '微信支付', amount: 1280, time: '2026-09-08 10:18', status: '已到账' },
+  { id: 'payment-2', receiptNo: 'RC202609070006', orderNo: 'OD202609060008', student: '周子涵', course: '少儿中国舞基础班', source: '面授课程', channel: '银行转账', amount: 1680, time: '2026-09-07 15:42', status: '待确认' },
+  { id: 'payment-3', receiptNo: 'RC202609050002', orderNo: 'OD202609050003', student: '刘女士', course: '成人声乐班', source: '面授课程', channel: '现金', amount: 2280, time: '2026-09-05 11:08', status: '异常' },
+  { id: 'payment-4', receiptNo: 'RC202609040001', orderNo: 'OD202609040001', student: '何安', course: '艺术歌曲示范课', source: '视频课程', channel: '支付宝', amount: 680, time: '2026-09-04 09:20', status: '已到账' }
 ];
 const refunds = [
   { id: 'refund-1', no: 'RF202609080003', orderNo: 'OD202609060008', student: '周子涵', phone: '139****8612', course: '少儿中国舞基础班', orderType: '面授课程', amount: 1680, reason: '时间安排冲突', channel: '银行转账', time: '2026-09-08 09:12', status: '待审批', remark: '' },
@@ -65,8 +71,8 @@ function syncSharedRefunds() {
 const refundCounted = (item) => item.status === '已退款';
 const orderReceiptTotal = (orderNo) => payments.filter((item) => item.orderNo === orderNo).reduce((sum, item) => sum + Number(item.amount || 0), 0);
 const orderRefundedTotal = (orderNo) => refunds.filter((item) => item.orderNo === orderNo && refundCounted(item)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-// 待退金额同时扣减已退款与在途（待审批／退款中）金额，避免同一订单被重复退款。
-const orderPendingRefund = (orderNo) => Math.max(0, Number((orderReceiptTotal(orderNo) - orderRefundedTotal(orderNo) - pendingRefundTotalForOrder(orderNo)).toFixed(2)));
+// MVP 一单一次全额终结退款：订单存在任意有效退款记录后不再作为线下登记候选。
+const orderPendingRefund = (orderNo) => refunds.some((item) => item.orderNo === orderNo && item.status !== '已拒绝') ? 0 : orderReceiptTotal(orderNo);
 function refundOrderStatus(orderNo) {
   const received = orderReceiptTotal(orderNo);
   const refunded = orderRefundedTotal(orderNo);
@@ -89,7 +95,7 @@ function videoRefundRuleFor(orderNo) {
   return { eligible: Number.isFinite(paidTime) && ageDays <= config.windowDays && watchedLessons <= config.maxLessons, watchedLessons, ageDays, config, reason: !Number.isFinite(paidTime) || ageDays > config.windowDays ? `超过${config.windowDays}日退款期限` : watchedLessons > config.maxLessons ? `已观看${watchedLessons}课时，超过${config.maxLessons}课时上限` : '满足视频课程退款条件' };
 }
 
-// 可登记线下退款的订单：已存在收款记录且待退金额大于 0；已取消订单不出现。
+// 可登记线下退款的订单：已存在收款记录且没有有效退款记录；已取消订单不出现。
 function offlineRefundCandidates() {
   const seen = new Map();
   payments.forEach((item) => {
@@ -103,10 +109,10 @@ function offlineRefundCandidates() {
 
 function openOfflineRefundForm() {
   const candidates = offlineRefundCandidates();
-  const options = candidates.map((item) => `<option value="${esc(item.orderNo)}">${esc(item.orderNo)} · ${esc(item.student)} · ${esc(item.course)} · 待退 ${money(item.pending)}</option>`).join('');
+  const options = candidates.map((item) => `<option value="${esc(item.orderNo)}">${esc(item.orderNo)} · ${esc(item.student)} · ${esc(item.course)} · 实收 ${money(item.pending)}</option>`).join('');
   // CR-2026-036 §3 登记要素：关联订单号／退款金额／退款方式／退款原因／退款时间／经办人（取当前操作者）／凭证附件（选填）／财务备注。
   const operator = readAdminSession()?.name || '周财务';
-  const body = `<label class="form-field wide"><span>关联订单 <b class="required-mark">*</b></span><select name="orderNo" required><option value="">请选择订单</option>${options}</select><small data-refund-hint>仅可登记待退金额大于 0 的订单；实收金额取该订单收款记录合计，不以订单金额代替。</small></label>${field('退款金额', 'amount', 'number', '不得超过待退金额')}${select('退款方式', 'channel', ['银行转账', '现金', '微信支付', '支付宝'], false, false)}<label class="form-field wide"><span>退款原因 <b class="required-mark">*</b></span><textarea name="reason" maxlength="200" placeholder="填写线下退款原因"></textarea></label>${field('退款时间', 'time', 'datetime-local')}<label class="form-field"><span>经办人</span><input class="readonly-field" readonly value="${esc(operator)}" aria-label="经办人取当前操作者，不可手工指定"></label><label class="form-field"><span>凭证附件</span><input type="file" name="voucher" accept=".jpg,.jpeg,.png,.pdf" aria-label="转账凭据或收据，选填"></label><label class="form-field wide"><span>财务备注</span><textarea name="remark" maxlength="200" placeholder="补充说明，如凭据号或经办说明"></textarea></label><p class="ops-danger" data-refund-error role="alert" hidden></p>`;
+  const body = `<label class="form-field wide"><span>关联订单 <b class="required-mark">*</b></span><select name="orderNo" required><option value="">请选择订单</option>${options}</select><small data-refund-hint>仅可登记一次全额退款；实收金额取该订单收款记录合计。</small></label><label class="form-field"><span>退款金额</span><input class="readonly-field" type="number" name="amount" readonly aria-label="退款金额锁定为订单实收全额"></label>${select('退款方式', 'channel', ['银行转账', '现金', '微信支付', '支付宝'], false, false)}<label class="form-field wide"><span>退款原因 <b class="required-mark">*</b></span><textarea name="reason" maxlength="200" placeholder="填写线下退款原因"></textarea></label>${field('退款时间', 'time', 'datetime-local')}<label class="form-field"><span>经办人</span><input class="readonly-field" readonly value="${esc(operator)}" aria-label="经办人取当前操作者，不可手工指定"></label><label class="form-field"><span>凭证附件</span><input type="file" name="voucher" accept=".jpg,.jpeg,.png,.pdf" aria-label="转账凭据或收据，选填"></label><label class="form-field wide"><span>财务备注</span><textarea name="remark" maxlength="200" placeholder="补充说明，如凭据号或经办说明"></textarea></label><p class="ops-danger" data-refund-error role="alert" hidden></p>`;
   const dialog = openDialog('登记线下退款', '线下退款没有渠道回调，登记成功即视为退款完成，订单状态直接变为已退款。', `<form id="ops-form" class="ops-dialog-grid">${body}</form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="ops-form" class="button primary">确认登记</button>');
   const form = dialog.querySelector('#ops-form');
   const error = dialog.querySelector('[data-refund-error]');
@@ -115,10 +121,12 @@ function openOfflineRefundForm() {
   const hint = dialog.querySelector('[data-refund-hint]');
   const refreshHint = () => {
     const orderNo = orderSelect.value;
-    if (!orderNo) { amountInput.max = ''; hint.textContent = '仅可登记待退金额大于 0 的订单；实收金额取该订单收款记录合计，不以订单金额代替。'; return; }
+    if (!orderNo) { amountInput.value = ''; hint.textContent = '仅可登记一次全额退款；实收金额取该订单收款记录合计。'; return; }
     const pending = orderPendingRefund(orderNo);
+    amountInput.min = pending;
     amountInput.max = pending;
-    hint.textContent = `该订单实收 ${money(orderReceiptTotal(orderNo))}，已退 ${money(orderRefundedTotal(orderNo))}，待退 ${money(pending)}。`;
+    amountInput.value = pending;
+    hint.textContent = `该订单实收 ${money(pending)}，本次必须全额登记。`;
   };
   orderSelect.addEventListener('change', refreshHint);
   refreshHint();
@@ -130,7 +138,7 @@ function openOfflineRefundForm() {
     const pending = orderPendingRefund(orderNo);
     const amount = Number(data.get('amount'));
     if (!amount || amount <= 0) { error.textContent = '退款金额必须大于 0。'; error.hidden = false; return; }
-    if (amount > pending) { error.textContent = `退款金额不得超过待退金额 ${money(pending)}。`; error.hidden = false; return; }
+    if (amount !== pending) { error.textContent = `MVP 仅支持全额退款，金额必须等于 ${money(pending)}。`; error.hidden = false; return; }
     const candidate = offlineRefundCandidates().find((item) => item.orderNo === orderNo) || {};
     if (candidate.status === '已取消') { error.textContent = '已取消订单不得登记退款。'; error.hidden = false; return; }
     if (candidate.orderType === '视频课程' && candidate.refundRule && !candidate.refundRule.eligible) { error.textContent = `视频课程不满足退款条件：${candidate.refundRule.reason}。`; error.hidden = false; return; }
@@ -199,7 +207,7 @@ function renderSalary() {
 function renderPayments() {
   opsData = payments;
   pageFrame('收款记录', '', '<button class="button primary" data-ops-action="payment-create">登记收款</button>', metrics([['本月收款', money(286420), '按收款日期统计'], ['已到账', payments.filter((p) => p.status === '已到账').length, '支付回调或人工确认'], ['待确认', payments.filter((p) => p.status === '待确认').length, '需核对银行流水'], ['异常', payments.filter((p) => p.status === '异常').length, '需人工处理']]) + filterPanel('payment-filter', select('收款渠道', 'channel', ['微信支付', '支付宝', '银行转账', '现金', '其他']) + select('收款来源', 'source', ['视频课程', '面授课程']) + select('到账状态', 'status', ['已到账', '待确认', '异常']) + field('订单号 / 学员', 'keyword', 'text', '模糊搜索', true)) + table('<thead><tr><th>收款单号</th><th>关联订单</th><th>学员</th><th>课程</th><th>来源 / 渠道</th><th>金额</th><th>收款时间</th><th>到账状态</th><th>操作</th></tr></thead>'));
-  const row = (item) => `<td>${item.receiptNo}</td><td>${item.orderNo}</td><td>${item.student}</td><td>${item.course}</td><td>${item.source}<br><span class="muted">${item.channel}</span></td><td class="ops-amount">${money(item.amount)}</td><td>${item.time}</td><td>${tag(item.status)}</td><td class="action-cell"><button class="text-button" data-ops-action="payment-view">查看详情</button>${item.status === '待确认' ? '<button class="text-button" data-ops-action="payment-confirm">确认到账</button>' : ''}${item.refundable ? '<button class="text-button" data-ops-action="payment-refund">发起退款</button>' : '<button class="text-button" data-ops-action="payment-refund">退款校验</button>'}</td>`;
+  const row = (item) => `<td>${item.receiptNo}</td><td>${item.orderNo}</td><td>${item.student}</td><td>${item.course}</td><td>${item.source}<br><span class="muted">${item.channel}</span></td><td class="ops-amount">${money(item.amount)}</td><td>${item.time}</td><td>${tag(item.status)}</td><td class="action-cell"><button class="text-button" data-ops-action="payment-view">查看详情</button>${item.status === '待确认' ? '<button class="text-button" data-ops-action="payment-confirm">确认到账</button>' : ''}${item.status === '已到账' ? '<button class="text-button" data-ops-action="payment-refund">退款校验</button>' : ''}</td>`;
   renderRows(opsData, row);
   bindFilter('payment-filter', opsData, (form) => { const { channel, source, status, keyword } = form; return (item) => (!channel.value || item.channel === channel.value) && (!source.value || item.source === source.value) && (!status.value || item.status === status.value) && (!keyword.value.trim() || `${item.orderNo}${item.student}`.includes(keyword.value.trim())); }, row);
 }
@@ -310,8 +318,8 @@ function handleAction(action, row) {
   if (action === 'payment-view') return detail('收款详情', '展示收款渠道、关联订单和到账状态。', [['收款单号', row.receiptNo], ['关联订单', row.orderNo], ['学员 / 课程', `${row.student} / ${row.course}`], ['收款来源', row.source], ['收款渠道', row.channel], ['收款金额', money(row.amount)], ['收款时间', row.time], ['到账状态', tag(row.status)]]);
   if (action === 'payment-confirm') { row.status = '已到账'; renderPayments(); return showToast('已确认到账，收款记录状态已更新。'); }
   if (action === 'payment-create') return openSimpleForm('登记线下收款', '银行转账和现金收款由财务人工登记，保存后进入待确认状态。', field('关联订单号', 'orderNo', 'text', '请输入订单号') + field('学员姓名', 'student', 'text', '请输入学员姓名') + field('课程名称', 'course', 'text', '请输入课程名称') + select('收款来源', 'source', ['面授课程', '视频课程'], false, false) + select('收款渠道', 'channel', ['银行转账', '现金', '其他'], false, false) + field('收款金额', 'amount', 'number', '请输入金额') + field('收款时间', 'time', 'datetime-local') + field('备注', 'remark', 'text', '选填', true), () => { closeDialog(); showToast('收款记录已登记，状态为待确认。'); });
-  if (action === 'payment-refund') { if (!row.refundable || row.source !== '面授课程') return openDialog('无法发起退款', '退款资格校验未通过。', `<p class="ops-danger">视频课程订单不支持退款。仅订单类型为面授课程且订单状态为已支付时允许创建退款申请。</p>`); return openSimpleForm('发起面授退款', '提交后进入教务主管审批；审批通过后订单进入退款中。', field('订单号', 'orderNo', 'text', row.orderNo) + field('退款金额', 'amount', 'number', String(row.amount)) + field('退款原因', 'reason', 'text', '请输入退款原因', true) + select('退款渠道', 'channel', ['银行转账', '现金', '微信支付', '支付宝'], false, false), (form) => { const outcome = createRefundRequest({ orderId: row.orderNo, origin: '后台发起', requestedBy: operatorName(), amount: Number(form.get('amount')) || row.amount, reason: String(form.get('reason') || '').trim(), channel: String(form.get('channel') || '银行转账') }); if (!outcome.ok) { showToast(outcome.reason === 'REFUND_ALREADY_OPEN' ? '该订单已有未结退款单，不能重复发起。' : '退款申请创建失败，请检查订单与金额。', 'warning'); return false; } syncSharedRefunds(); showToast('退款申请已创建，等待教务主管审批。'); }); }
-  if (action === 'refund-view') return detail('退款详情', '展示退款申请、审批和渠道处理信息；学员申请、学籍异动与线下退款记录同列展示。', [['退款单号', row.no], ['关联订单', row.orderNo], ['学员 / 手机号', `${row.student} / ${row.phone}`], ['课程 / 类型', `${row.course} / ${row.orderType}`], ['申请来源', row.origin || '系统'], ['申请金额', money(row.amount)], ...(row.totalLessons ? [['退款依据', `${row.rule || '按未消课课时比例'} · 已上 ${row.completedLessons ?? 0}/${row.totalLessons} 课时`]] : [['退款依据', row.rule || '视频课程全额退款规则']]), ['退款原因', row.reason], ['退款方式 / 渠道', `${row.source || '线上'} / ${row.channel}`], ['申请时间', row.time], ['当前状态', tag(row.status)], ['处理备注', row.remark || '—'], ['订单联动', row.objectType === '视频课程' || row.orderType === '视频课程' ? '退款完成后回收学习权限，学习记录保留' : row.classChangeId ? '学籍已先行退出；退款完成只更新关联状态，不重复减员' : '退款完成后学籍转为已退班并释放一次名额']]);
+  if (action === 'payment-refund') { if (row.status !== '已到账') return openDialog('无法发起退款', '退款资格校验未通过。', '<p class="ops-danger">仅已到账收款记录可进入退款校验；待确认或异常记录需先完成收款核对。</p>'); return openSimpleForm('发起全额退款', '退款金额固定为订单实收全额；提交后由统一退款服务校验资格并进入教务主管审批。', field('订单号', 'orderNo', 'text', row.orderNo) + `<label class="form-field"><span>退款金额</span><input class="readonly-field" readonly value="${money(row.amount)}" aria-label="退款金额锁定为订单实收全额"></label>` + field('退款原因', 'reason', 'text', '请输入退款原因', true) + select('退款渠道', 'channel', ['银行转账', '现金', '微信支付', '支付宝'], false, false), (form) => { const outcome = createRefundRequest({ orderId: row.orderNo, origin: '后台发起', requestedBy: operatorName(), reason: String(form.get('reason') || '').trim(), channel: String(form.get('channel') || '银行转账') }); if (!outcome.ok) { showToast(outcome.reason === 'REFUND_ALREADY_OPEN' ? '该订单已有有效退款单，不能重复发起。' : '退款申请创建失败，请检查订单资格。', 'warning'); return false; } syncSharedRefunds(); showToast('退款申请已创建，等待教务主管审批。'); }); }
+  if (action === 'refund-view') return detail('退款详情', '展示退款申请、审批和渠道处理信息；学员申请、学籍异动与线下退款记录同列展示。', [['退款单号', row.no], ['关联订单', row.orderNo], ['学员 / 手机号', `${row.student} / ${row.phone}`], ['课程 / 类型', `${row.course} / ${row.orderType}`], ['申请来源', row.origin || '系统'], ['申请金额', money(row.amount)], ...(row.totalLessons ? [['退款依据', `${row.rule || '资格校验通过，退订单实收全额'} · 已上 ${row.completedLessons ?? 0}/${row.totalLessons} 课时`]] : [['退款依据', row.rule || '视频课程全额退款规则']]), ['退款原因', row.reason], ['退款方式 / 渠道', `${row.source || '线上'} / ${row.channel}`], ['申请时间', row.time], ['当前状态', tag(row.status)], ['处理备注', row.remark || '—'], ['订单联动', row.objectType === '视频课程' || row.orderType === '视频课程' ? '退款完成后回收学习权限，学习记录保留' : row.classChangeId ? '学籍已先行退出；退款完成只更新关联状态，不重复减员' : '退款完成后学籍转为已退班并释放一次名额']]);
   if (action === 'refund-review') return openRefundReview(row);
   if (action === 'refund-complete') return openDialog('确认退款完成', '渠道退款完成后将同步订单和退款关联状态。', `<p>确认退款渠道已完成处理？订单将变为已退款。${row.classChangeId ? '该学籍已先行退出，本次不会再次减员。' : '仍在读的面授学籍将转为已退班并释放一次名额。'}</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-confirm-action="refund-complete">确认完成</button>')?.setAttribute('data-row-id', row.id);
   if (action === 'refund-exception') return openSimpleForm('登记退款异常', '渠道失败、超时或结果不明时登记；订单保持退款中，学籍不自动变化。', field('异常原因', 'reason', 'text', '请填写渠道错误或超时信息', true), (form) => { const reason = String(form.get('reason') || '').trim(); if (!reason) { showToast('异常原因必填。', 'warning'); return false; } const outcome = settleRefund(row.id, '异常', { name: operatorName(), exceptionReason: reason }); if (!outcome.ok) { showToast('退款异常登记失败，请刷新后重试。', 'warning'); return false; } syncSharedRefunds(); showToast('已登记退款异常并生成高优先级待办。', 'warning'); });

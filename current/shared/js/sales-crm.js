@@ -986,11 +986,11 @@ function openEnrollmentChangeForm(row, enrollment) {
     .filter(item => item.id !== row.id)
     .filter(item => !(shared.enrollments || []).some(entry => entry.classId === item.id && entry.studentId === enrollment.studentId && isEnrollmentActive(entry.status)));
   const targetOptions = targets.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('');
-  // 退班／退学可同步发起退费：金额按订单实收 × 未消课课时比例估算，最终以财务审批为准。
+  // 退班／退学可同步发起全额终结退款，最终以财务审批为准。
   const paidOrders = enrollmentRefundCandidates(row, enrollment.studentId);
-  const suggestedTotal = paidOrders.reduce((sum, item) => sum + item.suggested, 0);
+  const refundTotal = paidOrders.reduce((sum, item) => sum + item.refundAmount, 0);
   const refundFields = paidOrders.length
-    ? `<label class="form-field wide"><span>同步发起退费</span><span class="sales-inline-check"><input type="checkbox" name="withRefund" value="是" checked>本班已支付订单 ${paidOrders.length} 笔，预计退款 ${suggestedTotal} 元（${paidOrders[0].rule}）</span><small class="sub-cell">取消勾选则本次异动不发起退费，可由学员在「我的订单」自助申请，或由财务线下登记。</small></label>`
+    ? `<label class="form-field wide"><span>同步发起退费</span><span class="sales-inline-check"><input type="checkbox" name="withRefund" value="是" checked>本班已支付订单 ${paidOrders.length} 笔，全额退款合计 ${refundTotal} 元（${paidOrders[0].rule}）</span><small class="sub-cell">取消勾选则本次异动不发起退费，可由学员在「我的订单」自助申请，或由财务线下登记。</small></label>`
     : '<p class="sales-roster-meta">本班暂无可退费的已支付订单，本次异动只变更学籍。</p>';
   const fields = `<label class="form-field"><span>异动类型 <b class="required-mark">*</b></span><select name="type" required><option value="">请选择</option><option>退班</option><option>转班</option><option>退学</option></select></label>
     <label class="form-field"><span>转入班级</span><select name="targetClassId"><option value="">转班时必填</option>${targetOptions}</select></label>
@@ -1017,16 +1017,16 @@ function openEnrollmentChangeForm(row, enrollment) {
 }
 
 // 学籍异动可退费的订单：本班该学员的已支付订单，且当前没有未结退款单。
-// 建议金额按面授退款参数计算；学籍异动不是学员自助入口，不受自助窗口与消课比例上限拦截。
+// 退款金额固定为订单实收全额；学籍异动不是学员自助入口，不受自助窗口与消课比例上限拦截。
 function enrollmentRefundCandidates(row, studentId) {
   const shared = readDemoState();
   return (shared.orders || [])
     .filter(order => order.classId === row.id && order.studentId === studentId && order.status === '已支付')
     .map(order => {
       const suggestion = classRefundSuggestion({ order, classRecord: row, selfService: false });
-      return { order, suggested: suggestion.suggested, rule: suggestion.rule, total: suggestion.total, completed: suggestion.completed };
+      return { order, refundAmount: suggestion.refundAmount, rule: suggestion.rule, total: suggestion.total, completed: suggestion.completed };
     })
-    .filter(item => item.suggested > 0 && !openRefundForOrder(item.order.id));
+    .filter(item => item.refundAmount > 0 && !openRefundForOrder(item.order.id));
 }
 
 function applyEnrollmentChange(row, enrollment, { type, reason, targetClassId, withRefund = false, refundOrders = [] }) {
@@ -1066,7 +1066,7 @@ function applyEnrollmentChange(row, enrollment, { type, reason, targetClassId, w
         orderId: item.order.id,
         origin: REFUND_ORIGIN.ENROLLMENT,
         requestedBy: '教务异动登记',
-        amount: item.suggested,
+        amount: item.refundAmount,
         reason: `${type}退费：${reason}`,
         channel: item.order.payMethod || '原路退回',
         classChangeId: changeId,

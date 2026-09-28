@@ -18,7 +18,7 @@ function check(condition, label) {
   passed.push(label);
 }
 
-const futureSession = { date: '2026-09-20', startTime: '09:00', endTime: '10:00', status: '待上课' };
+const futureSession = { date: '2026-12-20', startTime: '09:00', endTime: '10:00', status: '待上课' };
 const defaults = store.classRefundSettings();
 
 function seedClassCase(suffix, { status = '已分班', enrolled = 5, amount = 100 } = {}) {
@@ -28,9 +28,9 @@ function seedClassCase(suffix, { status = '已分班', enrolled = 5, amount = 10
   store.writeDemoState((next) => ({
     ...next,
     classRefundSettings: defaults,
-    classes: [...next.classes.filter((row) => row.id !== classId), { id: classId, name: suffix, lessons: 1, sessions: [futureSession], enrolled }],
-    orders: [...next.orders.filter((row) => row.id !== orderId), { id: orderId, classId, studentId: 'student-001', accountId: 'account-001', amount, status: '已支付', createdAt: '2026-09-01 09:00' }],
-    enrollments: [...next.enrollments.filter((row) => row.id !== enrollmentId), { id: enrollmentId, classId, studentId: 'student-001', accountId: 'account-001', status }]
+    classes: [...next.classes.filter((row) => row.id !== classId), { ...(next.classes[0] || {}), id: classId, name: suffix, lessons: 1, sessions: [futureSession], enrolled }],
+    orders: [...next.orders.filter((row) => row.id !== orderId), { ...(next.orders[0] || {}), id: orderId, classId, courseId: '', studentId: 'student-001', accountId: 'account-001', amount, status: '已支付', createdAt: '2026-09-01 09:00' }],
+    enrollments: [...next.enrollments.filter((row) => row.id !== enrollmentId), { ...(next.enrollments[0] || {}), id: enrollmentId, classId, studentId: 'student-001', accountId: 'account-001', status }]
   }));
   return { classId, orderId, enrollmentId };
 }
@@ -40,7 +40,6 @@ function enrollmentOf(testCase) {
 }
 
 check(defaults.windowDays === 0 && defaults.selfMaxCompletedPercent === 100, '默认退款期限和消课比例参数正确');
-check(defaults.includeBonusLessons === false && defaults.handlingFeePercent === 0 && defaults.minAmount === 1, '默认赠课、手续费和最低金额参数正确');
 
 const applyCase = seedClassCase('apply');
 const application = refunds.createRefundRequest({ orderId: applyCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER, requestedBy: '学员' });
@@ -122,9 +121,10 @@ refunds.settleRefund(videoDoneRequest.refund.id, '完成', { name: '财务' });
 check(store.readDemoState().videoEntitlements.find((row) => row.courseId === videoDoneCase.courseId).status === '已失效', '视频退款完成回收学习授权');
 
 const offlineCase = seedClassCase('offline', { amount: 120 });
-const offline = refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 80, reason: '协商终结退款', channel: '银行转账', voucher: 'refund.pdf', operator: { name: '周财务', role: '财务' } });
+check(refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 40 }).reason === 'REFUND_AMOUNT_INVALID', '线下登记拦截部分退款');
+const offline = refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 120, reason: '协商终结退款', channel: '银行转账', voucher: 'refund.pdf', operator: { name: '周财务', role: '财务' } });
 check(offline.ok && offline.refund.status === '已退款' && offline.refund.source === '线下', '线下退款经统一服务直接终结');
 check(offline.order.status === '已退款' && enrollmentOf(offlineCase).status === '已退班', '线下退款联动订单与学籍');
-check(refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 40 }).reason === 'ORDER_ALREADY_REFUNDED', '线下退款完成后拦截第二次退款');
+check(refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 120 }).reason === 'ORDER_ALREADY_REFUNDED', '线下退款完成后拦截第二次退款');
 
 console.log(`退款闭环回归通过：${passed.length} 项`);
