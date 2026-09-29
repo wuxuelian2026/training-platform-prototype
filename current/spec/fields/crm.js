@@ -96,7 +96,10 @@ export const CRM_FIELD_SPEC = {
         { heading: '新增线索字段', fields: [
           { id: 'FD-CRM-016', label: '联系人', type: '文本', length: '2–30 字', required: '是', note: '线索联系人姓名', constraints: { minLength: 2, maxLength: 30 } },
           { id: 'FD-CRM-017', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '用于跟进与转化', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
-          { id: 'FD-CRM-018', label: '意向课程', type: '文本', length: '≤ 50 字', required: '否', note: '记录意向方向，便于分配课程顾问', constraints: { maxLength: 50 } },
+          { id: 'FD-CRM-018', label: '意向课程', type: '课程库引用', length: '必选 1 门面授课程', required: '是', note: '保存 course_id 与课程名称；仅允许选择课程库中已完成且未停用的面授课程', constraints: { dictionary: '课程库', required: true } },
+          { id: 'FD-CRM-097', label: '关联班级', type: '班级库引用', length: '最多 1 个班级', required: '否', note: '只展示所选意向课程下当前可报名且已发布的班级', constraints: { dictionary: '面授班级' } },
+          { id: 'FD-CRM-098', label: '关联教师', type: '只读派生', length: '—', required: '系统派生', note: '取关联班级授课教师，不允许手工输入', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-099', label: '意向备注', type: '多行文本', length: '≤ 200 字', required: '否', note: '记录学习目标、时间偏好等销售备注', constraints: { maxLength: 200 } },
           { id: 'FD-CRM-019', label: '来源类型', type: '下拉', length: '线上咨询 / 后台登记 / 转介绍 / 活动', required: '否', note: '记录线索来源渠道；与试听登记使用同一套预置来源，不再出现“咨询／后台登记试听”两套写法', constraints: { options: ['线上咨询', '后台登记', '转介绍', '活动'] } },
           { id: 'FD-CRM-075', label: '线索标签', type: '多选', length: '最多 5 个', required: '否', note: '固定标签用于销售分层与筛选，不参与线索状态流转', constraints: { options: ['高意向', '待回访', '试听后待转化', '价格敏感', '已流失待激活'], multi: true, maxItems: 5 } }
         ] }
@@ -108,6 +111,7 @@ export const CRM_FIELD_SPEC = {
         '同一手机号只保留一条主线索；已流失线索通过重新激活恢复，不重新建档，意向变化记录在跟进记录中。',
         'CR-2026-038：线索详情展示该线索名下的试听记录与报名结果，形成完整链条。'
         ,'P2：线索标签仅用于销售分层、筛选和详情识别，不改变 `SM-LEAD` 状态；标签取固定枚举，最多 5 个，可在列表行操作中维护。'
+        ,'历史仅有课程文本的线索标记为 unmatched；试听和转报名必须先补齐课程库关联，不得直接选择任意班级。'
       ]
     },
     'crm/conversions': {
@@ -132,12 +136,13 @@ export const CRM_FIELD_SPEC = {
       groups: [
         { heading: '登记试听字段', fields: [
           { id: 'FD-CRM-072', label: '来源线索编号', type: '下拉', length: '线索编号', required: '是', note: '试听记录必须关联来源线索；由线索发起试听登记时自动带入，直接登记试听时需选择来源线索', constraints: { dictionary: '线索' } },
-          { id: 'FD-CRM-020', label: '学员姓名', type: '文本', length: '2–30 字', required: '是', note: '试听学员姓名', constraints: { minLength: 2, maxLength: 30 } },
-          { id: 'FD-CRM-021', label: '家长手机号', type: '文本', length: '11 位数字', required: '是', note: '用于联系与后续转化', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
-          { id: 'FD-CRM-022', label: '目标课程', type: '文本', length: '≤ 50 字', required: '否', note: '试听意向课程', constraints: { maxLength: 50 } },
+          { id: 'FD-CRM-020', label: '学员姓名', type: '只读派生', length: '—', required: '系统继承', note: '取来源线索联系人，不允许在试听记录中改写', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-021', label: '家长手机号', type: '只读派生', length: '—', required: '系统继承', note: '取来源线索手机号，不允许在试听记录中改写', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-022', label: '目标课程', type: '课程库引用（只读）', length: '—', required: '系统继承', note: '取来源线索课程库关联，不允许自由文本输入', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-100', label: '试听班级', type: '班级库引用', length: '最多 1 个班级', required: '系统继承', note: '取线索关联班级；直接登记时由课程关联班级补充', constraints: { derived: true } },
           { id: 'FD-CRM-023', label: '试听时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '需与教师课表不冲突', constraints: { format: 'YYYY-MM-DD HH:mm' } },
           { id: 'FD-CRM-024', label: '试听校区', type: '下拉', length: '预置校区', required: '否', note: '试听发生校区' },
-          { id: 'FD-CRM-025', label: '试听教师', type: '下拉', length: '可选教师', required: '否', note: '需满足该专业可排课条件' },
+          { id: 'FD-CRM-025', label: '试听教师', type: '只读派生', length: '—', required: '系统继承', note: '取试听班级授课教师，不允许手工输入', constraints: { readOnly: true, derived: true } },
           { id: 'FD-CRM-026', label: '学员年龄', type: '文本', length: '≤ 20 字', required: '否', note: '登记试听学员年龄，用于匹配合适班级', constraints: { maxLength: 20 } },
           { id: 'FD-CRM-027', label: '备注', type: '多行文本', length: '≤ 200 字', required: '否', note: '选填，记录试听安排或特殊说明', constraints: { maxLength: 200 } }
         ] },

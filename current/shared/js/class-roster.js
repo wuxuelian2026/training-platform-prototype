@@ -57,6 +57,12 @@ function enrolledStudentsOf(classId) {
 
 // 名册 = 报名分班学员（置顶）+ 演示名册池补足到班级报名人数；按姓名去重。
 export function classRosterFor(classId, size = 0) {
+  // CR-2026-151：结业审核共享种子中的暑期中国舞基础1班固定为 5 名学员，名册必须与审核数据一致。
+  if (classId === 'class-mock-ended-pending-01') {
+    const names = new Set(['林知夏', '周予安', '陈一诺', '赵明月', '吴桐']);
+    const roster = DEMO_ROSTER.filter((student) => names.has(student.name));
+    return roster;
+  }
   const enrolled = enrolledStudentsOf(classId);
   const names = new Set(enrolled.map((item) => item.name));
   const roster = [...enrolled];

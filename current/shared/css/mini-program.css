@@ -584,6 +584,17 @@ body { background: #f7f7f5; }
 .mp-homework-facts div { padding-top: 9px; border-top: 1px solid #eee9e5; }
 .mp-homework-facts dt { color: var(--muted); font-size: 9px; }
 .mp-homework-facts dd { margin: 4px 0 0; color: #514943; font-size: 10px; line-height: 1.45; }
+.mp-homework-readonly { border-left: 3px solid #b86f5d; }
+.mp-homework-readonly-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0 0; }
+.mp-homework-readonly-facts div { padding-top: 9px; border-top: 1px solid #eee9e5; }
+.mp-homework-readonly-facts dt { color: var(--muted); font-size: 9px; }
+.mp-homework-readonly-facts dd { margin: 4px 0 0; color: #514943; font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.mp-homework-readonly-block { margin-top: 14px; padding-top: 11px; border-top: 1px solid #eee9e5; }
+.mp-homework-readonly-block strong { display: block; color: #514943; font-size: 10px; }
+.mp-homework-readonly-block p { margin: 6px 0 0; color: #514943; font-size: 11px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 420px) {
+  .mp-homework-readonly-facts { grid-template-columns: 1fr; gap: 8px; }
+}
 .teacher-lesson-locked { padding: 28px 18px; border: 1px solid #e4ded9; border-radius: 8px; background: #fff; text-align: center; }
 .teacher-lesson-locked strong { font-size: 14px; }
 .teacher-lesson-locked p { margin: 7px auto 14px; color: var(--muted); font-size: 11px; line-height: 1.55; }
@@ -816,6 +827,28 @@ body { background: #f7f7f5; }
 .teacher-graduation-picker > div { display: grid; gap: 6px; max-height: 220px; overflow-y: auto; }
 .teacher-graduation-picker label { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 8px; padding: 8px 10px; border: 1px solid #eee7e0; border-radius: 8px; font-size: 12px; }
 .teacher-graduation-picker label small { grid-column: 2; color: var(--muted); font-size: 10px; }
+.teacher-graduation-picker > div { max-height: none; }
+.teacher-graduation-student-card { padding: 10px; border: 1px solid #eee7e0; border-radius: 8px; background: #fff; }
+.teacher-graduation-student-card.is-excluded { opacity: .55; }
+.teacher-graduation-student-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.teacher-graduation-student-picker { display: flex !important; align-items: flex-start !important; gap: 8px !important; padding: 0 !important; border: 0 !important; }
+.teacher-graduation-student-picker span { min-width: 0; }
+.teacher-graduation-student-picker strong, .teacher-graduation-student-picker small { display: block; }
+.teacher-graduation-student-picker small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.teacher-graduation-student-fields { display: grid; gap: 8px; margin: 10px 0 0 24px; }
+.teacher-graduation-student-card:not(.is-expanded) .teacher-graduation-student-fields { display: none; }
+.teacher-graduation-toggle { flex: none; padding: 4px 8px; border: 0; border-radius: 5px; background: #f3f0ed; color: #655d58; font-size: 11px; }
+.teacher-graduation-student-fields .mp-field { margin: 0; }
+.teacher-graduation-student-fields textarea { min-height: 72px; }
+.teacher-graduation-apply-page { display: grid; gap: 14px; }
+.teacher-graduation-apply-page-head { padding: 4px 2px 0; }
+.teacher-graduation-apply-page-head span { display: block; margin-top: 12px; color: var(--muted); font-size: 11px; }
+.teacher-graduation-apply-page-head h1 { margin: 4px 0 0; font-size: 21px; }
+.teacher-graduation-apply-page-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.teacher-page-back { color: var(--muted); font-size: 12px; text-decoration: none; }
+.teacher-graduation-apply-form { padding: 16px 16px 88px; }
+.teacher-graduation-apply-actions { position: sticky; z-index: 3; bottom: 0; display: grid; grid-template-columns: .8fr 1.2fr; gap: 9px; margin: 14px -16px -72px; padding: 12px 16px 16px; border-top: 1px solid #eee7e0; background: rgba(255, 255, 255, .96); box-shadow: 0 -5px 14px rgba(39, 31, 25, .06); }
+.teacher-graduation-apply-actions .mp-button { width: 100%; text-align: center; }
 .teacher-class-no-next { margin: 13px 0 0; color: var(--muted); font-size: 11px; }
 .teacher-class-recent-record > strong { display: block; margin-top: 12px; font-size: 12px; }
 .teacher-class-recent-record > p { margin: 5px 0 0; color: #655d58; font-size: 10px; line-height: 1.6; }
@@ -1690,6 +1723,10 @@ body:has(.mp-class-nav) .page-help-trigger { display: none; }
 body:has(.is-schedule-share) .page-help-trigger { display: none; }
 .mp-class-section { scroll-margin-top: 106px; }
 .mp-class-result-group { display: grid; gap: 12px; }
+.mp-class-result-actions { margin-top: 14px; padding: 14px 0 2px; border-top: 1px solid #f0ece8; }
+.mp-class-result-actions h3 { margin: 0 0 10px; font-size: 14px; }
+.mp-class-result-actions-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.mp-class-result-actions-grid .mp-button { min-width: 0; padding: 0 10px; font-size: 12px; }
 .mp-class-hero-kicker { display: block; color: var(--muted); font-size: 11px; }
 .mp-class-next { display: grid; gap: 6px; padding: 14px 16px; background: var(--brand-soft); border: 1px solid #f0d8d4; border-left: 4px solid var(--brand); border-radius: 8px; box-shadow: 0 3px 12px rgba(62, 39, 25, .05); }
 .mp-class-next strong { font-size: 16px; }

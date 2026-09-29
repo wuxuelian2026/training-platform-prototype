@@ -157,7 +157,7 @@ const completedEnrollmentEndedPending = [1, 2, 3].map(index => {
   // 中国舞（王玥）：暑期批次课次保留在历史区间（6 月），全部课次早于演示基准日 2026-09-12，稳定派生「已结课」。
   // 保留组内 15 分钟跨校区衔接，继续用于演示教师转场提示。
   const sessions = publishedSessions('2026-06-18', { ...slotOf(CLASS_SLOTS.dance, index), total: courseTotalHours('COURSE-MOCK-1003') });
-  return classRecord({ id: `class-mock-ended-pending-${String(index).padStart(2, '0')}`, name: `暑期中国舞基础${index}班`, courseId: 'COURSE-MOCK-1003', course: '中国舞进阶训练', major: '中国舞', teacher: '王玥', scheduleStatus: '已发布', enrollStart: '2026-05-01 09:00', deadline: '2026-06-10 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 12, demoHomework: '点评完成', weekdays: ['周四'], updatedAt: '2026-09-10 10:00' });
+  return classRecord({ id: `class-mock-ended-pending-${String(index).padStart(2, '0')}`, name: `暑期中国舞基础${index}班`, courseId: 'COURSE-MOCK-1003', course: '中国舞进阶训练', major: '中国舞', teacher: '王玥', scheduleStatus: '已发布', enrollStart: '2026-05-01 09:00', deadline: '2026-06-10 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: index === 1 ? 5 : 12, demoHomework: '点评完成', weekdays: ['周四'], updatedAt: '2026-09-10 10:00' });
 });
 
 const completedEnrollmentEndedTeaching = [1, 2, 3].map(index => {
@@ -215,5 +215,8 @@ export function mergeClassSeed(overlay = []) {
   (overlay || []).forEach((item) => {
     byId.set(item.id, { ...(byId.get(item.id) || {}), ...item });
   });
+  // CR-2026-151：结业审核共享种子明确该班级只有 5 名学员，兼容旧缓存中的 12 人配置。
+  const endedDance = byId.get('class-mock-ended-pending-01');
+  if (endedDance) byId.set('class-mock-ended-pending-01', { ...endedDance, enrolled: 5 });
   return [...byId.values()];
 }

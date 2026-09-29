@@ -10,16 +10,19 @@
 <body>
   <div data-admin-shell data-title="我的待办" data-active="dashboard">
     <div id="page-content">
-      <div class="page-head"><div><h1>我的待办</h1></div><div class="toolbar-actions"><a class="button" href="../visualization/index.html">运营可视化大屏</a><button class="button primary">刷新数据</button></div></div>
+      <div class="page-head"><div><h1>我的待办</h1></div><div class="toolbar-actions"><a class="button" href="../visualization/index.html">运营可视化大屏</a><button class="button primary" type="button" data-workbench-refresh>刷新数据</button></div></div>
+      <div data-workbench-todos>
       <div class="card-grid">
         <div class="card"><div class="metric-label">在招生班级</div><div class="metric-value">12</div><div class="metric-note">较上周 +2</div></div>
-        <div class="card"><div class="metric-label">待复核结业</div><div class="metric-value">8</div><div class="metric-note">其中补课中3个</div></div>
+        <div class="card"><div class="metric-label">待处理事项</div><div class="metric-value" data-todo-count>0</div><div class="metric-note">按当前角色权限统计</div></div>
         <div class="card"><div class="metric-label">本月有效课时</div><div class="metric-value">286</div><div class="metric-note">已完成课次143</div></div>
-        <div class="card"><div class="metric-label">待发布工资</div><div class="metric-value">16</div><div class="metric-note">2026年8月工资草稿</div></div>
+        <div class="card"><div class="metric-label">高优先级异常</div><div class="metric-value" data-overdue-count>0</div><div class="metric-note">需优先处理</div></div>
       </div>
-      <div class="card"><div class="toolbar"><strong>重点待办</strong><span class="tag brand">今日更新</span></div><div class="mobile-list-item"><div><strong>课程申报待审核</strong><small>教研主管 · 5条</small></div><a class="button" href="pages/courses/applications.html">处理</a></div><div class="mobile-list-item"><div><strong>班级结业待复核</strong><small>教务主管 · 8条</small></div><a class="button" href="pages/academic/graduation.html">处理</a></div><div class="mobile-list-item"><div><strong>工资草稿待发布</strong><small>财务 · 16条</small></div><a class="button" href="pages/finance/salary.html">处理</a></div></div>
+      <div class="card"><div class="toolbar"><strong>重点待办</strong><span class="tag brand">实时汇总</span></div><div data-todo-list></div></div>
+      </div>
     </div>
   </div>
   <script type="module" src="../shared/js/admin-shell.js"></script>
+  <script type="module" src="../shared/js/workbench-todos.js"></script>
 </body>
 </html>
