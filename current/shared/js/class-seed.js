@@ -38,7 +38,7 @@ const publishedSessions = (firstDate, { total = 8, roomId = 'venue-302', startTi
 
 // owner：显式指定授课教师（用于「未发布的排课阶段演示班级归芭蕾舞教师徐帆」这一演示例外，见 CR-2026-134）；
 // demoHomework：该班的作业演示状态（'' | '未提交' | '点评中' | '点评完成'），驱动课次详情与课次行的作业口径。
-const classRecord = ({ id, name, courseId = 'COURSE-CR-2026-0001', course = '舞蹈基本功', teacher = '王玥', major = '中国舞', owner = '', demoHomework = '', batch = '秋季', scheduleStatus, enrollStart = '', deadline = '', firstLessonDate = '', sessions = [], enrolled = 0, capacity = 20, recommended = false, weekdays = ['周六'], updatedAt = '2026-09-17 10:00' }) => ({
+const classRecord = ({ id, name, courseId = 'COURSE-CR-2026-0001', course = '舞蹈基本功', teacher = '王玥', major = '中国舞', owner = '', demoHomework = '', batch = '秋季', scheduleStatus, enrollStart = '', deadline = '', firstLessonDate = '', sessions = [], enrolled = 0, capacity = 20, recommended = false, weekdays = ['周六'], scheduleHistory = [], updatedAt = '2026-09-17 10:00' }) => ({
   id,
   name,
   courseId,
@@ -53,7 +53,8 @@ const classRecord = ({ id, name, courseId = 'COURSE-CR-2026-0001', course = '舞
   enrolled,
   price: 1680,
   scheduleStatus,
-  scheduleVersion: scheduleStatus === '已发布' ? 1 : 0,
+  scheduleVersion: scheduleStatus === '已发布' ? Math.max(1, scheduleHistory.length) : 0,
+  scheduleHistory,
   schedule: scheduleStatus === '已发布' ? `每${weekdays[0] || '周六'} ${sessions[0]?.startTime || '09:00'}-${sessions[0]?.endTime || '10:30'}` : '',
   weekdays: scheduleStatus === '已发布' ? weekdays : [],
   firstLessonDate,
@@ -190,7 +191,12 @@ const classSceneClasses = SCENE_CLASSES.map((item) => {
 // 招生阶段「未开始」样班（李青）：报名 2026-10-01 开始、首课 2026-11-05，保证招生阶段三个状态都有演示数据。
 const readyPaintingClass = (() => {
   const sessions = publishedSessions('2026-11-05', { roomId: 'venue-art105', startTime: '16:45', endTime: '18:15', total: courseTotalHours('COURSE-CR-2026-0003') });
-  return classRecord({ id: 'class-mock-ready-painting-01', name: '秋季少儿国画待招生1班', courseId: 'COURSE-CR-2026-0003', course: '少儿国画入门', major: '中国画', teacher: '李青', scheduleStatus: '已发布', enrollStart: '2026-10-01 09:00', deadline: '2026-10-31 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 4, weekdays: ['周四'], updatedAt: '2026-09-20 10:00' });
+  const schedule = '每周四 16:45-18:15';
+  const scheduleHistory = [
+    { version: 1, effectiveAt: '2026-09-18 15:20', operator: '教务管理员', reason: '首次发布排班', teacher: '李青', campus: '光谷校区', classroom: '美术教室105', schedule: '每周四 15:00-16:30', firstLessonDate: '2026-11-05', lessonCount: sessions.length },
+    { version: 2, effectiveAt: '2026-09-20 10:00', operator: '教务管理员', reason: '整班排班变更', teacher: '李青', campus: '光谷校区', classroom: '美术教室105', schedule, firstLessonDate: sessions[0].date, lessonCount: sessions.length }
+  ];
+  return classRecord({ id: 'class-mock-ready-painting-01', name: '秋季少儿国画待招生1班', courseId: 'COURSE-CR-2026-0003', course: '少儿国画入门', major: '中国画', teacher: '李青', scheduleStatus: '已发布', enrollStart: '2026-10-01 09:00', deadline: '2026-10-31 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 4, weekdays: ['周四'], scheduleHistory, updatedAt: '2026-09-20 10:00' });
 })();
 export const classSeed = [
   ...pendingScheduleClasses,

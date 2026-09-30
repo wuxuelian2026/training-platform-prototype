@@ -4,11 +4,34 @@
 //       pages 承载页面（决定页面说明的状态段出现在哪些页）；diagram 是否出图。不得在此新增或改写状态语义。
 export const STATE_MACHINES = [
   {
+    "id": "SM-CLASS-SCHEDULE-STAGE",
+    "object": "阶段1 排课状态",
+    "diagram": false,
+    "pages": ["crm/classes"],
+    "states": [["pending", "待排课", false], ["scheduling", "排课中", false], ["completed", "已完成", true], ["cancelled", "已取消", true]],
+    "transitions": [["待排课", "保存排课草稿", "排课中", "教务主管"], ["待排课/排课中", "确认发布并生成正式课次", "已完成", "教务主管"], ["待排课/排课中", "取消班级", "已取消", "教务主管"]]
+  },
+  {
+    "id": "SM-CLASS-ENROLLMENT-STAGE",
+    "object": "阶段2 招生状态",
+    "diagram": false,
+    "pages": ["crm/classes"],
+    "states": [["not_started", "未开始", false], ["active", "进行中", false], ["ended", "已结束", true]],
+    "transitions": [["未开始", "到达报名开始时间", "进行中", "系统"], ["进行中", "到达报名截止时间或首课时间", "已结束", "系统"]]
+  },
+  {
+    "id": "SM-CLASS-TEACHING-STAGE",
+    "object": "阶段3 教学状态",
+    "diagram": false,
+    "pages": ["crm/classes"],
+    "states": [["pending", "待开课", false], ["teaching", "授课中", false], ["ended", "已结课", true]],
+    "transitions": [["待开课", "到达首课开始时间", "授课中", "系统"], ["授课中", "全部课次完成", "已结课", "系统"]]
+  },
+  {
     "id": "SM-CLASS-OPERATION",
     "object": "班级运营",
     "diagram": true,
     "pages": [
-      "crm/classes",
       "learner/fast-registration",
       "learner/class-detail"
     ],
@@ -78,23 +101,22 @@ export const STATE_MACHINES = [
     ]
   },
   {
-    // CR-2026-038 §3.1：销售线索状态机（字典 §12.4），承载 crm/leads 与派生视图 crm/conversions。
+    // CR-2026-038 §3.1：销售线索状态机（字典 §12.4），承载 crm/leads；CR-2026-152 起转化漏斗并入线索跟进页。
     "id": "SM-LEAD",
     "object": "销售线索",
     "diagram": false,
     "pages": [
-      "crm/leads",
-      "crm/conversions"
+      "crm/leads"
     ],
     "states": [
       [
-        "pending_assign",
-        "待分配",
+        "pending_followup",
+        "待跟进",
         false
       ],
       [
-        "following",
-        "跟进中",
+        "followed",
+        "已跟进",
         false
       ],
       [
@@ -110,19 +132,19 @@ export const STATE_MACHINES = [
     ],
     "transitions": [
       [
-        "待分配",
-        "指派负责人",
-        "跟进中",
+        "待跟进",
+        "首次有效跟进",
+        "已跟进",
         "销售"
       ],
       [
-        "跟进中",
+        "已跟进",
         "生成面授订单",
         "已转化",
         "系统"
       ],
       [
-        "跟进中",
+        "已跟进",
         "填写流失原因",
         "已流失",
         "销售"
@@ -130,19 +152,18 @@ export const STATE_MACHINES = [
       [
         "已流失",
         "重新激活（填原因）",
-        "跟进中",
+        "待跟进",
         "销售"
       ]
     ]
   },
   {
-    // CR-2026-038 §3.1：试听预约状态机（字典 §12.5），承载 crm/trials 与派生视图 crm/conversions。
+    // CR-2026-038 §3.1：试听预约状态机（字典 §12.5），承载 crm/trials；CR-2026-152 起转化漏斗并入线索跟进页。
     "id": "SM-TRIAL",
     "object": "试听预约",
     "diagram": false,
     "pages": [
-      "crm/trials",
-      "crm/conversions"
+      "crm/trials"
     ],
     "states": [
       [
@@ -192,7 +213,6 @@ export const STATE_MACHINES = [
     "object": "班级前台展示",
     "diagram": true,
     "pages": [
-      "crm/classes",
       "learner/fast-registration"
     ],
     "states": [
@@ -238,7 +258,6 @@ export const STATE_MACHINES = [
     "object": "报名",
     "diagram": true,
     "pages": [
-      "crm/classes",
       "learner/orders"
     ],
     "states": [

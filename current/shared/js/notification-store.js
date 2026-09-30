@@ -2,7 +2,7 @@
 // 通知主记录与逐人投递记录。发送时冻结接收人快照；补发只针对发送失败对象且幂等。
 import { demoTime, messageRetrySettings, readDemoState, writeDemoState } from './demo-store.js';
 
-export const NOTIFICATION_STATUS = { PENDING: '待发送', SENT: '发送成功', PARTIAL: '部分失败', FAILED: '发送失败', CANCELED: '已取消' };
+export const NOTIFICATION_STATUS = { PENDING: '待发送', SENT: '已发送', FAILED: '发送失败', CANCELED: '已取消' };
 export const DELIVERY_STATUS = { PENDING: '待发送', DELIVERED: '已送达', FAILED: '发送失败' };
 export const NOTIFICATION_SOURCE = { MANUAL: '人工通知', SYSTEM: '系统通知' };
 // 预置通知类型：人工通知由教务发起，系统通知由业务动作自动产生，共用同一份发送与投递记录。
@@ -65,8 +65,8 @@ export function notificationStatusOf(deliveries = []) {
   const failed = deliveries.filter((row) => row.status === DELIVERY_STATUS.FAILED).length;
   const pending = deliveries.filter((row) => row.status === DELIVERY_STATUS.PENDING).length;
   if (pending === deliveries.length) return NOTIFICATION_STATUS.PENDING;
-  if (!failed) return NOTIFICATION_STATUS.SENT;
-  return failed === deliveries.length ? NOTIFICATION_STATUS.FAILED : NOTIFICATION_STATUS.PARTIAL;
+  // 状态机为通知级三态＋已取消：任一接收人失败即整条「发送失败」，逐人结果留在投递明细。
+  return failed ? NOTIFICATION_STATUS.FAILED : NOTIFICATION_STATUS.SENT;
 }
 
 function statsOf(deliveries = []) {

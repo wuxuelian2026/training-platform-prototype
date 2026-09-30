@@ -10,7 +10,7 @@ import { TEACHER_FACTS } from './teacher-facts.js';
 import { explainTeacherCapacity } from './teacher-capacity.js';
 import { NOTIFICATION_SOURCE, NOTIFICATION_TYPES, cancelScheduledNotification, listNotifications, notificationDeliveryRows, processNotificationTasks, resendFailedDeliveries, retryPolicy, sendNotification } from './notification-store.js';
 import { defaultLessonDuration, lessonDurationValues, TIMELINE_END, TIMELINE_START, TIMELINE_STEP_MINUTES, TIMELINE_TICK_COUNT, isWithinTimeline, lessonDurationOptions, lessonEndTime, snapToStep, toMinutes, toTime } from './timetable-settings.js';
-import { classEnrollmentCondition, classScheduleStatus, classTeachingStatus, lessonStatusOf } from './class-lifecycle.js';
+import { classEnrollmentCondition, classScheduleChangeAllowed, classScheduleStatus, classTeachingStatus, lessonStatusOf } from './class-lifecycle.js';
 import { homeworkLifecycleStatus, homeworkRosterDrift, listHomework, listSubmissions, submissionSummary } from './homework-store.js';
 import { graduationSeed as graduation } from './graduation-seed.js';
 
@@ -33,7 +33,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => 
 const statusClass = (value) => ({
   启用: 'green', 停用: 'gray', 未发布: 'gray', 招生中: 'brand', 已满员: 'amber', 进行中: 'brand', 已结束: 'gray', 已排班: 'green', 待排课: 'amber', 排课中: 'brand', 已完成: 'green', 冲突: 'red', 无: 'green',
   待上课: 'amber', 上课中: 'brand', 已完成: 'green', 已到: 'green', 迟到: 'amber', 请假: 'gray', 缺勤: 'red', 正常: 'green', 待补录: 'amber', 已补录: 'green',
-  作业进行中: 'brand', 作业已结束: 'gray', 发送成功: 'green', 部分失败: 'amber', 发送中: 'brand', 发送失败: 'red', 待复核: 'brand', 建议结业: 'green', 需补课: 'amber', 已通过: 'green', 已取消结业: 'gray', 待教师提交: 'gray', 待后台审核: 'brand', 审核完成: 'gray', 未发起: 'gray',
+  作业进行中: 'brand', 作业已结束: 'gray', 待发送: 'amber', 已发送: 'green', 发送失败: 'red', 待复核: 'brand', 建议结业: 'green', 已通过: 'green', 已取消结业: 'gray', 复核中: 'brand', 已归档: 'gray', 审核中: 'brand', 未发起: 'gray',
   草稿: 'gray', 已发布: 'green', 已撤回: 'amber', 已生成: 'green', 生成中: 'brand', 生成失败: 'red'
 }[value] || 'gray');
 const tag = (value) => `<span class="tag ${statusClass(value)}">${escapeHtml(value)}</span>`;
@@ -308,7 +308,7 @@ export function openSchedulePlanner(prefill = {}) {
   if (!selectedClass) { showToast('请先在“面授班级”创建班级。', 'warning'); return; }
   const course = scheduleCourseCatalog.find(item => item.id === selectedClass.courseId);
   const plannerMode = prefill.mode || (classScheduleStatus(selectedClass) === '已完成' ? 'change' : 'create');
-  if (plannerMode === 'change' && classTeachingStatus(selectedClass) !== '待开课') {
+  if (plannerMode === 'change' && !classScheduleChangeAllowed(selectedClass)) {
     showToast('班级已开课，不能变更整体排班，请使用“课次调整”。', 'warning');
     return;
   }
@@ -372,7 +372,9 @@ function saveSchedulePlanner(mode, dialog, preview) {
   const publishStudentConflicts = studentConflictsWithOthers(preview.classRecord, preview.sessions);
   if (mode === 'publish' && publishStudentConflicts.length) { showToast(`${studentConflictText(publishStudentConflicts[0])}${sessionSuggestionText(preview.classRecord, preview.sessions[0] || {})}。`, 'error'); return; }
   const semester = String(preview.batch || '').includes('暑假') ? '2026暑期' : '2026秋季';
-  const record = { ...preview.classRecord, semester, teacher: preview.teacher, campus: preview.campus, classroom: preview.roomName, roomId: preview.roomId, schedule: plannerScheduleLabel(preview.weekdays, preview.weekdayTimes), weekdays: preview.weekdays, weekdayTimes: preview.weekdayTimes, weekday: preview.weekdays[0], startTime: preview.start, endTime: preview.end, lessonDuration: preview.duration, firstLessonDate: preview.firstLessonDate, scheduleStatus: mode === 'publish' ? '已发布' : '草稿', status: mode === 'publish' ? '招生中' : '排班草稿', display: mode === 'publish' ? '已展示' : '未发布', schedulePreview: preview.sessions, sessions: mode === 'publish' ? preview.sessions : [], scheduleVersion: mode === 'publish' ? Number(preview.classRecord.scheduleVersion || 0) + 1 : Number(preview.classRecord.scheduleVersion || 0), schedulePublishedAt: mode === 'publish' ? toLocalDateString() : preview.classRecord.schedulePublishedAt };
+  const nextVersion = Number(preview.classRecord.scheduleVersion || 0) + 1;
+  const scheduleSnapshot = { version: nextVersion, effectiveAt: demoTime(), operator: '当前账号', reason: mode === 'publish' && preview.classRecord.scheduleVersion ? '整班排班变更' : '首次发布排班', teacher: preview.teacher, campus: preview.campus, classroom: preview.roomName, schedule: plannerScheduleLabel(preview.weekdays, preview.weekdayTimes), firstLessonDate: preview.firstLessonDate, lessonCount: preview.sessions.length };
+  const record = { ...preview.classRecord, semester, teacher: preview.teacher, campus: preview.campus, classroom: preview.roomName, roomId: preview.roomId, schedule: plannerScheduleLabel(preview.weekdays, preview.weekdayTimes), weekdays: preview.weekdays, weekdayTimes: preview.weekdayTimes, weekday: preview.weekdays[0], startTime: preview.start, endTime: preview.end, lessonDuration: preview.duration, firstLessonDate: preview.firstLessonDate, scheduleStatus: mode === 'publish' ? '已发布' : '草稿', status: mode === 'publish' ? '招生中' : '排班草稿', display: mode === 'publish' ? '已展示' : '未发布', schedulePreview: preview.sessions, sessions: mode === 'publish' ? preview.sessions : [], scheduleVersion: mode === 'publish' ? nextVersion : Number(preview.classRecord.scheduleVersion || 0), schedulePublishedAt: mode === 'publish' ? toLocalDateString() : preview.classRecord.schedulePublishedAt, scheduleHistory: mode === 'publish' ? [...(preview.classRecord.scheduleHistory || []), scheduleSnapshot] : preview.classRecord.scheduleHistory };
   upsertDemoRecord('classes', record);
   closeDialog(); if (academicPage === 'timetable') renderTimetable(); showToast(mode === 'publish' ? `排班已发布，已按规则重排该班级 ${record.sessions.length} 个课次。${snappedNotes.length ? `时间已按 15 分钟刻度调整：${snappedNotes.join('、')}。` : ''}` : `排班草稿已保存，预览 ${preview.sessions.length} 个课次，尚未进入正式课表。`);
 }
@@ -521,7 +523,7 @@ export function openSessionAdjustment(prefill = {}) {
     upsertDemoRecord('classes', record);
     if (notify) {
       const enrolledLearners = (readDemoState().enrollments || []).filter((item) => item.classId === classRecord.id && item.status === '已分班' && item.studentId);
-      upsertDemoRecord('notifications', { id: demoId('notice'), type: '调课通知', classId: classRecord.id, sessionIndex: selectedIndex, recipients: enrolledLearners.length + 1, status: '发送成功', createdAt: demoTime(), reason });
+      upsertDemoRecord('notifications', { id: demoId('notice'), type: '调课通知', classId: classRecord.id, sessionIndex: selectedIndex, recipients: enrolledLearners.length + 1, status: '已发送', createdAt: demoTime(), reason });
       // CR-2026-138 CR138-04：调整通知写入教师端与学员端共用的消息集合，两端按 audience/recipientId 读取。
       const before = log.before;
       const after = log.after || {};
@@ -942,7 +944,7 @@ function renderTimetableList() {
     + filterPanel('timetable-filter', select('校区', 'campus', unique(items.map((item) => item.campus)), false, true, cache.campus || '') + select('授课教师', 'teacher', unique(items.map((item) => item.teacher)), false, true, cache.teacher || '') + select('班级', 'className', unique(items.map((item) => item.className)), false, true, cache.className || '') + select('课次状态', 'status', TIMETABLE_STATUS_OPTIONS, false, true, cache.status || ''))
     + table('<thead><tr><th>日期</th><th>时间</th><th>课程 / 班级</th><th>授课教师</th><th>校区 / 教室</th><th>课次状态</th><th>排课提示</th><th>考勤处理</th><th>操作</th></tr></thead>');
   pageFrame('课表管理', '', controls, content);
-  const row = (item) => `<td>${escapeHtml(item.day)}</td><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.course)}<br><span class="muted">${escapeHtml(item.className)}</span></td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.campus)}<br>${escapeHtml(item.room)}</td><td>${item.stopped ? `<span class="tag gray is-stopped">${escapeHtml(item.status)}</span>` : tag(item.status)}</td><td>${timetableRiskTags(item)}</td><td>${item.attendanceProcess === '—' ? '—' : tag(item.attendanceProcess)}</td><td><button class="text-button" data-academic-action="session-view">查看课次</button></td>`;
+  const row = (item) => `<td>${escapeHtml(item.day)}</td><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.course)}<br><span class="muted">${escapeHtml(item.className)}</span></td><td>${escapeHtml(item.teacher)}</td><td>${escapeHtml(item.campus)}<br>${escapeHtml(item.room)}</td><td>${item.stopped ? `<span class="tag gray is-stopped">${escapeHtml(item.status)}</span>` : tag(item.status)}</td><td>${timetableRiskTags(item)}</td><td>${item.attendanceProcess === '—' ? '—' : tag(item.attendanceProcess)}</td><td><button class="text-button" data-academic-action="session-view">查看课次</button>${item.classId && item.status === '待上课' ? `<a class="text-button" href="/admin/pages/academic/timetable.html?classId=${encodeURIComponent(item.classId)}&action=adjust${item.sessionIndex ? `&session=${encodeURIComponent(item.sessionIndex)}` : ''}">调整课次</a>` : ''}</td>`;
   const applyListFilter = () => {
     const form = document.querySelector('#timetable-filter');
     if (!form) return;
@@ -1023,7 +1025,7 @@ function renderClassTimetable(filterState = {}) {
     rows: items.filter((item) => item.className === className).sort((a, b) => a.date.localeCompare(b.date) || timetableSessionSort(a, b))
   }));
   const controls = timetableToolbar();
-  const content = `<div class="academic-calendar-toolbar"><div><strong>${escapeHtml(formatTimetableLabel(win))}</strong><p class="academic-subnote">${escapeHtml(semester)} · 按班级汇总课次，可打印单个班级的课表；调整课次仍走面授班级的「课次调整」。</p></div><div class="teacher-view-summary"><span>班级 ${groups.length} 个</span><span>课次 ${items.length} 条</span></div></div>`
+  const content = `<div class="academic-calendar-toolbar"><div><strong>${escapeHtml(formatTimetableLabel(win))}</strong><p class="academic-subnote">${escapeHtml(semester)} · 按班级汇总课次，可打印单个班级的课表；单次课次调整统一在课次列表进行。</p></div><div class="teacher-view-summary"><span>班级 ${groups.length} 个</span><span>课次 ${items.length} 条</span></div></div>`
     + filterPanel('class-timetable-filter', select('班级', 'className', unique(scoped.map((item) => item.className)), false, true, cache.className || '') + select('授课教师', 'teacher', unique(scoped.map((item) => item.teacher)), false, true, cache.teacher || '') + select('课次状态', 'status', TIMETABLE_STATUS_OPTIONS, false, true, cache.status || ''))
     + (groups.length ? groups.map((group) => {
       const first = group.rows[0];
@@ -1364,8 +1366,8 @@ function openTimetableSessionDialog(session) {
     + `<section class="academic-session-block"><strong>最近调整记录</strong>${logList}</section>`;
   // CR-2026-108：只有该班级存在可调整的未开始课次时才显示「去课次调整」，避免点开只弹提示。
   const adjustableCount = (classRecord?.sessions || []).filter(sessionCanAdjust).length;
-  const actions = `<button type="button" class="button" data-dialog-close>关闭</button>${session.classId && adjustableCount ? `<a class="button" href="/admin/pages/crm/classes.html?stage=teaching&classId=${encodeURIComponent(session.classId)}&action=adjust${session.sessionIndex ? `&session=${encodeURIComponent(session.sessionIndex)}` : ''}">去课次调整</a>` : ''}<a class="button primary" href="/admin/pages/crm/classes.html?stage=schedule${session.classId ? `&classId=${encodeURIComponent(session.classId)}` : ''}">去班级排课</a>`;
-  openDialog(`${session.className} · 课次详情`, '课次为只读展示；调整课次时间、教室或教师走「去课次调整」，整班排班变更走「去班级排课」。', body, actions);
+  const actions = `<button type="button" class="button" data-dialog-close>关闭</button>${session.classId && adjustableCount ? `<a class="button" href="/admin/pages/academic/timetable.html?classId=${encodeURIComponent(session.classId)}&action=adjust${session.sessionIndex ? `&session=${encodeURIComponent(session.sessionIndex)}` : ''}">调整课次</a>` : ''}<a class="button primary" href="/admin/pages/crm/classes.html?stage=schedule${session.classId ? `&classId=${encodeURIComponent(session.classId)}` : ''}">去班级排课</a>`;
+  openDialog(`${session.className} · 课次详情`, '课次为只读展示；单次课次调整统一在课表管理进行，整班排班变更仍走班级排课。', body, actions);
 }
 // E11: A4 landscape export. Columns paginate by teaching building, rows paginate by date group,
 // the header row repeats on every sheet and empty slot rows are hidden by default.
@@ -1490,23 +1492,23 @@ function renderMessages() {
   const monthRows = academicData.filter((item) => String(item.sentAt || item.scheduledAt || item.createdAt || '').startsWith(monthPrefix));
   const statOf = (status) => academicData.filter((item) => item.status === status).length;
   const retry = retryPolicy();
-  pageFrame('消息推送', '', '<button class="button primary" data-academic-action="message-create">发送班级通知</button>', metrics([['本月已发送', monthRows.filter((item) => !['待发送', '已取消'].includes(item.status)).length, '自动提醒与人工通知'], ['发送成功', statOf('发送成功'), '全部接收人已送达'], ['部分失败 / 失败', statOf('部分失败') + statOf('发送失败'), '可查看失败原因并按接收人补发'], ['待发送', statOf('待发送'), '定时通知等待发送'], ['自动重试策略', `最多 ${retry.maxAttempts} 次`, `间隔 ${retry.intervalsMinutes.join('/')} 分钟`]]) + filterPanel('message-filter', select('通知来源', 'source', [NOTIFICATION_SOURCE.MANUAL, NOTIFICATION_SOURCE.SYSTEM]) + select('消息类型', 'type', NOTIFICATION_TYPES) + select('发送状态', 'status', ['待发送', '发送成功', '部分失败', '发送失败', '已取消']) + field('关键词', 'keyword', 'text', '标题 / 班级')) + table('<thead><tr><th>消息标题</th><th>通知来源</th><th>消息类型</th><th>发送对象</th><th>关联班级</th><th>发送时间</th><th>已送达 / 已读</th><th>发送状态</th><th>操作</th></tr></thead>'));
-  const row = (item) => `<td><strong>${escapeHtml(item.title)}</strong></td><td>${tag(item.source || NOTIFICATION_SOURCE.MANUAL)}</td><td>${escapeHtml(item.type || '—')}</td><td>${escapeHtml(item.audience || '—')}</td><td>${escapeHtml(item.className || '—')}</td><td>${escapeHtml(item.time || '—')}</td><td>${item.stats ? `${item.stats.delivered} / ${item.stats.read}` : '—'}</td><td>${tag(item.status)}</td><td class="action-cell"><button class="text-button" data-academic-action="message-view">查看</button>${item.status === '待发送' ? '<button class="text-button" data-academic-action="message-cancel">取消发送</button>' : ''}${['部分失败', '发送失败'].includes(item.status) ? '<button class="text-button" data-academic-action="message-resend">补发</button>' : ''}</td>`;
+  pageFrame('消息推送', '', '<button class="button primary" data-academic-action="message-create">发送班级通知</button>', metrics([['本月已发送', monthRows.filter((item) => item.status === '已发送').length, '自动提醒与人工通知'], ['已发送', statOf('已发送'), '全部接收人已送达'], ['发送失败', statOf('发送失败'), '可查看失败原因并按接收人补发'], ['待发送', statOf('待发送'), '定时通知等待发送'], ['自动重试策略', `最多 ${retry.maxAttempts} 次`, `间隔 ${retry.intervalsMinutes.join('/')} 分钟`]]) + filterPanel('message-filter', select('通知来源', 'source', [NOTIFICATION_SOURCE.MANUAL, NOTIFICATION_SOURCE.SYSTEM]) + select('消息类型', 'type', NOTIFICATION_TYPES) + select('发送状态', 'status', ['待发送', '已发送', '发送失败', '已取消']) + field('关键词', 'keyword', 'text', '标题 / 班级')) + table('<thead><tr><th>消息标题</th><th>通知来源</th><th>消息类型</th><th>发送对象</th><th>关联班级</th><th>发送时间</th><th>已送达 / 已读</th><th>发送状态</th><th>操作</th></tr></thead>'));
+  const row = (item) => `<td><strong>${escapeHtml(item.title)}</strong></td><td>${tag(item.source || NOTIFICATION_SOURCE.MANUAL)}</td><td>${escapeHtml(item.type || '—')}</td><td>${escapeHtml(item.audience || '—')}</td><td>${escapeHtml(item.className || '—')}</td><td>${escapeHtml(item.time || '—')}</td><td>${item.stats ? `${item.stats.delivered} / ${item.stats.read}` : '—'}</td><td>${tag(item.status)}</td><td class="action-cell"><button class="text-button" data-academic-action="message-view">查看</button>${item.status === '待发送' ? '<button class="text-button" data-academic-action="message-cancel">取消发送</button>' : ''}${item.status === '发送失败' ? '<button class="text-button" data-academic-action="message-resend">补发</button>' : ''}</td>`;
   renderRows(academicData, row);
   applyFilter('message-filter', academicData, (form) => { const { source, type, status, keyword } = form; return (item) => (!source.value || item.source === source.value) && (!type.value || item.type === type.value) && (!status.value || item.status === status.value) && (!keyword.value.trim() || `${item.title}${item.className}`.includes(keyword.value.trim())); }, row);
 }
-function classCounts(item) { const valid = item.learners.filter((l) => l.status !== '已取消'); return { total: item.learners.length, approved: item.learners.filter((l) => l.status === '已通过').length, suggested: item.learners.filter((l) => l.status === '待审核' && Number.parseInt(l.attendance) >= 90 && Number.parseInt(l.homework) >= 80).length, retaking: item.learners.filter((l) => l.status === '需补课').length, pending: item.learners.filter((l) => l.status === '待审核').length, cancelled: item.learners.filter((l) => l.status === '已取消').length, rate: valid.length ? Math.round(item.learners.filter((l) => ['已通过', '需补课'].includes(l.status)).length / valid.length * 100) : 0 }; }
+function classCounts(item) { const valid = item.learners.filter((l) => l.status !== '已取消结业'); return { total: item.learners.length, approved: item.learners.filter((l) => l.status === '已通过').length, suggested: item.learners.filter((l) => l.status === '审核中' && Number.parseInt(l.attendance) >= 90 && Number.parseInt(l.homework) >= 80).length, pending: item.learners.filter((l) => l.status === '审核中').length, cancelled: item.learners.filter((l) => l.status === '已取消结业').length, rate: valid.length ? Math.round(item.learners.filter((l) => l.status === '已通过').length / valid.length * 100) : 0 }; }
 function renderGraduation() {
   academicData = graduation;
-  pageFrame('结业审核', '', '<button class="button" data-academic-action="graduation-export">导出审核台账</button>', metrics([['待后台审核班级', graduation.filter((g) => g.classStatus === '待后台审核').length, '按最早申请时间处理'], ['建议结业', graduation.reduce((s, g) => s + classCounts(g).suggested, 0), '系统按阈值初判'], ['需补课学员', graduation.reduce((s, g) => s + classCounts(g).retaking, 0), '学员级结果'], ['待补录考勤', attendance.filter((a) => a.process === '待补录').length, '不参与判定']]) + filterPanel('graduation-filter', select('班级结业状态', 'status', ['待教师提交', '待后台审核', '审核完成']) + select('授课教师', 'teacher', ['王玥', '陈晨']) + field('结课时间', 'date', 'date') + field('关键词', 'keyword', 'text', '班级名称')) + table('<thead><tr><th>班级名称</th><th>课程 / 教师</th><th>运营状态</th><th>学员数</th><th>建议结业</th><th>需补课</th><th>待审核</th><th>已取消结业</th><th>班级结业状态</th><th>完成率</th><th>操作</th></tr></thead>'));
-  const row = (item) => { const c = classCounts(item); return `<td><strong>${item.className}</strong><br><span class="muted">结课 ${item.endDate}</span></td><td>${item.course}<br><span class="muted">${item.teacher}</span></td><td>${tag(item.operational)}</td><td>${c.total}</td><td>${c.suggested}</td><td>${c.retaking ? tag(String(c.retaking)) : '0'}</td><td>${c.pending ? tag(String(c.pending)) : '0'}</td><td>${c.cancelled}</td><td>${tag(item.classStatus)}</td><td><div class="academic-progress">${c.rate}%<div class="academic-progress-bar"><span style="width:${c.rate}%"></span></div></div></td><td><button class="text-button" data-academic-action="graduation-review">${item.classStatus === '待后台审核' ? '按学员审核' : '查看'}</button></td>`; };
+  pageFrame('结业审核', '', '<button class="button" data-academic-action="graduation-export">导出审核台账</button>', metrics([['待复核班级', graduation.filter((g) => g.classStatus === '待复核').length, '按最早申请时间处理'], ['建议结业', graduation.reduce((s, g) => s + classCounts(g).suggested, 0), '系统按阈值初判'], ['待复核学员', graduation.reduce((s, g) => s + classCounts(g).pending, 0), '学员级结果'], ['待补录考勤', attendance.filter((a) => a.process === '待补录').length, '不参与判定']]) + filterPanel('graduation-filter', select('班级结业状态', 'status', ['待复核', '复核中', '已归档']) + select('授课教师', 'teacher', ['王玥', '陈晨']) + field('结课时间', 'date', 'date') + field('关键词', 'keyword', 'text', '班级名称')) + table('<thead><tr><th>班级名称</th><th>课程 / 教师</th><th>运营状态</th><th>学员数</th><th>建议结业</th><th>待复核</th><th>已取消结业</th><th>班级结业状态</th><th>完成率</th><th>操作</th></tr></thead>'));
+  const row = (item) => { const c = classCounts(item); return `<td><strong>${item.className}</strong><br><span class="muted">结课 ${item.endDate}</span></td><td>${item.course}<br><span class="muted">${item.teacher}</span></td><td>${tag(item.operational)}</td><td>${c.total}</td><td>${c.suggested}</td><td>${c.pending ? tag(String(c.pending)) : '0'}</td><td>${c.cancelled}</td><td>${tag(item.classStatus)}</td><td><div class="academic-progress">${c.rate}%<div class="academic-progress-bar"><span style="width:${c.rate}%"></span></div></div></td><td><button class="text-button" data-academic-action="graduation-review">${['待复核', '复核中'].includes(item.classStatus) ? '按学员审核' : '查看'}</button></td>`; };
   renderRows(academicData, row);
   applyFilter('graduation-filter', academicData, (form) => { const { status, teacher, keyword } = form; return (item) => (!status.value || item.classStatus === status.value) && (!teacher.value || item.teacher === teacher.value) && (!keyword.value.trim() || item.className.includes(keyword.value.trim())); }, row);
 }
 function renderReports() {
   academicData = reports;
   pageFrame('学习报告管理', '', '<button class="button" data-academic-action="report-export">导出报告清单</button>', metrics([['草稿', reports.filter((r) => r.status === '草稿').length, '发布前仅后台可见'], ['已发布', reports.filter((r) => r.status === '已发布').length, '学员端可查看'], ['已撤回', reports.filter((r) => r.status === '已撤回').length, '修订后可再次发布'], ['生成失败', reports.filter((r) => r.generation === '生成失败').length, '结业状态不受影响']]) + filterPanel('report-filter', select('报告状态', 'status', ['草稿', '已发布', '已撤回']) + select('课程名称', 'course', ['中国舞进阶训练', '舞蹈基本功', '声乐基础', '中国画基础']) + field('学员姓名', 'student', 'text', '姓名') + field('更新时间', 'date', 'date')) + table('<thead><tr><th>报告编号</th><th>学员</th><th>课程 / 班级</th><th>结业状态</th><th>报告状态</th><th>生成状态</th><th>版本 / 更新时间</th><th>操作</th></tr></thead>'));
-  const row = (item) => `<td>${item.number}</td><td>${item.student}</td><td>${item.course}<br><span class="muted">${item.className}</span></td><td>${tag('已通过')}</td><td>${tag(item.status)}</td><td>${tag(item.generation)}</td><td>${item.version}<br><span class="muted">${item.updated}</span></td><td class="action-cell"><button class="text-button" data-academic-action="report-preview">预览</button>${['草稿', '已撤回'].includes(item.status) ? '<button class="text-button" data-academic-action="report-publish">发布</button>' : ''}${item.status === '已发布' ? '<button class="text-button" data-academic-action="report-recall">撤回</button>' : ''}${item.generation === '生成失败' ? '<button class="text-button" data-academic-action="report-retry">重试</button>' : ''}${['草稿', '已撤回'].includes(item.status) ? '<button class="text-button danger-link" data-academic-action="report-delete">删除</button>' : ''}</td>`;
+  const row = (item) => `<td>${item.number}</td><td>${item.student}</td><td>${item.course}<br><span class="muted">${item.className}</span></td><td>${tag('已通过')}</td><td>${tag(item.status)}</td><td>${tag(item.generation)}</td><td>${item.version}<br><span class="muted">${item.updated}</span></td><td class="action-cell"><button class="text-button" data-academic-action="report-preview">预览</button>${['草稿', '已撤回'].includes(item.status) ? '<button class="text-button" data-academic-action="report-publish">发布</button>' : ''}${item.status === '已发布' ? '<button class="text-button" data-academic-action="report-recall">撤回</button>' : ''}${item.generation === '生成失败' ? '<button class="text-button" data-academic-action="report-retry">重试</button>' : ''}</td>`;
   renderRows(academicData, row);
   applyFilter('report-filter', academicData, (form) => { const { status, course, student } = form; return (item) => (!status.value || item.status === status.value) && (!course.value || item.course === course.value) && (!student.value.trim() || item.student.includes(student.value.trim())); }, row);
 }
@@ -1816,30 +1818,21 @@ function handleAction(action, row) {
   }
   if (action === 'report-publish') { const dialog = openDialog('确认发布学习报告', '发布后学员端将可见，并产生报告已发布待办。', `<p>确认发布“${escapeHtml(row.student)}”的学习报告？发布不会改变其已通过结业状态和证书。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-confirm-action="report-publish">确认发布</button>'); dialog.dataset.rowId = row.id; return dialog; }
   if (action === 'report-recall') return openSimpleForm('撤回学习报告', '撤回必须填写内部原因；学员端隐藏报告正文，但保留结业评语和证书。', field('撤回原因', 'reason', 'text', '请输入内部撤回原因', true), (form) => { const reason = String(form.get('reason') || '').trim(); if (!reason) { showToast('撤回学习报告时必须填写内部原因。', 'warning'); return; } row.reason = reason; row.status = '已撤回'; row.version = `v${Number(row.version.slice(1)) + 1}`; row.updated = '2026-09-08 11:20'; closeDialog(); renderReports(); showToast('报告已撤回，学员端正文已隐藏。'); });
-  if (action === 'report-delete') { const dialog = openDialog('确认删除报告', '删除草稿或已撤回版本后不可在后台继续编辑。', `<p>确认删除“${escapeHtml(row.student)}”的报告记录？</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" data-confirm-action="report-delete">确认删除</button>'); dialog.dataset.rowId = row.id; return dialog; }
   if (action === 'report-retry') { row.generation = '生成中'; renderReports(); showToast('报告生成已重新提交，正在重试。'); window.setTimeout(() => { row.generation = '已生成'; row.updated = '2026-09-08 11:22'; if (academicPage === 'reports') renderReports(); showToast('报告已生成，可预览或发布。'); }, 900); return; }
   if (action === 'report-export') return showToast('报告清单导出任务已创建。');
 }
 function openGraduationDetail(classRow) {
-  // 补课安排与学员结业状态分开维护：补课状态写在共享 makeups 记录里，教师端与学员端读同一条。
-  const makeupRowOf = (learner) => (readDemoState().makeups || []).find((item) => (item.classId === graduationClassId(classRow) || item.className === classRow.className) && item.studentId === learner.id) || null;
+  // CR-2026-154：结业审核只做通过。不达标学员的补课与退费线下完成，回系统只走「通过」或「取消结业」。
   const rowOf = (learner) => {
-    const suggested = learner.status === '待审核' && Number.parseInt(learner.attendance) >= 90 && Number.parseInt(learner.homework) >= 80;
-    const makeup = makeupRowOf(learner);
-    const makeupText = makeup
-      ? `第${escapeHtml(String(makeup.session))}次课<br><span class="muted">${escapeHtml(makeup.date || '日期待定')} ${escapeHtml(makeup.startTime || '')}-${escapeHtml(makeup.endTime || '')} · ${escapeHtml(makeup.status || '')}</span>`
-      : '—';
-    const actions = learner.status === '待审核'
-      ? `<button class="text-button" data-academic-action="learner-approve">通过</button><button class="text-button" data-academic-action="learner-cancel">取消结业</button>${suggested ? '' : '<button class="text-button" data-academic-action="learner-retake">退回补课</button>'}`
-      : learner.status === '需补课'
-        ? (makeup
-          ? `<button class="text-button" data-academic-action="learner-makeup-edit">修改补课</button>${makeup.status === '教师已提交' ? '<button class="text-button" data-academic-action="learner-makeup-confirm">确认补课完成</button>' : ''}`
-          : '<button class="text-button" data-academic-action="learner-makeup">安排补课</button>')
-        : '';
-    const select = learner.status === '待审核' && suggested ? `<label class="academic-checkbox"><input type="checkbox" data-learner-select="${learner.id}">选择</label>` : '—';
-    return `<tr class="${learner.status === '已通过' ? 'is-approved' : learner.status === '需补课' ? 'is-retake' : ''}" data-learner-id="${learner.id}"><td>${select}</td><td><strong>${escapeHtml(learner.name)}</strong></td><td>${escapeHtml(learner.attendance)}</td><td>${escapeHtml(learner.homework)}</td><td>${escapeHtml(learner.comment || '—')}</td><td>${escapeHtml(learner.suggestion || '—')}</td><td>${suggested ? tag('建议结业') : tag(learner.status)}</td><td>${makeupText}</td><td>${escapeHtml(learner.auditBy || '—')}<br><span class="muted">${escapeHtml(learner.auditAt || '未处理')}</span></td><td class="action-cell">${actions}</td></tr>`;
+    const suggested = learner.status === '审核中' && Number.parseInt(learner.attendance) >= 90 && Number.parseInt(learner.homework) >= 80;
+    const actions = learner.status === '审核中'
+      ? '<button class="text-button" data-academic-action="learner-approve">通过</button><button class="text-button" data-academic-action="learner-cancel">取消结业</button>'
+      : '';
+    const select = learner.status === '审核中' && suggested ? `<label class="academic-checkbox"><input type="checkbox" data-learner-select="${learner.id}">选择</label>` : '—';
+    const note = learner.resultNote ? escapeHtml(learner.resultNote) : '—';
+    return `<tr class="${learner.status === '已通过' ? 'is-approved' : ''}" data-learner-id="${learner.id}"><td>${select}</td><td><strong>${escapeHtml(learner.name)}</strong></td><td>${escapeHtml(learner.attendance)}</td><td>${escapeHtml(learner.homework)}</td><td>${escapeHtml(learner.comment || '—')}</td><td>${suggested ? tag('建议结业') : tag(learner.status)}</td><td>${note}</td><td>${escapeHtml(learner.auditBy || '—')}<br><span class="muted">${escapeHtml(learner.auditAt || '未处理')}</span></td><td class="action-cell">${actions}</td></tr>`;
   };
-  const body = () => `<div class="academic-status-callout">结业确认按学员记录执行。待补录考勤不计入结业判定，班级可同时存在已通过、需补课和已取消学员。班级状态只表示处理进度，学员状态单独判定；补课安排登记后同步教师端与学员端。</div><div class="table-wrap academic-table academic-learner-table"><table><thead><tr><th>选择</th><th>学员</th><th>出勤率</th><th>作业提交率</th><th>教师综合评语</th><th>成长建议</th><th>系统判定</th><th>补课安排</th><th>审核人 / 时间</th><th>操作</th></tr></thead><tbody>${classRow.learners.map(rowOf).join('')}</tbody></table></div>`;
+  const body = () => `<div class="academic-status-callout">结业确认按学员记录执行。待补录考勤不计入结业判定。系统按出勤率与作业提交率给出「建议结业」初判，仅作复核参考；不达标学员的补课与退费在线下完成，线下闭环后在此点「通过」。班级状态只表示处理进度，学员状态单独判定。</div><div class="table-wrap academic-table academic-learner-table"><table><thead><tr><th>选择</th><th>学员</th><th>出勤率</th><th>作业提交率</th><th>教师综合评语</th><th>系统判定</th><th>处理说明</th><th>审核人 / 时间</th><th>操作</th></tr></thead><tbody>${classRow.learners.map(rowOf).join('')}</tbody></table></div>`;
   const dialog = openDialog(`${classRow.className} · 按学员审核`, '展示出勤率、作业提交率、教师评语和系统判定。', `<div data-graduation-detail>${body()}</div>`, '<button type="button" class="button" data-dialog-close>关闭</button><button type="button" class="button primary" data-academic-action="graduation-batch">确认选中学员结业</button>');
   dialog.dataset.classId = classRow.id; return dialog;
 }
@@ -1848,39 +1841,6 @@ function graduationClassId(classRow) {
   return mergeClassSeed(readDemoState().classes || []).find((item) => item.name === classRow.className)?.id || classRow.id;
 }
 // 补课登记与修改共用同一张表单：有共享记录时为修改，无记录时为新增；保存后写回共享补课记录并回到审核明细。
-function openMakeupForm(classRow, learner) {
-  const classRecord = schedulingClasses().find((item) => item.name === classRow.className);
-  const sessions = classRecord?.sessions || [];
-  const existing = (readDemoState().makeups || []).find((item) => (item.classId === graduationClassId(classRow) || item.className === classRow.className) && item.studentId === learner.id) || null;
-  const planned = Array.isArray(learner.retakeSessions) && learner.retakeSessions.length ? learner.retakeSessions : sessions.map((session) => String(session.index));
-  const sessionOptions = planned.map((index) => {
-    const session = sessions.find((item) => String(item.index) === String(index));
-    if (!session) return '';
-    const selected = existing && String(existing.session) === String(session.index) ? ' selected' : '';
-    return `<option value="${escapeHtml(String(session.index))}"${selected}>第 ${escapeHtml(String(session.index))} 次 · ${escapeHtml(session.date || '日期待定')} · ${escapeHtml(session.startTime || session.start || '')}-${escapeHtml(session.endTime || session.end || '')}</option>`;
-  }).join('');
-  const body = `<label class="form-field wide"><span>需补课课次 <b class="required-mark">*</b></span><select name="session" required>${sessionOptions || '<option value="" disabled>暂无已指定的需补课课次</option>'}</select></label>`
-    + `<label class="form-field"><span>补课日期</span><input type="date" name="date" value="${escapeHtml(existing?.date || '')}"></label>`
-    + `<label class="form-field"><span>上课时间段 <b class="required-mark">*</b></span><div class="academic-time-range"><input name="startTime" type="time" required value="${escapeHtml(existing?.startTime || '')}" aria-label="补课开始时间"><span>至</span><input name="endTime" type="time" required value="${escapeHtml(existing?.endTime || '')}" aria-label="补课结束时间"></div></label>`
-    + `<label class="form-field wide"><span>安排说明</span><input type="text" name="note" value="${escapeHtml(existing?.note || '')}" placeholder="填写教务安排"></label>`;
-  return openSimpleForm(existing ? '修改补课安排' : '登记补课课次', '从该学员已指定的需补课课次中选择，并登记实际补课日期与上课时间段；保存后同步教师端和学员端。', body, (form) => {
-    const selected = form.get('session');
-    const startTime = form.get('startTime');
-    const endTime = form.get('endTime');
-    if (!selected || !startTime || !endTime || startTime >= endTime) { showToast('请选择需补课课次并填写正确的上课时间段。', 'warning'); return; }
-    learner.status = '需补课';
-    if (!Array.isArray(learner.retakeSessions) || !learner.retakeSessions.length) learner.retakeSessions = planned;
-    learner.retakeDate = form.get('date') || '';
-    learner.retakeSession = selected;
-    learner.retakeStartTime = startTime;
-    learner.retakeEndTime = endTime;
-    learner.retakeNote = form.get('note') || '';
-    upsertDemoRecord('makeups', { ...(existing || {}), id: existing?.id || `makeup-${graduationClassId(classRow)}-${learner.id}`, classId: graduationClassId(classRow), graduationId: classRow.id, studentId: learner.id, studentName: learner.name, className: classRow.className, status: '待教师完成', session: selected, date: learner.retakeDate, startTime, endTime, note: learner.retakeNote, assignedBy: '当前教务账号', updatedAt: demoTime() });
-    closeDialog();
-    openGraduationDetail(classRow);
-    showToast(existing ? '补课安排已更新，已同步教师端和学员端。' : '补课课次和上课时间段已登记，已同步教师端和学员端。');
-  });
-}
 function currentClassFromDialog(element) { const dialog = element.closest('dialog'); return graduation.find((item) => item.id === dialog?.dataset.classId); }
 function refreshGraduationDialog(dialog, classRow) { dialog.querySelector('[data-graduation-detail]').innerHTML = openGraduationDetailMarkup(classRow); }
 function openGraduationDetailMarkup(classRow) { const old = document.querySelector('[data-academic-dialog]'); const previous = old?.innerHTML; const holder = document.createElement('div'); holder.innerHTML = `<div data-graduation-detail></div>`; return openGraduationDetail(classRow) ? (document.querySelector('[data-academic-dialog] [data-graduation-detail]')?.innerHTML || previous || '') : ''; }
@@ -1891,7 +1851,6 @@ function confirmAction(action, row) {
   if (action === 'message-resend') { const attempted = resendFailedDeliveries(row.id); closeDialog(); renderMessages(); showToast(attempted ? `已补发 ${attempted} 位失败接收人，投递记录与尝试次数已更新。` : '没有待补发的失败接收人。', attempted ? 'success' : 'warning'); }
   if (action === 'message-cancel') { const canceled = cancelScheduledNotification(row?.id); closeDialog(); renderMessages(); showToast(canceled ? '定时通知已取消，不再向任何接收人发送。' : '该通知已发送或已取消，无需重复操作。', canceled ? 'success' : 'warning'); }
   if (action === 'report-publish') { row.status = '已发布'; row.updated = '2026-09-08 11:25'; closeDialog(); renderReports(); showToast('学习报告已发布，学员端现已可见。'); }
-  if (action === 'report-delete') { reports.splice(reports.findIndex((item) => item.id === row.id), 1); closeDialog(); renderReports(); showToast('报告记录已删除。'); }
 }
 // Drag selection lives on the matrix itself; releasing anywhere ends the gesture so a stray
 // pointer-out never leaves the classroom grid stuck in a selecting state.
@@ -1941,54 +1900,49 @@ document.addEventListener('click', (event) => {
   if (action === 'graduation-batch') { const classRow = currentClassFromDialog(button); if (!classRow) return; const selected = [...button.closest('dialog').querySelectorAll('[data-learner-select]:checked')]; if (!selected.length) { showToast('请先选择系统判定为建议结业的学员。', 'warning'); return; } openDialog('确认学员结业', '二次确认后仅更新选中学员，不改变班级整体结业状态。', `<p>确认将 ${selected.length} 名学员标记为“已通过”？系统将为每名学员生成学习报告和证书产物。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-academic-action="graduation-batch-confirm">确认结业</button>'); document.querySelector('[data-academic-dialog]').dataset.classId = classRow.id; document.querySelector('[data-academic-dialog]').dataset.selectedIds = selected.map((item) => item.dataset.learnerSelect).join(','); return; }
   if (action === 'graduation-batch-confirm') { const dialog = button.closest('dialog'); const classRow = graduation.find((item) => item.id === dialog.dataset.classId); const ids = (dialog.dataset.selectedIds || '').split(','); classRow.learners.forEach((learner) => { if (ids.includes(learner.id)) learner.status = '已通过'; }); closeDialog(); document.querySelector('[data-academic-dialog]')?.remove(); renderGraduation(); showToast('选中学员已确认结业，报告和证书进入生成队列。'); return; }
   const rowElement = button.closest('tr[data-row-id]'); const row = rowElement ? academicData.find((item) => item.id === rowElement.dataset.rowId) : null;
-  if (action === 'learner-approve' || action === 'learner-cancel') { const classRow = currentClassFromDialog(button); const learnerId = button.closest('tr')?.dataset.learnerId; const learner = classRow?.learners.find((item) => item.id === learnerId); if (!learner) return; if (action === 'learner-approve') { learner.status = '已通过'; learner.auditBy = '教务管理员'; learner.auditAt = '2026-09-10 17:00'; learner.auditNote = '审核通过'; refreshGraduationDialog(button.closest('dialog'), classRow); showToast(`${learner.name}已确认结业，报告和证书进入生成队列。`); return; } return openSimpleForm('取消结业', '取消后该学员本次结业流程结束，需填写原因。', field('取消原因', 'reason', 'text', '请输入取消原因', true), (form) => { learner.status = '已取消'; learner.cancelReason = form.get('reason'); learner.auditBy = '教务管理员'; learner.auditAt = '2026-09-10 17:00'; learner.auditNote = learner.cancelReason; closeDialog(); const detail = document.querySelector('[data-academic-dialog]'); if (detail) refreshGraduationDialog(detail, classRow); showToast(`${learner.name}已取消结业。`); }); }
-  if (action.startsWith('learner-')) {
+  if (action === 'learner-approve' || action === 'learner-cancel') {
     const classRow = currentClassFromDialog(button);
     const learnerId = button.closest('tr')?.dataset.learnerId;
     const learner = classRow?.learners.find((item) => item.id === learnerId);
-    if (!classRow || !learner) return;
-    if (action === 'learner-retake') {
-      const classRecord = schedulingClasses().find((item) => item.name === classRow.className);
-      const sessions = classRecord?.sessions || [];
-      const sessionOptions = sessions.map((session) => `<option value="${escapeHtml(String(session.index))}">第 ${escapeHtml(String(session.index))} 次 · ${escapeHtml(session.date || '日期待定')} · ${escapeHtml(session.startTime || session.start || '')}-${escapeHtml(session.endTime || session.end || '')}</option>`).join('');
-      return openSimpleForm('退回补课', '此操作只更新当前学员，不影响同班其他已通过学员。', field('补课说明', 'reason', 'text', '请输入未达标原因', true) + `<label class="form-field wide"><span>补课课次 <b class="required-mark">*</b></span><select name="sessions" multiple required size="${Math.min(Math.max(sessions.length, 3), 6)}">${sessionOptions || '<option value="" disabled>当前班级暂无可选课次</option>'}</select><small class="form-hint">按住 Ctrl（Windows）或 Command（Mac）可多选课次</small></label>`, (form) => {
-        const selectedSessions = form.getAll('sessions');
-        if (!selectedSessions.length) { showToast('请至少选择一项补课课次。', 'warning'); return; }
-        const labels = selectedSessions.map((index) => { const session = sessions.find((item) => String(item.index) === String(index)); return session ? `第${session.index}次课（${session.date || '日期待定'}）` : `第${index}次课`; });
-        learner.status = '需补课';
-        learner.retakeSessions = selectedSessions;
-        learner.comment = `${learner.comment} 补课安排：${labels.join('、')}。`;
+    if (!learner) return;
+    if (action === 'learner-approve') {
+      // CR-2026-154：不达标学员的线下处理结果用可选「处理说明」留痕，不参与状态流转。
+      return openSimpleForm('确认通过结业', '确认该学员本轮结业事务已闭环。达标学员直接通过；不达标学员在线下完成补课或退费后通过。', '<label class="form-field wide"><span>处理说明</span><input type="text" name="resultNote" maxlength="100" placeholder="线下补课／退费情况，选填"></label>', (form) => {
+        learner.status = '已通过';
+        learner.resultNote = String(form.get('resultNote') || '').trim();
+        learner.auditBy = '教务管理员';
+        learner.auditAt = demoTime();
+        learner.auditNote = '审核通过';
         closeDialog();
-        openGraduationDetail(classRow);
-        showToast('已退回补课，学员保持“需补课”，待教务登记补课安排。');
+        const detail = document.querySelector('[data-academic-dialog]');
+        if (detail) refreshGraduationDialog(detail, classRow);
+        showToast(`${learner.name}已确认结业，报告和证书进入生成队列。`);
       });
     }
-    if (action === 'learner-makeup' || action === 'learner-makeup-edit') return openMakeupForm(classRow, learner);
-    if (action === 'learner-makeup-confirm') {
-      const makeup = (readDemoState().makeups || []).find((item) => (item.classId === graduationClassId(classRow) || item.className === classRow.className) && item.studentId === learner.id);
-      if (!makeup) { showToast('未找到该学员的补课安排。', 'warning'); return; }
-      upsertDemoRecord('makeups', { ...makeup, status: '后台已确认', confirmedBy: '当前教务账号', confirmedAt: demoTime(), updatedAt: demoTime() });
-      learner.status = '待审核';
+    return openSimpleForm('取消结业', '取消后该学员本次结业流程结束，需填写原因。', field('取消原因', 'reason', 'text', '请输入取消原因', true), (form) => {
+      learner.status = '已取消结业';
+      learner.cancelReason = form.get('reason');
       learner.auditBy = '教务管理员';
       learner.auditAt = demoTime();
-      learner.auditNote = '补课完成，重新进入审核';
-      refreshGraduationDialog(button.closest('dialog'), classRow);
-      showToast(`${learner.name}补课已确认，重新进入待审核。`);
-      return;
-    }
-    if (action === 'learner-resubmit') {
-      learner.status = '待审核';
+      learner.auditNote = learner.cancelReason;
       closeDialog();
-      showToast('补课教学记录已提交，学员重新进入待审核列表。');
-      return;
-    }
+      const detail = document.querySelector('[data-academic-dialog]');
+      if (detail) refreshGraduationDialog(detail, classRow);
+      showToast(`${learner.name}已取消结业。`);
+    });
   }
   if (!row && ['campus-create', 'building-create', 'venue-create', 'venue-import', 'message-create', 'graduation-export', 'report-export', 'attendance-export', 'homework-export'].includes(action)) return handleAction(action);
   handleAction(action, row);
 });
 
 if (academicPage === 'venues') renderVenues();
-if (academicPage === 'timetable') renderTimetable();
+if (academicPage === 'timetable') {
+  renderTimetable();
+  const timetableParams = new URLSearchParams(window.location.search);
+  if (timetableParams.get('action') === 'adjust' && timetableParams.get('classId')) {
+    window.setTimeout(() => openSessionAdjustment({ classId: timetableParams.get('classId'), sessionIndex: Number(timetableParams.get('session')) || undefined }), 0);
+  }
+}
 if (academicPage === 'attendance') renderAttendance();
 if (academicPage === 'homework') renderHomework();
 if (academicPage === 'messages') renderMessages();

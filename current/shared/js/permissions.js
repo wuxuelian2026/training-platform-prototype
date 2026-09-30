@@ -40,7 +40,7 @@ export const PERMISSION_POINTS = [
   { id: 'PERM-CRM-003', module: '面授运营', object: '批次', action: '批次管理', scopes: TEACHING, note: '维护招生批次与班级归属' },
   { id: 'PERM-CRM-004', module: 'CRM管理', object: '试听', action: '试听登记', scopes: TEACHING, note: '登记试听、确认与试听结果' },
   { id: 'PERM-CRM-005', module: 'CRM管理', object: '线索', action: '线索跟进', scopes: ['all', 'campus', 'self'], note: '跟进线索、记录沟通与下次跟进' },
-  { id: 'PERM-CRM-006', module: 'CRM管理', object: '报名转化', action: '转化登记', scopes: ['all', 'campus', 'self'], note: '登记报名转化结果' },
+  // CR-2026-152：报名转化并入线索跟进页，不设独立菜单与权限点；原 PERM-CRM-006 已回收，编号保留仅作追溯。
   { id: 'PERM-CRM-007', module: 'CRM管理', object: '线索', action: '分配与流失处理', scopes: ['all', 'campus'], note: '分配负责人、标记流失；流失原因必填，操作写入审计' },
   { id: 'PERM-INVENTORY-001', module: '物资中心', object: '物资分类', action: '分类管理', scopes: SYSTEM, note: '维护物资分类与启停' },
   { id: 'PERM-INVENTORY-002', module: '物资中心', object: '物资', action: '物资管理', scopes: TEACHING, note: '新增与编辑物资档案' },
@@ -126,7 +126,6 @@ export const ADMIN_PAGE_PERMISSIONS = {
   '/admin/pages/crm/batches.html': ['PERM-CRM-003'],
   '/admin/pages/crm/trials.html': ['PERM-CRM-004'],
   '/admin/pages/crm/leads.html': ['PERM-CRM-005'],
-  '/admin/pages/crm/conversions.html': ['PERM-CRM-006'],
   '/admin/pages/inventory/categories.html': ['PERM-INVENTORY-001'],
   '/admin/pages/inventory/materials.html': ['PERM-INVENTORY-002'],
   '/admin/pages/inventory/stock-in.html': ['PERM-INVENTORY-003'],

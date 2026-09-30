@@ -44,7 +44,7 @@ export const STATE_MACHINES = [
       [
         "待上课",
         "调课",
-        "待上课（按新计划时间重新派生）",
+        "待上课",
         "教务主管"
       ]
     ]
@@ -187,16 +187,6 @@ export const STATE_MACHINES = [
         false
       ],
       [
-        "retake_required",
-        "需补课",
-        false
-      ],
-      [
-        "retaking",
-        "补课中",
-        false
-      ],
-      [
         "approved",
         "已通过",
         true
@@ -216,27 +206,9 @@ export const STATE_MACHINES = [
       ],
       [
         "审核中",
-        "退回补课（填要求）",
-        "需补课",
-        "教务主管"
-      ],
-      [
-        "需补课",
-        "登记补课课次",
-        "补课中",
-        "教务主管"
-      ],
-      [
-        "补课中",
-        "教师重新提交",
-        "审核中",
-        "教师本人"
-      ],
-      [
-        "审核中/需补课/补课中",
         "退款、退学或报名取消",
         "已取消结业",
-        "系统/教务主管"
+        "系统、教务主管"
       ]
     ]
   },
@@ -420,6 +392,11 @@ export const STATE_MACHINES = [
         "failed",
         "发送失败",
         false
+      ],
+      [
+        "cancelled",
+        "已取消",
+        true
       ]
     ],
     "transitions": [
@@ -440,6 +417,12 @@ export const STATE_MACHINES = [
         "自动重试（≤3 次）或人工补发",
         "待发送",
         "系统/教务主管/超级管理员"
+      ],
+      [
+        "待发送",
+        "取消定时发送",
+        "已取消",
+        "教务主管/超级管理员"
       ]
     ]
   },
@@ -489,11 +472,6 @@ export const STATE_MACHINES = [
     ],
     "states": [
       [
-        "draft",
-        "草稿",
-        false
-      ],
-      [
         "in_progress",
         "进行中",
         false
@@ -510,12 +488,6 @@ export const STATE_MACHINES = [
       ]
     ],
     "transitions": [
-      [
-        "草稿",
-        "发布",
-        "进行中",
-        "教师本人"
-      ],
       [
         "进行中",
         "截止时间到达",
@@ -541,5 +513,6 @@ export const STATE_MACHINES = [
         "教师本人"
       ]
     ]
-  }
+  },
+
 ];

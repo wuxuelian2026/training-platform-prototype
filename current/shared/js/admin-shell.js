@@ -65,8 +65,7 @@ const navGroups = [
   {
     icon: '客', label: 'CRM管理', items: [
       ['索', '线索跟进', '/admin/pages/crm/leads.html', 'crm'],
-      ['听', '后台登记试听', '/admin/pages/crm/trials.html', 'crm'],
-      ['转', '报名转化', '/admin/pages/crm/conversions.html', 'crm']
+      ['听', '后台登记试听', '/admin/pages/crm/trials.html', 'crm']
     ]
   },
   {

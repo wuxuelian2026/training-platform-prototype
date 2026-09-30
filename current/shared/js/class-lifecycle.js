@@ -34,9 +34,18 @@ export function classEnrollmentStatus(record, now = DEMO_NOW) {
   const firstLesson = asDate(record.sessions?.[0]?.date || record.firstLessonDate);
   if (start && now < start) return '未开始';
   if (record.enrollmentClosed === true || record.enrollmentStatus === '已关闭') return '已结束';
-  if (deadline && now > deadline) return '已结束';
-  if (firstLesson && now >= firstLesson) return '已结束';
+  const closure = [deadline, firstLesson].filter(Boolean).sort((left, right) => left - right)[0];
+  if (closure && now >= closure) return '已结束';
   return '进行中';
+}
+
+export function classStageEligible(record, stage, now = DEMO_NOW) {
+  const schedule = classScheduleStatus(record);
+  const enrollment = classEnrollmentStatus(record, now);
+  if (stage === 'schedule') return true;
+  if (stage === 'enrollment') return schedule === '已完成';
+  if (stage === 'teaching') return schedule === '已完成' && enrollment === '已结束';
+  return false;
 }
 
 export function classCapacityStatus(record) {
@@ -46,12 +55,25 @@ export function classCapacityStatus(record) {
 }
 
 export function classTeachingStatus(record, now = DEMO_NOW) {
-  if (!record || record.status === '已取消' || record.canceledAt) return '待开课';
+  if (!record || record.status === '已取消' || record.canceledAt) return '未进入教学';
+  if (classScheduleStatus(record) !== '已完成' || classEnrollmentStatus(record, now) !== '已结束') return '未进入教学';
   const first = asDate(record.sessions?.[0]?.date || record.firstLessonDate);
   const last = asDate(record.sessions?.at(-1)?.date || record.lastLessonDate);
   if (last && now > new Date(last.getTime() + 24 * 60 * 60 * 1000)) return '已结课';
   if (first && now >= first) return '授课中';
   return '待开课';
+}
+
+// 整班排班变更只允许发生在排课已完成、但教学执行尚未开始的班级。
+// 列表按钮与排班页拦截共用此判断，避免出现“看得到按钮但不能操作”。
+export function classScheduleChangeAllowed(record, now = DEMO_NOW) {
+  return Boolean(
+    record &&
+    record.status !== '已取消' &&
+    !record.canceledAt &&
+    classScheduleStatus(record) === '已完成' &&
+    classTeachingStatus(record, now) === '未进入教学'
+  );
 }
 
 export function classLessonProgress(record, now = DEMO_NOW) {

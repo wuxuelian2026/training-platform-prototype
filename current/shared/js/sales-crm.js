@@ -7,7 +7,7 @@ import { addWeeksLocal, toLocalDateString } from './date-utils.js';
 import { cloneProductSeed } from './product-seed.js';
 import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseDisplayConfigured, courseDisplayTags, persistSaleUnitDisplay, productForCourse, saleUnitDisplay } from './course-display.js';
 import { mountRichEditor, richTextToHtml, richTextValue } from './rich-editor.js';
-import { classCapacityStatus, classDisplayStatus, classEnrollmentCondition, classEnrollmentStatus, classLessonProgress, classScheduleStatus, classStageProjection, classTeachingStatus, deriveClassStatus } from './class-lifecycle.js';
+import { classCapacityStatus, classDisplayStatus, classEnrollmentCondition, classEnrollmentStatus, classLessonProgress, classScheduleChangeAllowed, classScheduleStatus, classStageEligible, classStageProjection, classTeachingStatus, deriveClassStatus } from './class-lifecycle.js';
 import { mergeVenues, resolveVenueId } from './venue-seed.js';
 import { defaultLessonDuration, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions as buildLessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
 import { openSchedulePlanner, openSessionAdjustment } from './academic.js';
@@ -97,8 +97,8 @@ const dataSets = {
     { id: 'trial-he', leadNo: 'CL20260905003', student: '何安', phone: '137****3130', course: '少儿美术启蒙班', time: '2026-09-15 18:30', campus: '南湖校区', status: '已确认', source: '转介绍', owner: '赵顾问' }
   ],
   leads: [
-    { id: 'lead-zhou', number: 'CL20260908012', student: '周女士', phone: '139****8612', course: '少儿中国舞基础班', source: '线上咨询', status: '跟进中', next: '2026-09-09', owner: '赵顾问', followUps: [] },
-    { id: 'lead-li', number: 'CL20260907008', student: '李先生', phone: '138****5541', course: '成人声乐班', source: '后台登记', status: '跟进中', next: '2026-09-12', owner: '赵顾问' },
+    { id: 'lead-zhou', number: 'CL20260908012', student: '周女士', phone: '139****8612', course: '少儿中国舞基础班', source: '线上咨询', status: '已跟进', next: '2026-09-09', owner: '赵顾问', followUps: [] },
+    { id: 'lead-li', number: 'CL20260907008', student: '李先生', phone: '138****5541', course: '成人声乐班', source: '后台登记', status: '已跟进', next: '2026-09-12', owner: '赵顾问' },
     { id: 'lead-he', number: 'CL20260905003', student: '何女士', phone: '137****3130', course: '少儿国画入门', source: '转介绍', status: '已转化', next: '—', owner: '赵顾问', intentCourseId: 'COURSE-CR-2026-0003', intentCourseName: '少儿国画入门', intentClassId: 'class-mock-enrolling-01', intentClassName: '秋季少儿国画招生中1班', intentTeacherName: '李青', classId: 'class-mock-enrolling-01', className: '秋季少儿国画招生中1班', teacherName: '李青', intentRemark: '希望安排周末班。' },
     { id: 'lead-sun', number: 'CL20260904006', student: '孙先生', phone: '136****7192', course: '中国画基础', source: '活动', status: '已流失', next: '—', owner: '赵顾问' }
   ],
@@ -160,49 +160,124 @@ function bookableClassField() {
   return `<label class="form-field wide"><span>报名班级<b class="required-mark">*</b></span><select name="classId" required><option value="">请选择可报名班级</option>${options}</select></label>`;
 }
 
-function leadCourseOptions() {
+function leadCourseOptions(selectedId = '') {
   return courseCatalog
     .filter((course) => course.type === '面授课程' && course.status === '已完成' && !course.disabledAt)
-    .map((course) => `<option value="${escapeHtml(course.id)}">${escapeHtml(course.name)} · ${escapeHtml(course.major || '未分类')}</option>`)
+    .map((course) => `<option value="${escapeHtml(course.id)}" ${selectedId === course.id ? 'selected' : ''}>${escapeHtml(course.name)} · ${escapeHtml(course.major || '未分类')}</option>`)
     .join('');
 }
 
-function leadCreateForm() {
-  const courseOptions = leadCourseOptions();
-  const classOptions = dataSets.classes
+// CR-2026-153：新增与编辑线索共用同一套字段、班级联动与校验，避免两处各写一份。
+function leadBookableClassOptions() {
+  return dataSets.classes
     .filter((record) => classEnrollmentCondition(record) === '报名中' && classDisplayStatus(record) === '显示')
-    .map((record) => `<option value="${escapeHtml(record.id)}" data-course-id="${escapeHtml(record.courseId || '')}" data-teacher="${escapeHtml(record.teacher || '')}">${escapeHtml(record.name)} · ${escapeHtml(record.course || '—')}</option>`)
+    .map((record) => `<option value="${escapeHtml(record.id)}" data-course-id="${escapeHtml(record.courseId || '')}" data-teacher="${escapeHtml(record.teacher || '')}">${escapeHtml(record.name)} · ${escapeHtml(record.teacher || '待定')}</option>`)
     .join('');
+}
+
+function leadTagPicker(selected) {
+  const set = selected instanceof Set ? selected : new Set(selected || []);
+  return `<fieldset class="crm-tag-picker wide"><legend>线索标签（最多 5 个）</legend>${LEAD_TAG_OPTIONS.map((value) => `<label><input type="checkbox" name="tags" value="${escapeHtml(value)}" ${set.has(value) ? 'checked' : ''}> ${escapeHtml(value)}</label>`).join('')}</fieldset>`;
+}
+
+// mode=create：来源类型可选（建档事实）；mode=edit：来源类型只读，渠道归因不允许事后修改。
+function leadFormFields(lead, mode, extraHtml = '') {
+  const selectedSource = lead?.source || '';
+  const sourceCell = mode === 'edit'
+    ? `<label class="form-field"><span>来源类型</span><input name="source" type="text" readonly value="${escapeHtml(selectedSource)}" title="渠道归因在建档时确定，编辑不可修改"></label>`
+    : `<label class="form-field"><span>来源类型</span><select name="source"><option value="">请选择来源</option>${leadSources.map((option) => `<option value="${escapeHtml(option)}" ${selectedSource === option ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}</select></label>`;
   return `<form id="business-dialog-form" class="sales-dialog-grid">
-    ${inputField('联系人', 'student', '请输入联系人')}
-    ${inputField('手机号', 'phone', '请输入手机号')}
-    <label class="form-field wide"><span>意向课程<b class="required-mark">*</b></span><select name="courseId" required><option value="">请选择课程库中的面授课程</option>${courseOptions}</select></label>
-    <label class="form-field wide"><span>关联班级</span><select name="classId"><option value="">暂不指定班级</option>${classOptions}</select></label>
-    <label class="form-field wide"><span>关联教师</span><input name="teacherName" type="text" readonly placeholder="选择班级后自动带出"></label>
-    ${selectField('来源类型', 'source', leadSources)}
-    <label class="form-field wide"><span>意向备注</span><textarea name="intentRemark" maxlength="200" placeholder="补充学员的学习目标、时间偏好等信息"></textarea></label>
+    <label class="form-field"><span>联系人<b class="required-mark">*</b></span><input name="student" required maxlength="30" value="${escapeHtml(lead?.student || '')}" placeholder="请输入联系人"></label>
+    <label class="form-field"><span>手机号<b class="required-mark">*</b></span><input name="phone" required maxlength="11" value="${escapeHtml(lead?.phone || '')}" placeholder="请输入 11 位手机号"></label>
+    <label class="form-field wide"><span>意向课程<b class="required-mark">*</b></span><select name="courseId" required><option value="">请选择课程库中的面授课程</option>${leadCourseOptions(lead?.intentCourseId || '')}</select></label>
+    <label class="form-field wide"><span>关联班级</span><select name="classId"><option value="">暂不指定班级</option>${leadBookableClassOptions()}</select></label>
+    <label class="form-field wide"><span>关联教师</span><input name="teacherName" type="text" readonly value="${escapeHtml(lead?.teacherName || '')}" placeholder="选择班级后自动带出"></label>
+    ${sourceCell}
+    <label class="form-field wide"><span>意向备注</span><textarea name="intentRemark" maxlength="200" placeholder="补充学员的学习目标、时间偏好等信息">${escapeHtml(lead?.intentRemark || '')}</textarea></label>
+    ${leadTagPicker(leadTagsOf(lead || {}))}
+    ${extraHtml}
   </form>`;
 }
 
-function bindLeadCreateForm(dialog) {
+// 关联班级按意向课程联动；编辑时保留原班级（即使已不可报名）以免静默丢数据。
+function bindLeadClassSync(dialog, preset = {}) {
   const form = dialog.querySelector('#business-dialog-form');
   const courseSelect = form?.elements.courseId;
   const classSelect = form?.elements.classId;
   const teacherInput = form?.elements.teacherName;
   if (!form || !courseSelect || !classSelect || !teacherInput) return;
-  const allClassOptions = [...classSelect.options].slice(1).map((option) => option.cloneNode(true));
-  const syncClasses = () => {
+  const allOptions = [...classSelect.options].slice(1).map((option) => option.cloneNode(true));
+  const presetClass = preset.classId ? dataSets.classes.find((item) => item.id === preset.classId) : null;
+  if (presetClass && !allOptions.some((option) => option.value === presetClass.id)) {
+    const extra = document.createElement('option');
+    extra.value = presetClass.id;
+    extra.dataset.courseId = presetClass.courseId || '';
+    extra.dataset.teacher = presetClass.teacher || '';
+    extra.textContent = `${presetClass.name} · ${presetClass.teacher || '待定'}（当前已不可报名）`;
+    allOptions.push(extra);
+  }
+  const sync = () => {
     const courseId = courseSelect.value;
-    const selected = classSelect.value;
+    const keep = classSelect.value;
     classSelect.innerHTML = '<option value="">暂不指定班级</option>';
-    allClassOptions.filter((option) => !courseId || option.dataset.courseId === courseId).forEach((option) => classSelect.appendChild(option));
-    if ([...classSelect.options].some((option) => option.value === selected)) classSelect.value = selected;
-    else classSelect.value = '';
+    allOptions.filter((option) => !courseId || option.dataset.courseId === courseId).forEach((option) => classSelect.appendChild(option));
+    if (keep && [...classSelect.options].some((option) => option.value === keep)) classSelect.value = keep;
     teacherInput.value = classSelect.selectedOptions[0]?.dataset.teacher || '';
   };
-  courseSelect.addEventListener('change', syncClasses);
+  if (preset.courseId) courseSelect.value = preset.courseId;
+  if (preset.classId && [...classSelect.options].some((option) => option.value === preset.classId)) classSelect.value = preset.classId;
+  sync();
+  if (preset.classId && [...classSelect.options].some((option) => option.value === preset.classId)) classSelect.value = preset.classId;
+  teacherInput.value = classSelect.selectedOptions[0]?.dataset.teacher || '';
+  courseSelect.addEventListener('change', () => { classSelect.value = ''; sync(); });
   classSelect.addEventListener('change', () => { teacherInput.value = classSelect.selectedOptions[0]?.dataset.teacher || ''; });
-  syncClasses();
+}
+
+// 统一解析与校验：手机号唯一（编辑时排除自身）、班级与课程一致、标签≤5。
+function collectLeadForm(form, mode, lead = null) {
+  if (!checkBusinessForm(form)) return null;
+  const data = new FormData(form);
+  const student = String(data.get('student') || '').trim();
+  const phone = String(data.get('phone') || '').trim();
+  const courseId = String(data.get('courseId') || '');
+  const classId = String(data.get('classId') || '');
+  const source = mode === 'edit' ? String(lead?.source || '') : String(data.get('source') || '').trim();
+  const intentRemark = String(data.get('intentRemark') || '').trim();
+  const tags = data.getAll('tags').map((value) => String(value));
+  if (!student) { showToast('请填写联系人。', 'warning'); return null; }
+  if (!/^\d{11}$/.test(phone)) { showToast('手机号需为 11 位数字。', 'warning'); return null; }
+  const duplicate = dataSets.leads.find((item) => item.phone === phone && item.id !== (lead?.id || ''));
+  if (duplicate) { showToast(`该手机号已有线索 ${duplicate.number}，请直接查看既有记录。`, 'warning'); return null; }
+  const course = courseCatalog.find((item) => item.id === courseId);
+  if (!course) { showToast('请选择课程库中的有效课程。', 'error'); return null; }
+  const classRecord = dataSets.classes.find((item) => item.id === classId) || null;
+  if (classRecord && classRecord.courseId !== courseId) { showToast('关联班级与意向课程不一致，请重新选择。', 'error'); return null; }
+  if (tags.length > 5) { showToast('线索标签最多选择 5 个。', 'warning'); return null; }
+  return { student, phone, courseId, classId, source, intentRemark, tags, course, classRecord };
+}
+
+function leadCreateForm() { return leadFormFields(null, 'create'); }
+
+function openLeadCreateForm() {
+  const dialog = openBusinessDialog('新增线索', '字段与编辑线索一致；意向课程来自课程库，关联班级后自动带出授课教师。', leadCreateForm(), '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">确认</button>');
+  bindLeadClassSync(dialog);
+  dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const values = collectLeadForm(event.currentTarget, 'create');
+    if (!values) return;
+    const lead = {
+      id: demoId('lead'), number: `CL${Date.now()}`, student: values.student, phone: values.phone,
+      course: values.course.name, intentCourseId: values.course.id, intentCourseName: values.course.name,
+      classId: values.classRecord?.id || '', className: values.classRecord?.name || '', teacherName: values.classRecord?.teacher || '',
+      intentClassId: values.classRecord?.id || '', intentClassName: values.classRecord?.name || '', intentTeacherName: values.classRecord?.teacher || '',
+      source: values.source || '后台登记', intentRemark: values.intentRemark, tags: values.tags,
+      status: '待跟进', owner: '当前账号', next: '待安排', created: toLocalDateString(), followUps: []
+    };
+    upsertDemoRecord('leads', lead);
+    closeBusinessDialog();
+    renderLeads();
+    showToast('线索已创建。');
+  });
 }
 
 function createLeadOrder(lead, classId) {
@@ -291,50 +366,92 @@ function openLeadEnrollForm(lead, renderAfter) {
     showToast('该历史线索尚未匹配课程库，请先补齐意向课程后再转报名。', 'warning');
     return;
   }
-  const selectedClassId = lead.intentClassId || lead.classId || '';
-  const dialog = openBusinessDialog('报名确认', '优先使用线索关联班级；只能选择与意向课程一致且当前可报名的班级。', `<form id="business-dialog-form" class="sales-dialog-grid">
+  const orders = dataSets.orders
+    .filter((order) => order.type === '面授课程' && order.status === '已支付')
+    .filter((order) => !order.sourceLeadId && !order.sourceLeadNo && !order.conversionLeadId)
+    .filter((order) => (!order.student || order.student === lead.student || order.account === lead.student) && order.courseId === lead.intentCourseId)
+    .sort((left, right) => String(right.time || right.createdAt || '').localeCompare(String(left.time || left.createdAt || '')));
+  if (!orders.length) {
+    showToast('暂无符合条件的已支付面授订单，请先在小程序完成报名和支付；引导过程请记录在跟进记录中。', 'warning');
+    return;
+  }
+  const dialog = openBusinessDialog('转报名', '用户已在小程序完成报名并支付后，由课程顾问手动选择对应的面授订单完成绑定。此操作不创建新订单。', `<form id="business-dialog-form" class="sales-dialog-grid">
     ${readonlyRows([['学员', lead.student], ['手机号', lead.phone], ['意向课程', lead.course || lead.intentCourseName || '未指定'], ['意向备注', lead.intentRemark || '—']])}
-    <label class="form-field wide"><span>报名班级<b class="required-mark">*</b></span><select name="classId" required><option value="">请选择同课程班级</option>${leadClassOptions(lead, selectedClassId)}</select></label>
-  </form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">生成待支付订单</button>');
+    <label class="form-field wide"><span>已支付面授订单号<b class="required-mark">*</b></span><select name="orderId" required><option value="">请选择订单号</option>${orders.map((order) => `<option value="${escapeHtml(order.id)}">${escapeHtml(order.number)} · ${escapeHtml(order.name || order.courseName || '面授课程')} · ${escapeHtml(order.linked || '未指定班级')}</option>`).join('')}</select></label>
+  </form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">确认绑定并转报名</button>');
   dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!checkBusinessForm(event.currentTarget)) return;
-    if (!createLeadOrder(lead, new FormData(event.currentTarget).get('classId'))) return;
+    const orderId = String(new FormData(event.currentTarget).get('orderId') || '');
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return showToast('请选择有效的已支付面授订单。', 'warning');
+    lead.status = '已转化';
+    lead.conversionOrderId = order.id;
+    lead.conversionOrderNo = order.number;
+    lead.conversionAt = demoTime();
+    lead.conversionClassId = order.classId || '';
+    lead.conversionClassName = order.linked || order.name || '';
+    order.sourceLeadId = lead.id;
+    order.sourceLeadNo = lead.number;
+    order.conversionBoundAt = demoTime();
+    upsertDemoRecord('leads', lead);
+    upsertDemoRecord('orders', order);
     closeBusinessDialog();
     renderAfter();
-    showToast('面授订单已生成，可在统一订单管理中按“面授课程”筛选查看。');
+    showToast(`已绑定面授订单 ${order.number}，线索已转化。`);
   });
 }
 
-function openLeadIntentForm(lead) {
-  const options = leadCourseOptions();
-  const dialog = openBusinessDialog('变更意向', '变更课程后将清空原关联班级和教师；已生成的试听与订单保留历史快照。', `<form id="business-dialog-form" class="sales-dialog-grid">
-    <label class="form-field wide"><span>意向课程<b class="required-mark">*</b></span><select name="courseId" required><option value="">请选择课程</option>${options}</select></label>
-    ${inputField('变更原因', 'reason', '请输入变更原因', true)}
-  </form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存变更</button>');
+// CR-2026-153：原「变更意向」「标记流失」「编辑标签」三个入口合并为一个「编辑线索」表单。
+// 意向课程变更才需要变更原因；标记流失需要 PERM-CRM-007 且原因为必填；标签沿用固定枚举，最多 5 个。
+function openLeadEditForm(lead) {
+  const canLose = Boolean(window.hbyxPermissions?.can('PERM-CRM-007'));
+  const resultSection = ['待跟进', '已跟进'].includes(lead.status) && canLose
+    ? `<section class="sales-dialog-section wide"><h4>线索结果</h4><div class="sales-dialog-grid">${selectField('线索处理', 'result', ['保持已跟进', '标记为已流失'])}<label class="form-field"><span>流失原因</span><input name="lostReason" maxlength="100" placeholder="选择标记为已流失时必填"></label></div></section>`
+    : '';
+  const dialog = openBusinessDialog('编辑线索', `线索编号 ${lead.number}；字段与新增线索一致，来源类型只读。`, leadFormFields(lead, 'edit', resultSection), '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保</button>');
+  bindLeadClassSync(dialog, { courseId: lead.intentCourseId || '', classId: lead.intentClassId || lead.classId || '' });
   dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (!checkBusinessForm(event.currentTarget)) return;
+    const values = collectLeadForm(event.currentTarget, 'edit', lead);
+    if (!values) return;
     const data = new FormData(event.currentTarget);
-    const course = courseCatalog.find((item) => item.id === data.get('courseId'));
-    const before = { courseId: lead.intentCourseId || '', courseName: lead.intentCourseName || lead.course || '', classId: lead.intentClassId || lead.classId || '', className: lead.intentClassName || lead.className || '', teacherName: lead.intentTeacherName || lead.teacherName || '' };
-    lead.course = course.name;
-    lead.intentCourseId = course.id;
-    lead.intentCourseName = course.name;
-    lead.intentClassId = '';
-    lead.intentClassName = '';
-    lead.intentTeacherName = '';
-    lead.classId = '';
-    lead.className = '';
-    lead.teacherName = '';
-    lead.intentChanges = [...(lead.intentChanges || []), { at: demoTime(), operator: '当前账号', reason: String(data.get('reason') || '').trim(), before, after: { courseId: course.id, courseName: course.name, classId: '', className: '', teacherName: '' } }];
+    const result = String(data.get('result') || '保持已跟进');
+    const lostReason = String(data.get('lostReason') || '').trim();
+    if (result === '标记为已流失' && !lostReason) { showToast('标记流失时必须填写流失原因。', 'warning'); return; }
+    const courseChanged = values.courseId !== (lead.intentCourseId || '');
+    if (courseChanged) {
+      const before = { courseId: lead.intentCourseId || '', courseName: lead.intentCourseName || lead.course || '', classId: lead.intentClassId || lead.classId || '', className: lead.intentClassName || lead.className || '', teacherName: lead.intentTeacherName || lead.teacherName || '' };
+      lead.intentChanges = [...(lead.intentChanges || []), { at: demoTime(), operator: '当前账号', before, after: { courseId: values.course.id, courseName: values.course.name, classId: values.classRecord?.id || '', className: values.classRecord?.name || '', teacherName: values.classRecord?.teacher || '' } }];
+    }
+    lead.student = values.student;
+    lead.phone = values.phone;
+    lead.course = values.course.name;
+    lead.intentCourseId = values.course.id;
+    lead.intentCourseName = values.course.name;
+    lead.intentRemark = values.intentRemark;
+    lead.classId = values.classRecord?.id || '';
+    lead.className = values.classRecord?.name || '';
+    lead.teacherName = values.classRecord?.teacher || '';
+    lead.intentClassId = lead.classId;
+    lead.intentClassName = lead.className;
+    lead.intentTeacherName = lead.teacherName;
+    lead.tags = values.tags;
+    if (result === '标记为已流失') {
+      lead.status = '已流失';
+      lead.lostReason = lostReason;
+      lead.lostAt = demoTime();
+    }
     upsertDemoRecord('leads', lead);
     closeBusinessDialog();
     renderLeads();
-    showToast('线索意向已变更，原试听和订单快照保持不变。');
+    const parts = [];
+    if (courseChanged) parts.push('意向已变更，原试听与订单快照保持不变');
+    parts.push('标签与主档已保存');
+    if (result === '标记为已流失') parts.push('线索已标记为已流失，历史跟进记录保留');
+    showToast(`编辑线索已保存：${parts.join('；')}。`);
   });
 }
-
 function timeRangeOverlaps(left, right) {
   const start = value => String(value || '').replace('T', ' ');
   return start(left.start) < start(right.end) && start(right.start) < start(left.end);
@@ -430,6 +547,10 @@ function batchForClass(record) {
 }
 function batchNameForClass(record) { return batchForClass(record)?.name || record?.batch || '—'; }
 function classBatchOptions() { return dataSets.batches.map(batch => batch.name); }
+function currentOngoingBatchName() {
+  const currentYear = String(DEMO_TODAY).slice(0, 4);
+  return dataSets.batches.find(batch => String(batch.start || '').startsWith(currentYear) && batchStatusOf(batch) === '进行中')?.name || '';
+}
 function productHasOrders(product) {
   if (!product) return false;
   const sharedOrders = readDemoState().orders || [];
@@ -447,7 +568,8 @@ function productCanDelete(product) {
 syncSharedBusinessData();
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-const statusClass = (value) => ({ 已上架: 'green', 已下架: 'gray', 草稿: 'gray', 已支付: 'green', 待支付: 'amber', 退款中: 'amber', 已退款: 'gray', 已取消: 'gray', 进行中: 'brand', 已结束: 'gray', 未开始: 'gray', 招生中: 'brand', 已满员: 'amber', 未发布: 'gray', 已展示: 'green', 待确认: 'amber', 已确认: 'brand', 已试听: 'green', 已报名: 'green', 已放弃: 'gray', 已分班: 'green', 学习中: 'brand', 已完成: 'green', 跟进中: 'brand', 已转化: 'green', 已流失: 'gray', 未转化: 'amber' }[value] || 'gray');
+const statusClass = (value) => ({ 已上架: 'green', 已下架: 'gray', 草稿: 'gray', 已支付: 'green', 待支付: 'amber', 退款中: 'amber', 已退款: 'gray', 已取消: 'gray', 进行中: 'brand', 已结束: 'gray', 未开始: 'gray', 招生中: 'brand', 已满员: 'amber', 未发布: 'gray', 已展示: 'green', 待确认: 'amber', 待试听: 'amber', 已确认: 'brand', 已试听: 'green', 已报名: 'green', 已放弃: 'gray', 已分班: 'green', 学习中: 'brand', 已完成: 'green', 跟进中: 'brand', 待跟进: 'amber', 已跟进: 'brand', 已转化: 'green', 已流失: 'gray', 未转化: 'amber' }[value] || 'gray');
+const trialDisplayStatus = (status) => ['待确认', '已确认'].includes(status) ? '待试听' : status;
 const tag = (value) => `<span class="tag ${statusClass(value)}">${escapeHtml(value)}</span>`;
 const LEAD_TAG_OPTIONS = ['高意向', '待回访', '试听后待转化', '价格敏感', '已流失待激活'];
 const leadTagsOf = (row) => Array.isArray(row?.tags) ? row.tags.filter(value => LEAD_TAG_OPTIONS.includes(value)).slice(0, 5) : [];
@@ -799,10 +921,36 @@ function renderBatches() {
   const classCountOf = (batch) => dataSets.classes.filter((row) => batchNameForClass(row) === batch.name).length;
   const statusCount = (value) => dataSets.batches.filter((batch) => batchStatusOf(batch) === value).length;
   const pendingScheduleCount = dataSets.classes.filter((row) => classScheduleStatus(row) === '待排课').length;
-  pageFrame('批次管理', '', '', metricCards([['年度批次', String(dataSets.batches.length), '按年自动生成，固定四批'], ['进行中', String(statusCount('进行中')), '按起止日期派生'], ['已结束', String(statusCount('已结束')), '按起止日期派生'], ['待排课班级', String(pendingScheduleCount), '需进入排课工作台']]) + filterPanel('batch-filter', selectField('招生季', 'season', ['春季', '暑假', '秋季', '寒假']) + selectField('批次状态', 'status', ['未开始', '进行中', '已结束']) + inputField('关键词', 'keyword', '批次名称', true)) + table('<thead><tr><th>批次名称</th><th>招生季</th><th>开始日期</th><th>结束日期</th><th>关联班级</th><th>状态</th><th>操作</th></tr></thead>'));
-  const rows = (row) => `<td><a class="reference-link" href="/admin/pages/crm/classes.html?batch=${encodeURIComponent(row.name)}">${row.name}</a></td><td>${row.season}</td><td>${row.start}</td><td>${row.end}</td><td>${classCountOf(row)}</td><td>${tag(batchStatusOf(row))}</td><td><a class="link" href="/admin/pages/crm/classes.html?batch=${encodeURIComponent(row.name)}">查看班级</a></td>`;
-  renderRows(businessData, rows, () => true);
-  document.querySelector('#batch-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { season, status, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!season.value || row.season === season.value) && (!status.value || batchStatusOf(row) === status.value) && (!keyword.value.trim() || row.name.includes(keyword.value.trim()))); });
+  const currentYear = String(DEMO_TODAY).slice(0, 4);
+  const years = [...new Set(dataSets.batches.map((row) => String(row.start || '').slice(0, 4)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+  const yearFilter = `<label class="form-field"><span>年度</span><select name="year"><option value="">全部年度</option>${years.map((year) => `<option value="${year}" ${year === currentYear ? 'selected' : ''}>${year}年</option>`).join('')}</select></label>`;
+  pageFrame('批次管理', '', '', metricCards([['年度批次', String(dataSets.batches.length), '按年自动生成，固定四批'], ['进行中', String(statusCount('进行中')), '按起止日期派生'], ['已结束', String(statusCount('已结束')), '按起止日期派生'], ['待排课班级', String(pendingScheduleCount), '需进入排课工作台']]) + filterPanel('batch-filter', yearFilter + selectField('招生季', 'season', ['春季', '暑假', '秋季', '寒假']) + selectField('批次状态', 'status', ['未开始', '进行中', '已结束']) + inputField('关键词', 'keyword', '批次名称', true)) + table('<thead><tr><th>批次名称</th><th>招生季</th><th>开始日期</th><th>结束日期</th><th>关联班级</th><th>状态</th><th>操作</th></tr></thead>'));
+  const rows = (row) => `<td><a class="reference-link" href="/admin/pages/crm/classes.html?batch=${encodeURIComponent(row.name)}">${row.name}</a></td><td>${row.season}</td><td>${row.start}</td><td>${row.end}</td><td>${classCountOf(row)}</td><td>${tag(batchStatusOf(row))}</td><td><a class="link" href="/admin/pages/crm/classes.html?batch=${encodeURIComponent(row.name)}">查看班级</a><button class="text-button" data-business-action="batch-edit">编辑</button></td>`;
+  const filterRows = (form) => { const { year, season, status, keyword } = form; renderRows(businessData, rows, (row) => (!year.value || String(row.start || '').startsWith(year.value)) && (!season.value || row.season === season.value) && (!status.value || batchStatusOf(row) === status.value) && (!keyword.value.trim() || row.name.includes(keyword.value.trim()))); };
+  const batchFilter = document.querySelector('#batch-filter');
+  if (batchFilter) { filterRows(batchFilter); batchFilter.addEventListener('submit', (event) => { event.preventDefault(); filterRows(event.currentTarget); }); batchFilter.addEventListener('reset', () => window.setTimeout(() => { batchFilter.year.value = currentYear; filterRows(batchFilter); }, 0)); }
+}
+
+function openBatchEditForm(row) {
+  const body = `<form id="batch-edit-form" class="crm-form-grid"><label class="form-field wide"><span>批次名称 <b class="required-mark">*</b></span><input name="name" required value="${escapeHtml(row.name || '')}"></label>${selectField('招生季', 'season', ['春季', '暑假', '秋季', '寒假'], row.season)}<label class="form-field"><span>开始日期 <b class="required-mark">*</b></span><input name="start" type="date" required value="${escapeHtml(row.start || '')}"></label><label class="form-field"><span>结束日期 <b class="required-mark">*</b></span><input name="end" type="date" required value="${escapeHtml(row.end || '')}"></label><p class="form-help wide">批次状态根据当前日期和起止日期自动计算，不支持手工修改。</p></form>`;
+  const dialog = openBusinessDialog('编辑批次', '修改批次基础信息；已关联班级的批次名称变更会同步影响班级归属筛选。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="batch-edit-form" class="button primary">保存</button>');
+  dialog.querySelector('#batch-edit-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const name = String(data.get('name') || '').trim();
+    const season = String(data.get('season') || '').trim();
+    const start = String(data.get('start') || '');
+    const end = String(data.get('end') || '');
+    if (!name || !season || !start || !end) return showToast('请完整填写批次名称、招生季和日期。', 'warning');
+    if (end < start) return showToast('结束日期不能早于开始日期。', 'warning');
+    const duplicate = dataSets.batches.find((item) => item.id !== row.id && item.name === name);
+    if (duplicate) return showToast('批次名称已存在，请更换名称。', 'warning');
+    Object.assign(row, { name, season, start, end });
+    upsertDemoRecord('batches', row);
+    closeBusinessDialog();
+    renderBatches();
+    showToast('批次信息已保存。');
+  });
 }
 
 function classStageTabs(activeStage) {
@@ -830,12 +978,11 @@ function renderClasses(stage = new URLSearchParams(window.location.search).get('
   // CR-2026-057/059：招生阶段从排课完成后开始；教学阶段只承载招生已结束的班级。
   const stageRows = businessData.filter(row => {
     const projection = projectionOf(row);
-    if (stage === 'enrollment' && projection.scheduleStatus !== '已完成') return false;
-    if (stage === 'teaching' && (projection.scheduleStatus !== '已完成' || projection.enrollmentStatus !== '已结束')) return false;
+    if (!classStageEligible(row, stage)) return false;
     return Boolean(projection[config.key]);
   });
   const enrolledTotal = stageRows.reduce((sum, row) => sum + Number(row.enrolled || 0), 0);
-  const metrics = metricCards(config.values.map(value => [value, stageRows.filter(row => phaseStatusOf(row) === value).length, `${config.label}为${value}`]).concat([['已报名', `${enrolledTotal} 人`, '当前示例班级合计报名人数', Math.min(Math.round((enrolledTotal / 60) * 100), 100)]]));
+  const metrics = metricCards(config.values.map(value => [value, stageRows.filter(row => phaseStatusOf(row) === value).length, `${config.label}为${value}`]).concat(stage === 'enrollment' ? [['已报名', `${enrolledTotal} 人`, '当前示例班级合计报名人数', Math.min(Math.round((enrolledTotal / 60) * 100), 100)]] : []));
   const stageColumns = stage === 'schedule'
     ? '<th>班级名称</th><th>关联课程</th><th>批次</th><th>授课教师</th><th>校区</th><th>排课状态</th><th>排班版本</th><th>操作</th>'
     : stage === 'enrollment'
@@ -848,8 +995,8 @@ function renderClasses(stage = new URLSearchParams(window.location.search).get('
   const rows = (row) => {
     const projection = projectionOf(row);
     const scheduleButton = ['待排课', '排课中'].includes(projection.scheduleStatus)
-      ? '<button class="text-button" data-perm="PERM-ACADEMIC-002" data-business-action="class-schedule-create">去排课</button>'
-      : `<button class="text-button" data-business-action="class-schedule-view">排班查看</button>${projection.teachingStatus === '待开课' ? '<button class="text-button" data-perm="PERM-ACADEMIC-002" data-business-action="class-schedule-change">排班变更</button>' : ''}`;
+      ? `<button class="text-button" data-perm="PERM-ACADEMIC-002" data-business-action="class-schedule-create">${projection.scheduleStatus === '排课中' ? '继续排课' : '去排课'}</button>`
+      : `<button class="text-button" data-business-action="class-schedule-view">排班查看</button>${classScheduleChangeAllowed(row) ? '<button class="text-button" data-perm="PERM-ACADEMIC-002" data-business-action="class-schedule-change">排班变更</button>' : ''}`;
     // CR-2026-047／2026-09-29 收窄：取消班级只在未发布阶段（待排课／待发布）提供，用于纠正建错的班级。
     const classCancelled = isClassCancelled(row);
     if (stage === 'schedule') {
@@ -860,11 +1007,11 @@ function renderClasses(stage = new URLSearchParams(window.location.search).get('
       const scheduleActions = classCancelled
         ? '<button class="text-button" data-business-action="class-view">查看</button>'
         : `<button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-edit">编辑</button>${scheduleButton}${cancelButton}`;
-      return `<td><a class="reference-link" href="#">${escapeHtml(row.name)}</a></td><td>${escapeHtml(row.course)}</td><td>${escapeHtml(batchNameForClass(row))}</td><td>${escapeHtml(row.teacher || '待排课')}</td><td>${escapeHtml(row.campus || '—')}</td><td>${statusCell}</td><td>${row.scheduleVersion ? `v${row.scheduleVersion}` : '—'}</td><td class="action-cell">${scheduleActions}</td>`;
+      return `<td><a class="reference-link" href="#">${escapeHtml(row.name)}</a></td><td>${escapeHtml(row.course)}</td><td>${escapeHtml(batchNameForClass(row))}</td><td>${escapeHtml(row.teacher || '待排课')}</td><td>${escapeHtml(row.campus || '—')}</td><td>${statusCell}</td><td>${row.scheduleVersion ? `<button class="text-button" data-business-action="schedule-history">v${row.scheduleVersion}</button>` : '—'}</td><td class="action-cell">${scheduleActions}</td>`;
     }
-    if (stage === 'enrollment') return `<td><a class="reference-link" href="#">${escapeHtml(row.name)}</a></td><td>${escapeHtml(row.course)}</td><td>${tag(projection.enrollmentStatus)}</td><td>${tag(projection.displayStatus)} <button class="text-button" data-business-action="class-display-toggle">${projection.displayStatus === '显示' ? '隐藏' : '显示'}</button></td><td>${recommendationSwitch(row, 'class-recommend-toggle', projection.displayStatus === '显示', '班级显示后可设置首页推荐')}</td><td>${row.enrolled || 0} / ${row.capacity || 0}</td><td>${tag(projection.capacityStatus)}</td><td>${escapeHtml(row.deadline || '—')}</td><td class="action-cell"><button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-schedule-view">排班查看</button>${projection.teachingStatus === '待开课' ? '<button class="text-button" data-perm="PERM-ACADEMIC-002" data-business-action="class-schedule-change">排班变更</button>' : ''}${projection.enrollmentStatus === '已结束' && projection.capacityStatus === '否' && projection.teachingStatus === '待开课' ? '<button class="text-button" data-business-action="class-extend-deadline">延长报名</button>' : ''}</td>`;
+    if (stage === 'enrollment') return `<td><a class="reference-link" href="#">${escapeHtml(row.name)}</a></td><td>${escapeHtml(row.course)}</td><td>${tag(projection.enrollmentStatus)}</td><td>${tag(projection.displayStatus)} <button class="text-button" data-business-action="class-display-toggle">${projection.displayStatus === '显示' ? '隐藏' : '显示'}</button></td><td>${recommendationSwitch(row, 'class-recommend-toggle', projection.displayStatus === '显示', '班级显示后可设置首页推荐')}</td><td>${row.enrolled || 0} / ${row.capacity || 0}</td><td>${tag(projection.capacityStatus)}</td><td>${escapeHtml(row.deadline || '—')}</td><td class="action-cell"><button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-schedule-view">排班查看</button>${projection.enrollmentStatus === '已结束' && projection.capacityStatus === '否' && projection.teachingStatus === '待开课' ? '<button class="text-button" data-business-action="class-extend-deadline">延长报名</button>' : ''}</td>`;
     const progress = classLessonProgress(row);
-    return `<td><a class="reference-link" href="#">${escapeHtml(row.name)}</a></td><td>${escapeHtml(row.course)}</td><td>${tag(projection.teachingStatus)}</td><td>${escapeHtml(row.firstLessonDate || '—')}</td><td>${progress.completed} / ${progress.total}</td><td>${escapeHtml(row.teacher || '—')}<span class="sub-cell">${escapeHtml(row.campus || '—')}</span></td><td class="action-cell"><button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-teaching-schedule">查看课表</button>${progress.completed < progress.total ? '<button class="text-button" data-business-action="class-session-adjust">课次调整</button>' : ''}</td>`;
+    return `<td><a class="reference-link" href="#">${escapeHtml(row.name)}</a></td><td>${escapeHtml(row.course)}</td><td>${tag(projection.teachingStatus)}</td><td>${escapeHtml(row.firstLessonDate || '—')}</td><td>${progress.completed} / ${progress.total}</td><td>${escapeHtml(row.teacher || '—')}<span class="sub-cell">${escapeHtml(row.campus || '—')}</span></td><td class="action-cell"><button class="text-button" data-business-action="class-view">查看</button><button class="text-button" data-business-action="class-teaching-schedule">查看课表</button></td>`;
   };
   pageFrame('面授班级', '', '<button class="button primary" data-business-action="class-create">创建面授班级</button>', classStageTabs(stage) + metrics + filterPanel('class-filter', filters) + table(`<thead><tr>${stageColumns}</tr></thead>`));
   renderRows(stageRows, rows, () => true);
@@ -893,6 +1040,13 @@ function renderClasses(stage = new URLSearchParams(window.location.search).get('
       batchField.value = initialBatch;
       document.querySelector('#class-filter')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     }
+  } else {
+    const defaultBatch = currentOngoingBatchName();
+    const batchField = document.querySelector('#class-filter [name=batch]');
+    if (batchField && defaultBatch && [...batchField.options].some((option) => option.value === defaultBatch)) {
+      batchField.value = defaultBatch;
+      document.querySelector('#class-filter')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
   }
   // 课表管理「去班级排课」深链：?classId=<班级ID> 进入时直接打开该班级的排课抽屉，
   // 排课已完成的班级按只读「排班查看」打开（教学阶段班级不再走变更）。
@@ -913,36 +1067,35 @@ function renderClasses(stage = new URLSearchParams(window.location.search).get('
 function renderTrials() {
   businessData = dataSets.trials;
   // CR-2026-038 §4.1／§5：试听状态只取 SM-TRIAL 四态，指标卡改为派生值。
-  const trialMetrics = (list) => metricCards([['待确认', list.filter((row) => row.status === '待确认').length, '需要确认试听时间'], ['已确认', list.filter((row) => row.status === '已确认').length, '已发送通知'], ['已试听', list.filter((row) => row.status === '已试听').length, '可进入报名转化'], ['已取消', list.filter((row) => row.status === '已取消').length, '保留取消原因']]);
-  pageFrame('后台登记试听', '', '<button class="button primary" data-business-action="trial-create">登记试听</button>', trialMetrics(businessData) + filterPanel('trial-filter', selectField('试听状态', 'status', ['待确认', '已确认', '已试听', '已取消']) + selectField('来源线索编号', 'leadNo', [...new Set(businessData.map((row) => row.leadNo).filter(Boolean))]) + selectField('目标课程', 'course', [...new Set(businessData.map((row) => row.course).filter(Boolean))]) + selectField('校区', 'campus', ['龙泉校区', '南湖校区']) + selectField('来源', 'source', leadSources) + inputField('关键词', 'keyword', '学员姓名 / 家长手机号', true)) + table('<thead><tr><th>学员姓名</th><th>家长手机号</th><th>目标课程</th><th>试听班级</th><th>试听教师</th><th>试听时间</th><th>校区</th><th>试听状态</th><th>来源线索编号</th><th>来源</th><th>跟进人</th><th>操作</th></tr></thead>'));
-  const rows = (row) => `<td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.phone)}</td><td>${escapeHtml(row.course)}</td><td>${escapeHtml(row.className || '未指定')}</td><td>${escapeHtml(row.teacher || '未指定')}</td><td>${escapeHtml(row.time)}</td><td>${escapeHtml(row.campus)}</td><td>${tag(row.status)}</td><td>${escapeHtml(row.leadNo || '—')}</td><td>${escapeHtml(row.source)}</td><td>${escapeHtml(row.owner)}</td><td class="action-cell">${['待确认', '已确认'].includes(row.status) ? `${row.status === '待确认' ? '<button class="text-button" data-business-action="trial-confirm">确认试听</button>' : ''}<button class="text-button" data-business-action="trial-cancel">取消试听</button>` : ''}<button class="text-button" data-business-action="trial-view">查看</button></td>`;
+  const trialMetrics = (list) => metricCards([['待试听', list.filter((row) => ['待确认', '已确认'].includes(row.status)).length, '待确认或已安排'], ['已试听', list.filter((row) => row.status === '已试听').length, '可进入报名转化'], ['已取消', list.filter((row) => row.status === '已取消').length, '保留取消原因']]);
+  pageFrame('后台登记试听', '', '<button class="button primary" data-business-action="trial-create">登记试听</button>', trialMetrics(businessData) + filterPanel('trial-filter', selectField('试听状态', 'status', ['待试听', '已试听', '已取消']) + selectField('来源线索编号', 'leadNo', [...new Set(businessData.map((row) => row.leadNo).filter(Boolean))]) + selectField('目标课程', 'course', [...new Set(businessData.map((row) => row.course).filter(Boolean))]) + selectField('校区', 'campus', ['龙泉校区', '南湖校区']) + selectField('来源', 'source', leadSources) + inputField('关键词', 'keyword', '学员姓名 / 家长手机号', true)) + table('<thead><tr><th>学员姓名</th><th>家长手机号</th><th>目标课程</th><th>试听班级</th><th>试听教师</th><th>试听时间</th><th>校区</th><th>试听状态</th><th>来源线索编号</th><th>来源</th><th>跟进人</th><th>操作</th></tr></thead>'));
+  const rows = (row) => `<td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.phone)}</td><td>${escapeHtml(row.course)}</td><td>${escapeHtml(row.className || '未指定')}</td><td>${escapeHtml(row.teacher || '未指定')}</td><td>${escapeHtml(row.time)}</td><td>${escapeHtml(row.campus)}</td><td>${tag(trialDisplayStatus(row.status))}</td><td>${escapeHtml(row.leadNo || '—')}</td><td>${escapeHtml(row.source)}</td><td>${escapeHtml(row.owner)}</td><td class="action-cell">${['待确认', '已确认'].includes(row.status) ? `${row.status === '待确认' ? '<button class="text-button" data-business-action="trial-confirm">确认试听</button>' : ''}<button class="text-button" data-business-action="trial-cancel">取消试听</button>` : ''}<button class="text-button" data-business-action="trial-view">查看</button></td>`;
   renderRows(businessData, rows, () => true);
-  document.querySelector('#trial-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, leadNo, course, campus, source, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!leadNo.value || row.leadNo === leadNo.value) && (!course.value || row.course === course.value) && (!campus.value || row.campus === campus.value) && (!source.value || row.source === source.value) && (!keyword.value.trim() || `${row.student}${row.phone}`.includes(keyword.value.trim()))); });
+  document.querySelector('#trial-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, leadNo, course, campus, source, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || trialDisplayStatus(row.status) === status.value) && (!leadNo.value || row.leadNo === leadNo.value) && (!course.value || row.course === course.value) && (!campus.value || row.campus === campus.value) && (!source.value || row.source === source.value) && (!keyword.value.trim() || `${row.student}${row.phone}`.includes(keyword.value.trim()))); });
 }
 
 function renderLeads() {
   businessData = dataSets.leads;
-  // CR-2026-038 §3／§5：线索状态只取 SM-LEAD 四态；指标卡与来源类型均与列表同源。
-  const leadMetrics = (list) => metricCards([['待分配', list.filter((row) => row.status === '待分配').length, '等待负责人分配'], ['跟进中', list.filter((row) => row.status === '跟进中').length, '需要继续跟进'], ['已转化', list.filter((row) => row.status === '已转化').length, '已生成报名结果'], ['已流失', list.filter((row) => row.status === '已流失').length, '保留历史记录', list.length ? Math.round((list.filter((row) => row.status === '已流失').length / list.length) * 100) : 0]]);
-  pageFrame('线索跟进', '', '<button class="button primary" data-business-action="lead-create">新增线索</button>', leadMetrics(businessData) + filterPanel('lead-filter', selectField('线索状态', 'status', ['待分配', '跟进中', '已转化', '已流失']) + selectField('来源类型', 'source', leadSources) + selectField('线索标签', 'tag', LEAD_TAG_OPTIONS) + inputField('关键词', 'keyword', '学员姓名 / 手机号', true)) + table('<thead><tr><th>线索编号</th><th>联系人</th><th>手机号</th><th>意向课程</th><th>关联班级</th><th>关联教师</th><th>来源</th><th>线索状态</th><th>标签</th><th>下次跟进</th><th>负责人</th><th>操作</th></tr></thead>'));
-  const rows = (row) => `<td>${escapeHtml(row.number)}</td><td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.phone)}</td><td>${escapeHtml(row.course || row.intentCourseName || '—')}</td><td>${escapeHtml(row.className || row.intentClassName || '未指定')}</td><td>${escapeHtml(row.teacherName || row.intentTeacherName || '未指定')}</td><td>${escapeHtml(row.source)}</td><td>${tag(row.status)}</td><td><div class="crm-lead-tags">${leadTagsDisplay(row)}</div></td><td>${escapeHtml(row.next)}</td><td>${escapeHtml(row.owner)}</td><td class="action-cell"><button class="text-button" data-business-action="lead-intent">变更意向</button>${row.status === '待分配' ? '<button class="text-button" data-perm="PERM-CRM-007" data-business-action="lead-assign">分配</button>' : ''}${row.status === '跟进中' ? '<button class="text-button" data-perm="PERM-CRM-007" data-business-action="lead-lose">标记流失</button>' : ''}<button class="text-button" data-business-action="lead-follow">填写跟进</button><button class="text-button" data-business-action="lead-tags">编辑标签</button>${row.status === '跟进中' ? '<button class="text-button" data-business-action="lead-trial">转为试听</button><button class="text-button" data-business-action="lead-enroll">转报名</button>' : ''}${row.status === '已流失' ? '<button class="text-button" data-business-action="lead-reactivate">重新激活</button>' : ''}<button class="text-button" data-business-action="lead-view">查看</button></td>`;
+  businessData.forEach((row) => {
+    if (row.status === '待分配') { row.status = '待跟进'; row.owner = row.owner === '待分配' ? '当前账号' : row.owner; }
+    if (row.status === '跟进中') row.status = Array.isArray(row.followUps) && row.followUps.length ? '已跟进' : '待跟进';
+  });
+  // CR-2026-038：线索状态按首次有效跟进收口为待跟进／已跟进／已转化／已流失。
+  const leadMetrics = (list) => metricCards([['待跟进', list.filter((row) => row.status === '待跟进').length, '尚未完成首次有效跟进'], ['已跟进', list.filter((row) => row.status === '已跟进').length, '已完成至少一次有效跟进'], ['已转化', list.filter((row) => row.status === '已转化').length, '已生成报名结果'], ['已流失', list.filter((row) => row.status === '已流失').length, '保留历史记录', list.length ? Math.round((list.filter((row) => row.status === '已流失').length / list.length) * 100) : 0]]);
+  // CR-2026-152：报名转化不再独立成页，漏斗与转化率作为线索跟进页顶部的只读派生区。
+  const conversions = derivedConversions();
+  const convertedCount = conversions.filter((row) => row.status === '已报名').length;
+  const attendedCount = conversions.filter((row) => row.trial === '已试听').length;
+  const conversionRate = conversions.length ? `${((convertedCount / conversions.length) * 100).toFixed(1)}%` : '0.0%';
+  const followedCount = dataSets.leads.filter((lead) => Array.isArray(lead.followUps) && lead.followUps.length).length;
+  const funnelBase = conversions.length || 1;
+  const funnelSteps = [['当前线索', conversions.length], ['有效跟进', followedCount], ['已试听', attendedCount], ['已报名', convertedCount]];
+  const funnel = funnelSteps.map(([label, count], index) => `<div class="crm-funnel-step"><div class="crm-funnel-head"><strong>${label}</strong><span>${count} · ${Math.round((count / funnelBase) * 100)}%</span></div><div class="crm-funnel-bar"><span style="width:${Math.round((count / funnelBase) * 100)}%"></span></div>${index ? `<small>较上一阶段 ${funnelSteps[index - 1][1] ? Math.round((count / funnelSteps[index - 1][1]) * 100) : 0}%</small>` : '<small>统计基准</small>'}</div>`).join('');
+  const funnelSection = `<section class="crm-funnel"><div class="crm-funnel-title"><h3>报名转化漏斗</h3><span>只读派生统计 · 报名转化率 ${conversionRate}</span></div><p>按当前全部线索、跟进、试听和有效报名事实实时计算，不单独维护数据与状态；待支付、已取消、退款中、已退款订单不计入已报名。</p><div class="crm-funnel-grid">${funnel}</div></section>`;
+  pageFrame('线索跟进', '', '<button class="button" data-business-action="lead-export">导出线索与转化</button><button class="button primary" data-business-action="lead-create">新增线索</button>', leadMetrics(businessData) + funnelSection + filterPanel('lead-filter', selectField('线索状态', 'status', ['待跟进', '已跟进', '已转化', '已流失']) + selectField('来源类型', 'source', leadSources) + selectField('线索标签', 'tag', LEAD_TAG_OPTIONS) + inputField('关键词', 'keyword', '学员姓名 / 手机号', true)) + table('<thead><tr><th>线索编号</th><th>联系人</th><th>手机号</th><th>意向课程</th><th>关联班级</th><th>关联教师</th><th>来源</th><th>线索状态</th><th>标签</th><th>下次跟进</th><th>负责人</th><th>操作</th></tr></thead>'));
+  const rows = (row) => `<td>${escapeHtml(row.number)}</td><td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.phone)}</td><td>${escapeHtml(row.course || row.intentCourseName || '—')}</td><td>${escapeHtml(row.className || row.intentClassName || '未指定')}</td><td>${escapeHtml(row.teacherName || row.intentTeacherName || '未指定')}</td><td>${escapeHtml(row.source)}</td><td>${tag(row.status)}</td><td><div class="crm-lead-tags">${leadTagsDisplay(row)}</div></td><td>${escapeHtml(row.next)}</td><td>${escapeHtml(row.owner)}</td><td class="action-cell"><button class="text-button" data-perm="PERM-CRM-005" data-business-action="lead-edit">编辑线索</button><button class="text-button" data-business-action="lead-follow">填写跟进</button>${['待跟进', '已跟进'].includes(row.status) ? '<button class="text-button" data-business-action="lead-trial">转为试听</button><button class="text-button" data-business-action="lead-enroll">转报名</button>' : ''}${row.status === '已流失' ? '<button class="text-button" data-business-action="lead-reactivate">重新激活</button>' : ''}<button class="text-button" data-business-action="lead-view">查看</button></td>`;
   renderRows(businessData, rows, () => true);
   document.querySelector('#lead-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, source, tag: tagField, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!source.value || row.source === source.value) && (!tagField.value || leadTagsOf(row).includes(tagField.value)) && (!keyword.value.trim() || `${row.student}${row.phone}`.includes(keyword.value.trim()))); });
-}
-
-function renderConversions() {
-  // CR-2026-038 §2.1：报名转化不再是独立数据，按线索派生（关联试听记录与报名订单）。
-  businessData = derivedConversions();
-  const converted = businessData.filter((row) => row.status === '已报名').length;
-  const attended = businessData.filter((row) => row.trial === '已试听').length;
-  const rate = businessData.length ? `${((converted / businessData.length) * 100).toFixed(1)}%` : '0.0%';
-  const followUp = dataSets.leads.filter((lead) => Array.isArray(lead.followUps) && lead.followUps.length).length;
-  const funnelTotal = businessData.length || 1;
-  const funnel = [['当前线索', businessData.length], ['有效跟进', followUp], ['已试听', attended], ['已报名', converted]].map(([label, count], index, stages) => `<div class="crm-funnel-step"><div class="crm-funnel-head"><strong>${label}</strong><span>${count} · ${Math.round((count / funnelTotal) * 100)}%</span></div><div class="crm-funnel-bar"><span style="width:${Math.round((count / funnelTotal) * 100)}%"></span></div>${index ? `<small>较上一阶段 ${stages[index - 1][1] ? Math.round((count / stages[index - 1][1]) * 100) : 0}%</small>` : '<small>统计基准</small>'}</div>`).join('');
-  pageFrame('报名转化', '', '<button class="button" data-business-action="conversion-export">导出转化数据</button>', metricCards([['当前线索', businessData.length, '与线索跟进同源'], ['已试听', attended, '完成试听记录'], ['已报名', converted, '已生成面授订单', businessData.length ? Math.round((converted / businessData.length) * 100) : 0], ['报名转化率', rate, '已报名 ÷ 当前线索']]) + `<section class="crm-funnel"><div class="crm-funnel-title"><h3>报名转化漏斗</h3><span>只读派生统计</span></div><p>按当前全部线索、跟进、试听和有效报名事实计算，不单独维护状态。</p><div class="crm-funnel-grid">${funnel}</div></section>` + filterPanel('conversion-filter', selectField('转化状态', 'status', ['已报名', '未转化']) + selectField('试听状态', 'trial', ['待确认', '已确认', '已试听', '已取消', '无试听记录']) + selectField('目标课程', 'course', [...new Set(businessData.map((row) => row.course).filter(Boolean))]) + inputField('关键词', 'keyword', '学员姓名 / 手机号', true)) + table('<thead><tr><th>线索编号</th><th>联系人</th><th>意向课程</th><th>试听时间</th><th>试听状态</th><th>报名状态</th><th>报名班级</th><th>负责人</th><th>操作</th></tr></thead>'));
-  const rows = (row) => `<td>${row.number}</td><td>${row.student}</td><td>${row.course}</td><td>${row.time}</td><td>${row.trial ? tag(row.trial) : '—'}</td><td>${tag(row.status)}</td><td>${row.className}</td><td>${row.owner}</td><td class="action-cell">${row.status === '未转化' ? '<button class="text-button" data-business-action="conversion-enroll">转报名</button>' : ''}<button class="text-button" data-business-action="conversion-view">查看</button></td>`;
-  renderRows(businessData, rows, () => true);
-  document.querySelector('#conversion-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, trial, course, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!trial.value || (trial.value === '无试听记录' ? !row.trial : row.trial === trial.value)) && (!course.value || row.course === course.value) && (!keyword.value.trim() || `${row.student}${row.number}`.includes(keyword.value.trim()))); });
 }
 
 // I1-O-16: the class detail dialog also shows generated sessions and the live class roster.
@@ -1028,19 +1181,26 @@ function openClassDetail(row) {
   const roster = enrollments.length ? enrollments.map(item => { const student = students.find(entry => entry.id === item.studentId); return `<tr><td>${escapeHtml(student?.name || item.studentId)}</td><td>${escapeHtml(item.enrolledAt || '—')}</td><td>已分班</td></tr>`; }).join('') : '<tr><td colspan="3">暂无学员报名</td></tr>';
   const sessions = Array.isArray(row.sessions) ? row.sessions : [];
   const projection = classStageProjection(row);
-  const body = `${workspaceTabs([['overview', '班级与招生'], ['course', '关联课程'], ['display', '展示信息'], ['teaching', '状态与教学'], ['students', '学员与记录']], 'overview')}<section data-workspace-panel="overview" class="sales-workspace-panel">${readonlyRows([['班级名称', row.name], ['所属批次', batchNameForClass(row)], ['招生容量', row.capacity || 0], ['课程定价', `¥${row.price}`], ['是否支持试听', row.trialEnabled || '是'], ['试听是否收费', row.trialFee || '否'], ['试听价格', row.trialFee === '是' ? `¥${row.trialPrice || 0}` : '免费'], ['试听说明', row.trialNote || '—'], ['报名开始时间', row.enrollStart || '—'], ['报名截止时间', row.deadline || '—'], ['班级状态', deriveClassStatus(row)]])}</section><section data-workspace-panel="course" class="sales-workspace-panel" hidden>${readonlyRows([['关联课程', row.course]])}${courseReadonlyContent(course)}</section><section data-workspace-panel="display" class="sales-workspace-panel" hidden>${saleUnitDisplayReadonly(row)}</section><section data-workspace-panel="teaching" class="sales-workspace-panel" hidden>${readonlyRows([['班级编号', row.id], ['排课状态', projection.scheduleStatus], ['招生状态', projection.enrollmentStatus], ['教学状态', projection.teachingStatus], ['展示状态', projection.displayStatus], ['名额已满', projection.capacityStatus], ['报名条件', classEnrollmentCondition(row)], ['授课教师', row.teacher], ['校区', row.campus], ['教室', row.classroom], ['上课规则', row.schedule], ['首次上课', row.firstLessonDate || '—'], ['课次时长', `${row.lessonDuration || defaultLessonDuration()} 分钟`], ['已生成课次', sessions.length]])}</section><section data-workspace-panel="students" class="sales-workspace-panel" hidden><div class="sales-dialog-summary"><div><span>已报名</span><strong>${row.enrolled || 0}</strong></div><div><span>招生容量</span><strong>${row.capacity || 0}</strong></div><div><span>剩余名额</span><strong>${Math.max(0, Number(row.capacity || 0) - Number(row.enrolled || 0))}</strong></div></div><div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>状态</th></tr></thead><tbody>${roster}</tbody></table></div></section>`;
+  const body = `${workspaceTabs([['overview', '班级与招生'], ['course', '关联课程'], ['display', '展示信息'], ['teaching', '状态与教学'], ['students', '学员与记录']], 'overview')}<section data-workspace-panel="overview" class="sales-workspace-panel">${readonlyRows([['班级名称', row.name], ['所属批次', batchNameForClass(row)], ['招生容量', row.capacity || 0], ['课程定价', `¥${row.price}`], ['是否支持试听', row.trialEnabled || '是'], ['试听是否收费', row.trialFee || '否'], ['试听价格', row.trialFee === '是' ? `¥${row.trialPrice || 0}` : '免费'], ['试听说明', row.trialNote || '—'], ['报名开始时间', row.enrollStart || '—'], ['报名截止时间', row.deadline || '—'], ['班级状态', deriveClassStatus(row)]])}</section><section data-workspace-panel="course" class="sales-workspace-panel" hidden>${readonlyRows([['关联课程', row.course]])}${courseReadonlyContent(course)}</section><section data-workspace-panel="display" class="sales-workspace-panel" hidden>${saleUnitDisplayReadonly(row)}</section><section data-workspace-panel="teaching" class="sales-workspace-panel" hidden>${readonlyRows([['班级编号', row.id], ['排课状态', projection.scheduleStatus], ['招生状态', projection.enrollmentStatus], ['教学状态', projection.teachingStatus], ['展示状态', projection.displayStatus], ['名额已满', projection.capacityStatus], ['报名条件', classEnrollmentCondition(row)], ['授课教师', row.teacher], ['校区', row.campus], ['教室', row.classroom], ['上课规则', row.schedule], ['首次上课', row.firstLessonDate || '—'], ['课次时长', `${row.lessonDuration || defaultLessonDuration()} 分钟`], ['已生成课次', sessions.length], ['排班版本', `v${row.scheduleVersion || 0}`]])}<button type="button" class="text-button" data-business-action="schedule-history">查看排班版本历史</button></section><section data-workspace-panel="students" class="sales-workspace-panel" hidden><div class="sales-dialog-summary"><div><span>已报名</span><strong>${row.enrolled || 0}</strong></div><div><span>招生容量</span><strong>${row.capacity || 0}</strong></div><div><span>剩余名额</span><strong>${Math.max(0, Number(row.capacity || 0) - Number(row.enrolled || 0))}</strong></div></div><div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>状态</th></tr></thead><tbody>${roster}</tbody></table></div></section>`;
   const scheduleAction = projection.scheduleStatus !== '已完成'
     ? `<button type="button" class="button primary" data-class-schedule-mode="create">去排课</button>`
-    : '<button type="button" class="button" data-class-schedule-mode="view">排班查看</button><button type="button" class="button primary" data-class-schedule-mode="change">排班变更</button>';
+    : `<button type="button" class="button" data-class-schedule-mode="view">排班查看</button>${classScheduleChangeAllowed(row) ? '<button type="button" class="button primary" data-class-schedule-mode="change">排班变更</button>' : ''}`;
   const dialog = openBusinessDialog('班级详情', `${row.name} · ${deriveClassStatus(row)}`, body, `<button type="button" class="button" data-dialog-close>关闭</button><button type="button" class="button" data-business-action="class-edit-detail">编辑班级</button>${scheduleAction}`, { workspace: true });
   dialog.querySelector('[data-business-action="class-edit-detail"]')?.addEventListener('click', () => { closeBusinessDialog(); openClassForm(row); });
+  dialog.querySelector('[data-business-action="schedule-history"]')?.addEventListener('click', () => openScheduleHistory(row));
   dialog.querySelectorAll('[data-class-schedule-mode]').forEach(button => button.addEventListener('click', () => { closeBusinessDialog(); openSchedulePlanner({ classId: row.id, mode: button.dataset.classScheduleMode }); }));
   initWorkspace(dialog, 'overview');
   mountClassEnrollmentPanel(dialog, row, shared);
 }
 
+function openScheduleHistory(row) {
+  const history = Array.isArray(row.scheduleHistory) && row.scheduleHistory.length ? row.scheduleHistory : (row.scheduleVersion ? [{ version: row.scheduleVersion, effectiveAt: row.schedulePublishedAt || row.updatedAt || row.created || '—', operator: '历史数据', reason: '当前排班版本', teacher: row.teacher, campus: row.campus, classroom: row.classroom, schedule: row.schedule, lessonCount: Array.isArray(row.sessions) ? row.sessions.length : 0 }] : []);
+  const rows = history.slice().sort((a, b) => Number(b.version || 0) - Number(a.version || 0)).map(item => `<tr><td><strong>v${escapeHtml(item.version || '—')}</strong>${Number(item.version) === Number(row.scheduleVersion) ? '<br><span class="sub-cell">当前生效</span>' : ''}</td><td>${escapeHtml(item.effectiveAt || '—')}</td><td>${escapeHtml(item.operator || '—')}</td><td>${escapeHtml(item.reason || '—')}</td><td>${escapeHtml(item.teacher || '—')} · ${escapeHtml(item.campus || '—')} · ${escapeHtml(item.classroom || '—')}<br><span class="sub-cell">${escapeHtml(item.schedule || '—')} · ${item.lessonCount || 0}课次</span></td></tr>`).join('') || '<tr><td colspan="5">暂无排班版本记录</td></tr>';
+  openBusinessDialog('排班版本历史', '仅供追溯查看；历史版本不可切换或回滚。', `<div class="sales-table-wrap"><table><thead><tr><th>版本</th><th>生效时间</th><th>操作人</th><th>变更原因</th><th>排班摘要</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+}
+
 function openDetail(row, kind) {
-  const labels = kind === 'product' ? [['商品名称', row.name], ['关联课程', row.course], ['售价', `¥${row.price}`], ['销售数量', row.sales], ['商品状态', row.status], ['上架时间', row.updated]] : kind === 'order' ? [['订单号', row.number], ['课程类型', row.type], ['学员', row.student], ['订单金额', `¥${row.amount}`], ['订单状态', row.status], ['关联状态', row.fulfillment], ['关联班级 / 权限', row.linked], ['下单时间', row.time]] : kind === 'class' ? [['班级名称', row.name], ['关联课程', row.course], ['授课教师', row.teacher], ['报名情况', `${row.enrolled} / ${row.capacity}`], ['运营状态', row.status], ['前台展示状态', row.display]] : kind === 'trial' ? [['学员', row.student], ['家长手机号', row.phone], ['目标课程', row.course], ['试听班级', row.className || '未指定'], ['试听教师', row.teacher || '未指定'], ['试听时间', row.time], ['校区', row.campus], ['来源线索', row.leadNo || '—'], ['试听状态', row.status], ['备注', row.remark || '—'], ['取消原因', row.cancelReason || '—']] : kind === 'lead' ? [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course], ['来源', row.source], ['线索状态', row.status]] : [['线索编号', row.number], ['联系人', row.student], ['意向课程', row.course], ['试听状态', row.trial], ['销售状态', row.salesStatus], ['报名状态', row.status], ['报名班级', row.className]];
+  const labels = kind === 'product' ? [['商品名称', row.name], ['关联课程', row.course], ['售价', `¥${row.price}`], ['销售数量', row.sales], ['商品状态', row.status], ['上架时间', row.updated]] : kind === 'order' ? [['订单号', row.number], ['课程类型', row.type], ['学员', row.student], ['订单金额', `¥${row.amount}`], ['订单状态', row.status], ['关联状态', row.fulfillment], ['关联班级 / 权限', row.linked], ['下单时间', row.time]] : kind === 'class' ? [['班级名称', row.name], ['关联课程', row.course], ['授课教师', row.teacher], ['报名情况', `${row.enrolled} / ${row.capacity}`], ['运营状态', row.status], ['前台展示状态', row.display]] : kind === 'trial' ? [['学员', row.student], ['家长手机号', row.phone], ['目标课程', row.course], ['试听班级', row.className || '未指定'], ['试听教师', row.teacher || '未指定'], ['试听时间', row.time], ['校区', row.campus], ['来源线索', row.leadNo || '—'], ['试听状态', trialDisplayStatus(row.status)], ['备注', row.remark || '—'], ['取消原因', row.cancelReason || '—']] : kind === 'lead' ? [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course], ['来源', row.source], ['线索状态', row.status]] : [['线索编号', row.number], ['联系人', row.student], ['意向课程', row.course], ['试听状态', row.trial], ['销售状态', row.salesStatus], ['报名状态', row.status], ['报名班级', row.className]];
   openBusinessDialog(`${kind === 'product' ? '商品' : kind === 'order' || kind === 'offline' ? '订单' : kind === 'class' ? '班级' : kind === 'trial' ? '试听预约' : kind === 'lead' ? '线索' : '报名转化'}详情`, '查看当前记录的完整字段和状态。', `<div class="sales-detail-list">${labels.map(([label, value]) => `<div><span>${label}</span><strong>${label.includes('状态') ? tag(value) : escapeHtml(value)}</strong></div>`).join('')}</div>`);
 }
 
@@ -1317,6 +1477,7 @@ function handleBusinessAction(action, row) {
   if (action === 'product-publish' || action === 'product-unpublish') { row.status = action === 'product-publish' ? '已上架' : '已下架'; row.updated = action === 'product-publish' ? demoTime() : row.updated; persistProduct(row); renderProducts(); showToast(action === 'product-publish' ? '商品已上架，学员端可购买。' : '商品已下架，历史订单不受影响。'); return; }
   if (action === 'order-view') return openOrderDetail(row);
   if (action === 'class-view') return openClassDetail(row);
+  if (action === 'schedule-history') return openScheduleHistory(row);
   if (action === 'class-create' || action === 'class-edit') return openClassForm(row);
   if (action === 'class-schedule-create') { openSchedulePlanner({ classId: row.id, mode: 'create' }); return; }
   if (action === 'class-schedule-view') { openSchedulePlanner({ classId: row.id, mode: 'view' }); return; }
@@ -1353,55 +1514,13 @@ function handleBusinessAction(action, row) {
   if (action === 'trial-cancel') return openSimpleForm('取消试听', '取消后保留历史记录，不再占用试听安排；如需再次试听请新建记录。', inputField('取消原因', 'reason', '请输入取消原因', true), '试听已取消。', (data) => { row.status = '已取消'; row.cancelledAt = demoTime(); row.cancelReason = String(data.get('reason') || '').trim(); upsertDemoRecord('trials', row); renderTrials(); });
   if (action === 'trial-create') return openTrialForm();
   if (action === 'lead-view') return openLeadDetail(row);
-  if (action === 'lead-intent') return openLeadIntentForm(row);
-  if (action === 'lead-assign') return openSimpleForm('分配线索', '分配后线索进入跟进中，并记录当前负责人。', selectField('负责人', 'owner', ['赵顾问', '王顾问', '陈顾问']), '线索已分配。', (data) => { const owner = String(data.get('owner') || '').trim(); if (!owner) return false; row.owner = owner; row.status = '跟进中'; row.assignedAt = demoTime(); upsertDemoRecord('leads', row); renderLeads(); });
-  if (action === 'lead-lose') return openSimpleForm('标记线索流失', '标记流失必须填写原因；历史跟进记录会保留，后续可重新激活。', inputField('流失原因', 'reason', '请输入流失原因', true), '线索已标记为已流失。', (data) => { const reason = String(data.get('reason') || '').trim(); if (!reason) return false; row.status = '已流失'; row.lostReason = reason; row.lostAt = demoTime(); upsertDemoRecord('leads', row); renderLeads(); });
-  if (action === 'lead-tags') {
-    const selected = new Set(leadTagsOf(row));
-    const fields = `<fieldset class="crm-tag-picker"><legend>选择标签（最多 5 个）</legend>${LEAD_TAG_OPTIONS.map((value) => `<label><input type="checkbox" name="tags" value="${escapeHtml(value)}" ${selected.has(value) ? 'checked' : ''}> ${escapeHtml(value)}</label>`).join('')}</fieldset>`;
-    const dialog = openBusinessDialog('编辑线索标签', '标签用于销售分层和筛选，不改变线索状态或转化流程。', `<form id="business-dialog-form" class="sales-dialog-grid">${fields}</form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存标签</button>');
-    dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => { event.preventDefault(); const values = [...new FormData(event.currentTarget).getAll('tags')]; if (values.length > 5) return showToast('最多选择 5 个标签。', 'warning'); row.tags = values; upsertDemoRecord('leads', row); closeBusinessDialog(); renderLeads(); showToast('线索标签已保存。'); });
-    return;
-  }
-  if (action === 'lead-follow') return openSimpleForm('填写跟进', '记录跟进方式、内容和下次跟进时间。', selectField('跟进方式', 'method', ['电话', '微信', '面谈', '短信']) + inputField('跟进内容', 'content', '请输入跟进内容', true) + inputField('下次跟进时间', 'next', '2026-09-20 10:00'), '跟进记录已保存。', (data) => { row.followUps = [...(row.followUps || []), { at: demoTime(), method: data.get('method'), content: String(data.get('content') || '').trim(), next: data.get('next') || '—', owner: row.owner || '当前账号' }]; row.next = data.get('next') || '—'; if (row.status === '待分配') row.status = '跟进中'; upsertDemoRecord('leads', row); renderLeads(); });
+  if (action === 'lead-edit') return openLeadEditForm(row);
+  if (action === 'lead-follow') return openSimpleForm('填写跟进', '记录跟进方式、内容和下次跟进时间；保存后完成首次有效跟进的线索变为“已跟进”。', selectField('跟进方式', 'method', ['电话', '微信', '面谈', '短信']) + inputField('跟进内容', 'content', '请输入跟进内容', true) + inputField('下次跟进时间', 'next', '2026-09-20 10:00'), '跟进记录已保存。', (data) => { row.followUps = [...(row.followUps || []), { at: demoTime(), method: data.get('method'), content: String(data.get('content') || '').trim(), next: data.get('next') || '—', owner: row.owner || '当前账号' }]; row.next = data.get('next') || '—'; if (row.status === '待跟进') row.status = '已跟进'; upsertDemoRecord('leads', row); renderLeads(); });
   if (action === 'lead-trial') return openLeadTrialForm(row);
   if (action === 'lead-enroll') return openLeadEnrollForm(row, renderLeads);
-  if (action === 'lead-reactivate') return openSimpleForm('重新激活线索', '重新激活必须填写原因，并将线索恢复为跟进中。', inputField('激活原因', 'reason', '请输入重新激活原因', true) + inputField('下次跟进时间', 'next', '2026-09-20 10:00', true), '线索已重新激活。', (data) => { row.status = '跟进中'; row.next = data.get('next'); row.followUps = [...(row.followUps || []), { at: demoTime(), method: '重新激活', content: data.get('reason'), next: data.get('next'), owner: row.owner || '当前账号' }]; upsertDemoRecord('leads', row); renderLeads(); });
-  if (action === 'lead-create') {
-    const dialog = openBusinessDialog('新增线索', '意向课程来自课程库；关联班级后自动带出授课教师。', leadCreateForm(), '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">确认</button>');
-    bindLeadCreateForm(dialog);
-    dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      if (!checkBusinessForm(form)) return;
-      const data = new FormData(form);
-      const phone = String(data.get('phone') || '').trim();
-      const duplicate = dataSets.leads.find(item => item.phone === phone);
-      if (duplicate) { showToast(`该手机号已有线索 ${duplicate.number}，请直接查看既有记录。`, 'warning'); return; }
-      const courseId = String(data.get('courseId') || '');
-      const classId = String(data.get('classId') || '');
-      const course = courseCatalog.find(item => item.id === courseId);
-      const classRecord = dataSets.classes.find(item => item.id === classId);
-      if (!course) { showToast('请选择课程库中的有效课程。', 'error'); return; }
-      if (classRecord && classRecord.courseId !== courseId) { showToast('关联班级与意向课程不一致，请重新选择。', 'error'); return; }
-      const lead = {
-        id: demoId('lead'), number: `CL${Date.now()}`, student: String(data.get('student') || '').trim(), phone,
-        course: course.name, intentCourseId: course.id, intentCourseName: course.name,
-        classId: classRecord?.id || '', className: classRecord?.name || '', teacherName: classRecord?.teacher || '',
-        intentClassId: classRecord?.id || '', intentClassName: classRecord?.name || '', intentTeacherName: classRecord?.teacher || '',
-        intentRemark: String(data.get('intentRemark') || '').trim(), source: data.get('source') || '后台登记',
-        status: '待分配', next: '—', owner: '—', followUps: []
-      };
-      dataSets.leads.unshift(lead);
-      upsertDemoRecord('leads', lead);
-      closeBusinessDialog();
-      renderLeads();
-      showToast('线索已创建。');
-    });
-    return;
-  }
-  if (action === 'conversion-view') return openDetail(row, 'conversion');
-  if (action === 'conversion-enroll') { const lead = dataSets.leads.find(item => item.id === row.leadId || item.number === row.number); if (!lead) return false; return openLeadEnrollForm(lead, renderConversions); }
+  if (action === 'lead-reactivate') return openSimpleForm('重新激活线索', '重新激活必须填写原因，并将线索恢复为待跟进。', inputField('激活原因', 'reason', '请输入重新激活原因', true) + inputField('下次跟进时间', 'next', '2026-09-20 10:00', true), '线索已重新激活。', (data) => { row.status = '待跟进'; row.next = data.get('next'); row.followUps = [...(row.followUps || []), { at: demoTime(), method: '重新激活', content: data.get('reason'), next: data.get('next'), owner: row.owner || '当前账号' }]; upsertDemoRecord('leads', row); renderLeads(); });
+  if (action === 'lead-create') return openLeadCreateForm();
+  if (action === 'lead-export') return showToast('导出任务已创建，线索与转化数据按当前角色权限脱敏。');
   if (action.endsWith('export')) return showToast('导出任务已创建，数据将按当前角色权限脱敏。');
 }
 
@@ -1420,6 +1539,7 @@ document.addEventListener('click', (event) => {
     openBusinessDialog('取消班级', '取消后班级进入终态，历史记录保留但不可恢复。', `<p class="sales-danger-note">确认取消班级“${escapeHtml(row.name)}”？该班级尚未发布，学员端不可见、没有报名与订单，取消不会触发退款或退班。已发布班级不提供取消入口，需终止时请下架并逐单处理退款与退班。</p>`, '<button type="button" class="button" data-dialog-close>返回</button><button type="button" class="button danger-button" data-confirm-action="class-cancel">确认取消班级</button>');
     return;
   }
+  if (action === 'batch-edit') return openBatchEditForm(row);
   if (action === 'product-publish' || action === 'product-unpublish' || action === 'product-delete') {
     if (!row) return;
     if (action === 'product-publish' && courseCatalog.find(course => course.id === row.courseId)?.disabledAt) {
@@ -1477,4 +1597,3 @@ if (businessPage === 'classes') {
 }
 if (businessPage === 'trials') renderTrials();
 if (businessPage === 'leads') renderLeads();
-if (businessPage === 'conversions') renderConversions();

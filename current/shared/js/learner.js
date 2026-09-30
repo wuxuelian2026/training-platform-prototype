@@ -1220,9 +1220,8 @@ function classResultActions(item, record) {
   if (record?.status !== 'ended') return '';
   const graduation = graduationRowForClass(item);
   const learnerGraduation = graduation?.learners.find((row) => row.name === currentStudent()?.name) || null;
-  const completion = learnerGraduation?.status || state.completionStatus || '待审核';
+  const completion = learnerGraduation?.status || state.completionStatus || '审核中';
   // 结业记录里的学员标识与学员端账号下的 studentId 不是同一套编码，按姓名为准，与结业状态读取口径一致。
-  const makeup = (readDemoState().makeups || []).find((row) => (row.classId === item.id || row.className === (item.className || item.name)) && (row.studentId === state.currentStudentId || row.studentName === currentStudent()?.name));
   const report = reportState();
   const certificate = state.certificateStatus || '已生成';
   const completed = completion === '已通过';
@@ -1232,14 +1231,11 @@ function classResultActions(item, record) {
   const action = (label, ready, disabledText) => ready
     ? `<a class="mp-button secondary" href="${href}">${label}</a>`
     : `<button class="mp-button secondary" type="button" disabled>${disabledText}</button>`;
-  // 结业结果说明按当前学员状态与共享补课记录生成：需补课学员能看到补课课次、时间与最新进度。
-  const makeupDetail = makeup ? `第${esc(makeup.session)}次课 · ${esc(makeup.date)} ${esc(makeup.startTime)}-${esc(makeup.endTime)} · ${esc(makeup.note || '请按安排完成补课')}` : '';
   let statusNote = '结业材料已提交，等待后台审核。';
   if (completed) statusNote = '结业审核已通过，成果按生成状态开放查看。';
-  else if (completion === '需补课') statusNote = makeup ? (makeup.status === '后台已确认' ? '补课已完成，等待后台重新审核。' : makeup.status === '教师已提交' ? `补课记录已提交，等待后台审核。补课安排：${makeupDetail}` : `补课安排：${makeupDetail}`) : '当前需要补课，等待教务登记补课安排。';
-  else if (completion === '已取消') statusNote = '本次结业流程已结束，如有疑问请联系教务。';
-  const makeupNote = `<p class="mp-class-result-actions-note">${statusNote}</p>`;
-  return `<section class="mp-class-result-actions" aria-label="学习成果入口"><h3>学习成果</h3>${makeupNote}<div class="mp-class-result-actions-grid">${action('查看学习报告', reportReady, '学习报告未生成')}${action('查看结业证书', certificateReady, '结业证书未生成')}</div></section>`;
+  else if (completion === '已取消结业') statusNote = '本次结业流程已结束，如有疑问请联系教务。';
+  const resultNote = `<p class="mp-class-result-actions-note">${statusNote}</p>`;
+  return `<section class="mp-class-result-actions" aria-label="学习成果入口"><h3>学习成果</h3>${resultNote}<div class="mp-class-result-actions-grid">${action('查看学习报告', reportReady, '学习报告未生成')}${action('查看结业证书', certificateReady, '结业证书未生成')}</div></section>`;
 }
 // 课次详情弹层：不新增独立页面（独立课次详情页属迭代2 范围）。
 // CR-2026-132：课次身份用「第 N 次 / 共 M 次」讲清进度，上课地点取该课次教室，
@@ -1465,6 +1461,8 @@ function submitLearnerHomework(event, draft, homework, existing) {
   toast(draft ? '作业草稿已保存' : '作业已提交');
   setTimeout(renderHomeworkPage, 180);
 }
+// 学员端文案映射：状态机「已通过」在学员端展示为「已结业」，其余取值原样展示（见 05-状态字典 §7.5）。
+function learnerGraduationLabel(status) { return status === '已通过' ? '已结业' : status; }
 function graduationRowForClass(item) { const key = item?.className || item?.name || ''; return graduationSeed.find((row) => row.className === key) || null; }
 function reportState() { return state.reportStatus || '已发布'; }
 // 结业数据与后台同源（graduation-seed.js）：按班级名关联，学员维度按当前学员姓名取数（CR-2026-149）。
@@ -1886,12 +1884,12 @@ function learningRecords() {
     'class-mock-ended-teaching-01': { lessonStatus: '上课中', lessonNote: '今日 10:00-11:30', nextLesson: '正在上课', homeworkStatus: '待提交' },
     'class-mock-ended-teaching-02': { lessonStatus: '待上课', lessonNote: '09-16 09:00-10:30', nextLesson: '09-16 09:00' },
     'class-mock-ended-teaching-03': { lessonStatus: '已完成', lessonNote: '09-13 10:00-11:30', nextLesson: '09-15 14:00', homeworkStatus: '待教师点评' },
-    // 已结课班级的学员结业状态（学员端文案：已结业／补课中／审核中），用于「已获证书」指标与成果入口。
+    // 已结课班级的学员结业状态（学员端文案：已结业／审核中／已取消结业），用于「已获证书」指标与成果入口。
     'class-mock-ended-pending-01': { completionStatus: '已结业' },
     'class-mock-ended-finished-01': { completionStatus: '已结业' },
-    'class-mock-ended-finished-02': { completionStatus: '补课中' },
+    'class-mock-ended-finished-02': { completionStatus: '审核中' },
     'class-mock-ended-finished-03': { completionStatus: '审核中' },
-    'class-mock-ended-finished-04': { completionStatus: '退回补课' },
+    'class-mock-ended-finished-04': { completionStatus: '审核中' },
   };
   const records = [
     { id: 'learning-video-001', courseId: 'COURSE-CR-2026-0002', studentIds: ['student-001', 'student-002'], type: 'video', status: 'ongoing', progress: videoProgress, lastPosition: '第3章 · 作品演唱 18:36' }
@@ -1941,7 +1939,7 @@ function learningRecords() {
     const reviewedHomework = homeworkRows.find(({ submission }) => submission?.status === '已点评');
     const graduation = item.type === 'class' ? graduationSeed.find(row => row.className === (item.className || item.name)) : null;
     const learnerGraduation = graduation?.learners.find(row => row.name === currentStudent()?.name) || null;
-    return { ...source, ...(activeOrderSnapshot || {}), ...item, status: accessRevoked ? 'ended' : item.status, completionStatus: accessRevoked ? '已退款，学习记录保留' : (learnerGraduation?.status || item.completionStatus), homeworkStatus: pendingHomework ? (pendingHomework.submission?.status === '草稿' ? '草稿' : '待提交') : reviewedHomework ? '已点评' : homeworkRows.length ? '待教师点评' : item.homeworkStatus, homeworkId: pendingHomework?.homework.id || reviewedHomework?.homework.id || '', name: item.name || item.className || source.name, href: accessRevoked ? '/learner/pages/orders.html' : (item.href || (item.type === 'video' ? `/learner/pages/video.html?courseId=${encodeURIComponent(source.id)}` : item.type === 'class' ? `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.classId || item.courseId)}&tab=lessons` : courseLink(item))), accessRevoked };
+    return { ...source, ...(activeOrderSnapshot || {}), ...item, status: accessRevoked ? 'ended' : item.status, completionStatus: accessRevoked ? '已退款，学习记录保留' : learnerGraduationLabel(learnerGraduation?.status || item.completionStatus), homeworkStatus: pendingHomework ? (pendingHomework.submission?.status === '草稿' ? '草稿' : '待提交') : reviewedHomework ? '已点评' : homeworkRows.length ? '待教师点评' : item.homeworkStatus, homeworkId: pendingHomework?.homework.id || reviewedHomework?.homework.id || '', name: item.name || item.className || source.name, href: accessRevoked ? '/learner/pages/orders.html' : (item.href || (item.type === 'video' ? `/learner/pages/video.html?courseId=${encodeURIComponent(source.id)}` : item.type === 'class' ? `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.classId || item.courseId)}&tab=lessons` : courseLink(item))), accessRevoked };
   });
 }
 function learningTasks() {
@@ -1975,16 +1973,10 @@ function learningTasks() {
   records.filter(item => item.type === 'class' && item.homeworkStatus === '已点评').slice(0, 2).forEach(item => {
     tasks.push({ group: 'reviewed', type: '作业已点评', title: '作业已点评', detail: `${item.className || item.name} · 教师已给出评语`, label: '查看点评', tone: 'gray', href: homeworkHref(item) });
   });
-  // 结业待办与班级详情「结业状态」同源，并读取后台登记的共享补课安排：待补课学员能看到课次与时间。
-  records.filter(item => item.type === 'class' && ['待审核', '需补课'].includes(item.completionStatus)).forEach(item => {
+  // 结业待办与班级详情「结业状态」同源；CR-2026-154 起不达标学员的补课与退费线下处理，系统只展示审核进度。
+  records.filter(item => item.type === 'class' && item.completionStatus === '审核中').forEach(item => {
     const className = item.className || item.name;
-    const makeup = (readDemoState().makeups || []).find(row => (row.classId === item.courseId || row.className === className) && (row.studentId === state.currentStudentId || row.studentName === currentStudent()?.name));
-    if (item.completionStatus === '需补课' && makeup) {
-      const makeupCopy = makeup.status === '后台已确认' ? '补课已完成，等待后台重新审核' : makeup.status === '教师已提交' ? '补课记录已提交，等待后台审核' : `补课课次：第${makeup.session}次课 · ${makeup.date} ${makeup.startTime}-${makeup.endTime}`;
-      tasks.push({ group: 'todo', type: '结业补课', title: '结业补课已安排', detail: `${className} · ${makeupCopy}`, label: '查看补课安排', tone: makeup.status === '待教师完成' ? 'green' : 'amber', href: `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.courseId)}&tab=result` });
-      return;
-    }
-    const detail = item.completionStatus === '待审核' ? '结业材料已提交，等待后台审核' : '当前需要完成补课，等待教务登记补课安排';
+    const detail = '结业材料已提交，等待后台审核；如需补课或退费，教务将线下联系';
     tasks.push({ group: 'todo', type: '结业进度', title: `结业${item.completionStatus}`, detail: `${className} · ${detail}`, label: '查看班级', tone: 'amber', href: `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.courseId)}&tab=result` });
   });
   if (reportState() === '已发布' && records.some(item => item.type === 'class')) tasks.push({ group: 'todo', type: '报告已发布', title: '报告已发布', detail: '学习报告可查看', label: '去查看', tone: 'green', href: `/learner/pages/results.html?courseId=${(records.find(item => item.type === 'class') || {}).courseId || 'class-001'}` });

@@ -81,7 +81,7 @@ export const ACADEMIC_FIELD_SPEC = {
         { id: 'FD-ACADEMIC-061', label: '授课教师', type: '下拉', length: '在职或历史授课教师', required: '否', note: '按班级授课教师筛选' },
         { id: 'FD-ACADEMIC-062', label: '结课时间', type: '日期区间', length: 'YYYY-MM-DD', required: '否', note: '按班级结课日期筛选', constraints: { format: 'YYYY-MM-DD' } },
         { id: 'FD-ACADEMIC-063', label: '关键词', type: '文本', length: '≤ 50 字', required: '否', note: '匹配班级名称或编号', constraints: { maxLength: 50 } },
-        { id: 'FD-ACADEMIC-064', label: '学员结业判定', type: '状态（只读）', length: '建议结业 / 待补课 / 待复核 / 已确认', required: '系统派生', note: '按学员逐个审核，列表展示汇总人数', constraints: { readOnly: true, derived: true } }
+        { id: 'FD-ACADEMIC-064', label: '学员结业判定', type: '状态（只读）', length: '建议结业 / 审核中 / 已通过 / 已取消结业', required: '系统派生', note: '建议结业为按出勤率与作业提交率给出的初判，仅作复核参考；学员结业取值以状态源 SM-STUDENT-GRADUATION 为准（CR-2026-154 收敛为审核中／已通过／已取消结业）', constraints: { readOnly: true, derived: true } },
       ] }], notes: ['结业审核以学员为粒度，班级列表仅展示汇总结果。']
     },
     'academic/homework': {

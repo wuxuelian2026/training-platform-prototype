@@ -13,8 +13,13 @@ export const STATE_MACHINES = [
     ],
     "states": [
       [
-        "draft",
-        "草稿",
+        "calculating",
+        "核算中",
+        false
+      ],
+      [
+        "ready",
+        "待发布",
         false
       ],
       [
@@ -25,8 +30,14 @@ export const STATE_MACHINES = [
     ],
     "transitions": [
       [
-        "草稿",
-        "核定并发布",
+        "核算中",
+        "核算完成",
+        "待发布",
+        "财务"
+      ],
+      [
+        "待发布",
+        "确认发布",
         "已发布",
         "财务"
       ]

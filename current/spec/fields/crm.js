@@ -93,15 +93,17 @@ export const CRM_FIELD_SPEC = {
     },
     'crm/leads': {
       groups: [
-        { heading: '新增线索字段', fields: [
+        { heading: '线索字段（新增与编辑共用）', fields: [
           { id: 'FD-CRM-016', label: '联系人', type: '文本', length: '2–30 字', required: '是', note: '线索联系人姓名', constraints: { minLength: 2, maxLength: 30 } },
-          { id: 'FD-CRM-017', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '用于跟进与转化', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
+          { id: 'FD-CRM-017', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '用于跟进与转化；编辑时唯一校验排除自身，改号只更新线索主档，历史试听与订单的手机号快照不变', constraints: { maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
           { id: 'FD-CRM-018', label: '意向课程', type: '课程库引用', length: '必选 1 门面授课程', required: '是', note: '保存 course_id 与课程名称；仅允许选择课程库中已完成且未停用的面授课程', constraints: { dictionary: '课程库', required: true } },
           { id: 'FD-CRM-097', label: '关联班级', type: '班级库引用', length: '最多 1 个班级', required: '否', note: '只展示所选意向课程下当前可报名且已发布的班级', constraints: { dictionary: '面授班级' } },
           { id: 'FD-CRM-098', label: '关联教师', type: '只读派生', length: '—', required: '系统派生', note: '取关联班级授课教师，不允许手工输入', constraints: { readOnly: true, derived: true } },
           { id: 'FD-CRM-099', label: '意向备注', type: '多行文本', length: '≤ 200 字', required: '否', note: '记录学习目标、时间偏好等销售备注', constraints: { maxLength: 200 } },
-          { id: 'FD-CRM-019', label: '来源类型', type: '下拉', length: '线上咨询 / 后台登记 / 转介绍 / 活动', required: '否', note: '记录线索来源渠道；与试听登记使用同一套预置来源，不再出现“咨询／后台登记试听”两套写法', constraints: { options: ['线上咨询', '后台登记', '转介绍', '活动'] } },
-          { id: 'FD-CRM-075', label: '线索标签', type: '多选', length: '最多 5 个', required: '否', note: '固定标签用于销售分层与筛选，不参与线索状态流转', constraints: { options: ['高意向', '待回访', '试听后待转化', '价格敏感', '已流失待激活'], multi: true, maxItems: 5 } }
+          { id: 'FD-CRM-019', label: '来源类型', type: '下拉', length: '线上咨询 / 后台登记 / 转介绍 / 活动', required: '否（编辑时只读）', note: '记录线索来源渠道；与试听登记使用同一套预置来源，不再出现“咨询／后台登记试听”两套写法', constraints: { options: ['线上咨询', '后台登记', '转介绍', '活动'] } },
+          { id: 'FD-CRM-075', label: '线索标签', type: '多选', length: '最多 5 个', required: '否', note: '固定标签用于销售分层与筛选，不参与线索状态流转', constraints: { options: ['高意向', '待回访', '试听后待转化', '价格敏感', '已流失待激活'], multi: true, maxItems: 5 } },
+          { id: 'FD-CRM-083', label: '报名转化漏斗', type: '统计（只读）', length: '当前线索 / 有效跟进 / 已试听 / 已报名', required: '系统派生', note: 'CR-2026-152 起合并到线索跟进页：展示各阶段数量、相对当前线索占比与相邻阶段转化率，不支持编辑', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-CRM-102', label: '流失原因', type: '多行文本', length: '≤ 100 字', required: '标记流失时必填', note: 'CR-2026-153 编辑线索「线索结果」内维护：选择标记为已流失时校验必填，记录流失原因与时间', constraints: { maxLength: 100, requiredWhen: 'markLost' } },
         ] }
       ],
       notes: [
@@ -112,24 +114,8 @@ export const CRM_FIELD_SPEC = {
         'CR-2026-038：线索详情展示该线索名下的试听记录与报名结果，形成完整链条。'
         ,'P2：线索标签仅用于销售分层、筛选和详情识别，不改变 `SM-LEAD` 状态；标签取固定枚举，最多 5 个，可在列表行操作中维护。'
         ,'历史仅有课程文本的线索标记为 unmatched；试听和转报名必须先补齐课程库关联，不得直接选择任意班级。'
-      ]
-    },
-    'crm/conversions': {
-      groups: [
-        { heading: '报名转化派生字段', fields: [
-          { id: 'FD-CRM-076', label: '线索编号', type: '文本（只读）', length: '—', required: '系统派生', note: '取线索 lead_no，不允许在本页编辑', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-CRM-077', label: '联系人', type: '文本（只读）', length: '—', required: '系统派生', note: '取线索联系人', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-CRM-078', label: '意向课程', type: '文本（只读）', length: '—', required: '系统派生', note: '取线索意向课程', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-CRM-079', label: '试听状态', type: '状态（只读）', length: 'SM-TRIAL 四态或无试听记录', required: '系统派生', note: '取关联试听事实，不新增转化状态', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-CRM-080', label: '报名状态', type: '状态（只读）', length: '已报名 / 未转化', required: '系统派生', note: '仅有效面授订单计入已报名；待支付、已取消、已退款不计入', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-CRM-081', label: '报名班级', type: '文本（只读）', length: '—', required: '系统派生', note: '取有效报名订单关联班级', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-CRM-082', label: '负责人', type: '文本（只读）', length: '—', required: '系统派生', note: '取线索负责人', constraints: { readOnly: true, derived: true } },
-          { id: 'FD-CRM-083', label: '转化漏斗', type: '统计（只读）', length: '当前线索 / 有效跟进 / 已试听 / 已报名', required: '系统派生', note: '展示数量、相对当前线索占比和相邻阶段转化率，不支持编辑', constraints: { readOnly: true, derived: true } }
-        ] }
-      ],
-      notes: [
-        '报名转化是按线索、试听和订单事实派生的只读视图，不落独立业务数据。',
-        '本页不新增状态机；报名状态只通过 source_lead_id/source_lead_no 关联当前有效已支付面授订单计算，待支付、已取消、退款中、已退款均显示为未转化。'
+        ,'CR-2026-152：原独立的报名转化页并入本页，页面顶部增加只读「报名转化漏斗」派生区（当前线索／有效跟进／已试听／已报名四阶段与相邻阶段转化率），不新增状态机与独立数据。'
+        ,'CR-2026-153：原「变更意向」「标记流失」「编辑标签」三个动作合并为统一「编辑线索」表单，字段包含意向课程、线索标签与线索结果；变更意向不再要求填写变更原因（2026-09-29 客户现场裁定去掉该字段），标记流失需 `PERM-CRM-007` 且流失原因为必填。'
       ]
     },
     'crm/trials': {
