@@ -5,6 +5,7 @@ import { mountFieldConstraints } from './field-constraints.js';
 import { MODULE_HELP_CONTENT, PAGE_HELP_CONTENT, SECTION_TEMPLATES, pageTypeOf } from '../../spec/pages/page-types.js';
 import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
 import { ADMIN_LOGIN_PATH, ADMIN_ROLE_LABELS, clearAdminSession, readAdminSession } from './admin-auth.js';
+import { unreadAdminMessageCount } from './admin-inbox.js';
 
 const root = document.querySelector('[data-admin-shell]');
 const content = document.querySelector('#page-content');
@@ -73,17 +74,17 @@ const navGroups = [
       ['类', '物资分类管理', '/admin/pages/inventory/categories.html', 'inventory'],
       ['物', '物资管理', '/admin/pages/inventory/materials.html', 'inventory'],
       ['入', '入库记录', '/admin/pages/inventory/inbound-records.html', 'inventory'],
-      ['出', '出库记录', '/admin/pages/inventory/outbound-records.html', 'inventory'],
-      ['账', '库存台账', '/admin/pages/inventory/ledger.html', 'inventory']
+      ['出', '出库记录', '/admin/pages/inventory/outbound-records.html', 'inventory']
     ]
   },
   {
     icon: '务', label: '教务执行监管', items: [
       ['勤', '考勤监控', '/admin/pages/academic/attendance.html', 'academic'],
       ['作', '作业批阅监管', '/admin/pages/academic/homework.html', 'academic'],
-      ['消', '消息推送', '/admin/pages/academic/messages.html', 'academic'],
+      ['消', '消息中心', '/admin/pages/academic/messages.html', 'academic'],
       ['毕', '结业审核', '/admin/pages/academic/graduation.html', 'academic'],
       ['报', '学习报告管理', '/admin/pages/academic/reports.html', 'academic']
+      ,['证', '结业证书', '/admin/pages/academic/certificates.html', 'academic']
     ]
   },
   {
@@ -137,8 +138,8 @@ const sidebar = visibleGroups.map((group, index) => {
 // and bound its listeners before the shell mounts, so the shell moves that node into the workspace instead
 // of copying its markup. Copying left the module rendering into a detached node, which only showed up in
 // the built preview where the shell chunk loads last.
-const page = '';
-root.innerHTML = `<div class="admin-app${readRailCollapsed() ? ' is-rail-collapsed' : ''}"><aside class="admin-sidebar"><div class="admin-brand"><div class="brand-mark">艺</div><div class="brand-copy"><strong>继续教育平台</strong><small>培训管理后台</small></div><button type="button" class="nav-rail-toggle" data-nav-rail-toggle aria-expanded="${!readRailCollapsed()}" title="${readRailCollapsed() ? '展开菜单' : '收起菜单'}" aria-label="${readRailCollapsed() ? '展开菜单' : '收起菜单'}"><span aria-hidden="true">${readRailCollapsed() ? '»' : '«'}</span></button></div><nav class="admin-nav">${sidebar}</nav><div class="nav-bulk-actions"><button type="button" class="nav-bulk-button" data-nav-expand-all>全部展开</button><button type="button" class="nav-bulk-button" data-nav-collapse-all>全部收起</button></div></aside><div class="mobile-nav-backdrop" data-mobile-nav-close hidden></div><aside class="mobile-nav-drawer" id="mobile-nav-drawer" aria-label="后台菜单"><div class="mobile-nav-header"><div class="admin-brand"><div class="brand-mark">艺</div><div class="brand-copy"><strong>继续教育平台</strong><small>培训管理后台</small></div></div><button type="button" class="icon-button" data-mobile-nav-close title="关闭菜单" aria-label="关闭菜单">×</button></div><nav class="admin-nav">${sidebar}</nav></aside><main class="admin-main"><header class="admin-topbar"><div class="crumb"><button type="button" class="icon-button mobile-nav-trigger" data-mobile-nav-trigger aria-expanded="false" aria-controls="mobile-nav-drawer" title="打开菜单" aria-label="打开菜单"><span class="mobile-nav-bars" aria-hidden="true"><i></i><i></i><i></i></span></button><span>培训管理</span> <strong>${title}</strong></div><div class="topbar-actions"><a class="topbar-message" href="/admin/pages/academic/messages.html" title="消息中心" aria-label="消息中心"><span class="topbar-message-icon" aria-hidden="true"></span><span class="topbar-badge">3</span></a><div class="top-user-wrap"><button type="button" class="top-user" data-profile-menu-trigger aria-expanded="false" aria-haspopup="menu"><span class="top-user-avatar" aria-hidden="true">${currentRoleName.slice(0, 1)}</span><span class="top-user-copy"><strong>${currentRoleName}</strong><small>${roleLabels[demoRole] || '教务主管'}</small></span><span class="top-user-chevron" aria-hidden="true">⌄</span></button><div class="profile-menu" data-profile-menu role="menu" hidden><a href="/admin/pages/system/profile.html" role="menuitem">个人中心</a><button type="button" data-profile-action="logout" role="menuitem">退出登录</button></div></div></div></header><div class="admin-content">${page}</div></main></div>`;
+  const page = '';
+root.innerHTML = `<div class="admin-app${readRailCollapsed() ? ' is-rail-collapsed' : ''}"><aside class="admin-sidebar"><div class="admin-brand"><div class="brand-mark">艺</div><div class="brand-copy"><strong>继续教育平台</strong><small>培训管理后台</small></div><button type="button" class="nav-rail-toggle" data-nav-rail-toggle aria-expanded="${!readRailCollapsed()}" title="${readRailCollapsed() ? '展开菜单' : '收起菜单'}" aria-label="${readRailCollapsed() ? '展开菜单' : '收起菜单'}"><span aria-hidden="true">${readRailCollapsed() ? '»' : '«'}</span></button></div><nav class="admin-nav">${sidebar}</nav><div class="nav-bulk-actions"><button type="button" class="nav-bulk-button" data-nav-expand-all>全部展开</button><button type="button" class="nav-bulk-button" data-nav-collapse-all>全部收起</button></div></aside><div class="mobile-nav-backdrop" data-mobile-nav-close hidden></div><aside class="mobile-nav-drawer" id="mobile-nav-drawer" aria-label="后台菜单"><div class="mobile-nav-header"><div class="admin-brand"><div class="brand-mark">艺</div><div class="brand-copy"><strong>继续教育平台</strong><small>培训管理后台</small></div></div><button type="button" class="icon-button" data-mobile-nav-close title="关闭菜单" aria-label="关闭菜单">×</button></div><nav class="admin-nav">${sidebar}</nav></aside><main class="admin-main"><header class="admin-topbar"><div class="crumb"><button type="button" class="icon-button mobile-nav-trigger" data-mobile-nav-trigger aria-expanded="false" aria-controls="mobile-nav-drawer" title="打开菜单" aria-label="打开菜单"><span class="mobile-nav-bars" aria-hidden="true"><i></i><i></i><i></i></span></button><span>培训管理</span> <strong>${title}</strong></div><div class="topbar-actions"><a class="topbar-message" href="/admin/pages/system/my-messages.html" title="我的消息" aria-label="我的消息"><span class="topbar-message-icon" aria-hidden="true"></span><span class="topbar-badge">3</span></a><div class="top-user-wrap"><button type="button" class="top-user" data-profile-menu-trigger aria-expanded="false" aria-haspopup="menu"><span class="top-user-avatar" aria-hidden="true">${currentRoleName.slice(0, 1)}</span><span class="top-user-copy"><strong>${currentRoleName}</strong><small>${roleLabels[demoRole] || '教务主管'}</small></span><span class="top-user-chevron" aria-hidden="true">⌄</span></button><div class="profile-menu" data-profile-menu role="menu" hidden><a href="/admin/pages/system/profile.html" role="menuitem">个人中心</a><button type="button" data-profile-action="logout" role="menuitem">退出登录</button></div></div></div></header><div class="admin-content">${page}</div></main></div>`;
 const pageSlot = root.querySelector('.admin-content');
 if (content && pageSlot) { content.classList.add('admin-content'); pageSlot.replaceWith(content); }
 // CR-2026-027：按钮级门禁 + 无权限空态（统一说明缺少的权限点）。
@@ -156,6 +157,13 @@ if (!permissionState.allowed) {
   document.body.appendChild(block);
 }
 normalizePrototypeLinks(root);
+const adminMessageBadge = root.querySelector('.topbar-badge');
+if (adminMessageBadge) {
+  adminMessageBadge.dataset.adminMessageCount = '';
+  const unreadMessages = unreadAdminMessageCount(adminSession);
+  adminMessageBadge.textContent = String(unreadMessages);
+  adminMessageBadge.hidden = unreadMessages === 0;
+}
 
 // 业务文案统一放在 spec/pages/page-types.js，壳层只负责渲染。
 const escapePageHelp = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));

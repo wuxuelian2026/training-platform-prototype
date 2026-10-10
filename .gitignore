@@ -1,4 +1,5 @@
 .DS_Store
+本地预览版/
 current/node_modules/
 current/dist/
 current/.vite/

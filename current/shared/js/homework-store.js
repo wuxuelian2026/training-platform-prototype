@@ -6,6 +6,7 @@ import { mergeClassSeed } from './class-seed.js';
 import { demoId, demoTime, fileSpecSettings, readDemoState, writeDemoState } from './demo-store.js';
 import { DEMO_NOW, demoDateTime } from './demo-clock.js';
 import { teacherAccounts } from './course-seed.js';
+import { emitNotificationEvent, suppressPendingNotifications } from './notification-store.js';
 
 const formatRules = {
   图片: ({ type = '', name = '' }) => type === '图片' || type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(name),
@@ -281,9 +282,13 @@ export function publishHomework(input) {
   const deadline = demoDateTime(input.deadline);
   if (!input.publishedBy) throw new Error('HOMEWORK_OPERATOR_FORBIDDEN');
   assertTeacherOwnsClass(input.classId, input.publishedBy);
-  if (!Number.isFinite(deadline.getTime()) || deadline.getTime() <= demoDateTime(now).getTime()) throw new Error('HOMEWORK_DEADLINE_INVALID');
+  const minimumDeadline = demoDateTime(now).getTime() + 24 * 60 * 60 * 1000;
+  if (!Number.isFinite(deadline.getTime()) || deadline.getTime() <= minimumDeadline) throw new Error('HOMEWORK_DEADLINE_MUST_EXCEED_24_HOURS');
   const homeworkId = input.id || demoId('HW');
   const existingHomework = getHomework(homeworkId);
+  const lessonHomework = listHomework({ classId: input.classId, lessonIndex: input.lessonIndex })
+    .find((item) => item.id !== homeworkId && item.status !== '已撤回');
+  if (lessonHomework) throw new Error('HOMEWORK_LESSON_ALREADY_PUBLISHED');
   // 应交名单发布时冻结：同一作业再次发布沿用原快照，发布后新报名学员不补入。
   const frozenStudents = Array.isArray(existingHomework?.rosterSnapshot) && existingHomework.rosterSnapshot.length
     ? existingHomework.rosterSnapshot.map((row) => ({ id: row.studentId, name: row.studentName }))
@@ -311,6 +316,13 @@ export function publishHomework(input) {
     appendHomeworkAudit(next, { action: '发布作业', homeworkId: record.id, classId: record.classId, actorId: record.publishedBy, requestId: input.requestId || '' });
     return next;
   });
+  emitNotificationEvent({
+    event: 'homework_published', sourceType: 'homework', sourceId: record.id, version: 'v1',
+    dedupeKey: `homework_published:${record.id}`, title: '有新的作业待提交',
+    content: `教师已发布「${record.title}」，截止时间为${record.deadline}，请进入作业页面查看要求并提交。`,
+    className: classInfo(record.classId).name || record.classId, target: `/learner/pages/homework.html?homeworkId=${encodeURIComponent(record.id)}&classId=${encodeURIComponent(record.classId)}`,
+    recipients: frozenStudents.map((student) => ({ recipientId: student.id, recipientType: '学员', name: student.name, scope: '作业发布时冻结的应交学员' }))
+  });
   return record;
 }
 
@@ -321,7 +333,9 @@ export function updateHomeworkDeadline(homeworkId, deadline, operator = {}) {
   if (!homework) throw new Error('HOMEWORK_NOT_FOUND');
   assertHomeworkOperator(homework, operator.id);
   if (homeworkLifecycleStatus(homework) === '已撤回') throw new Error('HOMEWORK_WITHDRAWN');
+  const minimumDeadline = demoDateTime(demoTime()).getTime() + 24 * 60 * 60 * 1000;
   if (!Number.isFinite(nextDeadline.getTime()) || !Number.isFinite(oldDeadline.getTime()) || nextDeadline.getTime() <= oldDeadline.getTime()) throw new Error('HOMEWORK_DEADLINE_MUST_EXTEND');
+  if (nextDeadline.getTime() <= minimumDeadline) throw new Error('HOMEWORK_DEADLINE_MUST_EXCEED_24_HOURS');
   const updated = { ...homework, deadline, updatedAt: demoTime(), deadlineExtendedAt: demoTime(), deadlineExtendedBy: operator.id || '', deadlineExtensionReason: operator.reason || '' };
   writeDemoState((next) => {
     next.homeworks = (next.homeworks || []).map((item) => item.id === homeworkId ? updated : item);
@@ -356,6 +370,7 @@ export function withdrawHomework(homeworkId, reason, operator = {}) {
     appendHomeworkAudit(next, { action: '撤回作业', homeworkId, classId: homework.classId, actorId: operator.id || '', requestId: operator.requestId || '', reason: updated.withdrawalReason });
     return next;
   });
+  suppressPendingNotifications('homework', homeworkId, '作业已撤回，不再发送待发送提醒');
   return updated;
 }
 
@@ -373,6 +388,15 @@ export function submitHomework(input) {
     next.homeworkNotifications = notifications;
     appendHomeworkAudit(next, { action: '提交作业', homeworkId: homework?.id || input.homeworkId, classId: homework?.classId || input.classId, actorId: record.studentId, requestId: input.requestId || '', submissionId: record.id, version: record.version || 1 });
     return next;
+  });
+  const homework = getHomework(input.homeworkId);
+  if (homework) emitNotificationEvent({
+    event: 'homework_submitted', sourceType: 'submission', sourceId: record.id, version: String(record.version || 1),
+    dedupeKey: `homework_submitted:${record.id}:v${record.version || 1}`, title: '有学员提交了作业',
+    content: `${record.studentName}已提交「${homework.title}」第${record.version || 1}次提交，请进入作业详情查看内容并完成点评。`,
+    className: classInfo(homework.classId).name || homework.classId, audience: 'teacher', audienceLabel: '授课教师',
+    recipients: [{ recipientId: homework.publishedBy || '', recipientType: '教师', name: teacherNameForId(homework.publishedBy), scope: '作业发布教师' }],
+    target: `/teacher/pages/homework.html?homeworkId=${encodeURIComponent(homework.id)}`
   });
   return record;
 }

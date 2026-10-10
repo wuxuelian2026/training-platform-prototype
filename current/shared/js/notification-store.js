@@ -5,8 +5,18 @@ import { demoTime, messageRetrySettings, readDemoState, writeDemoState } from '.
 export const NOTIFICATION_STATUS = { PENDING: '待发送', SENT: '已发送', FAILED: '发送失败', CANCELED: '已取消' };
 export const DELIVERY_STATUS = { PENDING: '待发送', DELIVERED: '已送达', FAILED: '发送失败' };
 export const NOTIFICATION_SOURCE = { MANUAL: '人工通知', SYSTEM: '系统通知' };
-// 预置通知类型：人工通知由教务发起，系统通知由业务动作自动产生，共用同一份发送与投递记录。
-export const NOTIFICATION_TYPES = ['调课通知', '上课提醒', '退款状态通知', '合同签署通知', '作业发布提醒', '结业审核通知', '工资已发布提醒'];
+// 通知由业务事件自动产生；后台只查看结果、处理失败投递，不直接新增业务通知。
+export const NOTIFICATION_TYPES = ['课次调整', '上课提醒', '作业发布', '作业截止提醒', '作业撤回', '作业提交提醒', '退款状态变更', '结业审核结果', '工资发布', '课程申报结果', '证书审核结果', '合同待签署'];
+
+export const NOTIFICATION_RULES = {
+  lesson_rescheduled: { type: '调课通知', trigger: '调课保存并发布后立即', frequency: '同一课次版本一次', schedule: 'immediate' },
+  lesson_reminder: { type: '上课提醒', trigger: '课次开始前 24 小时', frequency: '每课次一次', schedule: 'before_lesson_24h' },
+  homework_published: { type: '作业发布提醒', trigger: '作业发布成功后立即', frequency: '同一 homeworkId 一次', schedule: 'immediate' },
+  homework_deadline_extended: { type: '作业截止提醒', trigger: '截止时间变更保存后立即', frequency: '同一 homeworkId + 截止时间版本一次', schedule: 'immediate' },
+  homework_withdrawn: { type: '作业撤回', trigger: '作业撤回成功后立即', frequency: '同一 homeworkId 一次', schedule: 'immediate' },
+  homework_submitted: { type: '作业提交提醒', trigger: '学员提交成功后立即', frequency: '同一 submissionId + version 一次', schedule: 'immediate' },
+  refund_status_changed: { type: '退款状态通知', trigger: '退款状态变更成功后立即', frequency: '同一退款单 + 状态版本一次', schedule: 'immediate' }
+};
 
 const deliveryLogId = (notificationId, recipientId) => `${notificationId}:${recipientId}`;
 
@@ -45,7 +55,7 @@ const DEMO_NOTIFICATIONS = [
   {
     // 系统通知演示：失败后按参数配置的间隔自动重试，首次进入页面即完成第 2 次投递。
     notification: {
-      id: 'message-3', title: '退款已完成通知', type: '退款状态通知', className: '成人声乐班',
+      id: 'message-3', title: '退款已完成通知', type: '退款状态变更', className: '成人声乐班',
       audience: 'learner', audienceLabel: '学员', audienceRule: '仅在读学员',
       sendMode: '立即发送', scheduledAt: '', createdAt: '2026-09-12 09:30', sentAt: '2026-09-12 09:30',
       failureReason: '1 位学员首次投递失败', retryCount: 0, source: NOTIFICATION_SOURCE.SYSTEM, isDemo: true,
@@ -58,6 +68,31 @@ const DEMO_NOTIFICATIONS = [
     ]
   }
 ];
+
+const DEMO_TEMPLATE_TYPES = [
+  ['作业发布', '作业已发布｜秋季芭蕾舞进阶1班', '林知夏已发布作业“练习视频”，提交截止：2026-10-12。', '学员、教师'],
+  ['作业截止提醒', '作业截止提醒｜练习视频', '作业“练习视频”将于2026-10-12截止，请及时提交。', '学员'],
+  ['作业撤回', '作业已撤回｜练习视频', '作业“练习视频”已被教师撤回，本次作业不再接受提交。', '学员'],
+  ['作业提交提醒', '收到作业提交｜练习视频', '林知夏已提交作业“练习视频”，请及时查看和批阅。', '教师'],
+  ['结业审核结果', '结业审核结果｜秋季芭蕾舞进阶1班', '林知夏的秋季芭蕾舞进阶1班结业审核已确认通过，学习报告和结业证书已生成。', '学员、教师'],
+  ['工资发布', '工资单已发布｜2026年9月', '2026年9月工资单已发布，实际核发金额：4800元。', '教师'],
+  ['课程申报结果', '课程申报通过｜芭蕾舞进阶', '课程“芭蕾舞进阶”申报结果：通过。', '教师'],
+  ['证书审核结果', '证书审核通过｜教师资格证', '证书“教师资格证”审核结果：通过。', '教师'],
+  ['合同待签署', '合同待签署｜HT-2026-009', '合同HT-2026-009已生成，请于2026-10-15前下载、线下签署并上传签署件。', '教师']
+];
+
+const buildTemplateDemo = ([type, title, content, audience], index) => ({
+  notification: {
+    id: `message-template-${index + 1}`, title, type, className: '秋季芭蕾舞进阶1班',
+    audience: audience.includes('教师') && audience.includes('学员') ? 'teacher_and_learner' : audience.includes('教师') ? 'teacher' : 'learner',
+    audienceLabel: audience, audienceRule: '演示接收范围', sendMode: '立即发送', scheduledAt: '',
+    createdAt: `2026-09-${String(13 + index).padStart(2, '0')} 10:00`, sentAt: `2026-09-${String(13 + index).padStart(2, '0')} 10:00`,
+    failureReason: index % 3 === 0 ? '演示投递失败 1 人' : '', retryCount: 0, source: NOTIFICATION_SOURCE.SYSTEM, isDemo: true, content, target: ''
+  },
+  deliveries: index % 3 === 0
+    ? [{ recipientId: `demo-recipient-${index}`, recipientType: audience.includes('教师') ? '教师' : '学员', name: audience.includes('教师') ? '王玥' : '林知夏', scope: '演示接收范围', status: DELIVERY_STATUS.FAILED, readAt: '', failureReason: '演示投递失败' }]
+    : [{ recipientId: `demo-recipient-${index}`, recipientType: audience.includes('教师') ? '教师' : '学员', name: audience.includes('教师') ? '王玥' : '林知夏', scope: '演示接收范围', status: DELIVERY_STATUS.DELIVERED, readAt: index % 2 ? '' : `2026-09-${String(13 + index).padStart(2, '0')} 10:15` }]
+});
 
 /** 通知整体状态由逐人投递结果派生，不单独维护一份会与投递记录分叉的状态。 */
 export function notificationStatusOf(deliveries = []) {
@@ -107,7 +142,8 @@ export function retryPolicy() {
 /** 首次读取时补齐演示通知与投递记录；已存在的记录不会被覆盖，保证补发结果可保留。 */
 export function ensureNotificationSeed() {
   const existing = new Set((readDemoState().notifications || []).map((item) => item.id));
-  const missing = DEMO_NOTIFICATIONS.filter((item) => !existing.has(item.notification.id));
+  const allDemoNotifications = [...DEMO_NOTIFICATIONS, ...DEMO_TEMPLATE_TYPES.map(buildTemplateDemo)];
+  const missing = allDemoNotifications.filter((item) => !existing.has(item.notification.id));
   if (!missing.length) return readDemoState().notifications || [];
   const snapshot = JSON.parse(JSON.stringify(missing));
   writeDemoState((next) => {
@@ -183,6 +219,11 @@ export function sendNotification(payload) {
     source: payload.source || NOTIFICATION_SOURCE.MANUAL,
     content: payload.content,
     target: payload.target || ''
+    ,triggerEvent: payload.triggerEvent || ''
+    ,triggerSourceType: payload.triggerSourceType || ''
+    ,triggerSourceId: payload.triggerSourceId || ''
+    ,triggerVersion: payload.triggerVersion || ''
+    ,dedupeKey: payload.dedupeKey || ''
   };
   writeDemoState((next) => {
     next.notifications = [notification, ...(next.notifications || [])];
@@ -202,6 +243,48 @@ export function sendNotification(payload) {
     return next;
   });
   return notification;
+}
+
+/**
+ * 业务事件统一入口。事件幂等由 dedupeKey 保证；接收人由业务侧在事件成功后冻结。
+ * 规则只描述产品口径，不偷偷创建延时任务；需要提前提醒的事件由调度器按 schedule 计算 scheduledAt。
+ */
+export function emitNotificationEvent({ event, sourceType, sourceId, version = '', dedupeKey, title, content, className = '', audience = 'learner', audienceLabel = '学员', audienceRule = '事件发生时接收人快照', recipients = [], target = '', scheduledAt = '' } = {}) {
+  const rule = NOTIFICATION_RULES[event];
+  if (!rule) return { ok: false, reason: 'NOTIFICATION_RULE_NOT_FOUND' };
+  const key = dedupeKey || `${event}:${sourceId || 'unknown'}:${version || 'v1'}`;
+  const existing = listNotifications().find((item) => item.dedupeKey === key);
+  if (existing) return { ok: true, duplicate: true, notification: existing };
+  const notification = sendNotification({
+    id: `event-${key.replace(/[^a-zA-Z0-9:_-]/g, '-')}`,
+    title, type: rule.type, className, audience, audienceLabel, audienceRule,
+    sendMode: scheduledAt ? '定时发送' : '立即发送', scheduledAt, content, recipients, target,
+    source: NOTIFICATION_SOURCE.SYSTEM, triggerEvent: event, triggerSourceType: sourceType,
+    triggerSourceId: sourceId, triggerVersion: version, dedupeKey: key
+  });
+  return { ok: true, duplicate: false, notification };
+}
+
+/** 业务撤回、取消或失效时调用：阻止尚未投递的相关通知，并保留取消记录供追溯。 */
+export function suppressPendingNotifications(sourceType, sourceId, reason = '业务已取消或失效') {
+  if (!sourceId) return 0;
+  let count = 0;
+  writeDemoState((next) => {
+    const ids = new Set((next.notifications || [])
+      .filter((item) => item.triggerSourceType === sourceType && item.triggerSourceId === sourceId)
+      .map((item) => item.id));
+    if (!ids.size) return next;
+    next.notifications = (next.notifications || []).map((item) => {
+      if (!ids.has(item.id)) return item;
+      const pending = (next.notificationDeliveryLogs || []).some((row) => row.notificationId === item.id && row.status === DELIVERY_STATUS.PENDING);
+      if (!pending) return item;
+      count += 1;
+      return { ...item, status: NOTIFICATION_STATUS.CANCELED, canceledAt: demoTime(), cancelReason: reason };
+    });
+    next.notificationDeliveryLogs = (next.notificationDeliveryLogs || []).filter((row) => !(ids.has(row.notificationId) && row.status === DELIVERY_STATUS.PENDING));
+    return next;
+  });
+  return count;
 }
 
 /**

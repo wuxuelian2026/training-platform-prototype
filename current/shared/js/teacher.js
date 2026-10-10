@@ -238,8 +238,8 @@ const teacherMessageDefaults = [
   { id: 'TMSG20260910001', type: '新增排课通知', title: '今日课程将在09:00开始', summary: '少儿舞蹈基础班第8次课将在龙泉校区综合楼302上课。', body: '教务已为您安排一节舞蹈基本功课程，请提前到达龙泉校区综合楼302并完成上课准备。', createdAt: '2026-09-12 07:30', read: false, target: '/teacher/pages/class-detail.html?class=class-001&lesson=8', actionLabel: '进入课次详情' },
   { id: 'TMSG20260909001', type: '课次调整通知', title: '第12次课时间已调整', summary: '少儿舞蹈提高班第12次课因场地检修改到9月19日同一时段、改在艺术楼201上课。', body: '因龙泉校区综合楼302场地检修，原定9月12日的少儿舞蹈提高班第12次课已调整为9月19日同一时段，上课地点改为艺术楼201。请按调整后的时间地点上课。', createdAt: '2026-09-11 17:25', read: false, target: '/teacher/pages/class-detail.html?class=class-002&lesson=12', actionLabel: '查看课次详情' },
   { id: 'TMSG20260909002', type: '合同签署通知', title: '您有一份合同待教师签署', summary: '2026-2027年度教师合作协议请于9月20日前完成签署。', body: '新的教师合作协议已推送，请核对授课范围、课时单价和有效期，并在2026年9月20日前完成签署。', createdAt: '2026-09-09 16:10', read: false, target: '/teacher/pages/contract-detail.html?contract=contract-2027', actionLabel: '查看合同' },
-  { id: 'TMSG20260908003', type: '工资已发放', title: '2026年7月工资已发放', summary: '本期实际核发5483.20元，已发放至尾号2866账户。', body: '2026年7月工资已完成发放，实际核发5483.20元，已于2026年8月5日发放至中国建设银行尾号2866账户。', createdAt: '2026-09-08 10:20', read: true, target: '/teacher/pages/salary-detail.html?month=2026-07', actionLabel: '查看工资明细' },
-  { id: 'TMSG20260908004', type: '工资单已发布', title: '2026年6月工资单已发布', summary: '本期实际核发5024.40元，等待财务发放。', body: '2026年6月工资单已发布，本期共计28课时，实际核发5024.40元。当前状态为待发放，资金到账后将另行通知。', createdAt: '2026-09-08 09:40', read: true, target: '/teacher/pages/salary-detail.html?month=2026-06', actionLabel: '查看工资明细' },
+  { id: 'TMSG20260908003', type: '工资单已发布', title: '2026年7月工资单已发布', summary: '本期实际核发5483.20元，已发放至尾号2866账户。', body: '2026年7月工资已完成发放，实际核发5483.20元，已于2026年8月5日发放至中国建设银行尾号2866账户。', createdAt: '2026-09-08 10:20', read: true, target: '/teacher/pages/salary-detail.html?month=2026-07', actionLabel: '查看工资明细' },
+  { id: 'TMSG20260908004', type: '工资单已发布', title: '2026年6月工资单已发布', summary: '本期实际核发5024.40元，可查看工资明细。', body: '2026年6月工资单已发布，本期共计28课时，实际核发5024.40元。实际转账由财务在线下流程完成，本平台不登记线下结果。', createdAt: '2026-09-08 09:40', read: true, target: '/teacher/pages/salary-detail.html?month=2026-06', actionLabel: '查看工资明细' },
   { id: 'TMSG20260907003', type: '作业提交提醒', title: '有学员提交了作业', summary: '林知夏已提交“节奏练习视频”，请及时批改并填写文字评语。', body: '学员林知夏已完成“节奏练习视频”作业提交，请进入班级课次详情查看作业内容并完成文本评语。', createdAt: '2026-09-07 18:30', read: false, target: '/teacher/pages/class-detail.html?class=class-001&lesson=8', actionLabel: '查看作业' },
   { id: 'TMSG20260907004', type: '课程申报审核结果', title: '课程申报已通过', summary: '您申报的《声乐演唱技巧》已通过教研审核。', body: '课程申报资料已通过审核，教务将继续完成课程发布和后续排课安排。', createdAt: '2026-09-07 15:40', read: true, target: '/teacher/pages/applications.html', actionLabel: '查看课程申报' },
   { id: 'TMSG20260906005', type: '证书审核结果', title: '教师证书审核结果已更新', summary: '中国舞教师资格证已已通过。', body: '您提交的中国舞教师资格证已完成审核，证书状态已更新为已通过。', createdAt: '2026-09-06 11:05', read: true, target: '/teacher/pages/certificates.html', actionLabel: '查看我的证书' },
@@ -528,7 +528,7 @@ function renderLessonExecution(classItem, session) {
   const operationPanel = active || completed ? `<section class="teacher-lesson-workspace"><nav class="teacher-lesson-tabs" aria-label="课中工作区"><button type="button" class="${teacherLessonTab === 'attendance' ? 'active' : ''}" data-lesson-tab="attendance">考勤</button><button type="button" class="${teacherLessonTab === 'homework' ? 'active' : ''}" data-lesson-tab="homework">作业${homeworkRecords.length ? `（${homeworkRecords.length}）` : ''}</button><button type="button" class="${teacherLessonTab === 'record' ? 'active' : ''}" data-lesson-tab="record">教学记录</button></nav><div class="teacher-lesson-tab-content">${tStack(
     `<section class="teacher-lesson-section" data-lesson-panel="attendance"><div class="teacher-lesson-section-head"><div><span>01</span><h2>学员考勤</h2></div>${attendancePill}</div><div class="teacher-attendance-toolbar"><div class="teacher-attendance-summary">${lessonAttendanceSummary()}</div>${completed ? '' : '<div class="teacher-attendance-batch"><button type="button" data-lesson-action="all-present">全部标记为出勤</button><button type="button" data-lesson-action="batch-status">批量设置</button></div>'}</div><p class="teacher-attendance-help">课中保存考勤，结束上课时统一推送至学员端和后台。</p><div class="teacher-lesson-student-list">${Object.entries(lesson.attendance).map(([name, status]) => lessonAttendanceStudent(name, status, active)).join('')}</div>${completed ? '' : '<p class="teacher-attendance-help">登记完成后，使用页面底部「保存考勤」保存本课次考勤。</p>'}</section>`,
     completed ? `<section class="teacher-lesson-section" data-lesson-panel="record"><div class="teacher-lesson-section-head"><div><span>03</span><h2>教学记录</h2></div>${lesson.teachingRecord ? tPill('已记录', 'green') : tPill('未记录', 'amber')}</div><div class="teacher-static-lesson-record"><p>${tEsc(lesson.teachingRecord || '未记录')}</p></div></section>` : `<section class="teacher-lesson-section" data-lesson-panel="record"><div class="teacher-lesson-section-head"><div><span>03</span><h2>教学记录</h2></div>${tPill('未开始', 'gray')}</div><p class="mp-muted">教学记录在结束上课时填写，填写后可在此处查看。</p></section>`,
-    `<section class="teacher-lesson-section" data-lesson-panel="homework">${homeworkRecords.length ? homeworkRecords.map((item) => { const summary = submissionSummary(item.id); const lifecycle = homeworkLifecycleStatus(item); return `<div class="teacher-homework-published"><div><div class="teacher-homework-published-title"><strong>${tEsc(item.title)}</strong>${tPill(lifecycle, lifecycle === '进行中' ? 'green' : lifecycle === '已撤回' ? 'gray' : 'amber')}</div><p>${tEsc(item.type)} · ${item.required ? '必交' : '选交'}</p><span>截止 ${tEsc(item.deadline)} · 已提交 ${summary.submitted}/${summary.total} · 待点评 ${summary.pendingReview} 人</span></div><button type="button" data-lesson-action="homework-submissions" data-homework-id="${tEsc(item.id)}">查看提交</button></div>`; }).join('') : `<div class="teacher-homework-empty"><p>${active ? '本课次尚未发布作业，可使用页面底部「发布作业」发布；一个课次可发布多项作业，发布后推送至学员端作业本。' : '本课次已结束，未发布作业。'}</p></div>`}</section>`
+    `<section class="teacher-lesson-section" data-lesson-panel="homework">${homeworkRecords.length ? homeworkRecords.map((item) => { const summary = submissionSummary(item.id); const lifecycle = homeworkLifecycleStatus(item); return `<div class="teacher-homework-published"><div><div class="teacher-homework-published-title"><strong>${tEsc(item.title)}</strong>${tPill(lifecycle, lifecycle === '进行中' ? 'green' : lifecycle === '已撤回' ? 'gray' : 'amber')}</div><p>${tEsc(item.type)} · ${item.required ? '必交' : '选交'}</p><span>截止 ${tEsc(item.deadline)} · 已提交 ${summary.submitted}/${summary.total} · 待点评 ${summary.pendingReview} 人</span></div>${lifecycle === '已撤回' ? '<button type="button" data-lesson-action="open-homework">编辑并重新发布</button>' : '<button type="button" data-lesson-action="homework-submissions" data-homework-id="' + tEsc(item.id) + '">查看提交</button>'}</div>`; }).join('') : `<div class="teacher-homework-empty"><p>${active ? '本课次尚未发布作业，可使用页面底部「发布作业」发布；当前 MVP 每个课次仅支持发布 1 份作业，发布后推送至学员端作业本。' : '本课次已结束，未发布作业。'}</p></div>`}</section>`
   )}</div></section>` : `<section class="teacher-lesson-locked"><strong>开始上课后登记课堂信息</strong><p>保存学员考勤后，可结束本课次并填写教学记录。</p><ol><li>登记并保存学员考勤</li><li>结束上课时填写教学记录并同步</li><li>课后作业（可选）</li></ol></section>`;
   tLayout(`<div class="teacher-lesson-page ${active || showHomeworkBottomAction ? 'has-bottom-action' : ''}">${tStack(
     `<section class="teacher-lesson-hero"><div class="teacher-lesson-hero-head"><div><span>${tEsc(classItem.course)}</span><h2><a class="teacher-lesson-class-link" href="${relativePath(`/teacher/pages/class-overview.html?class=${encodeURIComponent(classItem.id)}`)}" aria-label="查看${tEsc(classItem.name)}班级详情">${tEsc(classItem.name)}</a> · 第 ${tEsc(session.index)} 次课</h2><small>共 ${tEsc((classItem.sessions || []).length || classItem.total)} 次课 · 本节课为第 ${tEsc(session.index)} 次</small></div>${tPill(plannedStatus, lessonTone(plannedStatus))}</div><dl><div><dt>上课时间</dt><dd>${tEsc(session.date)} ${tEsc(session.weekday || '')} ${tEsc(session.startTime || session.start || '')}–${tEsc(session.endTime || session.end || '')}</dd></div><div><dt>上课地点</dt><dd>${tEsc(sessionVenueOf(session, classItem).campus)} · ${tEsc(sessionVenueOf(session, classItem).room)}</dd></div></dl></section>`,
@@ -536,7 +536,7 @@ function renderLessonExecution(classItem, session) {
     active ? `<section class="teacher-lesson-readiness"><div><strong>${lesson.attendanceSaved ? '1/1' : '0/1'}</strong><span>上课中必做事项</span></div><ul><li class="${lesson.attendanceSaved ? 'done' : ''}"><i aria-hidden="true">${lesson.attendanceSaved ? '✓' : ''}</i>学员考勤</li></ul></section>` : '',
     operationPanel,
     completed ? executionRecorded ? `<section class="teacher-lesson-complete-note"><strong>执行记录已保存</strong><p>${tEsc(lesson.endedAt || '待补录')} 结束上课，本课次执行事实已按课次留档。</p></section>` : `<section class="teacher-lesson-complete-note"><strong>计划课次已完成，执行事实待补录</strong><p>尚未记录教师实际开始、结束时间和教学记录，不得据此判断教学闭环已完成。</p>${lessonSupplementAllowed(session) ? '<button type="button" class="mp-button secondary" data-lesson-action="supplement">补录执行记录</button>' : '<small>已超过教师补录时限，请联系教务主管处理。</small>'}</section>` : ''
-  )}${active ? `<div class="teacher-lesson-bottom-action">${teacherLessonTab === 'homework' ? '<button type="button" class="mp-button secondary" data-lesson-action="open-homework">发布作业</button>' : teacherLessonTab === 'attendance' ? '<button type="button" class="mp-button secondary" data-lesson-action="save-attendance">保存考勤</button>' : ''}<button type="button" class="mp-button" data-lesson-action="end">结束上课</button></div>` : showHomeworkBottomAction ? '<div class="teacher-lesson-bottom-action"><button type="button" class="mp-button" data-lesson-action="open-homework">发布作业</button></div>' : ''}</div>`);
+  )}${active ? `<div class="teacher-lesson-bottom-action">${teacherLessonTab === 'homework' && !homeworkRecords.length ? '<button type="button" class="mp-button secondary" data-lesson-action="open-homework">发布作业</button>' : teacherLessonTab === 'attendance' ? '<button type="button" class="mp-button secondary" data-lesson-action="save-attendance">保存考勤</button>' : ''}<button type="button" class="mp-button" data-lesson-action="end">结束上课</button></div>` : showHomeworkBottomAction && !homeworkRecords.length ? '<div class="teacher-lesson-bottom-action"><button type="button" class="mp-button" data-lesson-action="open-homework">发布作业</button></div>' : ''}</div>`);
 }
 // I1-TEACHER-CLASS-03：课次详情按课次查看作业（提交与批改情况、未提交名单）。
 // CR-2026-134：作业演示状态取自班级的 demoHomework（未提交／点评中／点评完成），未设置时按 80% 提交、少量待批改的默认口径派生。
@@ -1378,9 +1378,9 @@ function initApplicationDetail() {
   });
 }
 const salaryRecords = [
-  { key: '2026-07', month: '2026年7月', publishedAt: '2026-08-01', paymentStatus: '已发放', paidAt: '2026-08-05', hours: 32, payableTaxIncluded: 5760, paidTaxIncluded: 5520, tax: 36.80, net: 5483.20, attendance: { expected: 18, actual: 16, late: 1, early: 1, absent: 1, leave: 1 }, deductions: { late: 30, early: 30, absent: 180, total: 240 }, account: '中国建设银行 尾号 2866', items: [{ course: '舞蹈基本功', className: '少儿舞蹈基础班', hours: 20, rate: 180, subtotal: 3600 }, { course: '舞蹈基本功', className: '少儿舞蹈提高班', hours: 12, rate: 165, subtotal: 1980 }] },
-  { key: '2026-06', month: '2026年6月', publishedAt: '2026-07-01', paymentStatus: '待发放', paidAt: '', hours: 28, payableTaxIncluded: 5040, paidTaxIncluded: 5040, tax: 15.60, net: 5024.40, attendance: { expected: 15, actual: 14, late: 0, early: 0, absent: 0, leave: 1 }, deductions: { late: 0, early: 0, absent: 0, total: 0 }, account: '中国建设银行 尾号 2866', items: [{ course: '舞蹈基本功', className: '少儿舞蹈基础班', hours: 18, rate: 180, subtotal: 3240 }, { course: '舞蹈基本功', className: '少儿舞蹈提高班', hours: 10, rate: 180, subtotal: 1800 }] },
-  { key: '2026-05', month: '2026年5月', publishedAt: '2026-06-01', paymentStatus: '发放中', paidAt: '', hours: 26, payableTaxIncluded: 4680, paidTaxIncluded: 4650, tax: 3, net: 4647, attendance: { expected: 14, actual: 13, late: 1, early: 0, absent: 0, leave: 1 }, deductions: { late: 30, early: 0, absent: 0, total: 30 }, account: '中国建设银行 尾号 2866', items: [{ course: '舞蹈基本功', className: '少儿舞蹈基础班', hours: 16, rate: 180, subtotal: 2880 }, { course: '舞蹈基本功', className: '少儿舞蹈提高班', hours: 10, rate: 180, subtotal: 1800 }] }
+  { key: '2026-07', month: '2026年7月', publishedAt: '2026-08-01', paymentStatus: '已发布', paidAt: '2026-08-05', hours: 32, payableTaxIncluded: 5760, paidTaxIncluded: 5520, tax: 36.80, net: 5483.20, attendance: { expected: 18, actual: 16, late: 1, early: 1, absent: 1, leave: 1 }, deductions: { late: 30, early: 30, absent: 180, total: 240 }, account: '中国建设银行 尾号 2866', items: [{ course: '舞蹈基本功', className: '少儿舞蹈基础班', hours: 20, rate: 180, subtotal: 3600 }, { course: '舞蹈基本功', className: '少儿舞蹈提高班', hours: 12, rate: 165, subtotal: 1980 }] },
+  { key: '2026-06', month: '2026年6月', publishedAt: '2026-07-01', paymentStatus: '已发布', paidAt: '', hours: 28, payableTaxIncluded: 5040, paidTaxIncluded: 5040, tax: 15.60, net: 5024.40, attendance: { expected: 15, actual: 14, late: 0, early: 0, absent: 0, leave: 1 }, deductions: { late: 0, early: 0, absent: 0, total: 0 }, account: '中国建设银行 尾号 2866', items: [{ course: '舞蹈基本功', className: '少儿舞蹈基础班', hours: 18, rate: 180, subtotal: 3240 }, { course: '舞蹈基本功', className: '少儿舞蹈提高班', hours: 10, rate: 180, subtotal: 1800 }] },
+  { key: '2026-05', month: '2026年5月', publishedAt: '2026-06-01', paymentStatus: '已发布', paidAt: '', hours: 26, payableTaxIncluded: 4680, paidTaxIncluded: 4650, tax: 3, net: 4647, attendance: { expected: 14, actual: 13, late: 1, early: 0, absent: 0, leave: 1 }, deductions: { late: 30, early: 0, absent: 0, total: 30 }, account: '中国建设银行 尾号 2866', items: [{ course: '舞蹈基本功', className: '少儿舞蹈基础班', hours: 16, rate: 180, subtotal: 2880 }, { course: '舞蹈基本功', className: '少儿舞蹈提高班', hours: 10, rate: 180, subtotal: 1800 }] }
 ];
 function money(value) { return `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; }
 function deductionMoney(value) { return Number(value) ? `-${money(value)}` : money(0); }
@@ -1411,25 +1411,32 @@ function salaryAttendanceTone(status) {
   if (['迟到', '早退'].includes(status)) return 'amber';
   return 'gray';
 }
-function salaryPaymentTone(status) { return status === '已发放' ? 'green' : status === '发放中' ? '' : 'amber'; }
+function salaryPaymentTone() { return 'green'; }
 function salaryPaymentCopy(record) {
-  if (record.paymentStatus === '已发放') return `${record.paidAt} 已发放`;
-  if (record.paymentStatus === '发放中') return '已进入发放批次，正在处理';
-  return '工资单已发布，等待财务发放';
+  return '工资单已发布，可查看工资明细';
 }
 function renderSalary() {
-  const records = demoLocalize(salaryRecords);
+  const records = demoLocalize(salaryRecords).map(item => ({ ...item, paymentStatus: '已发布', paidAt: '' }));
   const latest = records[0];
-  const paidRecords = records.filter(item => item.paymentStatus === '已发放');
-  const total = paidRecords.reduce((sum, item) => sum + item.net, 0);
+  const publishedRecords = records.filter(item => item.paymentStatus === '已发布');
+  const total = publishedRecords.reduce((sum, item) => sum + item.net, 0);
+  const currentYear = String(new Date().getFullYear());
+  const annualTotal = publishedRecords.filter(item => item.key.startsWith(`${currentYear}-`)).reduce((sum, item) => sum + item.net, 0);
   const totalHours = records.reduce((sum, item) => sum + item.hours, 0);
-  tLayout(tStack(`<section class="teacher-salary-summary"><div class="teacher-salary-summary-head"><div><span>累计已发放</span><strong>${money(total)}</strong></div>${tPill(`${paidRecords.length}期已到账`, 'green')}</div><div class="teacher-salary-summary-meta"><div><span>最近工资月份</span><strong>${latest.month}</strong></div><div><span>最近已发放</span><strong>${money(paidRecords[0]?.net || 0)}</strong></div><div><span>已发布课时</span><strong>${totalHours}课时</strong></div></div></section>`, `<section class="teacher-salary-list"><div class="teacher-salary-list-head"><div><h2>工资记录</h2><p>按发布时间从近到远排列</p></div><span>${salaryRecords.length} 个月</span></div>${salaryRecords.map(record => `<a class="teacher-salary-card" href="${relativePath(`/teacher/pages/salary-detail.html?month=${record.key}`)}"><div class="teacher-salary-card-head"><div><span>工资月份</span><h3>${record.month}</h3></div>${tPill(record.paymentStatus, salaryPaymentTone(record.paymentStatus))}</div><div class="teacher-salary-card-money"><div><span>应付工资含税</span><strong>${money(record.payableTaxIncluded)}</strong></div><div><span>实际核发</span><strong>${money(record.net)}</strong></div></div><div class="teacher-salary-card-foot"><span>${record.hours}课时 · ${salaryPaymentCopy(record)}</span><span>查看明细 ›</span></div></a>`).join('')}</section>`, `<p class="teacher-salary-note">工资单发布后即可查看明细；资金到账以“已发放”状态为准。</p>`));
+  tLayout(tStack(`<section class="teacher-salary-summary"><div class="teacher-salary-summary-head"><div><span>累计已发布</span><strong>${money(total)}</strong></div>${tPill(`${publishedRecords.length}期已发布`, 'green')}</div><div class="teacher-salary-summary-meta"><div><span>本年度累计</span><strong>${money(annualTotal)}</strong></div><div><span>最近工资月份</span><strong>${latest.month}</strong></div><div><span>最近发布金额</span><strong>${money(publishedRecords[0]?.net || 0)}</strong></div><div><span>已发布课时</span><strong>${totalHours}课时</strong></div></div></section>`, `<section class="teacher-salary-list"><div class="teacher-salary-list-head"><div><h2>工资记录</h2><p>按发布时间从近到远排列</p></div><span>${salaryRecords.length} 个月</span></div>${salaryRecords.map(record => `<a class="teacher-salary-card" href="${relativePath(`/teacher/pages/salary-detail.html?month=${record.key}`)}"><div class="teacher-salary-card-head"><div><span>工资月份</span><h3>${record.month}</h3></div>${tPill(record.paymentStatus, salaryPaymentTone(record.paymentStatus))}</div><div class="teacher-salary-card-money"><div><span>应付工资含税</span><strong>${money(record.payableTaxIncluded)}</strong></div><div><span>实际核发</span><strong>${money(record.net)}</strong></div></div><div class="teacher-salary-card-foot"><span>${record.hours}课时 · ${salaryPaymentCopy(record)}</span><span>查看明细 ›</span></div></a>`).join('')}</section>`, `<p class="teacher-salary-note">工资单发布后即可查看明细；实际转账由财务在线下流程完成，本平台不登记线下结果。</p>`));
 }
+function renderSalaryDetailLegacy() {
+  const key = new URLSearchParams(location.search).get('month');
+  const record = demoLocalize(salaryRecords).map(item => ({ ...item, paymentStatus: '已发布', paidAt: '' })).find(item => item.key === key) || demoLocalize(salaryRecords)[0];
+  const lessonDetails = salaryLessonDetails(record);
+  tLayout(tStack(`<section class="teacher-salary-detail-summary"><div class="teacher-salary-detail-status"><span>${record.month}工资</span>${tPill(record.paymentStatus, salaryPaymentTone(record.paymentStatus))}</div><span>实际核发</span><strong>${money(record.net)}</strong><p class="salary-payment-${record.paymentStatus === '已发布' ? 'success' : 'pending'}">${salaryPaymentCopy(record)}</p><div class="teacher-salary-equation"><div><span>实发工资含税</span><strong>${money(record.paidTaxIncluded)}</strong></div><i>−</i><div><span>个人所得税</span><strong>${money(record.tax)}</strong></div><i>=</i><div><span>实际核发</span><strong>${money(record.net)}</strong></div></div></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>出勤统计</h2><span>按课次统计</span></div><div class="teacher-salary-attendance-primary"><div><span>应出勤课次</span><strong>${record.attendance.expected}<small>课次</small></strong></div><div><span>实出勤课次</span><strong>${record.attendance.actual}<small>课次</small></strong></div></div><dl class="teacher-salary-attendance-status"><div><dt>迟到</dt><dd>${record.attendance.late}次</dd></div><div><dt>早退</dt><dd>${record.attendance.early}次</dd></div><div><dt>缺勤</dt><dd>${record.attendance.absent}次</dd></div><div><dt>请假</dt><dd>${record.attendance.leave}次</dd></div></dl><p class="teacher-salary-block-note">迟到、早退计入实出勤；缺勤、请假不计入实出勤。</p></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>扣款明细</h2><strong class="${record.deductions.total ? 'has-adjustment' : ''}">${deductionMoney(record.deductions.total)}</strong></div><dl class="teacher-salary-deduction-grid"><div><dt>迟到扣款</dt><dd>${deductionMoney(record.deductions.late)}</dd></div><div><dt>早退扣款</dt><dd>${deductionMoney(record.deductions.early)}</dd></div><div><dt>缺勤扣款</dt><dd>${deductionMoney(record.deductions.absent)}</dd></div><div class="total"><dt>累计扣款</dt><dd>${deductionMoney(record.deductions.total)}</dd></div></dl></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>工资核算</h2><span>单位：元</span></div><dl class="teacher-salary-settlement"><div><dt>应付工资含税</dt><dd>${money(record.payableTaxIncluded)}</dd></div><div><dt>实发工资含税</dt><dd>${money(record.paidTaxIncluded)}</dd></div><div><dt>个税</dt><dd>${deductionMoney(record.tax)}</dd></div><div class="total"><dt>实际核发</dt><dd>${money(record.net)}</dd></div></dl></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>课次明细</h2><span>${lessonDetails.length}课次</span></div><div class="teacher-salary-lessons">${lessonDetails.map(item => `<article><div class="teacher-salary-lesson-head"><div><span>${tEsc(item.lesson)}</span><h3>${tEsc(item.className)}</h3></div>${tPill(item.status, salaryAttendanceTone(item.status))}</div><p>${tEsc(item.course)}</p><dl><div class="wide"><dt>上课时间</dt><dd>${tEsc(item.scheduledAt)}</dd></div><div><dt>实际开始时间</dt><dd>${tEsc(item.actualStart)}</dd></div><div><dt>实际结束时间</dt><dd>${tEsc(item.actualEnd)}</dd></div></dl>${item.exception ? `<div class="teacher-salary-lesson-exception">${tEsc(item.exception)}</div>` : ['缺勤', '请假'].includes(item.status) ? '<div class="teacher-salary-lesson-missed">本课次未实际上课</div>' : ''}</article>`).join('')}</div></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>工资单信息</h2></div><dl class="teacher-salary-payment"><div><dt>工资单状态</dt><dd>已发布</dd></div><div><dt>收款账户</dt><dd>${tEsc(record.account)}</dd></div><div><dt>发布时间</dt><dd>${record.publishedAt}</dd></div></dl></section>`));
+}
+// 工资详情与后台核算保持同一字段口径，不在教师端展开考勤、扣款拆分或课次明细。
 function renderSalaryDetail() {
   const key = new URLSearchParams(location.search).get('month');
-  const record = demoLocalize(salaryRecords).find(item => item.key === key) || demoLocalize(salaryRecords)[0];
-  const lessonDetails = salaryLessonDetails(record);
-  tLayout(tStack(`<section class="teacher-salary-detail-summary"><div class="teacher-salary-detail-status"><span>${record.month}工资</span>${tPill(record.paymentStatus, salaryPaymentTone(record.paymentStatus))}</div><span>实际核发</span><strong>${money(record.net)}</strong><p class="salary-payment-${record.paymentStatus === '已发放' ? 'success' : 'pending'}">${salaryPaymentCopy(record)}</p><div class="teacher-salary-equation"><div><span>实发工资含税</span><strong>${money(record.paidTaxIncluded)}</strong></div><i>−</i><div><span>个人所得税</span><strong>${money(record.tax)}</strong></div><i>=</i><div><span>实际核发</span><strong>${money(record.net)}</strong></div></div></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>出勤统计</h2><span>按课次统计</span></div><div class="teacher-salary-attendance-primary"><div><span>应出勤课次</span><strong>${record.attendance.expected}<small>课次</small></strong></div><div><span>实出勤课次</span><strong>${record.attendance.actual}<small>课次</small></strong></div></div><dl class="teacher-salary-attendance-status"><div><dt>迟到</dt><dd>${record.attendance.late}次</dd></div><div><dt>早退</dt><dd>${record.attendance.early}次</dd></div><div><dt>缺勤</dt><dd>${record.attendance.absent}次</dd></div><div><dt>请假</dt><dd>${record.attendance.leave}次</dd></div></dl><p class="teacher-salary-block-note">迟到、早退计入实出勤；缺勤、请假不计入实出勤。</p></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>扣款明细</h2><strong class="${record.deductions.total ? 'has-adjustment' : ''}">${deductionMoney(record.deductions.total)}</strong></div><dl class="teacher-salary-deduction-grid"><div><dt>迟到扣款</dt><dd>${deductionMoney(record.deductions.late)}</dd></div><div><dt>早退扣款</dt><dd>${deductionMoney(record.deductions.early)}</dd></div><div><dt>缺勤扣款</dt><dd>${deductionMoney(record.deductions.absent)}</dd></div><div class="total"><dt>累计扣款</dt><dd>${deductionMoney(record.deductions.total)}</dd></div></dl></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>工资核算</h2><span>单位：元</span></div><dl class="teacher-salary-settlement"><div><dt>应付工资含税</dt><dd>${money(record.payableTaxIncluded)}</dd></div><div><dt>实发工资含税</dt><dd>${money(record.paidTaxIncluded)}</dd></div><div><dt>个税</dt><dd>${deductionMoney(record.tax)}</dd></div><div class="total"><dt>实际核发</dt><dd>${money(record.net)}</dd></div></dl></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>课次明细</h2><span>${lessonDetails.length}课次</span></div><div class="teacher-salary-lessons">${lessonDetails.map(item => `<article><div class="teacher-salary-lesson-head"><div><span>${tEsc(item.lesson)}</span><h3>${tEsc(item.className)}</h3></div>${tPill(item.status, salaryAttendanceTone(item.status))}</div><p>${tEsc(item.course)}</p><dl><div class="wide"><dt>上课时间</dt><dd>${tEsc(item.scheduledAt)}</dd></div><div><dt>实际开始时间</dt><dd>${tEsc(item.actualStart)}</dd></div><div><dt>实际结束时间</dt><dd>${tEsc(item.actualEnd)}</dd></div></dl>${item.exception ? `<div class="teacher-salary-lesson-exception">${tEsc(item.exception)}</div>` : ['缺勤', '请假'].includes(item.status) ? '<div class="teacher-salary-lesson-missed">本课次未实际上课</div>' : ''}</article>`).join('')}</div></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>发放信息</h2></div><dl class="teacher-salary-payment"><div><dt>工资单状态</dt><dd>已发布</dd></div><div><dt>发放状态</dt><dd>${tEsc(record.paymentStatus)}</dd></div><div><dt>发放日期</dt><dd>${record.paidAt || '--'}</dd></div><div><dt>收款账户</dt><dd>${tEsc(record.account)}</dd></div><div><dt>发布时间</dt><dd>${record.publishedAt}</dd></div></dl></section>`));
+  const source = demoLocalize(salaryRecords).find(item => item.key === key) || demoLocalize(salaryRecords)[0];
+  const record = { ...source, paymentStatus: '已发布', paidAt: '', deduction: source.deduction ?? source.deductions?.total ?? 0 };
+  tLayout(tStack(`<section class="teacher-salary-detail-summary"><div class="teacher-salary-detail-status"><span>${record.month}工资</span>${tPill(record.paymentStatus, salaryPaymentTone(record.paymentStatus))}</div><span>实际核发</span><strong>${money(record.net)}</strong><p class="salary-payment-success">${salaryPaymentCopy(record)}</p></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>工资核算</h2><span>单位：元</span></div><dl class="teacher-salary-settlement"><div><dt>应付工资含税</dt><dd>${money(record.payableTaxIncluded)}</dd></div><div><dt>累计扣款</dt><dd>${deductionMoney(record.deduction)}</dd></div><div><dt>实发工资含税</dt><dd>${money(record.paidTaxIncluded)}</dd></div><div><dt>个税</dt><dd>${deductionMoney(record.tax)}</dd></div><div class="total"><dt>实际核发</dt><dd>${money(record.net)}</dd></div><div><dt>扣款核定说明</dt><dd>${tEsc(record.deductionReason || '—')}</dd></div></dl></section>`, `<section class="teacher-salary-detail-block"><div class="teacher-salary-block-head"><h2>工资单信息</h2></div><dl class="teacher-salary-payment"><div><dt>工资单状态</dt><dd>已发布</dd></div><div><dt>工资月份</dt><dd>${record.month}</dd></div><div><dt>发布时间</dt><dd>${record.publishedAt}</dd></div></dl></section>`));
 }
 function teacherProfileRow({ mark, title, description, href, value = '', tone = '' }) {
   return `<a class="teacher-profile-row" href="${relativePath(href)}"><span class="teacher-profile-row-mark" aria-hidden="true">${tEsc(mark)}</span><span class="teacher-profile-row-copy"><strong>${tEsc(title)}</strong><small>${tEsc(description)}</small></span>${value ? `<span class="teacher-profile-row-value ${tone}">${tEsc(value)}</span>` : ''}<span class="teacher-profile-row-arrow" aria-hidden="true">›</span></a>`;
@@ -1444,7 +1451,6 @@ function renderProfile() {
       teacherProfileRow({ mark: '信', title: '消息通知', description: '查看排课、审核与工资通知', href: loginFor('/teacher/pages/messages.html'), value: '登录后查看', tone: 'amber' }),
       teacherProfileRow({ mark: '证', title: '我的证书', description: '资格证书与审核记录', href: loginFor('/teacher/pages/certificates.html'), value: '登录后查看', tone: 'amber' }),
       teacherProfileRow({ mark: '合', title: '我的合同', description: '查看协议、有效期与签署状态', href: loginFor('/teacher/pages/contracts.html'), value: '登录后查看', tone: 'amber' }),
-      teacherProfileRow({ mark: '作', title: '我的作业', description: '查看已发布作业与学员提交', href: loginFor('/teacher/pages/homework.html'), value: '登录后查看', tone: 'amber' }),
       teacherProfileRow({ mark: '结', title: '结业申请记录', description: '查看复核结果', href: loginFor('/teacher/pages/graduation.html'), value: '登录后查看', tone: 'amber' }),
       teacherProfileRow({ mark: '设', title: '设置', description: '账号设置、协议与关于我们', href: loginFor('/teacher/pages/settings.html') })
     ].join('');
@@ -1462,7 +1468,6 @@ function renderProfile() {
     { mark: '信', title: '消息通知', description: '查看排课、审核与工资通知', href: '/teacher/pages/messages.html', value: unreadMessages ? `${unreadMessages}条未读` : '已读', tone: unreadMessages ? 'amber' : 'green' },
     { mark: '证', title: '我的证书', description: '资格证书与审核记录', href: '/teacher/pages/certificates.html', value: '1项待审核', tone: 'amber' },
     { mark: '合', title: '我的合同', description: '查看协议、有效期与签署状态', href: '/teacher/pages/contracts.html', value: `${contracts.filter(item => item.status === '待教师签署').length}份待教师签署`, tone: 'amber' },
-    { mark: '作', title: '我的作业', description: '查看已发布作业与学员提交', href: '/teacher/pages/homework.html', value: `${listHomework({ publishedBy: sessionStorage.getItem('hbyx-teacher-id') || defaultTeacherId() }).length}项`, tone: 'green' },
     { mark: '结', title: '结业申请记录', description: '查看复核结果', href: '/teacher/pages/graduation.html', value: `${graduationPending}项处理中`, tone: graduationPending ? 'amber' : 'green' }
   ].map(teacherProfileRow).join('');
   const settings = teacherProfileRow({ mark: '设', title: '设置', description: '账号设置、协议与关于我们', href: '/teacher/pages/settings.html' });
@@ -1861,6 +1866,7 @@ function bindTeacherContractEvents() {
   });
 }
 let teacherGraduationFilter = '全部';
+let teacherGraduationClassFilter = '全部';
 function graduationStatusTone(status) {
   if (status === '已通过') return 'green';
   if (status === '审核中') return 'brand';
@@ -1871,21 +1877,39 @@ function graduationStatusCopy(record) {
   if (record.status === '已通过') return record.result || '数据复核通过，结业成果正在生成';
   return record.cancelReason;
 }
+// 结业记录允许来自教师端本地草稿或后台同步数据；统一补齐展示字段，避免单条脏数据阻断整页渲染。
+function enrichGraduationRecord(record = {}) {
+  return {
+    ...record,
+    avatar: record.avatar || String(record.student || '学').slice(0, 1),
+    className: record.className || '未关联班级',
+    course: record.course || '面授课程',
+    professional: record.professional || '—',
+    completedAt: record.completedAt || '—',
+    submittedAt: record.submittedAt || record.createdAt || '—',
+    attendanceRate: record.attendanceRate ?? '—',
+    homeworkRate: record.homeworkRate ?? '—',
+    lessons: record.lessons || '—',
+    timeline: Array.isArray(record.timeline) && record.timeline.length ? record.timeline : [{ title: '提交结业申请', time: record.submittedAt || record.createdAt || '—', text: '结业材料已提交，等待后台审核。' }]
+  };
+}
 function graduationRecordCard(record) {
   const cardAction = '查看详情';
   return `<a class="teacher-graduation-card" href="${relativePath(`/teacher/pages/graduation-detail.html?graduation=${record.id}`)}"><div class="teacher-graduation-card-head"><div class="teacher-graduation-student"><span aria-hidden="true">${tEsc(record.avatar)}</span><div><h3>${tEsc(record.student)}</h3><p>${tEsc(record.className)}</p></div></div>${tPill(record.status, graduationStatusTone(record.status))}</div><div class="teacher-graduation-course"><strong>${tEsc(record.course)}</strong><span>${tEsc(record.professional)}</span></div><dl class="teacher-graduation-metrics"><div><dt>出勤率</dt><dd>${record.attendanceRate}%</dd></div><div><dt>作业提交率</dt><dd>${record.homeworkRate}%</dd></div><div><dt>完成课次</dt><dd>${tEsc(record.lessons)}</dd></div></dl><div class="teacher-graduation-card-foot"><span>${tEsc(record.submittedAt)} 提交</span><strong>${cardAction}<i aria-hidden="true">›</i></strong></div></a>`;
 }
 function renderTeacherGraduations() {
   const records = demoLocalize([...teacherState.graduationRecords]).map(enrichGraduationRecord).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  const classOptions = [...new Set(records.map(item => item.className).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
   const filters = [
     ['全部', records.length],
     ['处理中', records.filter(item => item.status === '审核中').length],
     ['已完成', records.filter(item => ['已通过', '已取消结业'].includes(item.status)).length]
   ];
-  const visible = records.filter(item => teacherGraduationFilter === '全部' || (teacherGraduationFilter === '处理中' ? item.status === '审核中' : ['已通过', '已取消结业'].includes(item.status)));
+  const visible = records.filter(item => (teacherGraduationFilter === '全部' || (teacherGraduationFilter === '处理中' ? item.status === '审核中' : ['已通过', '已取消结业'].includes(item.status))) && (teacherGraduationClassFilter === '全部' || item.className === teacherGraduationClassFilter));
   tLayout(tStack(
     `<section class="teacher-graduation-overview"><div><span>已提交申请</span><strong>${records.length}</strong><small>人</small></div><p>申请按学员复核<br>处理完成后置为已通过</p></section>`,
     `<nav class="teacher-graduation-filters" aria-label="结业申请筛选">${filters.map(([name, count]) => `<button type="button" class="${teacherGraduationFilter === name ? 'active' : ''}" data-graduation-filter="${name}" aria-pressed="${teacherGraduationFilter === name}">${name}<span>${count}</span></button>`).join('')}</nav>`,
+    `<label class="teacher-graduation-class-filter"><span>按班级筛选</span><select data-graduation-class-filter aria-label="按班级筛选"><option value="全部">全部班级</option>${classOptions.map(name => `<option value="${tEsc(name)}" ${teacherGraduationClassFilter === name ? 'selected' : ''}>${tEsc(name)}</option>`).join('')}</select></label>`,
     `<section class="teacher-graduation-list"><div class="teacher-graduation-list-head"><h2>${teacherGraduationFilter === '全部' ? '全部申请' : teacherGraduationFilter}</h2><span>${visible.length} 条记录</span></div>${visible.length ? visible.map(graduationRecordCard).join('') : '<div class="teacher-contract-empty">暂无符合条件的结业申请</div>'}</section>`
   ));
 }
@@ -1918,6 +1942,7 @@ function renderTeacherGraduationDetail() {
 }
 function bindTeacherGraduationEvents() {
   document.querySelectorAll('[data-graduation-filter]').forEach(button => button.addEventListener('click', () => { teacherGraduationFilter = button.dataset.graduationFilter; renderTeacherGraduations(); bindTeacherGraduationEvents(); }));
+  document.querySelector('[data-graduation-class-filter]')?.addEventListener('change', event => { teacherGraduationClassFilter = event.target.value; renderTeacherGraduations(); bindTeacherGraduationEvents(); });
   document.querySelector('[data-graduation-action="cancel"]')?.addEventListener('click', () => { renderTeacherGraduationDetail(); bindTeacherGraduationEvents(); tToast('已取消本次填写'); });
 ;
 }
@@ -1988,7 +2013,7 @@ function renderTeacherHomeworkPage(classItem, session) {
       sharedRecord = publishHomework(homeworkRecord);
     } catch (publishError) {
       error.hidden = false;
-      error.textContent = publishError?.message === 'HOMEWORK_DEADLINE_INVALID' ? '截止时间必须晚于当前时间。' : publishError?.message === 'HOMEWORK_OPERATOR_FORBIDDEN' ? '当前教师无权在该班级发布作业。' : '作业发布失败，请稍后重试。';
+      error.textContent = publishError?.message === 'HOMEWORK_DEADLINE_INVALID' ? '截止时间必须晚于当前时间。' : publishError?.message === 'HOMEWORK_DEADLINE_MUST_EXCEED_24_HOURS' ? '截止时间必须至少晚于发布时刻 24 小时。' : publishError?.message === 'HOMEWORK_LESSON_ALREADY_PUBLISHED' ? '本课次已发布作业，当前仅支持每课次 1 个作业。' : publishError?.message === 'HOMEWORK_OPERATOR_FORBIDDEN' ? '当前教师无权在该班级发布作业。' : '作业发布失败，请稍后重试。';
       return;
     }
     teacherState.lesson.homework = Array.isArray(teacherState.lesson.homework)
@@ -2239,11 +2264,11 @@ function renderTeacherHomeworkLibrary() {
   const homeworkId = new URLSearchParams(location.search).get('homeworkId');
   if (homeworkId) {
     const homework = getHomework(homeworkId);
-    if (!homework) { tLayout(tStack(tCard(`<h2>作业不存在</h2><p>该作业可能已被移除，请返回我的作业。</p><a class="mp-button secondary" href="${relativePath('/teacher/pages/homework.html')}">返回作业列表</a>`))); return; }
+    if (!homework) { tLayout(tStack(tCard(`<h2>作业不存在</h2><p>该作业可能已被移除，请返回课次详情。</p><a class="mp-button secondary" href="${relativePath('/teacher/pages/classes.html')}">返回我的班级</a>`))); return; }
     // MVP 口径 6（2026-09-24 冻结）：教师只能操作本人授课班级的作业，禁止按 URL 跨教师／跨班级直接访问。
     const teacherId = sessionStorage.getItem('hbyx-teacher-id') || defaultTeacherId();
     const classItem = teacherHomeworkClass(homework);
-    if ((homework.publishedBy && homework.publishedBy !== teacherId) || classItem.teacher !== currentTeacherName() || !currentTeacherClasses().some((item) => item.id === homework.classId)) { tLayout(tStack(tCard(`<h2>无权查看该作业</h2><p>该作业不属于你授课的班级，请返回我的作业。</p><a class="mp-button secondary" href="${relativePath('/teacher/pages/homework.html')}">返回作业列表</a>`))); return; }
+    if ((homework.publishedBy && homework.publishedBy !== teacherId) || classItem.teacher !== currentTeacherName() || !currentTeacherClasses().some((item) => item.id === homework.classId)) { tLayout(tStack(tCard(`<h2>无权查看该作业</h2><p>该作业不属于你授课的班级，请返回我的班级。</p><a class="mp-button secondary" href="${relativePath('/teacher/pages/classes.html')}">返回我的班级</a>`))); return; }
     const rows = listSubmissions(homework.id);
     const summary = submissionSummary(homework.id);
     const lifecycle = homeworkLifecycleStatus(homework);
@@ -2303,7 +2328,10 @@ else if (teacherPath.endsWith('/applications.html')) renderApplications();
 else if (teacherPath.endsWith('/application-create.html')) renderApplicationCreate();
 else if (teacherPath.endsWith('/application-detail.html')) renderApplicationDetail();
 else if (teacherPath.endsWith('/salary.html')) renderSalary();
-else if (teacherPath.endsWith('/salary-detail.html')) renderSalaryDetail();
+else if (teacherPath.endsWith('/salary-detail.html')) {
+  renderSalaryDetail();
+  mountSalaryAttendanceSummary();
+}
 else if (teacherPath.endsWith('/profile.html')) renderProfile();
 else if (teacherPath.endsWith('/messages.html')) renderTeacherMessages();
 else if (teacherPath.endsWith('/message-detail.html')) renderTeacherMessageDetail();
@@ -2315,6 +2343,19 @@ else if (teacherPath.endsWith('/contracts.html')) renderTeacherContracts();
 else if (teacherPath.endsWith('/contract-detail.html')) renderTeacherContractDetail();
 else if (teacherPath.endsWith('/graduation.html')) renderTeacherGraduations();
 else if (teacherPath.endsWith('/graduation-detail.html')) renderTeacherGraduationDetail();
+function mountSalaryAttendanceSummary() {
+  const settlement = document.querySelector('.teacher-salary-settlement');
+  if (!settlement || settlement.querySelector('[data-salary-attendance]')) return;
+  const key = new URLSearchParams(location.search).get('month');
+  const record = demoLocalize(salaryRecords).find(item => item.key === key) || demoLocalize(salaryRecords)[0];
+  [['应出勤课次', record.attendance.expected], ['实出勤课次', record.attendance.actual]].reverse().forEach(([label, value]) => {
+    const item = document.createElement('div');
+    item.dataset.salaryAttendance = 'true';
+    item.innerHTML = `<dt>${label}</dt><dd>${value}<small>课次</small></dd>`;
+    settlement.prepend(item);
+  });
+}
+
 initApplicationForm();
 initApplicationDetail();
 bindTeacherCertificateEvents();

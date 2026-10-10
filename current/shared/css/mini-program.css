@@ -120,6 +120,24 @@ body { background: #f7f7f5; }
 .mp-course-detail-chapter.is-locked { background: #fbfaf9; color: #958c86; }
 .mp-course-detail-chapter.is-locked strong { color: #958c86; }
 .mp-course-detail-chapter.is-locked .mp-pill { justify-self: end; }
+.mp-course-detail-chapter-group { border-top: 1px solid #eee9e3; }
+.mp-course-detail-chapter-group:last-child { border-bottom: 0; }
+.mp-course-detail-chapter-group > summary { display: grid; grid-template-columns: 28px minmax(0, 1fr) 18px; align-items: center; gap: 9px; min-height: 58px; cursor: pointer; list-style: none; }
+.mp-course-detail-chapter-group > summary::-webkit-details-marker { display: none; }
+.mp-course-detail-chapter-group > summary > span:last-child { color: #9f928a; font-size: 16px; transition: transform .16s ease; }
+.mp-course-detail-chapter-group[open] > summary > span:last-child { transform: rotate(180deg); }
+.mp-course-detail-chapter-group > summary:hover { background: #fcf7f5; }
+.mp-course-detail-lessons { margin: 0 0 8px 37px; border-left: 1px solid #eee9e3; }
+.mp-course-detail-lesson { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 50px; padding: 7px 8px 7px 12px; border-bottom: 1px solid #f0ece8; color: var(--ink); text-decoration: none; }
+.mp-course-detail-lesson:last-child { border-bottom: 0; }
+.mp-course-detail-lesson > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
+.mp-course-detail-lesson strong, .mp-course-detail-lesson small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-course-detail-lesson strong { font-size: 13px; line-height: 1.4; }
+.mp-course-detail-lesson small { color: var(--muted); font-size: 11px; }
+.mp-course-detail-lesson-index { color: #a07d70; font-size: 11px; font-weight: 700; }
+.mp-course-detail-lesson.is-playable:hover { background: #fcf7f5; }
+.mp-course-detail-lesson.is-playable:focus-visible { outline: 3px solid rgba(139,2,2,.2); outline-offset: -3px; }
+.mp-course-detail-lesson.is-locked { background: #fbfaf9; color: #958c86; }
 .mp-course-detail-play { color: var(--brand); font-size: 20px; line-height: 1; }
 .mp-video-preview-note { margin: 0 0 10px; padding: 9px 10px; border-radius: 5px; background: #f6f3f0; color: #756c66; font-size: 11px; line-height: 1.5; }
 .mp-fast-filter-chips, .mp-course-filter-row { display: flex; min-width: 0; gap: 7px; overflow-x: auto; padding: 1px 0 5px; scrollbar-width: none; scroll-snap-type: x proximity; }
@@ -1057,8 +1075,9 @@ body { background: #f7f7f5; }
 .teacher-salary-summary-head span, .teacher-salary-summary-meta span { display: block; color: var(--muted); font-size: 10px; }
 .teacher-salary-summary-head strong { display: block; margin-top: 5px; color: #332d29; font-size: 27px; font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .teacher-salary-summary-head .mp-pill { flex: none; }
-.teacher-salary-summary-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid #eee9e5; background: #faf9f7; }
+.teacher-salary-summary-meta { display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid #eee9e5; background: #faf9f7; }
 .teacher-salary-summary-meta > div { min-width: 0; padding: 11px 12px; border-right: 1px solid #eee9e5; }
+.teacher-salary-summary-meta > div:nth-child(n + 2) { display: none; }
 .teacher-salary-summary-meta > div:last-child { border-right: 0; }
 .teacher-salary-summary-meta strong { display: block; margin-top: 4px; overflow: hidden; color: #514943; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .teacher-salary-list { display: grid; min-width: 0; gap: 9px; }
@@ -1412,6 +1431,8 @@ body { background: #f7f7f5; }
 .teacher-graduation-filters button span { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 9px; background: #f1efec; color: #7c746e; font-size: 9px; }
 .teacher-graduation-filters button.active { background: #fff8f6; color: var(--brand); font-weight: 700; }
 .teacher-graduation-filters button.active span { background: #f0dcd8; color: var(--brand); }
+.teacher-graduation-class-filter { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 2px; color: var(--muted); font-size: 11px; }
+.teacher-graduation-class-filter select { min-width: 0; min-height: 38px; padding: 0 10px; border: 1px solid #e5dfda; border-radius: 6px; background: #fff; color: var(--ink); }
 .teacher-graduation-filters button:focus-visible, .teacher-graduation-card:focus-visible { outline: 3px solid rgba(139,2,2,.16); outline-offset: 2px; }
 .teacher-graduation-list { display: grid; min-width: 0; gap: 9px; }
 .teacher-graduation-list-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 2px; }
@@ -1648,7 +1669,19 @@ button.mp-learning-task-more { width: 100%; background: none; border: 0; font: i
 .mp-video-progress-card .mp-section-head { margin-bottom: 8px; }
 .mp-video-progress-value { color: var(--brand); font-size: 16px; }
 .mp-video-progress-copy { margin-top: 8px !important; font-size: 11px; }
-.mp-video-outline { min-width: 0; padding: 16px; background: #fff; border: 1px solid #e9e4df; border-radius: 8px; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
+.mp-video-progress-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 3px 10px; padding: 11px 2px 3px; color: var(--muted); }
+.mp-video-progress-summary span { font-size: 12px; }
+.mp-video-progress-summary strong { color: var(--brand); font-size: 15px; }
+.mp-video-progress-summary small { grid-column: 1 / -1; font-size: 11px; line-height: 1.4; }
+.mp-video-outline { min-width: 0; padding: 0 16px; background: #fff; border: 1px solid #e9e4df; border-radius: 8px; box-shadow: 0 3px 12px rgba(62, 39, 25, .035); }
+.mp-video-outline > summary { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
+.mp-video-outline > summary::-webkit-details-marker { display: none; }
+.mp-video-outline > summary > span:first-child { display: grid; min-width: 0; gap: 3px; }
+.mp-video-outline > summary strong { font-size: 14px; }
+.mp-video-outline > summary small { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.mp-video-outline-chevron { flex: none; color: var(--muted); font-size: 17px; transition: transform .16s ease; }
+.mp-video-outline[open] > summary { border-bottom: 1px solid #eee9e3; }
+.mp-video-outline[open] .mp-video-outline-chevron { transform: rotate(180deg); }
 .mp-video-chapter-list { display: grid; border-top: 1px solid #eee9e3; }
 .mp-video-chapter { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; min-width: 0; min-height: 62px; align-items: center; gap: 9px; padding: 0 4px; border: 0; border-bottom: 1px solid #f0ece8; background: #fff; color: var(--ink); text-align: left; }
 .mp-video-chapter.active { margin: 0 -4px; padding-right: 8px; padding-left: 8px; border-left: 3px solid var(--brand); background: #fff8f6; color: var(--brand); }

@@ -10,14 +10,14 @@ export const SYSTEM_FIELD_SPEC = {
         { heading: '平台基础参数', fields: [
           { id: 'FD-SYSTEM-001', label: '平台名称', type: '文本', length: '≤ 50 字', required: '否', note: '用于后台页头等平台标识展示', constraints: { maxLength: 50 } },
           { id: 'FD-SYSTEM-002', label: '默认时区', type: '下拉', length: 'Asia/Shanghai（UTC+8）', required: '否', note: '平台统一时间口径，影响课次与流水时间展示' },
-          { id: 'FD-SYSTEM-004', label: '作业默认截止时间（小时）', type: '数字', length: '1–720', required: '否', note: '布置作业时的默认截止时间', constraints: { min: 1, max: 720 } },
+          { id: 'FD-SYSTEM-004', label: '作业默认截止时间（小时）', type: '数字', length: '24–720', required: '否', note: '布置作业时的默认截止时间；必须至少距发布时刻 24 小时，最长 720 小时', constraints: { min: 24, max: 720 } },
           { id: 'FD-SYSTEM-005', label: '最低出勤率（%）', type: '数字', length: '0–100', required: '否', note: '结业判定使用', constraints: { min: 0, max: 100 } },
           { id: 'FD-SYSTEM-006', label: '最低作业提交率（%）', type: '数字', length: '0–100', required: '否', note: '结业判定使用', constraints: { min: 0, max: 100 } },
-          { id: 'FD-SYSTEM-033', label: '视频退款最多观看课时数', type: '数字', length: '0–999', required: '否', note: '视频订单退款资格的观看课时上限，默认 3 课时；按账号与课程去重计数', constraints: { min: 0, max: 999 } },
+          { id: 'FD-SYSTEM-033', label: '自助退款最大已消课比例（%）', type: '数字', length: '0–100', required: '否', note: '视频按已观看课时／总课时，面授按已完成课次／总课次计算；两类课程共用', constraints: { min: 0, max: 100 } },
           { id: 'FD-SYSTEM-034', label: '合同签署截止期限（天）', type: '数字', length: '1–30', required: '否', note: '合同推送后按该天数生成签署截止日期，默认 7 天；后台合同列表与教师端我的合同读取同一份配置，修改后对新推送的合同生效', constraints: { min: 1, max: 30 } },
           { id: 'FD-SYSTEM-055', label: '证书到期提醒窗口（天）', type: '下拉', length: '7 / 15 / 30 / 60', required: '否', note: '后台证书列表与教师端我的证书按该窗口判定「即将过期」，默认 30 天；只允许四选一，不支持任意整数，修改后两端同步生效', constraints: { options: ['7', '15', '30', '60'] } },
           { id: 'FD-SYSTEM-047', label: '待支付订单支付时限（分钟）', type: '数字', length: '1–1440', required: '否', note: '待支付订单创建后按该时限关闭为「已取消（超时）」，默认 30 分钟；学员端支付页与统一订单管理同源展示', constraints: { min: 1, max: 1440 } },
-          { id: 'FD-SYSTEM-048', label: '退款申请窗口（自然日）', type: '数字', length: '1–30', required: '否', note: '视频订单支付后按该窗口判断退款资格，默认 7 个自然日；与该页的观看课时上限共同决定资格', constraints: { min: 1, max: 30 } },
+          { id: 'FD-SYSTEM-048', label: '退款申请窗口（自然日）', type: '数字', length: '0–365', required: '否', note: '视频与面授共用，支付后计算；0 表示不限', constraints: { min: 0, max: 365 } },
           { id: 'FD-SYSTEM-049', label: '图片上传上限（MB）', type: '数字', length: '1–1024', required: '否', note: '封面、证书与成果等图片类上传的统一上限，默认 10MB', constraints: { min: 1, max: 1024 } },
           { id: 'FD-SYSTEM-050', label: '文档上传上限（MB）', type: '数字', length: '1–1024', required: '否', note: 'PDF、Word、PPT 等文档类上传的统一上限，默认 50MB；合同签署件按本项校验', constraints: { min: 1, max: 1024 } },
           { id: 'FD-SYSTEM-051', label: '视频上传上限（MB）', type: '数字', length: '1–10240', required: '否', note: '视频课程与教学视频上传的统一上限，默认 500MB', constraints: { min: 1, max: 10240 } },
@@ -35,7 +35,7 @@ export const SYSTEM_FIELD_SPEC = {
         ] }
       ],
       notes: [
-        '保存前校验数值范围：作业截止 1–720 小时、出勤率与作业提交率 0–100%、最多观看课时 0–999、合同签署截止期限 1–30 天、转场最小间隔 1–120 分钟、跨校区额外预留 0–120 分钟、支付时限 1–1440 分钟、退款窗口 1–30 天、文件规格为正整数、重试次数 1–5 且至少一个重试间隔。',
+        '保存前校验数值范围：作业截止 24–720 小时、出勤率与作业提交率 0–100%、最多观看课时 0–999、合同签署截止期限 1–30 天、转场最小间隔 1–120 分钟、跨校区额外预留 0–120 分钟、支付时限 1–1440 分钟、退款窗口 1–30 天、文件规格为正整数、重试次数 1–5 且至少一个重试间隔。',
         '业务枚举（难度等级、适合年龄、课时类型、课时时长）不在本页维护，统一在「系统管理 → 数据字典」页维护，本页不得出现这些枚举的增删入口。',
         '任一参数超出范围时整体不保存，并提示需要修正的取值区间。',
         '固定规则不提供配置：课表时间轴（每天 08:00–21:00、15 分钟 1 刻度、共 52 格）是本页唯一的固定规则，页面只做只读说明；调整需走变更单。',
@@ -131,6 +131,22 @@ export const SYSTEM_FIELD_SPEC = {
         '禁用后当前有效会话立即失效；账号、关联学员关系、订单、报名、学习进度与考勤等历史数据全部保留。',
         '账号状态与学员状态分离，禁用账号不改变其关联学员的状态。',
         '手机号、最近登录 IP 等敏感信息按角色脱敏展示，后端接口必须独立校验权限。'
+      ]
+    },
+    'system/my-messages': {
+      groups: [
+        { heading: '我的消息展示字段', fields: [
+          { id: 'FD-SYSTEM-056', label: '消息标题', type: '只读', length: '—', required: '系统展示', note: '展示当前后台账号收到的通知标题；演示数据标记为演示', constraints: { readOnly: true, system: true } },
+          { id: 'FD-SYSTEM-057', label: '消息类型', type: '只读', length: '—', required: '系统展示', note: '展示通知所属业务类型，不在本页编辑', constraints: { readOnly: true, system: true } },
+          { id: 'FD-SYSTEM-058', label: '关联班级', type: '只读', length: '—', required: '系统展示', note: '展示消息关联的班级，没有关联对象时显示短横线', constraints: { readOnly: true, system: true } },
+          { id: 'FD-SYSTEM-059', label: '接收时间', type: '只读', length: 'YYYY-MM-DD HH:mm', required: '系统展示', note: '展示消息发送或创建时间', constraints: { readOnly: true, system: true } },
+          { id: 'FD-SYSTEM-060', label: '消息状态', type: '只读', length: '未读 / 已读', required: '系统展示', note: '按当前账号的消息接收记录展示阅读状态', constraints: { readOnly: true, system: true } }
+        ] }
+      ],
+      notes: [
+        '仅展示当前后台账号作为接收人的业务消息；消息模板与推送记录不在本页重复维护。',
+        '消息用于知会和留痕，不承载审批、确认、发布等处理动作；需要处理的事项统一进入“我的待办”。',
+        '消息接收范围按通知事件生成时冻结的接收人快照确定，当前账号不在接收范围时不展示。'
       ]
     }
   }

@@ -138,7 +138,8 @@ export const STATE_MACHINES = [
     "object": "班级结业",
     "diagram": false,
     "pages": [
-      "academic/graduation"
+      "academic/graduation",
+      "academic/certificates"
     ],
     "states": [
       [
@@ -190,25 +191,14 @@ export const STATE_MACHINES = [
         "approved",
         "已通过",
         true
-      ],
-      [
-        "cancelled",
-        "已取消结业",
-        true
       ]
     ],
     "transitions": [
       [
         "审核中",
-        "审核通过",
+        "确认结业",
         "已通过",
         "教务主管"
-      ],
-      [
-        "审核中",
-        "退款、退学或报名取消",
-        "已取消结业",
-        "系统、教务主管"
       ]
     ]
   },
@@ -221,150 +211,21 @@ export const STATE_MACHINES = [
     ],
     "states": [
       [
-        "draft",
-        "草稿",
+        "unpublished",
+        "未发布",
         false
       ],
       [
         "published",
         "已发布",
         false
-      ],
-      [
-        "recalled",
-        "已撤回",
-        false
       ]
     ],
     "transitions": [
       [
-        "草稿",
+        "未发布",
         "发布",
         "已发布",
-        "教务主管"
-      ],
-      [
-        "已发布",
-        "撤回（填原因）",
-        "已撤回",
-        "教务主管"
-      ],
-      [
-        "已撤回",
-        "修订后重新发布",
-        "已发布",
-        "教务主管"
-      ]
-    ]
-  },
-  {
-    "id": "SM-REPORT-GENERATION",
-    "object": "报告生成",
-    "diagram": true,
-    "pages": [
-      "academic/reports"
-    ],
-    "states": [
-      [
-        "pending",
-        "待生成",
-        false
-      ],
-      [
-        "generating",
-        "生成中",
-        false
-      ],
-      [
-        "generated",
-        "已生成",
-        true
-      ],
-      [
-        "failed",
-        "生成失败",
-        false
-      ]
-    ],
-    "transitions": [
-      [
-        "待生成",
-        "任务调度",
-        "生成中",
-        "系统"
-      ],
-      [
-        "生成中",
-        "生成成功",
-        "已生成",
-        "系统"
-      ],
-      [
-        "生成中",
-        "生成或存储异常",
-        "生成失败",
-        "系统"
-      ],
-      [
-        "生成失败",
-        "人工重试",
-        "生成中",
-        "教务主管"
-      ]
-    ]
-  },
-  {
-    "id": "SM-CERTIFICATE-GENERATION",
-    "object": "证书生成",
-    "diagram": true,
-    "pages": [
-      "academic/graduation"
-    ],
-    "states": [
-      [
-        "pending",
-        "待生成",
-        false
-      ],
-      [
-        "generating",
-        "生成中",
-        false
-      ],
-      [
-        "generated",
-        "已生成",
-        true
-      ],
-      [
-        "failed",
-        "生成失败",
-        false
-      ]
-    ],
-    "transitions": [
-      [
-        "待生成",
-        "任务调度",
-        "生成中",
-        "系统"
-      ],
-      [
-        "生成中",
-        "生成成功",
-        "已生成",
-        "系统"
-      ],
-      [
-        "生成中",
-        "生成或存储异常",
-        "生成失败",
-        "系统"
-      ],
-      [
-        "生成失败",
-        "人工重试",
-        "生成中",
         "教务主管"
       ]
     ]

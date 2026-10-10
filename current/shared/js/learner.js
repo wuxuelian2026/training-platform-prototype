@@ -4,7 +4,7 @@ import { mountPageHelp } from './page-help.js';
 import { toLocalDateTimeString, toLocalMonthString } from './date-utils.js';
 import { mountMobileSettings } from './mobile-settings.js';
 import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
-import { accountStudents, demoId, demoTime, fileSpecSettings, getCurrentAccountId, paymentTimeoutSettings, readDemoState, subscribeDemoState, transitionVideoEntitlement, upsertDemoRecord, updateDemoRecord, videoRefundSettings, writeDemoState } from './demo-store.js';
+import { accountStudents, demoId, demoTime, fileSpecSettings, getCurrentAccountId, paymentTimeoutSettings, readDemoState, refundSettings, subscribeDemoState, transitionVideoEntitlement, upsertDemoRecord, updateDemoRecord, writeDemoState } from './demo-store.js';
 import { DEMO_NOW, DEMO_TODAY, demoDateTime } from './demo-clock.js';
 import { classSeed } from './class-seed.js';
 import { graduationSeed } from './graduation-seed.js';
@@ -76,7 +76,7 @@ const demo = {
   students: [{ id: 'student-001', name: '林知夏', gender: '女', birthMonth: '2017-05', relation: '女儿' }, { id: 'student-002', name: '林知远', gender: '男', birthMonth: '2015-10', relation: '儿子' }],
   courses: [
     { id: 'COURSE-CR-2026-0002', type: 'video', objectType: 'course', name: '声乐演唱技巧', teacher: '陈晨', category: '音乐表演', discipline: '音乐', field: '音乐表演', professional: '声乐演唱', level: '中级', age: '成人', hours: 12, price: 1280, progress: 45, chapter: '第3章 · 作品演唱', status: '可购买', intro: '从发声、气息、共鸣到作品演唱，建立清晰、可反复练习的声乐训练路径。', detail: ['课程从呼吸与发声基础开始，逐步进入共鸣位置、咬字处理和作品表达，适合已有基础、希望系统提升演唱能力的学员。', '每节课包含教师示范、训练重点和课后练习建议，可按自己的节奏重复观看。'], outline: [{ title: '第1章 · 发声基础', note: '4课时' }, { title: '第2章 · 气息与共鸣', note: '4课时' }, { title: '第3章 · 作品演唱', note: '4课时' }] },
-    ...VIDEO_DEMO_COURSES.map((course) => ({ id: course.id, type: 'video', objectType: 'course', name: course.name, teacher: course.teacher, category: course.major, discipline: course.major, field: course.major, professional: course.major, level: course.difficulty, age: course.ages.join('、'), hours: course.hours, price: Number(course.price), progress: 0, status: '可购买', intro: `围绕${course.name}的核心内容设计分段视频课程。`, detail: [`课程包含教师示范、重点讲解与课后练习，适合按自己的节奏反复学习。`], outline: course.outline.map((chapter) => ({ title: chapter.name, note: `${chapter.lessons.length}课时` })) }))
+    ...VIDEO_DEMO_COURSES.map((course) => ({ id: course.id, type: 'video', objectType: 'course', name: course.name, teacher: course.teacher, category: course.major, discipline: course.major, field: course.major, professional: course.major, level: course.difficulty, age: course.ages.join('、'), hours: course.hours, price: Number(course.price), progress: 0, status: '可购买', intro: `围绕${course.name}的核心内容设计分段视频课程。`, detail: [`课程包含教师示范、重点讲解与课后练习，适合按自己的节奏反复学习。`], chapters: course.outline.map((chapter) => ({ ...chapter, title: chapter.name, note: `${chapter.lessons.length}课时` })), outline: course.outline.map((chapter) => ({ ...chapter, title: chapter.name, note: `${chapter.lessons.length}课时` })) }))
   ],
   classOptions: learnerClassCourses,
   // CR-2026-022 §2.3：名师数据只保留展示字段，取值来自教师档案
@@ -720,6 +720,33 @@ function hasPurchasedVideo(item) {
   return state.orders.some(order => order.accountId === state.accountId && order.courseId === item.id && order.status === '已支付' && !['处理中', '退款中'].includes(order.refundStatus));
 }
 function videoLessonLink(item, index, preview = false) { return `/learner/pages/video.html?courseId=${encodeURIComponent(item.id)}&chapter=${index}${preview ? '&preview=1' : ''}`; }
+function videoLessonsOf(item) {
+  const chapters = Array.isArray(item?.chapters) && item.chapters.length ? item.chapters : (item?.outline || []);
+  const lessons = [];
+  chapters.forEach((chapter, chapterIndex) => {
+    const rows = Array.isArray(chapter.lessons) && chapter.lessons.length ? chapter.lessons : [{ name: chapter.title || chapter.name, duration: 0 }];
+    rows.forEach((lesson, lessonIndex) => lessons.push({ ...lesson, chapterIndex, lessonIndex, chapterTitle: chapter.title || chapter.name }));
+  });
+  return lessons;
+}
+function courseOutlineMarkup(item, { playable = false, purchased = false } = {}) {
+  const chapters = Array.isArray(item?.chapters) && item.chapters.length ? item.chapters : (item?.outline || []);
+  if (!chapters.length) return '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
+  let lessonOffset = 0;
+  return `<div class="mp-course-detail-outline">${chapters.map((chapter, chapterIndex) => {
+    const lessons = Array.isArray(chapter.lessons) && chapter.lessons.length ? chapter.lessons : [];
+    const chapterStart = lessonOffset;
+    lessonOffset += lessons.length;
+    const chapterBody = lessons.length ? `<div class="mp-course-detail-lessons">${lessons.map((lesson, lessonIndex) => {
+      const lessonIndexGlobal = chapterStart + lessonIndex;
+      const preview = playable && item.preview === '允许试看' && lessonIndexGlobal === 0 && !purchased;
+      const available = playable && (purchased || preview);
+      const content = `<span class="mp-course-detail-lesson-index">${String(lessonIndex + 1).padStart(2, '0')}</span><span><strong>${esc(lesson.name || `第${lessonIndex + 1}课时`)}</strong><small>${esc(lesson.kind || '')}${lesson.duration ? ` · ${lesson.duration}分钟` : ''}</small></span>${available ? (preview ? pill('免费试听', 'green') : '<span class="mp-course-detail-play" aria-hidden="true">›</span>') : playable ? pill('购买后学习', 'gray') : ''}`;
+      return available ? `<a class="mp-course-detail-lesson is-playable" href="${videoLessonLink(item, lessonIndexGlobal, preview)}">${content}</a>` : `<div class="mp-course-detail-lesson${playable ? ' is-locked' : ''}">${content}</div>`;
+    }).join('')}</div>` : '';
+    return `<details class="mp-course-detail-chapter-group" ${chapterIndex === 0 ? 'open' : ''}><summary><span class="mp-course-detail-index">${String(chapterIndex + 1).padStart(2, '0')}</span><span class="mp-course-detail-chapter-copy"><strong>${esc(chapter.title || chapter.name)}</strong><small>${esc(chapter.note || chapter.desc || (lessons.length ? `${lessons.length}课时` : ''))}</small></span><span aria-hidden="true">⌄</span></summary>${chapterBody}</details>`;
+  }).join('')}</div>`;
+}
 function courseTeacherSection(item) {
   // 面授分支不展示教师板块：面授课程档案上的人是申报教师，真正上课的教师属于班级，
   // 课程级不借用任一班级的授课教师。视频课程才展示课程档案对应的教师卡片。
@@ -734,7 +761,7 @@ function renderOfflineCourseDetail(item) {
   const detailTab = params.get('tab') === 'outline' ? 'outline' : 'intro';
   const detailParagraphs = (item.detail || [item.intro]).filter(Boolean).map(text => `<p>${esc(text)}</p>`).join('') || '<p class="mp-muted">课程介绍暂未维护。</p>';
   const outline = Array.isArray(item.outline) ? item.outline : [];
-  const outlineContent = outline.length ? `<div class="mp-course-detail-outline">${outline.map((chapter, index) => `<div class="mp-course-detail-chapter"><span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></div>`).join('')}</div>` : '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
+  const outlineContent = courseOutlineMarkup(item);
   const recommendation = item.recommendation ? `<p class="mp-course-detail-subtitle">${esc(item.recommendation)}</p>` : '';
   layout(stack(
     `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${courseCoverTags(item, '面授课程', item.status, item.bookable ? 'green' : 'gray')}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">课程档案</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2></div>${recommendation}<dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div><div><dt>适合年龄</dt><dd>${esc(item.age)}</dd></div><div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div><dt>可报班级</dt><dd>${esc(item.bookableClassCount)}个</dd></div></dl></div></section>`,
@@ -760,15 +787,7 @@ function renderCourseDetail(item) {
   const detailParagraphs = item.detailHtml ? richTextBody(item.detailHtml) : (item.detail || [item.intro]).filter(Boolean).map(text => `<p>${esc(text)}</p>`).join('');
   const hasOutline = Array.isArray(item.outline) && item.outline.length > 0;
   const purchased = hasPurchasedVideo(item);
-  const outlineContent = hasOutline ? `<div class="mp-course-detail-outline">${item.outline.map((chapter, index) => {
-    if (isClass) return `<div class="mp-course-detail-chapter"><span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></div>`;
-    // RM-F-05: preview follows the product policy — 关闭试看 locks every lesson, 开启试看 opens lesson 1 only.
-    const preview = item.preview === '允许试看' && index === 0 && !purchased;
-    const available = purchased || preview;
-    const action = preview ? pill('免费试听', 'green') : purchased ? '<span class="mp-course-detail-play" aria-hidden="true">›</span>' : pill('购买后学习', 'gray');
-    const content = `<span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><span class="mp-course-detail-chapter-copy"><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></span>${action}`;
-    return available ? `<a class="mp-course-detail-chapter is-playable" href="${videoLessonLink(item, index, preview)}">${content}</a>` : `<div class="mp-course-detail-chapter is-locked" aria-disabled="true">${content}</div>`;
-  }).join('')}</div>` : '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
+  const outlineContent = hasOutline ? courseOutlineMarkup(item, { playable: !isClass, purchased }) : '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
   const recommendation = item.recommendation ? `<p class="mp-course-detail-subtitle">${esc(item.recommendation)}</p>` : '';
 
   layout(stack(
@@ -1054,7 +1073,7 @@ function classMaterialView(item) {
   // I1-CLASS-DETAIL-21：课程简介为后台录入内容（缺省用约 200 字占位文本），含课程图片占位；默认收起。
   const introSection = `<section class="mp-class-detail-block"><div class="mp-section-head"><h3>课程简介</h3><div class="mp-class-fold-actions"><button type="button" class="mp-class-fold-toggle" data-class-fold="intro" aria-expanded="false">展开</button></div></div><div class="mp-class-fold-body is-collapsed" id="class-fold-intro"><div class="mp-class-fold-clamp mp-rich-content mp-class-detail-intro">${introBody}</div><div class="mp-class-intro-figure mp-class-fold-hide" role="img" aria-label="课程图片占位，实际图片由后台录入"><span>课程图片（后台录入）</span></div></div></section>`;
   // I1-CLASS-DETAIL-21：课程大纲同样默认收起。
-  const outline = outlineSource.length ? `<section class="mp-class-detail-block"><div class="mp-section-head"><h3>课程大纲</h3><div class="mp-class-fold-actions"><span class="mp-muted">共${outlineSource.length}章</span><button type="button" class="mp-class-fold-toggle" data-class-fold="outline" aria-expanded="false">展开</button></div></div><div class="mp-class-fold-body is-collapsed" id="class-fold-outline"><div class="mp-course-detail-outline mp-class-fold-hide">${outlineSource.map((chapter, index) => `<div class="mp-course-detail-chapter"><span class="mp-course-detail-index">${String(index + 1).padStart(2, '0')}</span><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '')}</small></div>`).join('')}</div></div></section>` : '';
+  const outline = outlineSource.length ? `<section class="mp-class-detail-block"><div class="mp-section-head"><h3>课程大纲</h3><div class="mp-class-fold-actions"><span class="mp-muted">共${outlineSource.length}章</span><button type="button" class="mp-class-fold-toggle" data-class-fold="outline" aria-expanded="false">展开</button></div></div><div class="mp-class-fold-body is-collapsed" id="class-fold-outline"><div class="mp-class-fold-hide">${courseOutlineMarkup({ ...item, outline: outlineSource, chapters: outlineSource })}</div></div></section>` : '';
   return `${introSection}${outline}`;
 }
 // 演示作业口径集中一处：学员端作业记录尚未接入教务作业表，接入后只改这里。
@@ -1124,7 +1143,8 @@ function classLessonsView(item, sessions, { scheduleOnly = false, ended = false 
     const label = entry.homework ? homeworkEntryLabel(entry.homework.submission?.status) : '';
     // 课次行整体已经是「进课次详情」的大点击区，行尾再放一个齐平按钮会形成两个相邻且权重接近的点击目标；
     // 作业改成独立浅底行动条并整条可点，用底色把「课次」和「这份作业」分成两层。
-    const homeworkCard = !scheduleOnly && entry.homework
+    // 待上课课次不展示作业；作业在课次开始后才对学员开放查看与提交。
+    const homeworkCard = !scheduleOnly && entry.attendance.started && entry.homework
       ? `<a class="mp-class-lesson-hw" href="${homeworkDetailHref(entry.homework.homework.id, item.id)}" aria-label="作业 ${esc(entry.homework.homework.title)}，${esc(label)}"><span class="mp-class-lesson-hw-body"><strong>${esc(entry.homework.homework.title)}</strong><small>课后作业 · 截止 ${esc(entry.homework.homework.deadline)}${entry.homework.submission?.review?.comment ? ` · 教师评语：${esc(entry.homework.submission.review.comment)}` : ''}</small></span><span class="mp-class-lesson-hw-go">${esc(label)} ›</span></a>`
       : '';
     // I1-CLASS-DETAIL-20：课次行可点，打开课次详情独立页（含课次状态、出勤结果、作业与教师评语）。
@@ -1264,7 +1284,10 @@ function renderLessonDetail(item) {
   const execution = (readDemoState().lessonExecutions || []).find((row) => row.classId === item.id && Number(row.sessionIndex) === Number(session.index)) || null;
   const time = `${session.startTime || session.start || '—'}–${session.endTime || session.end || '—'}`;
   const facts = [['课程名称', item.courseName || item.name || '—'], ['上课班级', item.className || item.name || '—'], ['课次进度', `共 ${sessions.length} 次课 · 本次为第 ${index + 1} 次`], ['课次状态', entry.status], ['上课时间', `${session.date} ${session.weekday || ''} ${time}`], ['上课地点', sessionRoomText(session, item)], ['授课教师', `${item.teacher}老师`], ...(started ? [['我的出勤', entry.attendance.label]] : [])];
-  const homeworkSection = !started ? '<p class="mp-muted">本节课尚未开始，暂无出勤与作业记录。</p>' : homework ? `<section class="mp-class-detail-block"><h3>课后作业</h3><dl class="mp-dialog-rows"><div><dt>作业标题</dt><dd>${esc(homework.title)}</dd></div><div><dt>作业状态</dt><dd>${esc(submission?.status || '未提交')}</dd></div><div><dt>截止时间</dt><dd>${esc(homework.deadline)}</dd></div><div><dt>提交格式</dt><dd>${esc((homework.formats || []).join('、') || '以作业要求为准')}</dd></div></dl>${homework.description ? `<div class="mp-dialog-comment"><span>作业要求</span><p>${esc(homework.description)}</p></div>` : ''}${submission?.review?.comment ? `<div class="mp-dialog-comment"><span>教师评语</span><p>${esc(submission.review.comment)}</p></div>` : ''}<a class="mp-button secondary full" href="${relativePath(homeworkDetailHref(homework.id, item.id))}">${homeworkEntryLabel(submission?.status)}</a></section>` : '<p class="mp-muted">本节课没有布置作业。</p>';
+  const homeworkAttachment = submission?.attachments?.[0]?.name || '未提交附件';
+  const hasLearnerSubmission = Boolean(submission && (submission.content || submission.text || submission.attachments?.length || submission.fileName));
+  const learnerSubmissionEcho = hasLearnerSubmission ? `<div class="mp-dialog-comment"><span>我的提交</span>${submission.content || submission.text ? `<p>${esc(submission.content || submission.text)}</p>` : ''}${submission.attachments?.length || submission.fileName ? `<small>附件：${esc(homeworkAttachment)}</small>` : ''}</div>` : '';
+  const homeworkSection = !started ? '<p class="mp-muted">本节课尚未开始，暂无出勤与作业记录。</p>' : homework ? `<section class="mp-class-detail-block"><h3>课后作业</h3><dl class="mp-dialog-rows"><div><dt>作业标题</dt><dd>${esc(homework.title)}</dd></div><div><dt>作业状态</dt><dd>${esc(submission?.status || '未提交')}</dd></div><div><dt>截止时间</dt><dd>${esc(homework.deadline)}</dd></div><div><dt>提交格式</dt><dd>${esc((homework.formats || []).join('、') || '以作业要求为准')}</dd></div>${submission ? `<div><dt>提交时间</dt><dd>${esc(submission.submittedAt || '草稿')}</dd></div>` : ''}</dl>${homework.description ? `<div class="mp-dialog-comment"><span>作业要求</span><p>${esc(homework.description)}</p></div>` : ''}${learnerSubmissionEcho}${submission?.review?.comment ? `<div class="mp-dialog-comment"><span>教师评语</span><p>${esc(submission.review.comment)}</p></div>` : ''}</section>` : '<p class="mp-muted">本节课没有布置作业。</p>';
   layout(stack(`<section class="mp-class-detail-block"><div class="mp-lesson-dialog-head"><div><span class="mp-muted">课次详情</span><h2>第 ${index + 1} 次课 · ${esc(session.date)} ${esc(session.weekday || '')}</h2></div>${pill(entry.status, lessonStatusTone(entry.status))}</div><dl class="mp-dialog-rows">${facts.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl></section>`, homeworkSection, started ? `<section class="mp-class-detail-block"><h3>教师课堂记录</h3><p class="mp-dialog-record">${esc(execution?.teachingRecord || '教师暂未填写本节课教学记录。')}</p></section>` : '', `<a class="mp-button secondary full" href="${relativePath(`/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.id)}&tab=lessons`)}">返回班级详情</a>`));
   document.title = `课次详情 · 第${index + 1}次`;
 }
@@ -1340,7 +1363,10 @@ function homeworkRecordsFor(classId = '') {
 // 2026-09-28 口径：学员端作业链路为「班级详情 → 课次 → 本人作业详情」。作业详情页只服务单条作业，
 // 不再提供「本班作业列表」作为中间页——课次段已按课次逐条列出作业，列表页只是同一批信息的更少字段。
 function homeworkDetailHref(homeworkId, classId) {
-  return `/learner/pages/homework.html?homeworkId=${encodeURIComponent(homeworkId)}&classId=${encodeURIComponent(classId)}`;
+  const homework = listHomework({ classId }).find((item) => item.id === homeworkId);
+  return homework
+    ? `/learner/pages/lesson-detail.html?courseId=${encodeURIComponent(classId)}&lesson=${encodeURIComponent(homework.lessonIndex)}&section=homework`
+    : `/learner/pages/homework.html?homeworkId=${encodeURIComponent(homeworkId)}&classId=${encodeURIComponent(classId)}`;
 }
 // 入口文案跟随本人提交状态，避免已点评的作业仍写「去提交」。
 function homeworkEntryLabel(status) {
@@ -1374,8 +1400,13 @@ function homeworkFileAllowed(homework, file) {
   const accept = homeworkAcceptAttr(homework);
   if (!accept) return false;
   const name = String(file?.name || '').toLowerCase();
-  return accept.split(',').some((rule) => (rule.endsWith('/*')
-    ? String(file?.type || '').startsWith(rule.replace('/*', '/'))
+  const type = String(file?.type || '').toLowerCase();
+  return accept.split(',').some((rule) => (rule === 'video/*'
+    ? type.startsWith('video/') || /\.(mp4|mov|avi|m4v|webm)$/i.test(name)
+    : rule === 'image/*'
+      ? type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(name)
+      : rule === 'audio/*'
+        ? type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg)$/i.test(name)
     : name.endsWith(rule.toLowerCase())));
 }
 function homeworkTextAllowed(homework) {
@@ -1416,10 +1447,14 @@ function renderHomeworkPage() {
   const lockNote = overdue ? `已过截止时间（${esc(homework.deadline)}），本次作业只读，不支持迟交。` : status === '已提交' ? '作业已提交，当前为只读查看状态，等待教师点评。' : '教师已点评，本次作业为只读查看状态。';
   const fileSpec = fileSpecSettings();
   const fileLimitText = `图片${fileSpec.imageMb}MB、视频${fileSpec.videoMb}MB、文档${fileSpec.documentMb}MB`;
+  const allowsText = homeworkTextAllowed(homework);
+  const allowsAttachment = Boolean(acceptAttr);
+  const textField = allowsText ? `<div class="mp-field"><label for="homework-text">文字说明</label><textarea id="homework-text" placeholder="请输入本次作业说明">${esc(submission?.content || submission?.text || '')}</textarea></div>` : '';
+  const attachmentField = allowsAttachment ? `<div class="mp-field"><label for="homework-file">附件</label><input id="homework-file" type="file" accept="${acceptAttr}"><small class="mp-muted">允许格式：${esc((homework.formats || []).filter((format) => format !== '文字').join('、'))}；${fileLimitText}；演示原型只记录文件名，不上传真实文件。</small><span id="homework-file-name" class="mp-muted">${attachmentName ? `已选择：${esc(attachmentName)}` : '尚未选择附件'}</span></div>` : '';
   const history = Array.isArray(submission?.history) && submission.history.length ? card(`<div class="mp-section-head"><h3>提交记录</h3><span>${submission.history.length + 1} 次</span></div><div class="mp-list">${[...submission.history, submission].map((row, index) => `<div class="mp-item"><div><strong>第${row.version || index + 1}次提交</strong><small>${esc(row.submittedAt || row.updatedAt || '草稿')} · ${esc(row.status)}</small></div>${row.review?.comment ? `<span class="mp-muted">已点评</span>` : ''}</div>`).join('')}</div>`) : '';
   const submissionPanel = locked && (status === '已提交' || status === '已点评')
     ? card(`<section class="mp-homework-readonly"><div class="mp-section-head"><h3>提交详情</h3><span>${esc(submission?.submittedAt || '已提交')}</span></div><p class="mp-notice">${lockNote}</p><dl class="mp-homework-readonly-facts"><div><dt>提交状态</dt><dd>${pill(status, statusTone)}</dd></div><div><dt>提交时间</dt><dd>${esc(submission?.submittedAt || '—')}</dd></div><div><dt>更新时间</dt><dd>${esc(submission?.updatedAt || '—')}</dd></div></dl><div class="mp-homework-readonly-block"><strong>文字说明</strong><p>${esc(submission?.content || submission?.text || '未填写文字说明')}</p></div><div class="mp-homework-readonly-block"><strong>附件</strong><p>${attachmentName ? esc(attachmentName) : '未提交附件'}</p></div></section>`)
-    : card(`<form id="homework-form" class="mp-form"><div class="mp-section-head"><h3>提交作业</h3><span>尚未提交</span></div>${draftNotice}<div class="mp-field"><label for="homework-text">文字说明</label><textarea id="homework-text" placeholder="请输入本次作业说明">${esc(submission?.content || submission?.text || '')}</textarea></div><div class="mp-field"><label for="homework-file">附件</label><input id="homework-file" type="file" ${acceptAttr ? `accept="${acceptAttr}"` : ''}><small class="mp-muted">${acceptAttr ? `允许格式：${esc((homework.formats || []).join('、'))}；${fileLimitText}；演示原型只记录文件名，不上传真实文件。` : '本次作业仅接受文字说明，无需上传附件。'}</small><span id="homework-file-name" class="mp-muted">${attachmentName ? `已选择：${esc(attachmentName)}` : '尚未选择附件'}</span></div><p id="homework-error" class="mp-notice" hidden></p><div class="mp-actions"><button type="button" class="mp-button secondary" data-homework-action="save">保存草稿</button><button type="submit" class="mp-button">${status === '草稿' ? '提交作业' : '提交作业'}</button></div></form>`);
+    : card(`<form id="homework-form" class="mp-form"><div class="mp-section-head"><h3>提交作业</h3><span>尚未提交</span></div>${draftNotice}${textField}${attachmentField}<p id="homework-error" class="mp-notice" hidden></p><div class="mp-actions"><button type="button" class="mp-button secondary" data-homework-action="save">保存草稿</button><button type="submit" class="mp-button">提交作业</button></div></form>`);
   layout(stack(card(`<div class="mp-pills">${pill(status, statusTone)}${pill(homework.required ? '必交' : '选交', 'gray')}</div><h2 style="margin-top:12px">${esc(homework.title)}</h2><p>${esc(homework.description)}</p><dl class="mp-homework-facts"><div><dt>所属班级</dt><dd>${esc(course(homework.classId)?.name || homework.classId)}</dd></div><div><dt>第几次课</dt><dd>第${esc(homework.lessonIndex)}次课</dd></div><div><dt>截止时间</dt><dd>${esc(homework.deadline)}</dd></div><div><dt>提交格式</dt><dd>${esc((homework.formats || []).join('、'))}</dd></div></dl></div>`), submissionPanel, status === '已提交' || status === '已点评' ? card(`<div class="mp-section-head"><h3>教师点评</h3>${pill(status === '已点评' ? '已点评' : '待点评', status === '已点评' ? 'green' : 'amber')}</div><p>${esc(submission?.review?.comment || '教师尚未完成批改。')}</p>`) : '', history));
   const fileInput = document.querySelector('#homework-file'); fileInput?.addEventListener('change', event => { const file = event.target.files[0]; if (file) document.querySelector('#homework-file-name').textContent = `已选择：${file.name}`; });
   document.querySelector('#homework-form')?.addEventListener('submit', event => submitLearnerHomework(event, false, homework, submission));
@@ -1496,6 +1531,31 @@ function renderResultsPage() {
   document.querySelector('#report-status').addEventListener('change', event => { state.reportStatus = event.target.value; saveState(); renderResultsPage(); });
 }
 function paymentStatusLabel(order) { return order?.status === '已取消' && order.cancelType === 'timeout' ? '已取消（超时）' : order?.status || '待支付'; }
+// 学员端将支付事实与退款处理进度分开展示；退款单的状态优先于订单兼容字段。
+function learnerPaymentStatus(order) {
+  if (order?.status === '待支付') return '待付款';
+  if (order?.status === '已取消') return order.cancelType === 'timeout' ? '已取消（超时）' : '已取消';
+  if (['已支付', '退款中', '已退款'].includes(order?.status)) return '已付款';
+  return '待付款';
+}
+function learnerRefundRecord(order) {
+  const records = order ? refundsForOrder(order.id) : [];
+  return records[records.length - 1] || null;
+}
+function learnerRefundStatus(order) {
+  if (!order) return '';
+  const record = learnerRefundRecord(order);
+  const source = String(record?.status || order.refundStatus || '');
+  if (order.status === '已退款' || source === '已退款' || source.includes('已完成')) return '已退款';
+  if (source === '已拒绝' || source.includes('拒绝') || source.includes('未通过')) return '退款申请未通过';
+  if (source === '退款异常' || source.includes('异常') || source.includes('失败')) return '退款处理异常';
+  if (source === '待审批' || source.includes('待审核') || source.includes('待审批')) return '退款申请处理中';
+  if (order.status === '退款中' || source === '退款中' || source.includes('退款处理中') || source.includes('处理中')) return '退款处理中';
+  return '';
+}
+function learnerPaymentTone(order) { return learnerPaymentStatus(order) === '已付款' ? 'green' : learnerPaymentStatus(order).startsWith('已取消') ? 'gray' : 'amber'; }
+function learnerRefundTone(status) { return status === '已退款' ? 'green' : status === '退款处理异常' ? 'red' : 'amber'; }
+function hasLearnerRefund(order) { return Boolean(learnerRefundStatus(order)); }
 function videoWatchedLessonCount(order, item) {
   const progress = readDemoState().progress?.[`${state.accountId}-${item.id}`] || {};
   const ids = new Set([...(Array.isArray(progress.chapterDone) ? progress.chapterDone : []), ...Object.entries(progress.positions || {}).filter(([, seconds]) => Number(seconds) > 0).map(([id]) => id)]);
@@ -1503,15 +1563,17 @@ function videoWatchedLessonCount(order, item) {
   return [...ids].filter(id => /^chapter-\d+$/.test(id) && (!total || Number(id.slice(8)) <= total)).length;
 }
 function videoRefundEligibility(order, item) {
-  const config = videoRefundSettings();
+  const config = refundSettings();
   if (!order || order.status !== '已支付' || !item || item.type !== 'video') return { eligible: false, watchedLessons: 0, config, reason: '仅已支付视频订单可申请退款。' };
   const paidAt = order.paidAt || order.createdAt;
   const paidTime = paidAt ? new Date(String(paidAt).replace(' ', 'T')).getTime() : NaN;
   const ageDays = Number.isFinite(paidTime) ? Math.max(0, (demoDateTime(DEMO_TODAY).getTime() - paidTime) / 86400000) : Infinity;
   const watchedLessons = videoWatchedLessonCount(order, item);
-  if (!Number.isFinite(paidTime) || ageDays > config.windowDays) return { eligible: false, watchedLessons, ageDays, config, reason: `已超过购课${config.windowDays}日退款期限。` };
-  if (watchedLessons > config.maxLessons) return { eligible: false, watchedLessons, ageDays, config, reason: `已观看${watchedLessons}课时，超过最多${config.maxLessons}课时的退款条件。` };
-  return { eligible: true, watchedLessons, ageDays, config, reason: `购课${Math.floor(ageDays)}日，已观看${watchedLessons}课时，可申请全额退款。` };
+  if (!Number.isFinite(paidTime) || (config.windowDays > 0 && ageDays > config.windowDays)) return { eligible: false, watchedLessons, ageDays, config, reason: `已超过购课${config.windowDays}日退款期限。` };
+  const totalLessons = Array.isArray(item.outline) && item.outline.length ? item.outline.length : Number(item.lessons || item.hours || 0);
+  const completedPercent = totalLessons > 0 ? watchedLessons / totalLessons * 100 : 0;
+  if (completedPercent > config.selfMaxCompletedPercent) return { eligible: false, watchedLessons, completedPercent, ageDays, config, reason: `已消课${Math.round(completedPercent)}%，超过${config.selfMaxCompletedPercent}%的退款条件。` };
+  return { eligible: true, watchedLessons, completedPercent, ageDays, config, reason: `购课${Math.floor(ageDays)}日，已消课${Math.round(completedPercent)}%，可申请全额退款。` };
 }
 // 视频退款的状态迁移同时驱动学习授权（字典 SM-VIDEO-ENTITLEMENT）：
 // 申请退款即冻结，失败或超时解冻，退款完成置已失效。
@@ -1526,7 +1588,26 @@ function syncVideoEntitlementForRefund(order, item, nextStatus, reason) {
 // 学员端自助申请退款（2026-09-24 定案：面授与视频都允许学员自助发起）：
 // 列表与详情共用同一入口，统一生成共享退款单进入后台交易中心审批；
 // 面授消课只用于资格判定，视频沿用观看资格；两类订单均为一单一次全额终结退款。
-function applyRefundApplication(orderId) {
+function openRefundReasonDialog(orderId, onSubmit) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'mp-dialog';
+  dialog.innerHTML = `<form method="dialog" class="mp-dialog-card" data-refund-reason-form><h2>申请退款</h2><p class="mp-dialog-copy">请填写退款原因，提交后将进入后台审批。</p><div class="mp-field"><label for="refund-reason">退款原因</label><textarea id="refund-reason" name="reason" rows="4" maxlength="200" required placeholder="请填写退款原因"></textarea><small class="mp-muted">必填，最多 200 字</small></div><p class="mp-form-error" data-refund-reason-error hidden></p><div class="mp-actions"><button value="cancel" class="mp-button secondary" type="submit">取消</button><button value="confirm" class="mp-button" type="submit">提交退款申请</button></div></form>`;
+  document.body.append(dialog);
+  const form = dialog.querySelector('[data-refund-reason-form]');
+  const error = dialog.querySelector('[data-refund-reason-error]');
+  form.addEventListener('submit', (event) => {
+    if (event.submitter?.value !== 'confirm') { dialog.close(); return; }
+    event.preventDefault();
+    const reason = String(new FormData(form).get('reason') || '').trim();
+    if (!reason) { error.hidden = false; error.textContent = '退款原因必填。'; return; }
+    dialog.close();
+    onSubmit(reason);
+  });
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  dialog.showModal();
+}
+
+function applyRefundApplication(orderId, reason = '') {
   const order = state.orders.find(row => row.id === orderId);
   const item = order ? orderCourse(order) : null;
   if (!order) { toast('未找到该订单', 'error'); return false; }
@@ -1547,13 +1628,11 @@ function applyRefundApplication(orderId) {
     orderId: order.id,
     origin: REFUND_ORIGIN.LEARNER,
     requestedBy: '学员自助申请',
-    reason: item?.type === 'video'
-      ? `视频课程退款：购课${Math.floor(eligibility.ageDays || 0)}日，已观看${eligibility.watchedLessons}课时`
-      : `学员自助申请面授退款：${suggestion?.rule || ''}`,
+    reason,
     channel: order.payMethod || '原路退回'
   });
   if (!result.ok) {
-    toast(result.reason === 'REFUND_ALREADY_OPEN' ? '该订单已有未结退款单，请等待后台处理' : (classRefundMessages[result.reason] || '退款申请提交失败，请联系客服'), 'error');
+    toast(result.reason === 'REFUND_ALREADY_OPEN' ? '该订单已有未结退款单，请等待后台处理' : result.reason === 'REFUND_REASON_REQUIRED' ? '退款原因必填' : (classRefundMessages[result.reason] || '退款申请提交失败，请联系客服'), 'error');
     return false;
   }
   // 订单的演示态与共享态保持一致，订单详情页继续读取同一份状态。
@@ -1724,25 +1803,33 @@ function orderFulfillmentStatus(order, isClass) {
 // 本原型按静态时限文案呈现，不跳秒、不自动关闭，也不在本地改写订单状态；真实实现按服务端 pay_deadline_at 计算剩余时限。
 const ORDER_PAY_WINDOW_HINT = `请在 ${paymentTimeoutSettings().paymentTimeoutMinutes} 分钟内完成支付，超时订单将自动关闭；继续支付会复用当前订单号。`;
 const ORDER_SECTIONS = [
-  { key: 'pending', title: '待处理', statuses: ['待支付', '退款中'], note: '需要你处理的动作' },
-  { key: 'history', title: '历史订单', statuses: ['已支付', '已退款', '已取消'], note: '已完成的交易记录' }
+  { key: 'pending', title: '待付款', note: '需要完成支付', matches: order => order.status === '待支付' },
+  { key: 'refund', title: '退款进度', note: '退款状态跟踪', matches: order => hasLearnerRefund(order) },
+  { key: 'history', title: '交易记录', note: '已付款和已取消订单', matches: order => ['已支付', '已取消'].includes(order.status) && !hasLearnerRefund(order) }
 ];
 function orderPendingHint(order) {
   if (order.status === '待支付') return ORDER_PAY_WINDOW_HINT;
-  if (order.status === '退款中') {
+  const refundStatus = learnerRefundStatus(order);
+  if (refundStatus) {
     const credentials = orderCredentials(order);
+    if (refundStatus === '退款申请未通过') {
+      const record = learnerRefundRecord(order);
+      return `退款申请未通过${record?.rejectReason || record?.remark || order.refundRejectReason ? `：${record?.rejectReason || record?.remark || order.refundRejectReason}` : ''}。`;
+    }
+    if (refundStatus === '退款处理异常') return `退款处理异常${order.refundExceptionReason ? `：${order.refundExceptionReason}` : '，请等待后台处理'}。`;
+    if (refundStatus === '退款申请处理中') return '退款申请已提交，等待后台审核。';
+    if (refundStatus === '已退款') return '退款已完成，款项已按原支付方式退回。';
     return credentials.refundExpectedAt
-      ? `退款进度：${credentials.refundStatus}，预计 ${credentials.refundExpectedAt} 到账。`
-      : `退款进度：${credentials.refundStatus || '处理中'}。`;
+      ? `退款处理中，预计 ${credentials.refundExpectedAt} 到账。`
+      : '退款处理中，到账时间以支付渠道为准。';
   }
   return '';
 }
 // 段内排序：待支付按剩余支付时限升序（时限统一，按创建时间升序等价于最紧急在前），退款中按发起时间倒序。
 function sortPendingOrders(orders) {
-  const paying = orders.filter(order => order.status === '待支付').sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-  const refunding = orders.filter(order => order.status === '退款中').sort((a, b) => (b.refundAt || b.updatedAt || b.createdAt || '').localeCompare(a.refundAt || a.updatedAt || a.createdAt || ''));
-  return [...paying, ...refunding];
+  return [...orders].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
 }
+const sortRefundOrders = (orders) => [...orders].sort((a, b) => (b.refundAt || b.updatedAt || b.createdAt || '').localeCompare(a.refundAt || a.updatedAt || a.createdAt || ''));
 const sortHistoryOrders = (orders) => [...orders].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 function orderCard(order) {
   const item = orderCourse(order);
@@ -1753,7 +1840,7 @@ function orderCard(order) {
   const subjectFact = isClass ? `<div><span>当前学员</span><strong>${esc(student.name)}</strong></div>` : `<div><span>购买账号</span><strong>${esc(purchaseAccount().name)}</strong></div>`;
   const detailLink = `/learner/pages/order-detail.html?orderId=${encodeURIComponent(order.id)}`;
   const videoRefund = !isClass ? videoRefundEligibility(order, item) : { eligible: false };
-  const primary = isPaymentResumable(order)
+  const primary = order.status === '待支付'
     ? `<button class="mp-button mp-order-action" type="button" data-order-action="pay" data-course-id="${item.id}" data-order-id="${order.id}">${order.status === '待支付' ? '去支付' : '继续支付'}</button>`
     : order.status === '已支付' && isClass
       ? `<button class="mp-button secondary mp-order-action" type="button" data-order-action="refund" data-order-id="${order.id}">申请退款</button>`
@@ -1763,38 +1850,54 @@ function orderCard(order) {
   // 学籍异动或退款完成后，订单卡片同步说明该班学籍状态，避免「已退班但订单显示正常」的误读。
   const enrollment = isClass ? (readDemoState().enrollments || []).find(row => row.classId === order.classId && row.studentId === order.studentId) : null;
   const exitHint = enrollment && !isEnrollmentActive(enrollment.status) ? `学籍状态：${enrollment.status}${enrollment.changeReason ? ` · ${enrollment.changeReason}` : ''}` : '';
+  const refundStatus = learnerRefundStatus(order);
   const hint = [orderPendingHint(order), exitHint].filter(Boolean).join('；');
-  return `<article class="mp-order-card"><div class="mp-order-card-head"><div><strong>${esc(item.name)}</strong><small>${isClass ? '面授课程' : '视频课程'} · ${esc(order.id)}</small></div>${pill(paymentStatusLabel(order), orderTone(order.status))}</div>${hint ? `<p class="mp-order-card-hint">${esc(hint)}</p>` : ''}<div class="mp-order-card-facts">${subjectFact}<div><span>${isClass ? '班级' : '课程类型'}</span><strong>${esc(isClass ? item.className : '视频课程')}</strong></div>${isClass ? `<div><span>上课安排</span><strong>${esc(item.campus)} · ${esc(item.schedule)}</strong></div>` : `<div><span>下单时间</span><strong>${esc(times.createdAt)}</strong></div>`}<div><span>${times.paidAt ? '支付时间' : '订单时间'}</span><strong>${esc(times.paidAt || times.createdAt)}</strong></div>${order.paymentReason ? `<div><span>支付说明</span><strong>${esc(order.paymentReason)}</strong></div>` : ''}</div><div class="mp-order-card-footer"><span>实付 <b>${money2(order.amount || item.price)}</b></span><div class="mp-actions">${primary}<a class="mp-button secondary mp-order-action" href="${detailLink}">${order.status === '退款中' ? '查看退款进度' : '查看详情'}</a></div></div></article>`;
+  const statusBadges = `${pill(learnerPaymentStatus(order), learnerPaymentTone(order))}${refundStatus ? pill(refundStatus, learnerRefundTone(refundStatus)) : ''}`;
+  return `<article class="mp-order-card"><div class="mp-order-card-head"><div><strong>${esc(item.name)}</strong><small>${isClass ? '面授课程' : '视频课程'} · ${esc(order.id)}</small></div><div class="mp-pills" aria-label="订单状态">${statusBadges}</div></div>${hint ? `<p class="mp-order-card-hint">${esc(hint)}</p>` : ''}<div class="mp-order-card-facts">${subjectFact}<div><span>${isClass ? '班级' : '课程类型'}</span><strong>${esc(isClass ? item.className : '视频课程')}</strong></div>${isClass ? `<div><span>上课安排</span><strong>${esc(item.campus)} · ${esc(item.schedule)}</strong></div>` : `<div><span>下单时间</span><strong>${esc(times.createdAt)}</strong></div>`}<div><span>${times.paidAt ? '支付时间' : '订单时间'}</span><strong>${esc(times.paidAt || times.createdAt)}</strong></div>${order.paymentReason ? `<div><span>支付说明</span><strong>${esc(order.paymentReason)}</strong></div>` : ''}</div><div class="mp-order-card-footer"><span>实付 <b>${money2(order.amount || item.price)}</b></span><div class="mp-actions">${primary}<a class="mp-button secondary mp-order-action" href="${detailLink}">${refundStatus ? '查看退款进度' : '查看详情'}</a></div></div></article>`;
 }
 function renderOrders() {
   if (!isLoggedIn()) { layout(stack(`<section class="mp-locked"><span class="mp-avatar" aria-hidden="true">单</span><strong>登录后查看我的订单</strong><p>登录后可查看课程交易记录、支付状态和退款进度。</p><a class="mp-button" href="/login.html?redirect=${encodeURIComponent('/learner/pages/orders.html')}">去登录</a></section>`)); return; }
-  // CR-2026-023／CR-2026-026：页签固定为 SM-ORDER 五态 + 全部，取值与列表同源；「全部」为待处理 + 历史订单两段式。
-  const tabs = [['all', '全部'], ['待支付', '待支付'], ['已支付', '已支付'], ['退款中', '退款中'], ['已退款', '已退款'], ['已取消', '已取消']];
+  // 学员端只展示业务可理解的四个入口；支付状态与退款进度分别派生，后台审批/执行状态不直接暴露。
+  const tabs = [['all', '全部'], ['pending', '待付款'], ['paid', '已付款'], ['refund', '退款进度']];
   const orders = state.orders.map(normalizeOrderStatus);
-  layout(stack(card(`<div class="mp-tabs" aria-label="订单状态筛选">${tabs.map(([value, label], index) => `<button class="mp-tab ${index === 0 ? 'active' : ''}" data-order-tab="${value}" type="button">${label}<span>${orders.filter(order => value === 'all' || order.status === value).length}</span></button>`).join('')}</div>`), `<div id="order-list" class="mp-order-list" aria-live="polite"></div>`));
+  const tabMatches = {
+    pending: order => order.status === '待支付',
+    paid: order => order.status === '已支付' && !hasLearnerRefund(order),
+    refund: order => hasLearnerRefund(order)
+  };
+  layout(stack(card(`<div class="mp-tabs" aria-label="订单状态筛选">${tabs.map(([value, label], index) => `<button class="mp-tab ${index === 0 ? 'active' : ''}" data-order-tab="${value}" type="button">${label}<span>${orders.filter(order => value === 'all' || tabMatches[value]?.(order)).length}</span></button>`).join('')}</div>`), `<div id="order-list" class="mp-order-list" aria-live="polite"></div>`));
   const draw = () => {
     const active = document.querySelector('[data-order-tab].active')?.dataset.orderTab || 'all';
     const list = document.querySelector('#order-list');
     if (active !== 'all') {
-      const filtered = sortHistoryOrders(orders.filter(order => order.status === active));
-      list.innerHTML = filtered.length ? filtered.map(orderCard).join('') : `<div class="mp-empty">暂无${active}订单</div>`;
+      const filtered = active === 'pending'
+        ? sortPendingOrders(orders.filter(tabMatches.pending))
+        : active === 'refund'
+          ? sortRefundOrders(orders.filter(tabMatches.refund))
+          : sortHistoryOrders(orders.filter(tabMatches.paid));
+      const emptyLabels = { pending: '待付款', paid: '已付款', refund: '退款进度' };
+      list.innerHTML = filtered.length ? filtered.map(orderCard).join('') : `<div class="mp-empty">暂无${emptyLabels[active]}订单</div>`;
     } else if (!orders.length) {
       list.innerHTML = `<div class="mp-empty"><strong>暂无订单</strong><p>挑选一门课程开始学习吧。</p></div><a class="mp-button secondary full" href="/learner/pages/courses.html">去课程库看看</a>`;
     } else {
       list.innerHTML = ORDER_SECTIONS.map(section => {
         const rows = section.key === 'pending'
-          ? sortPendingOrders(orders.filter(order => section.statuses.includes(order.status)))
-          : sortHistoryOrders(orders.filter(order => section.statuses.includes(order.status)));
-        const body = rows.length ? rows.map(orderCard).join('') : `<div class="mp-empty">${section.key === 'pending' ? '暂无待处理订单' : '暂无历史订单'}</div>`;
+          ? sortPendingOrders(orders.filter(section.matches))
+          : section.key === 'refund'
+            ? sortRefundOrders(orders.filter(section.matches))
+            : sortHistoryOrders(orders.filter(section.matches));
+        const body = rows.length ? rows.map(orderCard).join('') : `<div class="mp-empty">${section.key === 'pending' ? '暂无待付款订单' : section.key === 'refund' ? '暂无退款进度' : '暂无交易记录'}</div>`;
         return `<section class="mp-order-section"><div class="mp-order-section-head"><h3>${section.title}</h3><span>${rows.length} 笔 · ${section.note}</span></div>${body}</section>`;
       }).join('');
     }
     list.querySelectorAll('[data-order-action="pay"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); go(`/learner/pages/payment.html?${order?.classId ? `classId=${encodeURIComponent(order.classId)}` : `courseId=${encodeURIComponent(node.dataset.courseId)}`}&orderId=${encodeURIComponent(node.dataset.orderId)}`); }));
     list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => {
-      if (!applyRefundApplication(node.dataset.orderId)) return;
-      const refund = refundsForOrder(node.dataset.orderId).find(row => row.status === '待审批');
-      draw();
-      toast(refund ? `退款申请已提交，申请金额 ¥${refund.amount}，等待后台审核` : '退款申请已提交，等待后台审核');
+      openRefundReasonDialog(node.dataset.orderId, (reason) => {
+        if (!applyRefundApplication(node.dataset.orderId, reason)) return;
+        const refund = refundsForOrder(node.dataset.orderId).find(row => row.status === '待审批');
+        draw();
+        toast(refund ? `退款申请已提交，申请金额 ¥${refund.amount}，等待后台审核` : '退款申请已提交，等待后台审核');
+      });
     }));
   };
   document.querySelectorAll('[data-order-tab]').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('[data-order-tab]').forEach(item => item.classList.remove('active')); tab.classList.add('active'); draw(); }));
@@ -1819,11 +1922,15 @@ function orderAssociation(order, item, isClass) {
 // 状态 + 下一步指引（CR-2026-026 §3.4）
 function orderStatusGuidance(order, isClass) {
   const credentials = orderCredentials(order);
+  const refundStatus = learnerRefundStatus(order);
+  if (refundStatus === '退款申请未通过') return '退款申请未通过，订单已恢复为已付款；是否可以再次申请退款以当前退款规则为准。';
+  if (refundStatus === '退款处理异常') return `退款处理异常${order.refundExceptionReason ? `：${order.refundExceptionReason}` : ''}，后台正在核对支付渠道结果。`;
+  if (refundStatus === '退款申请处理中') return '退款申请已提交，等待后台审核；审核结果会在退款进度中更新。';
+  if (refundStatus === '退款处理中') return `${credentials.refundExpectedAt ? `退款处理中，预计 ${credentials.refundExpectedAt} 到账；` : '退款处理中，到账时间以支付渠道为准；'}${isClass ? '退款完成前学籍仍为在读，可继续查看班级并正常上课。' : '视频课程学习权限在审核期间暂时冻结。'}`;
+  if (refundStatus === '已退款') return `退款已完成，${isClass ? '原面授班级名额已释放' : '课程学习权限已关闭'}。`;
   if (order.status === '待支付') return `${ORDER_PAY_WINDOW_HINT}超时后订单自动关闭，未产生课程授权与面授分班。`;
   if (order.status === '已支付') return '支付已确认，订单交易完成；课程学习与面授报名结果以关联卡片为准。';
-  if (order.status === '退款中') return `${credentials.refundExpectedAt ? `退款申请已受理，${credentials.refundExpectedAt}；` : '退款申请已受理，等待后台审核；'}${isClass ? '退款完成前学籍仍为在读，可继续查看班级并正常上课。' : '视频课程学习权限在审核期间暂时冻结。'}`;
-  if (order.status === '已退款') return `退款已完成，${isClass ? '原面授班级名额已释放' : '课程学习权限已关闭'}。`;
-  if (order.status === '已取消') return `${order.paymentReason || '订单已取消'}。本次未授权、不分班、不扣减面授名额，可继续支付复用当前订单号。`;
+  if (order.status === '已取消') return `${order.paymentReason || '订单已取消'}。本次未授权、不分班、不扣减面授名额；如需继续报名或购买，请从课程入口重新发起。`;
   return '订单状态以系统记录为准。';
 }
 function renderOrderDetail() {
@@ -1843,10 +1950,11 @@ function renderOrderDetail() {
   const videoRefund = !isClass ? videoRefundEligibility(order, item) : { eligible: false };
   const canRefund = isClass && isPaid;
   const canVideoRefund = !isClass && videoRefund.eligible;
-  const displayStatus = paymentStatusLabel(order);
+  const displayStatus = learnerPaymentStatus(order);
+  const refundStatus = learnerRefundStatus(order);
   const association = orderAssociation(order, item, isClass);
   const refundable = order.status === '退款中' || order.status === '已退款';
-  const primaryAction = isPaymentResumable(order)
+  const primaryAction = order.status === '待支付'
     ? `<a class="mp-button full" href="/learner/pages/payment.html?${isClass ? `classId=${encodeURIComponent(item.id)}` : `courseId=${encodeURIComponent(item.id)}`}&orderId=${encodeURIComponent(order.id)}">${order.status === '待支付' ? '去支付' : '继续支付'}</a>`
     : isClass && isPaid
       ? `<a class="mp-button full" href="${courseLink(item)}">查看班级</a>`
@@ -1854,12 +1962,13 @@ function renderOrderDetail() {
         ? `<button class="mp-button full" type="button" data-action="learning">进入学习</button>`
         : '';
   const secondaryAction = canRefund ? button('申请退款', `data-action="refund" data-order-id="${order.id}"`, 'secondary') : canVideoRefund ? button('申请全额退款', `data-action="refund" data-order-id="${order.id}"`, 'secondary') : '';
+  const rejectedRefund = refundsForOrder(order.id).find(row => row.status === '已拒绝');
   layout(stack(
-    card(`<div class="mp-order-detail-status">${pill(displayStatus, orderTone(order.status))}<span class="mp-muted">${isClass ? '面授课程订单' : '视频课程订单'}</span></div><div class="mp-order-status-copy">${esc(orderStatusGuidance(order, isClass))}</div>`),
-    card(`<div class="mp-section-head"><h3>状态总览</h3><span class="mp-muted">三层状态</span></div><dl class="mp-order-detail-facts"><div><dt>交易状态</dt><dd>${esc(paymentStatusLabel(order))}</dd></div><div><dt>退款进度</dt><dd>${esc(order.status === '退款中' || order.status === '已退款' ? (credentials.refundStatus || '处理中') : '无退款申请')}</dd></div><div><dt>履约状态</dt><dd>${esc(orderFulfillmentStatus(order, isClass))}</dd></div></dl>`),
+    card(`<div class="mp-order-detail-status"><div class="mp-pills" aria-label="订单状态">${pill(displayStatus, learnerPaymentTone(order))}${refundStatus ? pill(refundStatus, learnerRefundTone(refundStatus)) : ''}</div><span class="mp-muted">${isClass ? '面授课程订单' : '视频课程订单'}</span></div><div class="mp-order-status-copy">${esc(orderStatusGuidance(order, isClass))}</div>`),
     card(`<div class="mp-section-head"><h3>关联课程</h3><span class="mp-muted">${isClass ? '面授班级' : '视频课程'}</span></div><div class="mp-order-association"><div><strong>${esc(association.title)}</strong><span>${esc(association.line)}</span></div><a class="mp-button secondary" href="${association.href}">${association.label}</a></div><p class="mp-order-association-note">教师、上课时间、教室与学习进度在班级详情与学习页维护，订单详情不重复展开。</p>`),
     card(`<div class="mp-section-head"><h3>金额与支付</h3><span class="mp-muted">交易凭证</span></div><dl class="mp-order-detail-facts"><div><dt>实付金额</dt><dd><strong class="mp-price">${money2(order.amount || item.price)}</strong></dd></div><div><dt>支付方式</dt><dd>${esc(credentials.payMethod)}</dd></div><div><dt>支付流水号</dt><dd>${esc(credentials.paymentNo || '未产生支付流水')}</dd></div><div><dt>支付时间</dt><dd>${esc(credentials.paidAt || '未完成支付')}</dd></div></dl>`),
-    refundable ? card(`<div class="mp-section-head"><h3>退款信息</h3>${pill(credentials.refundStatus || '处理中', order.status === '已退款' ? 'green' : 'amber')}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(credentials.refundNo || '—')}</dd></div><div><dt>退款金额</dt><dd>${money2(credentials.refundAmount)}</dd></div><div><dt>退款方式</dt><dd>${esc(credentials.refundMethod)}</dd></div><div><dt>退款状态</dt><dd>${esc(credentials.refundStatus || '处理中')}</dd></div><div><dt>${order.status === '已退款' ? '实际到账时间' : '预计到账时间'}</dt><dd>${esc(credentials.refundExpectedAt || '以渠道回执为准')}</dd></div><div class="wide"><dt>退款原因</dt><dd>${esc(credentials.refundReason)}</dd></div></dl>${order.status === '退款中' ? '<p class="mp-notice">退款结果由后台根据支付渠道回执更新，学员端仅展示进度。</p>' : ''}`) : '',
+    refundable ? card(`<div class="mp-section-head"><h3>退款信息</h3>${pill(refundStatus || '退款处理中', learnerRefundTone(refundStatus))}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(credentials.refundNo || '—')}</dd></div><div><dt>退款金额</dt><dd>${money2(credentials.refundAmount)}</dd></div><div><dt>退款方式</dt><dd>${esc(credentials.refundMethod)}</dd></div><div><dt>退款状态</dt><dd>${esc(refundStatus || '退款处理中')}</dd></div><div><dt>${order.status === '已退款' ? '实际到账时间' : '预计到账时间'}</dt><dd>${esc(credentials.refundExpectedAt || '以渠道回执为准')}</dd></div><div class="wide"><dt>退款原因</dt><dd>${esc(credentials.refundReason)}</dd></div></dl>${order.status === '退款中' ? '<p class="mp-notice">退款结果由后台根据支付渠道回执更新，学员端仅展示进度。</p>' : ''}`) : '',
+    rejectedRefund ? card(`<div class="mp-section-head"><h3>退款记录</h3>${pill('已拒绝', 'gray')}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(rejectedRefund.no || '—')}</dd></div><div><dt>申请金额</dt><dd>${money2(rejectedRefund.amount)}</dd></div><div class="wide"><dt>处理结果</dt><dd>${esc(rejectedRefund.rejectReason || rejectedRefund.remark || '退款申请未通过')}</dd></div></dl><p class="mp-notice">订单已恢复为可用状态，是否可以再次申请退款以当前退款规则为准。</p>`) : '',
     card(`<div class="mp-section-head"><h3>订单信息</h3><span class="mp-muted">交易记录</span></div><dl class="mp-order-detail-facts"><div><dt>订单号</dt><dd class="mp-order-no"><span>${esc(order.id)}</span><button class="mp-button secondary" type="button" data-action="copy-order-no" data-order-no="${esc(order.id)}">复制</button></dd></div><div><dt>下单时间</dt><dd>${esc(times.createdAt)}</dd></div>${isClass ? `<div><dt>报名学员</dt><dd>${esc(student.name)}</dd></div>` : `<div><dt>购买账号</dt><dd>${esc(purchaseAccount().name)}${purchaseAccount().phone ? `（${esc(purchaseAccount().phone)}）` : ''}</dd></div>`}<div><dt>订单类型</dt><dd>${isClass ? '面授课程' : '视频课程'}</dd></div>${!isClass && isPaid ? `<div class="wide"><dt>退款资格</dt><dd>${esc(videoRefund.reason)}${videoRefund.eligible ? ' 申请后将按实付金额全额退款。' : ''}</dd></div>` : ''}${order.paymentReason ? `<div class="wide"><dt>状态说明</dt><dd>${esc(order.paymentReason)}</dd></div>` : ''}</dl>`),
     primaryAction || secondaryAction ? `<div class="mp-order-detail-actions">${primaryAction}${secondaryAction ? `<div class="mp-actions">${secondaryAction}</div>` : ''}</div>` : '',
     `<a class="mp-button secondary full" href="/learner/pages/orders.html">返回我的订单</a>`
@@ -1939,47 +2048,33 @@ function learningRecords() {
     const reviewedHomework = homeworkRows.find(({ submission }) => submission?.status === '已点评');
     const graduation = item.type === 'class' ? graduationSeed.find(row => row.className === (item.className || item.name)) : null;
     const learnerGraduation = graduation?.learners.find(row => row.name === currentStudent()?.name) || null;
-    return { ...source, ...(activeOrderSnapshot || {}), ...item, status: accessRevoked ? 'ended' : item.status, completionStatus: accessRevoked ? '已退款，学习记录保留' : learnerGraduationLabel(learnerGraduation?.status || item.completionStatus), homeworkStatus: pendingHomework ? (pendingHomework.submission?.status === '草稿' ? '草稿' : '待提交') : reviewedHomework ? '已点评' : homeworkRows.length ? '待教师点评' : item.homeworkStatus, homeworkId: pendingHomework?.homework.id || reviewedHomework?.homework.id || '', name: item.name || item.className || source.name, href: accessRevoked ? '/learner/pages/orders.html' : (item.href || (item.type === 'video' ? `/learner/pages/video.html?courseId=${encodeURIComponent(source.id)}` : item.type === 'class' ? `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.classId || item.courseId)}&tab=lessons` : courseLink(item))), accessRevoked };
+    // 作业状态只来自真实已发布的作业记录；没有发布作业时不展示状态胶囊，也不生成待提交待办。
+    const homeworkStatus = pendingHomework ? (pendingHomework.submission?.status === '草稿' ? '草稿' : '待提交') : reviewedHomework ? '已点评' : homeworkRows.length ? '待教师点评' : '';
+    return { ...source, ...(activeOrderSnapshot || {}), ...item, status: accessRevoked ? 'ended' : item.status, completionStatus: accessRevoked ? '已退款，学习记录保留' : learnerGraduationLabel(learnerGraduation?.status || item.completionStatus), homeworkStatus, homeworkId: pendingHomework?.homework.id || reviewedHomework?.homework.id || '', name: item.name || item.className || source.name, href: accessRevoked ? '/learner/pages/orders.html' : (item.href || (item.type === 'video' ? `/learner/pages/video.html?courseId=${encodeURIComponent(source.id)}` : item.type === 'class' ? `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.classId || item.courseId)}&tab=lessons` : courseLink(item))), accessRevoked };
   });
 }
 function learningTasks() {
-  // P1-3: tasks are derived from the current account + student instead of a fixed student-001 list.
+  // 学习模块待办只承载需要学员提交的作业；提醒和结果通知统一进入消息中心。
   const records = learningRecords();
   const tasks = [];
-  records.filter(item => item.type === 'class' && item.status === 'ongoing' && item.nextLesson).slice(0, 1).forEach(item => {
-    tasks.push({ group: 'todo', type: '上课提醒', title: '上课提醒', detail: `${item.className || item.name} · ${item.nextLesson}`, label: '查看课次', tone: 'green', href: `/learner/pages/class-detail.html?courseId=${item.courseId}&tab=lessons` });
-  });
-  // 2026-09-28：作业待办不再截断 3 条，覆盖「待提交／草稿／待教师点评」；已点评不算待办，单列回看分组。
   // 多学员口径：records 已按当前学员过滤，切换学员后待办整体重算，不做跨学员聚合。
-  const homeworkPriority = { 待提交: 0, 草稿: 0, 待教师点评: 1 };
+  const homeworkPriority = { 待提交: 0, 草稿: 0 };
   const homeworkHref = (item) => (item.homeworkId
     ? homeworkDetailHref(item.homeworkId, item.courseId)
     : `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.courseId)}&tab=lessons`);
   records.filter(item => item.type === 'class' && homeworkPriority[item.homeworkStatus] !== undefined)
     .sort((a, b) => homeworkPriority[a.homeworkStatus] - homeworkPriority[b.homeworkStatus])
     .forEach(item => {
-      const waiting = item.homeworkStatus === '待教师点评';
       tasks.push({
         group: 'todo',
-        type: waiting ? '作业待点评' : '作业待提交',
-        title: waiting ? '作业待教师点评' : '作业待提交',
-        detail: `${item.className || item.name} · 课后练习${waiting ? '已提交，等待教师点评' : '待提交'}`,
-        label: homeworkEntryLabel(waiting ? '已提交' : item.homeworkStatus),
-        tone: waiting ? 'green' : 'amber',
+        type: '待提交作业',
+        title: '待提交作业',
+        detail: `${item.className || item.name} · 课后练习${item.homeworkStatus === '草稿' ? '待继续提交' : '待提交'}`,
+        label: homeworkEntryLabel(item.homeworkStatus),
+        tone: 'amber',
         href: homeworkHref(item),
       });
     });
-  // 已点评只做回看入口：不算待办，最多 2 条，避免学习中心首屏被历史作业占满。
-  records.filter(item => item.type === 'class' && item.homeworkStatus === '已点评').slice(0, 2).forEach(item => {
-    tasks.push({ group: 'reviewed', type: '作业已点评', title: '作业已点评', detail: `${item.className || item.name} · 教师已给出评语`, label: '查看点评', tone: 'gray', href: homeworkHref(item) });
-  });
-  // 结业待办与班级详情「结业状态」同源；CR-2026-154 起不达标学员的补课与退费线下处理，系统只展示审核进度。
-  records.filter(item => item.type === 'class' && item.completionStatus === '审核中').forEach(item => {
-    const className = item.className || item.name;
-    const detail = '结业材料已提交，等待后台审核；如需补课或退费，教务将线下联系';
-    tasks.push({ group: 'todo', type: '结业进度', title: `结业${item.completionStatus}`, detail: `${className} · ${detail}`, label: '查看班级', tone: 'amber', href: `/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.courseId)}&tab=result` });
-  });
-  if (reportState() === '已发布' && records.some(item => item.type === 'class')) tasks.push({ group: 'todo', type: '报告已发布', title: '报告已发布', detail: '学习报告可查看', label: '去查看', tone: 'green', href: `/learner/pages/results.html?courseId=${(records.find(item => item.type === 'class') || {}).courseId || 'class-001'}` });
   return tasks;
 }
 function learningCourseCard(item) {
@@ -1993,7 +2088,7 @@ function learningCourseCard(item) {
   const completedLessons = item.completedLessons ?? Math.round((item.progress || 0) * totalLessons / 100);
   const courseStatus = item.status === 'ongoing' ? '' : pill(statusLabels[item.status], statusTones[item.status]);
   const homeworkTone = item.homeworkStatus === '待教师点评' ? 'green' : 'amber';
-  const homeworkInfo = item.homeworkStatus ? ` ${pill(`作业：${item.homeworkStatus}`, homeworkTone)}` : '';
+  const homeworkInfo = item.homeworkStatus && item.lessonStatus !== '待上课' ? ` ${pill(`作业：${item.homeworkStatus}`, homeworkTone)}` : '';
   const classInfo = item.lessonStatus
     ? `<div class="mp-learning-lesson-row"><span>第${esc(item.lessonNo)}/${esc(totalLessons)}课</span>${pill(item.lessonStatus, lessonTone)}${homeworkInfo}</div><p class="mp-learning-schedule">${esc(item.lessonNote || item.nextLesson)} · ${esc(item.classroom)}</p>`
     : `<p class="mp-learning-schedule">${item.status === 'upcoming' ? `首次上课：${esc(item.nextLesson)}` : item.status === 'ended' ? '课程已结束' : esc(item.nextLesson)} · ${esc(item.classroom)}</p>`;
@@ -2031,13 +2126,11 @@ function renderLearning() {
       : '<div class="mp-learning-type-empty">暂无课程</div>';
     const activeCount = records.filter(item => item.status !== 'ended').length;
     const certificates = records.filter(item => item.status === 'ended' && item.completionStatus === '已结业').length;
-    // 待办分两层：「待处理」首屏 2 条、可展开全部；「最近点评」只做回看，不计入待办数。
-    const todoTasks = tasks.filter((task) => task.group !== 'reviewed');
-    const reviewedTasks = tasks.filter((task) => task.group === 'reviewed');
+    // 学习页只展示待提交作业；消息提醒和已点评记录不进入待办。
+    const todoTasks = tasks;
     const taskRow = (task, hidden) => `<a class="mp-learning-task" href="${task.href}"${hidden ? ' style="display:none"' : ''}${task.group === 'todo' ? ' data-learning-task' : ''}><div><strong>${esc(task.title)}</strong><small>${esc(task.detail)}</small></div>${pill(task.label, task.tone)}</a>`;
     const todoList = `<div class="mp-learning-task-list">${todoTasks.map((task, index) => taskRow(task, index >= 2)).join('')}</div>${todoTasks.length > 2 ? `<button type="button" class="mp-learning-task-more" data-learning-task-more>查看全部 ${todoTasks.length} 项待办</button>` : ''}`;
-    const reviewedList = reviewedTasks.length ? `<div class="mp-learning-inline-task-head" style="margin-top:8px"><strong>最近点评</strong><span>${reviewedTasks.length}项</span></div><div class="mp-learning-task-list">${reviewedTasks.map((task) => taskRow(task, false)).join('')}</div>` : '';
-    const taskSummary = tasks.length ? `<div class="mp-learning-inline-tasks"><div class="mp-learning-inline-task-head"><strong>待办</strong><span>${todoTasks.length}项</span></div>${todoList}${reviewedList}</div>` : '';
+    const taskSummary = tasks.length ? `<div class="mp-learning-inline-tasks"><div class="mp-learning-inline-task-head"><strong>待提交作业</strong><span>${todoTasks.length}项</span></div>${todoList}</div>` : '';
     layout(stack(
       card(`<div class="mp-learning-student"><div><span class="mp-muted">当前学员</span><strong>${esc(currentStudent().name)}</strong></div><div class="mp-field"><label class="mp-sr-only" for="learning-student-select">切换当前学员</label><select id="learning-student-select">${state.students.map(student => `<option value="${student.id}" ${student.id === state.currentStudentId ? 'selected' : ''}>${esc(student.name)}</option>`).join('')}</select></div></div><div class="mp-section-head mp-learning-summary-head"><h2>学习概况</h2></div><div class="mp-metric-grid mp-learning-metrics"><div class="mp-metric"><strong>${activeCount}</strong><span>在读课程</span></div><div class="mp-metric"><strong>${attendanceRates[state.currentStudentId] || 0}%</strong><span>总出勤率</span></div><div class="mp-metric"><strong>${todoTasks.length}</strong><span>待办</span></div><div class="mp-metric"><strong>${certificates}</strong><span>已获证书</span></div></div>${taskSummary}`, 'mp-learning-summary-card'),
       `<section class="mp-learning-section"><div class="mp-section-head"><h2>我的课程</h2><span class="mp-muted">${records.length}门</span></div><div class="mp-tabs mp-learning-tabs" role="tablist">${Object.entries(statusLabels).map(([status, label]) => `<button class="mp-tab ${status === activeStatus ? 'active' : ''}" type="button" role="tab" aria-selected="${status === activeStatus}" data-learning-status="${status}">${label}<span>${records.filter(item => item.status === status).length}</span></button>`).join('')}</div>${courseList}</section>`
@@ -2063,7 +2156,7 @@ function renderLearning() {
 }
 function renderVideo() {
   const item = course(params.get('courseId') || 'COURSE-CR-2026-0002');
-  const chapters = Array.isArray(item.outline) && item.outline.length ? item.outline : [{ title: '第1章 · 基础训练', note: '第1节' }, { title: '第2章 · 技术练习', note: '第2节' }, { title: '第3章 · 作品演唱', note: '第3节' }];
+  const chapters = videoLessonsOf(item).length ? videoLessonsOf(item) : [{ title: '第1章 · 基础训练', note: '第1节' }, { title: '第2章 · 技术练习', note: '第2节' }, { title: '第3章 · 作品演唱', note: '第3节' }];
   const currentIndex = Math.min(Math.max(Number(params.get('chapter') || chapters.length - 1), 0), chapters.length - 1);
   const purchased = hasPurchasedVideo(item);
   // RM-F-05: the player honours the same product preview policy as the course detail page.
@@ -2073,12 +2166,14 @@ function renderVideo() {
     return;
   }
   const current = chapters[currentIndex];
+  const chapterTitle = (chapter) => chapter?.name || chapter?.title || `第${currentIndex + 1}章`;
   const chapterId = `chapter-${String(currentIndex + 1).padStart(3, '0')}`;
   const sharedProgress = readDemoState().progress?.[`${state.accountId}-${item.id}`] || {};
   const completedIds = Array.isArray(sharedProgress.chapterDone) ? sharedProgress.chapterDone : (Array.isArray(state.chapterDone) ? state.chapterDone : []);
   const isCompleted = completedIds.includes(chapterId);
   const completedCount = chapters.filter((_, index) => completedIds.includes(`chapter-${String(index + 1).padStart(3, '0')}`)).length;
-  const courseProgress = completedCount === chapters.length ? 100 : Number(item.progress || 0);
+  // 课程总进度以章节完成数为准，避免课程卡片旧进度与章节明细不一致。
+  const courseProgress = chapters.length ? Math.round((completedCount / chapters.length) * 100) : 0;
   const positions = sharedProgress.positions || state.videoPositions || {};
   let watchedSeconds = Number(positions[chapterId] || (currentIndex === chapters.length - 1 ? 1116 : 0));
   const watchedText = `${String(Math.floor(watchedSeconds / 60)).padStart(2, '0')}:${String(watchedSeconds % 60).padStart(2, '0')}`;
@@ -2089,18 +2184,19 @@ function renderVideo() {
     const done = completedIds.includes(id);
     const active = index === currentIndex;
     const locked = isPreview && index !== 0;
-    return `<button class="mp-video-chapter ${active ? 'active' : ''}" type="button" data-video-chapter="${index}" aria-current="${active ? 'true' : 'false'}" ${locked ? 'disabled aria-label="购买后开放"' : ''}><span class="mp-video-chapter-index">${String(index + 1).padStart(2, '0')}</span><span class="mp-video-chapter-copy"><strong>${esc(chapter.title)}</strong><small>${esc(chapter.note || '视频课节')}</small></span>${locked ? pill('购买后开放', 'gray') : done ? '<span class="mp-video-check" aria-label="已完成">✓</span>' : active ? pill(isPreview ? '免费试听' : '学习中', isPreview ? 'green' : '') : '<span class="mp-video-chapter-arrow" aria-hidden="true">›</span>'}</button>`;
+    return `<button class="mp-video-chapter ${active ? 'active' : ''}" type="button" data-video-chapter="${index}" aria-current="${active ? 'true' : 'false'}" ${locked ? 'disabled aria-label="购买后开放"' : ''}><span class="mp-video-chapter-index">${String(index + 1).padStart(2, '0')}</span><span class="mp-video-chapter-copy"><strong>${esc(chapterTitle(chapter))}</strong><small>${esc(chapter.chapterTitle || chapter.note || '视频课时')}${chapter.duration ? ` · ${chapter.duration}分钟` : ''}</small></span>${locked ? pill('购买后开放', 'gray') : done ? '<span class="mp-video-check" aria-label="已完成">✓</span>' : active ? pill(isPreview ? '免费试听' : '学习中', isPreview ? 'green' : '') : '<span class="mp-video-chapter-arrow" aria-hidden="true">›</span>'}</button>`;
   }).join('');
+  const currentTitle = chapterTitle(current);
   layout(stack(
-    `<section class="mp-video-player-wrap"><div id="video-player" class="mp-video-player" data-playing="false"><div class="mp-video-poster" data-cover-mark="${esc((item.professional || item.name).slice(0, 1))}"><span class="mp-video-type">视频课程</span><button id="video-play" class="mp-video-play" type="button" aria-label="播放视频"><span aria-hidden="true">▶</span></button><strong>${esc(current.title)}</strong></div><div class="mp-video-controls"><div class="mp-video-scrubber"><span style="width:${watchedRatio}%"></span></div><div class="mp-video-control-row"><button id="video-play-small" class="mp-video-control-icon" type="button" aria-label="播放或暂停"><span aria-hidden="true">▶</span></button><span class="mp-video-time">${watchedText} / 40:00</span><div class="mp-video-control-right"><button id="video-speed" class="mp-video-speed" type="button">1×</button><button id="video-fullscreen" class="mp-video-control-icon" type="button" aria-label="全屏"><span aria-hidden="true">⛶</span></button></div></div></div></div><div class="mp-video-current"><div><span class="mp-muted">正在学习</span><h2>${esc(current.title)}</h2></div><span class="mp-video-current-progress">本课 ${watchedRatio}%</span></div></section>`,
-    card(`<div class="mp-section-head"><h3>学习进度</h3><strong class="mp-video-progress-value">${courseProgress}%</strong></div><div class="mp-progress"><span style="width:${courseProgress}%"></span></div><p class="mp-video-progress-copy">已完成 ${completedCount}/${chapters.length} 章节 · 当前学习进度会自动保存</p>`, 'mp-video-progress-card'),
-    `<section class="mp-video-outline"><div class="mp-section-head"><h3>课程目录</h3><span class="mp-muted">共${chapters.length}章</span></div>${isPreview ? '<p class="mp-video-preview-note">当前为第一课时免费试听，购买后可学习完整课程。</p>' : ''}<div class="mp-video-chapter-list">${chapterItems}</div>${isPreview ? '' : `<div class="mp-video-complete-row">${button(isCompleted ? '本节已完成' : '标记本节完成', 'id="complete-chapter"', 'secondary')}</div>`}</section>`,
+    `<section class="mp-video-player-wrap"><div id="video-player" class="mp-video-player" data-playing="false"><div class="mp-video-poster" data-cover-mark="${esc((item.professional || item.name).slice(0, 1))}"><span class="mp-video-type">视频课程</span><button id="video-play" class="mp-video-play" type="button" aria-label="播放视频"><span aria-hidden="true">▶</span></button><strong>${esc(currentTitle)}</strong></div><div class="mp-video-controls"><div class="mp-video-scrubber"><span style="width:${watchedRatio}%"></span></div><div class="mp-video-control-row"><button id="video-play-small" class="mp-video-control-icon" type="button" aria-label="播放或暂停"><span aria-hidden="true">▶</span></button><span class="mp-video-time">${watchedText} / 40:00</span><div class="mp-video-control-right"><button id="video-speed" class="mp-video-speed" type="button">1×</button><button id="video-fullscreen" class="mp-video-control-icon" type="button" aria-label="全屏"><span aria-hidden="true">⛶</span></button></div></div></div></div><div class="mp-video-current"><div><span class="mp-muted">正在学习</span><h2>${esc(currentTitle)}</h2></div><span class="mp-video-current-progress">本课 ${watchedRatio}%</span></div></section>`,
+    `<section class="mp-video-progress-summary" aria-label="课程学习进度"><span>课程进度</span><strong>${courseProgress}%</strong><small>已完成 ${completedCount}/${chapters.length} 章节 · 进度自动保存</small></section>`,
+    `<details class="mp-video-outline"><summary><span><strong>课程目录</strong><small>共${chapters.length}课时 · 当前第${currentIndex + 1}节</small></span><span class="mp-video-outline-chevron" aria-hidden="true">⌄</span></summary>${isPreview ? '<p class="mp-video-preview-note">当前为第一课时免费试听，购买后可学习完整课程。</p>' : ''}<div class="mp-video-chapter-list">${chapterItems}</div>${isPreview ? '' : `<div class="mp-video-complete-row">${button(isCompleted ? '本节已完成' : '标记本节完成', 'id="complete-chapter"', 'secondary')}</div>`}</details>`,
     `<nav class="mp-video-navigation" aria-label="章节导航"><button class="mp-button secondary" type="button" data-video-nav="prev" ${currentIndex === 0 ? 'disabled' : ''}><span aria-hidden="true">‹</span> 上一节</button>${isPreview ? `<a class="mp-button" href="/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}">购买完整课程</a>` : `<button class="mp-button" type="button" data-video-nav="next" ${currentIndex === chapters.length - 1 ? 'disabled' : ''}>下一节 <span aria-hidden="true">›</span></button>`}</nav>`
   ));
   const player = document.querySelector('#video-player');
   const playButtons = [document.querySelector('#video-play'), document.querySelector('#video-play-small')];
   let playTimer;
-  const updatePlayback = () => { watchedSeconds = Math.min(watchedSeconds + 1, totalSeconds); const nextPositions = { ...positions, [chapterId]: watchedSeconds }; state.videoPositions = nextPositions; saveVideoProgress(item.id, { positions: nextPositions, lastPosition: `${current.title} ${String(Math.floor(watchedSeconds / 60)).padStart(2, '0')}:${String(watchedSeconds % 60).padStart(2, '0')}`, percent: Math.min(Math.round((watchedSeconds / totalSeconds) * 100), 100) }); const time = player.querySelector('.mp-video-time'); const scrubber = player.querySelector('.mp-video-scrubber span'); if (time) time.textContent = `${String(Math.floor(watchedSeconds / 60)).padStart(2, '0')}:${String(watchedSeconds % 60).padStart(2, '0')} / 40:00`; if (scrubber) scrubber.style.width = `${Math.min(Math.round((watchedSeconds / totalSeconds) * 100), 100)}%`; };
+  const updatePlayback = () => { watchedSeconds = Math.min(watchedSeconds + 1, totalSeconds); const nextPositions = { ...positions, [chapterId]: watchedSeconds }; state.videoPositions = nextPositions; saveVideoProgress(item.id, { positions: nextPositions, lastPosition: `${currentTitle} ${String(Math.floor(watchedSeconds / 60)).padStart(2, '0')}:${String(watchedSeconds % 60).padStart(2, '0')}`, percent: Math.min(Math.round((watchedSeconds / totalSeconds) * 100), 100) }); const time = player.querySelector('.mp-video-time'); const scrubber = player.querySelector('.mp-video-scrubber span'); if (time) time.textContent = `${String(Math.floor(watchedSeconds / 60)).padStart(2, '0')}:${String(watchedSeconds % 60).padStart(2, '0')} / 40:00`; if (scrubber) scrubber.style.width = `${Math.min(Math.round((watchedSeconds / totalSeconds) * 100), 100)}%`; };
   const togglePlay = () => { const playing = player.dataset.playing === 'true'; player.dataset.playing = String(!playing); playButtons.forEach(control => { control.querySelector('span').textContent = playing ? '▶' : 'Ⅱ'; control.setAttribute('aria-label', playing ? '播放视频' : '暂停视频'); }); if (playing) { clearInterval(playTimer); } else { playTimer = setInterval(updatePlayback, 1000); } };
   window.addEventListener('pagehide', () => clearInterval(playTimer), { once: true });
   playButtons.forEach(control => control.addEventListener('click', togglePlay));
@@ -2110,7 +2206,7 @@ function renderVideo() {
   document.querySelector('#video-fullscreen').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen?.(); else player.requestFullscreen?.(); });
   document.querySelectorAll('[data-video-chapter]').forEach(chapter => chapter.addEventListener('click', () => go(`/learner/pages/video.html?courseId=${encodeURIComponent(item.id)}&chapter=${chapter.dataset.videoChapter}`)));
   document.querySelectorAll('[data-video-nav]').forEach(control => control.addEventListener('click', () => { const nextIndex = currentIndex + (control.dataset.videoNav === 'next' ? 1 : -1); if (nextIndex >= 0 && nextIndex < chapters.length) go(`/learner/pages/video.html?courseId=${encodeURIComponent(item.id)}&chapter=${nextIndex}`); }));
-  document.querySelector('#complete-chapter')?.addEventListener('click', () => { const nextDone = [...new Set([...completedIds, chapterId])]; const nextPositions = { ...positions, [chapterId]: totalSeconds }; state.chapterDone = nextDone; state.videoPositions = nextPositions; saveVideoProgress(item.id, { chapterDone: nextDone, positions: nextPositions, percent: Math.round((nextDone.length / chapters.length) * 100), lastPosition: `${current.title} 40:00` }); saveState(); renderVideo(); toast('学习进度已保存'); });
+  document.querySelector('#complete-chapter')?.addEventListener('click', () => { const nextDone = [...new Set([...completedIds, chapterId])]; const nextPositions = { ...positions, [chapterId]: totalSeconds }; state.chapterDone = nextDone; state.videoPositions = nextPositions; saveVideoProgress(item.id, { chapterDone: nextDone, positions: nextPositions, percent: Math.round((nextDone.length / chapters.length) * 100), lastPosition: `${currentTitle} 40:00` }); saveState(); renderVideo(); toast('学习进度已保存'); });
 }
 function consultationStatusTone(status) { return status === '已回复' || status === '已报名' ? 'green' : status === '已试听' ? 'amber' : 'gray'; }
 function renderConsultation() {
@@ -2152,7 +2248,7 @@ function renderProfile() {
   layout(stack(
     card(`<div class="mp-profile-identity"><span class="mp-avatar mp-profile-avatar" aria-hidden="true">林</span><div><h2>林女士</h2><p>手机号 ${esc(state.phone || '138****2026')}</p></div></div>`),
     card(`<div class="mp-profile-student-head"><h2>学员管理</h2></div><div class="mp-student-row is-current mp-current-student"><span class="mp-student-avatar" aria-hidden="true">${esc(currentStudent().name.slice(0, 1))}</span><div class="mp-student-copy"><strong>${esc(currentStudent().name)}</strong><small>${esc(currentStudent().relation)}</small></div><a class="mp-button secondary mp-student-switch" href="/learner/pages/student-management.html">学员管理</a></div>`),
-    `<section class="mp-profile-entry-list" aria-label="个人中心功能"><a class="mp-profile-entry" href="/learner/pages/orders.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">单</span><strong>我的订单</strong><span class="mp-link">查看全部 ›</span></div><div class="mp-profile-metrics">${profileMetric('待支付', orderCount('待支付'), 'amber')}${profileMetric('已支付', orderCount('已支付'), 'green')}${profileMetric('已退款', orderCount('已退款'))}</div></a><a class="mp-profile-entry" href="/learner/pages/consultation.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">咨</span><strong>我的咨询</strong><span class="mp-link">查看记录 ›</span></div><div class="mp-profile-metrics mp-profile-consultation-metrics">${profileMetric('待回复', consultationCount('待回复'), 'amber')}${profileMetric('已回复', consultationCount('已回复'), 'green')}${profileMetric('已试听', consultationCount('已试听'))}${profileMetric('已报名', consultationCount('已报名'))}</div></a><a class="mp-profile-entry mp-profile-message-entry" href="/learner/pages/messages.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">信</span><strong>消息通知</strong>${unreadMessageCount ? `<span class="mp-profile-unread"><i aria-hidden="true"></i>${unreadMessageCount}条未读</span>` : '<span class="mp-muted">已读</span>'}<span class="mp-link">›</span></div></a></section>`,
+    `<section class="mp-profile-entry-list" aria-label="个人中心功能"><a class="mp-profile-entry" href="/learner/pages/orders.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">单</span><strong>我的订单</strong><span class="mp-link">查看全部 ›</span></div><div class="mp-profile-metrics">${profileMetric('待支付', orderCount('待支付'), 'amber')}${profileMetric('已支付', orderCount('已支付'), 'green')}${profileMetric('退款售后', orderCount('已退款'))}</div></a><a class="mp-profile-entry" href="/learner/pages/consultation.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">咨</span><strong>我的咨询</strong><span class="mp-link">查看记录 ›</span></div><div class="mp-profile-metrics mp-profile-consultation-metrics">${profileMetric('待回复', consultationCount('待回复'), 'amber')}${profileMetric('已回复', consultationCount('已回复'), 'green')}${profileMetric('已试听', consultationCount('已试听'))}${profileMetric('已报名', consultationCount('已报名'))}</div></a><a class="mp-profile-entry mp-profile-message-entry" href="/learner/pages/messages.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">信</span><strong>消息通知</strong>${unreadMessageCount ? `<span class="mp-profile-unread"><i aria-hidden="true"></i>${unreadMessageCount}条未读</span>` : '<span class="mp-muted">已读</span>'}<span class="mp-link">›</span></div></a></section>`,
     `<a class="mp-profile-entry mp-profile-teacher-entry" href="/login.html?role=teacher"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">师</span><div><strong>教师工作台</strong><small>课表、班级与教学执行</small></div><span class="mp-link">进入 ›</span></div></a>`,
     `<a class="mp-profile-entry mp-profile-settings-entry" href="/learner/pages/settings.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">设</span><strong>设置</strong><span class="mp-link">›</span></div></a>`
   ));
@@ -2308,9 +2404,12 @@ document.addEventListener('click', event => {
   if (action === 'switch-student') switchStudent();
   if (action === 'copy-order-no') { const orderNo = event.target.closest('[data-order-no]')?.dataset.orderNo || ''; if (orderNo) copyOrderNo(orderNo); }
   if (action === 'refund') {
-    if (!applyRefundApplication(event.target.closest('[data-order-id]')?.dataset.orderId)) return;
-    renderOrderDetail();
-    toast('退款申请已提交，等待后台审核');
+    const orderId = event.target.closest('[data-order-id]')?.dataset.orderId;
+    openRefundReasonDialog(orderId, (reason) => {
+      if (!applyRefundApplication(orderId, reason)) return;
+      renderOrderDetail();
+      toast('退款申请已提交，等待后台审核');
+    });
   }
 });
 

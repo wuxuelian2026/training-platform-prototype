@@ -86,7 +86,12 @@ const dataSets = {
         { at: '2026-09-02 16:10', role: '学员端', from: '—', to: '待支付', reason: '学员提交报名' },
         { at: '2026-09-02 16:55', role: '系统', from: '待支付', to: '已取消', reason: '支付时限超时，订单自动取消' }
       ]
-    }
+    },
+    { id: 'order-video-pending', number: 'OD202609090001', name: '声乐演唱技巧', type: '视频课程', account: '演示家长A', accountPhone: '138****2026', student: '', amount: '1280.00', status: '待支付', fulfillment: '未开始', linked: '未开通权限', time: '2026-09-09 10:18', payment: null, refund: null, fulfillmentDetail: { 学习权限: '未开通' }, logs: [{ at: '2026-09-09 10:18', role: '学员端', from: '—', to: '待支付', reason: '学员提交订单' }] },
+    { id: 'order-video-refunding', number: 'OD202609070001', name: '声乐演唱技巧', type: '视频课程', account: '演示家长A', accountPhone: '138****2026', student: '', amount: '1280.00', status: '退款中', fulfillment: '学习中', linked: '学习权限：冻结', time: '2026-09-07 15:12', payment: { channel: '微信支付', amount: '1280.00', status: '支付成功', time: '2026-09-07 15:15' }, refund: { number: 'RF202609090001', amount: '1280.00', status: '退款中', reason: '学员时间冲突', expectedAt: '2026-09-20', method: '原路退回' }, fulfillmentDetail: { 学习权限: '退款处理中暂时冻结' }, logs: [{ at: '2026-09-09 10:20', role: '学员端', from: '已支付', to: '退款中', reason: '发起退款申请' }] },
+    { id: 'order-video-refunded', number: 'OD202609060001', name: '声乐演唱技巧', type: '视频课程', account: '演示家长A', accountPhone: '138****2026', student: '', amount: '1280.00', status: '已退款', fulfillment: '已关闭', linked: '学习权限：已回收', time: '2026-09-06 17:08', payment: { channel: '微信支付', amount: '1280.00', status: '支付成功', time: '2026-09-06 17:10' }, refund: { number: 'RF202609080011', amount: '1280.00', status: '已退款', reason: '课程调整', expectedAt: '2026-09-08', method: '原路退回' }, fulfillmentDetail: { 学习权限: '已回收，学习记录保留' }, logs: [{ at: '2026-09-07 09:05', role: '支付渠道', from: '退款中', to: '已退款', reason: '原路退款完成' }] },
+    { id: 'order-video-cancelled', number: 'OD202609050001', name: '声乐演唱技巧', type: '视频课程', account: '演示家长A', accountPhone: '138****2026', student: '', amount: '1280.00', status: '已取消', fulfillment: '未开始', linked: '未开通权限', time: '2026-09-05 16:30', payment: null, refund: null, fulfillmentDetail: { 学习权限: '未开通' }, logs: [{ at: '2026-09-05 16:55', role: '系统', from: '待支付', to: '已取消', reason: '支付时限超时' }] },
+    { id: 'order-class-paid', number: 'OD202609090002', name: '少儿中国舞基础班', type: '面授课程', account: '演示家长A', accountPhone: '139****2027', student: '周子涵', amount: '1680.00', status: '已支付', fulfillment: '已分班', linked: '南湖校区 · 2026秋季班', time: '2026-09-09 09:36', payment: { channel: '微信支付', amount: '1680.00', status: '支付成功', time: '2026-09-09 09:38' }, refund: null, fulfillmentDetail: { 班级: '2026秋季中国舞启蒙一班', 名额占用: '已占用' }, logs: [{ at: '2026-09-09 09:38', role: '支付渠道', from: '待支付', to: '已支付', reason: '支付成功并自动分班' }] }
   ],
   // 批次状态不落库，按 start/end 派生（batchStatusOf）；取值来自批次种子，与课表学期下拉同源。
   batches: cloneBatchSeed(),
@@ -280,39 +285,6 @@ function openLeadCreateForm() {
   });
 }
 
-function createLeadOrder(lead, classId) {
-  if (!classId) { showToast('暂无可报名班级，无法转报名。', 'warning'); return false; }
-  const existing = leadOrderOf(lead);
-  if (existing) {
-    openBusinessDialog('已有进行中订单', '该线索已存在面授订单，不能重复创建待支付订单。',
-      `<div class="sales-detail-list"><div><span>订单号</span><strong>${escapeHtml(existing.number)}</strong></div><div><span>订单状态</span><strong>${tag(existing.status)}</strong></div><div><span>关联班级</span><strong>${escapeHtml(existing.linked || existing.name || '—')}</strong></div><div><span>订单金额</span><strong>¥${escapeHtml(existing.amount || '0.00')}</strong></div></div>`,
-      '<a class="button primary" href="./offline-orders.html">查看订单</a><button type="button" class="button" data-dialog-close>关闭</button>');
-    return false;
-  }
-  const classRecord = dataSets.classes.find((record) => record.id === classId);
-  if (!classRecord || classEnrollmentCondition(classRecord) !== '报名中' || classDisplayStatus(classRecord) !== '显示') {
-    showToast('所选班级当前不可报名，请刷新后重新选择。', 'warning');
-    return false;
-  }
-  if (lead.intentCourseId && classRecord.courseId !== lead.intentCourseId) {
-    showToast('报名班级与线索意向课程不一致，请选择同课程班级。', 'warning');
-    return false;
-  }
-  const order = {
-    id: demoId('order'), number: `OD${Date.now()}`, name: classRecord.course || classRecord.name,
-    type: '面授课程', student: lead.student, account: lead.student, amount: String(classRecord.price || '0.00'),
-    status: '待支付', fulfillment: '未生成报名', linked: classRecord.name, classId: classRecord.id,
-    courseId: classRecord.courseId, time: demoTime(), sourceLeadNo: lead.number, sourceLeadId: lead.id,
-    intentCourseId: lead.intentCourseId || '', intentCourseName: lead.intentCourseName || lead.course || '',
-    intentClassId: lead.intentClassId || lead.classId || '', intentClassName: lead.intentClassName || lead.className || '',
-    intentTeacherName: lead.intentTeacherName || lead.teacherName || '',
-    logs: [{ at: demoTime(), role: '课程顾问', from: '—', to: '待支付', reason: 'CRM 转报名创建订单' }]
-  };
-  dataSets.orders.unshift(order);
-  upsertDemoRecord('orders', order);
-  return true;
-}
-
 function leadClassOptions(lead, selectedClassId = '') {
   const courseId = lead.intentCourseId || '';
   if (!courseId) return '';
@@ -361,54 +333,26 @@ function openLeadTrialForm(lead) {
   });
 }
 
-function openLeadEnrollForm(lead, renderAfter) {
-  if (!lead.intentCourseId) {
-    showToast('该历史线索尚未匹配课程库，请先补齐意向课程后再转报名。', 'warning');
-    return;
-  }
-  const orders = dataSets.orders
+function paidLeadOrders(lead) {
+  return dataSets.orders
     .filter((order) => order.type === '面授课程' && order.status === '已支付')
-    .filter((order) => !order.sourceLeadId && !order.sourceLeadNo && !order.conversionLeadId)
+    .filter((order) => !order.sourceLeadId && !order.sourceLeadNo && !order.conversionLeadId || order.sourceLeadId === lead.id || order.sourceLeadNo === lead.number)
     .filter((order) => (!order.student || order.student === lead.student || order.account === lead.student) && order.courseId === lead.intentCourseId)
     .sort((left, right) => String(right.time || right.createdAt || '').localeCompare(String(left.time || left.createdAt || '')));
-  if (!orders.length) {
-    showToast('暂无符合条件的已支付面授订单，请先在小程序完成报名和支付；引导过程请记录在跟进记录中。', 'warning');
-    return;
-  }
-  const dialog = openBusinessDialog('转报名', '用户已在小程序完成报名并支付后，由课程顾问手动选择对应的面授订单完成绑定。此操作不创建新订单。', `<form id="business-dialog-form" class="sales-dialog-grid">
-    ${readonlyRows([['学员', lead.student], ['手机号', lead.phone], ['意向课程', lead.course || lead.intentCourseName || '未指定'], ['意向备注', lead.intentRemark || '—']])}
-    <label class="form-field wide"><span>已支付面授订单号<b class="required-mark">*</b></span><select name="orderId" required><option value="">请选择订单号</option>${orders.map((order) => `<option value="${escapeHtml(order.id)}">${escapeHtml(order.number)} · ${escapeHtml(order.name || order.courseName || '面授课程')} · ${escapeHtml(order.linked || '未指定班级')}</option>`).join('')}</select></label>
-  </form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">确认绑定并转报名</button>');
-  dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    if (!checkBusinessForm(event.currentTarget)) return;
-    const orderId = String(new FormData(event.currentTarget).get('orderId') || '');
-    const order = orders.find((item) => item.id === orderId);
-    if (!order) return showToast('请选择有效的已支付面授订单。', 'warning');
-    lead.status = '已转化';
-    lead.conversionOrderId = order.id;
-    lead.conversionOrderNo = order.number;
-    lead.conversionAt = demoTime();
-    lead.conversionClassId = order.classId || '';
-    lead.conversionClassName = order.linked || order.name || '';
-    order.sourceLeadId = lead.id;
-    order.sourceLeadNo = lead.number;
-    order.conversionBoundAt = demoTime();
-    upsertDemoRecord('leads', lead);
-    upsertDemoRecord('orders', order);
-    closeBusinessDialog();
-    renderAfter();
-    showToast(`已绑定面授订单 ${order.number}，线索已转化。`);
-  });
+}
+
+function leadConversionSection(lead) {
+  const orders = paidLeadOrders(lead);
+  const selectedId = lead.conversionOrderId || '';
+  const options = orders.map((order) => `<option value="${escapeHtml(order.id)}" ${order.id === selectedId ? 'selected' : ''}>${escapeHtml(order.number)} · ${escapeHtml(order.name || order.courseName || '面授课程')} · ${escapeHtml(order.linked || '未指定班级')}</option>`).join('');
+  return `<section class="sales-dialog-section wide"><h4>线索处理</h4><div class="sales-dialog-grid"><label class="form-field"><span>线索处理<b class="required-mark">*</b></span><select name="result"><option value="保持当前状态">保持当前状态</option><option value="保持已跟进">保持已跟进</option><option value="已转化" ${lead.status === '已转化' ? 'selected' : ''}>已转化</option><option value="标记为已流失">标记为已流失</option></select></label><label class="form-field wide"><span>已支付订单号<b class="required-mark">*</b></span><select name="conversionOrderId"><option value="">请选择已支付面授订单</option>${options}</select></label><label class="form-field"><span>流失原因</span><input name="lostReason" maxlength="100" placeholder="选择标记为已流失时必填"></label></div></section>`;
 }
 
 // CR-2026-153：原「变更意向」「标记流失」「编辑标签」三个入口合并为一个「编辑线索」表单。
 // 意向课程变更才需要变更原因；标记流失需要 PERM-CRM-007 且原因为必填；标签沿用固定枚举，最多 5 个。
 function openLeadEditForm(lead) {
   const canLose = Boolean(window.hbyxPermissions?.can('PERM-CRM-007'));
-  const resultSection = ['待跟进', '已跟进'].includes(lead.status) && canLose
-    ? `<section class="sales-dialog-section wide"><h4>线索结果</h4><div class="sales-dialog-grid">${selectField('线索处理', 'result', ['保持已跟进', '标记为已流失'])}<label class="form-field"><span>流失原因</span><input name="lostReason" maxlength="100" placeholder="选择标记为已流失时必填"></label></div></section>`
-    : '';
+  const resultSection = canLose ? leadConversionSection(lead) : '';
   const dialog = openBusinessDialog('编辑线索', `线索编号 ${lead.number}；字段与新增线索一致，来源类型只读。`, leadFormFields(lead, 'edit', resultSection), '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保</button>');
   bindLeadClassSync(dialog, { courseId: lead.intentCourseId || '', classId: lead.intentClassId || lead.classId || '' });
   dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => {
@@ -419,6 +363,12 @@ function openLeadEditForm(lead) {
     const result = String(data.get('result') || '保持已跟进');
     const lostReason = String(data.get('lostReason') || '').trim();
     if (result === '标记为已流失' && !lostReason) { showToast('标记流失时必须填写流失原因。', 'warning'); return; }
+    let conversionOrder = null;
+    if (result === '已转化') {
+      const orderId = String(data.get('conversionOrderId') || '');
+      conversionOrder = paidLeadOrders(lead).find((order) => order.id === orderId) || null;
+      if (!conversionOrder) { showToast('选择“已转化”时必须选择有效的已支付面授订单。', 'warning'); return; }
+    }
     const courseChanged = values.courseId !== (lead.intentCourseId || '');
     if (courseChanged) {
       const before = { courseId: lead.intentCourseId || '', courseName: lead.intentCourseName || lead.course || '', classId: lead.intentClassId || lead.classId || '', className: lead.intentClassName || lead.className || '', teacherName: lead.intentTeacherName || lead.teacherName || '' };
@@ -442,6 +392,18 @@ function openLeadEditForm(lead) {
       lead.lostReason = lostReason;
       lead.lostAt = demoTime();
     }
+    if (result === '已转化') {
+      lead.status = '已转化';
+      lead.conversionOrderId = conversionOrder.id;
+      lead.conversionOrderNo = conversionOrder.number;
+      lead.conversionAt = lead.conversionAt || demoTime();
+      lead.conversionClassId = conversionOrder.classId || '';
+      lead.conversionClassName = conversionOrder.linked || conversionOrder.name || '';
+      conversionOrder.sourceLeadId = lead.id;
+      conversionOrder.sourceLeadNo = lead.number;
+      conversionOrder.conversionBoundAt = conversionOrder.conversionBoundAt || demoTime();
+      upsertDemoRecord('orders', conversionOrder);
+    }
     upsertDemoRecord('leads', lead);
     closeBusinessDialog();
     renderLeads();
@@ -449,6 +411,7 @@ function openLeadEditForm(lead) {
     if (courseChanged) parts.push('意向已变更，原试听与订单快照保持不变');
     parts.push('标签与主档已保存');
     if (result === '标记为已流失') parts.push('线索已标记为已流失，历史跟进记录保留');
+    if (result === '已转化') parts.push(`已绑定已支付订单 ${conversionOrder.number}`);
     showToast(`编辑线索已保存：${parts.join('；')}。`);
   });
 }
@@ -881,12 +844,15 @@ function renderProducts() {
 
 function renderOrders() {
   businessData = dataSets.orders;
-  // CR-2026-032 §2：指标卡可点击筛选（再次点击取消）、新增下单时间范围、关联状态并入订单状态列副行。
+  // CR-2026-032 §2：指标卡可点击筛选；支付、履约、退款三类状态分列展示。
   const metricCard = ([label, value, note, progress, metric]) => `<button type="button" class="card metric-card" data-order-metric="${metric}"><span class="metric-label">${label}</span><span class="metric-value">${value}</span><span class="metric-note">${note}</span>${progress ? `<span class="metric-progress"><span style="width:${progress}%"></span></span>` : ''}</button>`;
-  pageFrame('统一订单管理', '', '<button class="button" data-business-action="order-export">导出订单</button>', `<div class="card-grid compact-metrics">${[['今日订单', '26', '视频与面授合计', 0, 'today'], ['待支付', '1', '待完成支付', 0, '待支付'], ['退款中', '1', '符合规则的退款申请', 0, '退款中'], ['已支付', '18', '交易已完成', 70, '已支付']].map(metricCard).join('')}</div>` + filterPanel('order-filter', selectField('订单类型', 'type', ['视频课程', '面授课程']) + selectField('订单状态', 'status', ['待支付', '已支付', '已取消', '退款中', '已退款']) + selectField('关联状态', 'fulfillment', ['已分班', '已取消', '学习中', '未开始', '已完成']) + `<label class="form-field"><span>下单时间起</span><input name="from" type="date"></label><label class="form-field"><span>下单时间止</span><input name="to" type="date"></label>` + inputField('关键词', 'keyword', '订单号 / 课程名称 / 购买账号', true)) + table('<thead><tr><th>订单号</th><th>课程名称</th><th>课程类型</th><th>购买账号 / 学员</th><th>订单金额</th><th>订单状态 / 关联状态</th><th>关联班级 / 权限</th><th>下单时间</th><th>操作</th></tr></thead>'));
+  pageFrame('统一订单管理', '', '<button class="button" data-business-action="order-export">导出订单</button>', `<div class="sales-workspace-tabs order-type-tabs" role="tablist"><button type="button" role="tab" data-order-type="" aria-selected="true" class="active">全部订单</button><button type="button" role="tab" data-order-type="面授课程" aria-selected="false">面授课程</button><button type="button" role="tab" data-order-type="视频课程" aria-selected="false">视频课程</button></div><div class="card-grid compact-metrics" data-order-metrics></div>` + filterPanel('order-filter', selectField('订单类型', 'type', ['视频课程', '面授课程']) + selectField('支付状态', 'status', ['待支付', '已支付', '已取消']) + selectField('退款状态', 'refundStatus', ['无退款', '待审批', '退款中', '退款异常', '已退款', '已拒绝']) + `<label class="form-field"><span>下单时间起</span><input name="from" type="date"></label><label class="form-field"><span>下单时间止</span><input name="to" type="date"></label>` + inputField('购买账号', 'account', '账号名称 / 手机号 / 账号编号') + inputField('学员', 'student', '学员姓名') + inputField('班级名称', 'className', '关联班级名称') + inputField('关键词', 'keyword', '订单号 / 课程名称', true)) + table('<thead><tr><th>订单号</th><th>课程名称</th><th>课程类型</th><th>购买账号 / 学员</th><th>订单金额</th><th>支付状态</th><th>退款状态</th><th>关联班级</th><th>下单时间</th><th>操作</th></tr></thead>'));
   const params = new URLSearchParams(window.location.search);
+  document.querySelector('#order-filter [name="type"]')?.closest('.form-field')?.remove();
   // RM-F-07: video orders name the purchasing account; offline orders keep account + student.
-  const rows = (row) => `<td>${row.number}</td><td>${row.name}</td><td>${row.type}</td><td>${row.type === '视频课程' ? `${row.account || row.student}${row.account ? `<span class="sub-cell">${row.accountPhone || ''}</span>` : ''}` : `${row.account || '—'}<span class="sub-cell">学员：${row.student || '—'}</span>`}</td><td class="amount-cell">¥${row.amount}</td><td>${tag(row.status)}<span class="sub-cell">${row.fulfillment ? `关联状态：${row.fulfillment}` : '关联状态：—'}</span></td><td>${row.linked}</td><td>${row.time}</td><td><button class="text-button" data-business-action="order-view">查看详情</button></td>`;
+  const paymentStatusOf = (row) => ['退款中', '已退款'].includes(row.status) ? '已支付' : row.status;
+  const refundStatusOf = (row) => { const linked = (readDemoState().refunds || []).find(item => item.orderNo === row.number) || row.refund; return linked?.status || (['退款中', '已退款'].includes(row.status) ? row.status : '无退款'); };
+  const rows = (row) => { const collection = (readDemoState().paymentRecords || []).find(item => item.orderNo === row.number && ['待确认', '已到账'].includes(item.status)); return `<td>${row.number}</td><td>${row.name}</td><td>${row.type}</td><td>${row.type === '视频课程' ? `${row.account || row.student}${row.account ? `<span class="sub-cell">${row.accountPhone || ''}</span>` : ''}` : `${row.account || '—'}<span class="sub-cell">学员：${row.student || '—'}</span>`}</td><td class="amount-cell">¥${row.amount}</td><td>${tag(paymentStatusOf(row))}${collection ? `<span class="sub-cell">收款：${collection.status}</span>` : ''}</td><td>${tag(refundStatusOf(row))}</td><td>${row.type === '面授课程' ? (row.linked || '—') : '—'}</td><td>${row.time}</td><td><button class="text-button" data-business-action="order-view">查看详情</button>${row.status === '待支付' && !collection ? '<button class="text-button" data-business-action="order-payment-create">登记收款</button>' : ''}</td>`; };
   // 指标卡与筛选条件叠加：指标卡再次点击取消；下单时间范围含起止当天。
   let metricFilter = '';
   const inRange = (row, form) => {
@@ -900,19 +866,32 @@ function renderOrders() {
   const matchesMetric = (row) => {
     if (!metricFilter) return true;
     if (metricFilter === 'today') return String(row.time || '').startsWith('2026-09-08');
-    return row.status === metricFilter;
+    return metricFilter === '退款中' ? refundStatusOf(row) === '退款中' : paymentStatusOf(row) === metricFilter;
   };
-  const filterRows = (form) => renderRows(businessData, rows, (row) => matchesMetric(row) && inRange(row, form) && (!form.type.value || row.type === form.type.value) && (!form.status.value || row.status === form.status.value) && (!form.fulfillment.value || row.fulfillment === form.fulfillment.value) && (!form.keyword.value.trim() || `${row.number}${row.name}${row.student}${row.account || ''}`.includes(form.keyword.value.trim())));
+  const filterRows = (form, type = '') => renderRows(businessData, rows, (row) => matchesMetric(row) && inRange(row, form) && (!type || row.type === type) && (!form.status.value || paymentStatusOf(row) === form.status.value) && (!form.refundStatus.value || refundStatusOf(row) === form.refundStatus.value) && (!form.account.value.trim() || `${row.account || ''}${row.accountPhone || ''}`.includes(form.account.value.trim())) && (!form.student.value.trim() || String(row.student || '').includes(form.student.value.trim())) && (!form.className.value.trim() || String(row.linked || '').includes(form.className.value.trim())) && (!form.keyword.value.trim() || `${row.number}${row.name}`.includes(form.keyword.value.trim())));
   const form = document.querySelector('#order-filter');
-  if (form && params.get('type') === 'offline') form.type.value = '面授课程';
-  // 指标卡点击筛选：命中同一指标再次点击即取消。
-  document.querySelectorAll('[data-order-metric]').forEach((card) => card.addEventListener('click', () => {
+  let activeOrderType = params.get('type') === 'offline' ? '面授课程' : params.get('type') === 'video' ? '视频课程' : '';
+  const metricData = (type) => {
+    const scoped = businessData.filter((row) => !type || row.type === type);
+    const count = (status) => scoped.filter((row) => status === '退款中' ? refundStatusOf(row) === status : paymentStatusOf(row) === status).length;
+    return [['今日订单', scoped.filter((row) => String(row.time || '').startsWith('2026-09-08')).length, type ? `${type}订单` : '视频与面授合计', 0, 'today'], ['待支付', count('待支付'), '待完成支付', 0, '待支付'], ['退款中', count('退款中'), '符合规则的退款申请', 0, '退款中'], ['已支付', count('已支付'), '交易已完成', scoped.length ? Math.round((count('已支付') / scoped.length) * 100) : 0, '已支付']];
+  };
+  const bindMetricCards = () => document.querySelectorAll('[data-order-metric]').forEach((card) => card.addEventListener('click', () => {
     metricFilter = metricFilter === card.dataset.orderMetric ? '' : card.dataset.orderMetric;
     document.querySelectorAll('[data-order-metric]').forEach((item) => item.classList.toggle('is-active', item.dataset.orderMetric === metricFilter));
-    filterRows(form || { type: { value: '' }, status: { value: '' }, fulfillment: { value: '' }, keyword: { value: '' }, from: { value: '' }, to: { value: '' } });
+    filterRows(form || { status: { value: '' }, keyword: { value: '' }, from: { value: '' }, to: { value: '' } }, activeOrderType);
   }));
-  filterRows(form || { type: { value: '' }, status: { value: '' }, fulfillment: { value: '' }, keyword: { value: '' }, from: { value: '' }, to: { value: '' } });
-  form?.addEventListener('submit', (event) => { event.preventDefault(); filterRows(event.currentTarget); });
+  const renderMetrics = (type) => { const target = document.querySelector('[data-order-metrics]'); if (target) { target.innerHTML = metricData(type).map(metricCard).join(''); bindMetricCards(); } };
+  const syncOrderTypeTab = (type) => {
+    activeOrderType = type;
+    metricFilter = '';
+    document.querySelectorAll('[data-order-type]').forEach((tab) => { const active = tab.dataset.orderType === type; tab.classList.toggle('active', active); tab.setAttribute('aria-selected', String(active)); });
+    renderMetrics(type);
+    filterRows(form || { status: { value: '' }, keyword: { value: '' }, from: { value: '' }, to: { value: '' } }, type);
+  };
+  document.querySelectorAll('[data-order-type]').forEach((tab) => tab.addEventListener('click', () => syncOrderTypeTab(tab.dataset.orderType || '')));
+  syncOrderTypeTab(activeOrderType);
+  form?.addEventListener('submit', (event) => { event.preventDefault(); filterRows(event.currentTarget, activeOrderType); });
 }
 
 function renderBatches() {
@@ -1093,7 +1072,7 @@ function renderLeads() {
   const funnel = funnelSteps.map(([label, count], index) => `<div class="crm-funnel-step"><div class="crm-funnel-head"><strong>${label}</strong><span>${count} · ${Math.round((count / funnelBase) * 100)}%</span></div><div class="crm-funnel-bar"><span style="width:${Math.round((count / funnelBase) * 100)}%"></span></div>${index ? `<small>较上一阶段 ${funnelSteps[index - 1][1] ? Math.round((count / funnelSteps[index - 1][1]) * 100) : 0}%</small>` : '<small>统计基准</small>'}</div>`).join('');
   const funnelSection = `<section class="crm-funnel"><div class="crm-funnel-title"><h3>报名转化漏斗</h3><span>只读派生统计 · 报名转化率 ${conversionRate}</span></div><p>按当前全部线索、跟进、试听和有效报名事实实时计算，不单独维护数据与状态；待支付、已取消、退款中、已退款订单不计入已报名。</p><div class="crm-funnel-grid">${funnel}</div></section>`;
   pageFrame('线索跟进', '', '<button class="button" data-business-action="lead-export">导出线索与转化</button><button class="button primary" data-business-action="lead-create">新增线索</button>', leadMetrics(businessData) + funnelSection + filterPanel('lead-filter', selectField('线索状态', 'status', ['待跟进', '已跟进', '已转化', '已流失']) + selectField('来源类型', 'source', leadSources) + selectField('线索标签', 'tag', LEAD_TAG_OPTIONS) + inputField('关键词', 'keyword', '学员姓名 / 手机号', true)) + table('<thead><tr><th>线索编号</th><th>联系人</th><th>手机号</th><th>意向课程</th><th>关联班级</th><th>关联教师</th><th>来源</th><th>线索状态</th><th>标签</th><th>下次跟进</th><th>负责人</th><th>操作</th></tr></thead>'));
-  const rows = (row) => `<td>${escapeHtml(row.number)}</td><td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.phone)}</td><td>${escapeHtml(row.course || row.intentCourseName || '—')}</td><td>${escapeHtml(row.className || row.intentClassName || '未指定')}</td><td>${escapeHtml(row.teacherName || row.intentTeacherName || '未指定')}</td><td>${escapeHtml(row.source)}</td><td>${tag(row.status)}</td><td><div class="crm-lead-tags">${leadTagsDisplay(row)}</div></td><td>${escapeHtml(row.next)}</td><td>${escapeHtml(row.owner)}</td><td class="action-cell"><button class="text-button" data-perm="PERM-CRM-005" data-business-action="lead-edit">编辑线索</button><button class="text-button" data-business-action="lead-follow">填写跟进</button>${['待跟进', '已跟进'].includes(row.status) ? '<button class="text-button" data-business-action="lead-trial">转为试听</button><button class="text-button" data-business-action="lead-enroll">转报名</button>' : ''}${row.status === '已流失' ? '<button class="text-button" data-business-action="lead-reactivate">重新激活</button>' : ''}<button class="text-button" data-business-action="lead-view">查看</button></td>`;
+  const rows = (row) => `<td>${escapeHtml(row.number)}</td><td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.phone)}</td><td>${escapeHtml(row.course || row.intentCourseName || '—')}</td><td>${escapeHtml(row.className || row.intentClassName || '未指定')}</td><td>${escapeHtml(row.teacherName || row.intentTeacherName || '未指定')}</td><td>${escapeHtml(row.source)}</td><td>${tag(row.status)}</td><td><div class="crm-lead-tags">${leadTagsDisplay(row)}</div></td><td>${escapeHtml(row.next)}</td><td>${escapeHtml(row.owner)}</td><td class="action-cell"><button class="text-button" data-perm="PERM-CRM-005" data-business-action="lead-edit">编辑线索</button><button class="text-button" data-business-action="lead-follow">填写跟进</button>${['待跟进', '已跟进'].includes(row.status) ? '<button class="text-button" data-business-action="lead-trial">转为试听</button>' : ''}${row.status === '已流失' ? '<button class="text-button" data-business-action="lead-reactivate">重新激活</button>' : ''}<button class="text-button" data-business-action="lead-view">查看</button></td>`;
   renderRows(businessData, rows, () => true);
   document.querySelector('#lead-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, source, tag: tagField, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!source.value || row.source === source.value) && (!tagField.value || leadTagsOf(row).includes(tagField.value)) && (!keyword.value.trim() || `${row.student}${row.phone}`.includes(keyword.value.trim()))); });
 }
@@ -1113,6 +1092,24 @@ function appendClassRosterSection(row) {
   const remaining = Math.max(0, Number(row.capacity || 0) - Number(row.enrolled || 0));
   const aggregateNote = Number(row.enrolled || 0) > enrollments.length ? `<p class="sales-roster-meta">汇总报名 ${Number(row.enrolled || 0)} 人；当前可查看 ${enrollments.length} 条报名明细。</p>` : '';
   card.insertAdjacentHTML('beforeend', `<section class="sales-class-roster"><h3>课次与班级名单</h3><div class="sales-dialog-summary"><div><span>课次</span><strong>${sessions.length}</strong></div><div><span>已报名 / 容量</span><strong>${Number(row.enrolled || 0)} / ${Number(row.capacity || 0)}</strong></div><div><span>剩余名额</span><strong>${remaining}</strong></div></div><p class="sales-roster-meta">上课规则：${escapeHtml(row.schedule || '—')} · 课次：${escapeHtml(sessionLine)}</p>${aggregateNote}<div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>登录账号</th><th>报名时间</th><th>状态</th></tr></thead><tbody>${roster}</tbody></table></div></section>`);
+}
+
+function openOrderPaymentForm(row) {
+  if (row.status !== '待支付') return showToast('仅待支付订单可以登记线下收款。', 'warning');
+  const shared = readDemoState();
+  const existing = (shared.paymentRecords || []).find(item => item.orderNo === row.number && ['待确认', '已到账'].includes(item.status));
+  if (existing) return showToast('该订单已有收款记录，不能重复登记。', 'warning');
+  const amount = Number(row.amount || 0);
+  const body = `<form id="order-payment-form" class="sales-dialog-grid"><div class="sales-dialog-summary wide"><div><span>订单号</span><strong>${escapeHtml(row.number)}</strong></div><div><span>学员 / 购买账号</span><strong>${escapeHtml(row.student || row.account || '—')}</strong></div><div><span>应收金额</span><strong>¥${amount.toFixed(2)}</strong></div></div><label class="form-field"><span>收款方式 <b class="required-mark">*</b></span><select name="channel" required><option value="银行转账">银行转账</option><option value="现金">现金</option><option value="其他">其他</option></select></label><label class="form-field"><span>收款时间 <b class="required-mark">*</b></span><input name="time" type="datetime-local" required></label><label class="form-field wide"><span>收款凭证 / 流水号</span><input name="voucher" maxlength="100" placeholder="选填，建议填写银行流水号"></label><label class="form-field wide"><span>备注</span><textarea name="remark" maxlength="200" placeholder="选填"></textarea></label><p class="form-help wide">登记后收款记录进入“待确认”，订单仍为待支付；财务核对到账后才会触发支付和履约。</p></form>`;
+  const dialog = openBusinessDialog('登记订单收款', '只登记与当前订单关联的线下收款，不直接确认到账。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="order-payment-form" class="button primary">登记收款</button>');
+  dialog.querySelector('#order-payment-form')?.addEventListener('submit', (event) => {
+    event.preventDefault(); const data = new FormData(event.currentTarget); const channel = String(data.get('channel') || ''); const time = String(data.get('time') || '').replace('T', ' ');
+    if (!channel || !time) return showToast('收款方式和收款时间必填。', 'warning');
+    const records = readDemoState().paymentRecords || [];
+    if (records.some(item => item.orderNo === row.number && ['待确认', '已到账'].includes(item.status))) return showToast('该订单已有收款记录，不能重复登记。', 'warning');
+    const record = { id: `payment-${Date.now()}`, receiptNo: `RC${Date.now()}`, orderNo: row.number, student: row.student || '—', course: row.name, source: row.type, channel, amount, time, status: '待确认', businessKey: `receipt:${row.number}:${channel}:${time}:${amount}`, auditStatus: '待核对', voucher: String(data.get('voucher') || '').trim(), remark: String(data.get('remark') || '').trim() };
+    upsertDemoRecord('paymentRecords', record); row.collectionStatus = '待确认'; closeBusinessDialog(); renderOrders(); showToast('收款已登记，等待财务核对到账。');
+  });
 }
 
 // CR-2026-032 §3：订单详情由通用弹窗改为订单专用分区详情（五分区，无数据的分区不渲染，不展示渠道侧标识与回调结果）。
@@ -1150,7 +1147,7 @@ function openOrderDetail(row) {
   const body = [
     section('订单信息', `<dl class="course-detail-list">${baseRows}</dl>`),
     section('支付记录', paymentRows ? `<dl class="course-detail-list">${paymentRows}</dl>` : ''),
-    section('退款记录', refundRows),
+    section('退款记录', `${refundRows}<p class="sales-dialog-summary"><a class="link" href="/admin/pages/finance/refunds.html?orderNo=${encodeURIComponent(row.number)}">进入退款记录处理</a><span class="sub-cell">审批、异常登记、渠道重试和完成确认统一在退款记录页操作</span></p>`),
     section('履约结果', `<dl class="course-detail-list">${fulfillmentRows || '<div class="wide"><dt>结果</dt><dd>—</dd></div>'}${seatFailed ? '<div class="wide"><dt>退款结果</dt><dd>报名未成功，已发起全额原路退款</dd></div>' : ''}</dl>`),
     section('操作日志', logRows ? `<div class="table-wrap"><table><thead><tr><th>时间</th><th>操作人角色</th><th>状态变更</th><th>变更原因</th></tr></thead><tbody>${logRows}</tbody></table></div>` : '')
   ].join('');
@@ -1476,6 +1473,7 @@ function handleBusinessAction(action, row) {
   }
   if (action === 'product-publish' || action === 'product-unpublish') { row.status = action === 'product-publish' ? '已上架' : '已下架'; row.updated = action === 'product-publish' ? demoTime() : row.updated; persistProduct(row); renderProducts(); showToast(action === 'product-publish' ? '商品已上架，学员端可购买。' : '商品已下架，历史订单不受影响。'); return; }
   if (action === 'order-view') return openOrderDetail(row);
+  if (action === 'order-payment-create') return openOrderPaymentForm(row);
   if (action === 'class-view') return openClassDetail(row);
   if (action === 'schedule-history') return openScheduleHistory(row);
   if (action === 'class-create' || action === 'class-edit') return openClassForm(row);
@@ -1517,7 +1515,6 @@ function handleBusinessAction(action, row) {
   if (action === 'lead-edit') return openLeadEditForm(row);
   if (action === 'lead-follow') return openSimpleForm('填写跟进', '记录跟进方式、内容和下次跟进时间；保存后完成首次有效跟进的线索变为“已跟进”。', selectField('跟进方式', 'method', ['电话', '微信', '面谈', '短信']) + inputField('跟进内容', 'content', '请输入跟进内容', true) + inputField('下次跟进时间', 'next', '2026-09-20 10:00'), '跟进记录已保存。', (data) => { row.followUps = [...(row.followUps || []), { at: demoTime(), method: data.get('method'), content: String(data.get('content') || '').trim(), next: data.get('next') || '—', owner: row.owner || '当前账号' }]; row.next = data.get('next') || '—'; if (row.status === '待跟进') row.status = '已跟进'; upsertDemoRecord('leads', row); renderLeads(); });
   if (action === 'lead-trial') return openLeadTrialForm(row);
-  if (action === 'lead-enroll') return openLeadEnrollForm(row, renderLeads);
   if (action === 'lead-reactivate') return openSimpleForm('重新激活线索', '重新激活必须填写原因，并将线索恢复为待跟进。', inputField('激活原因', 'reason', '请输入重新激活原因', true) + inputField('下次跟进时间', 'next', '2026-09-20 10:00', true), '线索已重新激活。', (data) => { row.status = '待跟进'; row.next = data.get('next'); row.followUps = [...(row.followUps || []), { at: demoTime(), method: '重新激活', content: data.get('reason'), next: data.get('next'), owner: row.owner || '当前账号' }]; upsertDemoRecord('leads', row); renderLeads(); });
   if (action === 'lead-create') return openLeadCreateForm();
   if (action === 'lead-export') return showToast('导出任务已创建，线索与转化数据按当前角色权限脱敏。');

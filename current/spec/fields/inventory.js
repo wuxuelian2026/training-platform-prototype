@@ -65,7 +65,7 @@ export const INVENTORY_FIELD_SPEC = {
       ],
       notes: [
         '新增物资库存固定为0，库存只能由入库和出库流水变更，不直接手工改写库存数。',
-        '库存状态按无库存、库存不足、正常展示，库存不足的物资优先提示。',
+        '库存状态按库存不足、正常展示；库存不高于预警阈值统一归为库存不足并优先提示。',
         '已产生出入库流水的物资保留历史记录，不删除台账；物资仅允许停用。'
       ]
     },
@@ -93,16 +93,6 @@ export const INVENTORY_FIELD_SPEC = {
         { id: 'FD-INVENTORY-037', label: '入库数量', type: '数字（只读）', length: '正整数', required: '系统记录', note: '入库流水数量', constraints: { readOnly: true, integer: true } },
         { id: 'FD-INVENTORY-038', label: '入库日期', type: '日期（只读）', length: 'YYYY-MM-DD', required: '系统记录', note: '入库流水日期', constraints: { readOnly: true, format: 'YYYY-MM-DD' } }
       ] }], notes: ['流水只读，登记错误通过新增反向流水冲销。']
-    },
-    'inventory/ledger': {
-      groups: [{ heading: '库存台账字段', fields: [
-        { id: 'FD-INVENTORY-039', label: '物资名称', type: '文本', length: '≤ 50 字', required: '否', note: '按物资名称关键词筛选', constraints: { maxLength: 50 } },
-        { id: 'FD-INVENTORY-040', label: '物资分类', type: '下拉', length: '预置分类', required: '否', note: '按物资分类筛选' },
-        { id: 'FD-INVENTORY-041', label: '库存状态', type: '下拉', length: '正常 / 库存不足 / 无库存', required: '否', note: '按当前库存与预警阈值派生' },
-        { id: 'FD-INVENTORY-042', label: '当前库存', type: '整数（只读）', length: '非负整数', required: '系统派生', note: '入库数量减出库数量，不支持直接编辑', constraints: { readOnly: true, derived: true, integer: true } },
-        { id: 'FD-INVENTORY-043', label: '预警阈值', type: '整数（只读）', length: '非负整数', required: '台账记录', note: '来自物资档案', constraints: { readOnly: true, derived: true, integer: true } },
-        { id: 'FD-INVENTORY-044', label: '单位', type: '文本（只读）', length: '预置单位', required: '系统记录', note: '来自物资档案', constraints: { readOnly: true, derived: true } }
-      ] }], notes: ['台账库存只由入库和出库流水计算，不提供手工调库存。']
     },
     'inventory/outbound-records': {
       groups: [{ heading: '出库记录查询字段', fields: [

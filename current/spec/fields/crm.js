@@ -104,6 +104,8 @@ export const CRM_FIELD_SPEC = {
           { id: 'FD-CRM-075', label: '线索标签', type: '多选', length: '最多 5 个', required: '否', note: '固定标签用于销售分层与筛选，不参与线索状态流转', constraints: { options: ['高意向', '待回访', '试听后待转化', '价格敏感', '已流失待激活'], multi: true, maxItems: 5 } },
           { id: 'FD-CRM-083', label: '报名转化漏斗', type: '统计（只读）', length: '当前线索 / 有效跟进 / 已试听 / 已报名', required: '系统派生', note: 'CR-2026-152 起合并到线索跟进页：展示各阶段数量、相对当前线索占比与相邻阶段转化率，不支持编辑', constraints: { readOnly: true, derived: true } },
           { id: 'FD-CRM-102', label: '流失原因', type: '多行文本', length: '≤ 100 字', required: '标记流失时必填', note: 'CR-2026-153 编辑线索「线索结果」内维护：选择标记为已流失时校验必填，记录流失原因与时间', constraints: { maxLength: 100, requiredWhen: 'markLost' } },
+          { id: 'FD-CRM-103', label: '线索处理', type: '下拉', length: '保持当前状态 / 保持已跟进 / 已转化 / 标记为已流失', required: '是', note: '统一在编辑线索弹窗内处理结果；选择已转化时联动已支付订单号', constraints: { options: ['保持当前状态', '保持已跟进', '已转化', '标记为已流失'] } },
+          { id: 'FD-CRM-104', label: '已支付订单号', type: '订单引用', length: '已支付面授订单', required: '选择已转化时必填', note: '支持按订单号、课程或班级搜索；订单必须属于当前学员、与意向课程一致且未绑定其他线索', constraints: { dictionary: '统一订单', requiredWhen: 'converted', uniqueBinding: true } },
         ] }
       ],
       notes: [

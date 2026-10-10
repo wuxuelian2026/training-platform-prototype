@@ -260,6 +260,8 @@ const defaultState = () => ({
   progress: {},
   // CR-2026-052：视频退款规则由后台参数配置，客户端与财务端读取同一份演示状态。
   videoRefundSettings: { windowDays: 7, maxLessons: 3 },
+  // 视频课程和面授课程共用退款申请窗口与已消课比例。
+  refundSettings: { windowDays: 7, selfMaxCompletedPercent: 100 },
   // 2026-09-24：面授退款策略只对新申请生效；退款单创建时保存策略快照。
   classRefundSettings: {
     windowDays: 0,
@@ -355,18 +357,29 @@ const clampInt = (value, min, max, fallback) => {
 // 学员端资格校验与后台线下登记读取同一份配置。
 export function videoRefundSettings() {
   const settings = readStored().videoRefundSettings || {};
+  const unified = readStored().refundSettings || {};
   return {
-    windowDays: clampInt(settings.windowDays ?? 7, 1, 30, 7),
-    maxLessons: clampInt(settings.maxLessons ?? 3, 0, 999, 3)
+    windowDays: clampInt(unified.windowDays ?? settings.windowDays ?? 7, 0, 365, 7),
+    maxLessons: clampInt(settings.maxLessons ?? 3, 0, 999, 3),
+    selfMaxCompletedPercent: clampInt(unified.selfMaxCompletedPercent ?? 100, 0, 100, 100)
+  };
+}
+
+export function refundSettings() {
+  const settings = readStored().refundSettings || {};
+  return {
+    windowDays: clampInt(settings.windowDays ?? 7, 0, 365, 7),
+    selfMaxCompletedPercent: clampInt(settings.selfMaxCompletedPercent ?? 100, 0, 100, 100)
   };
 }
 
 // 面授退款参数只决定资格；MVP 退款金额固定为订单实收全额。
 export function classRefundSettings() {
   const settings = readStored().classRefundSettings || {};
+  const unified = refundSettings();
   return {
-    windowDays: clampInt(settings.windowDays ?? 0, 0, 365, 0),
-    selfMaxCompletedPercent: clampInt(settings.selfMaxCompletedPercent ?? 100, 0, 100, 100)
+    windowDays: clampInt(unified.windowDays ?? settings.windowDays ?? 0, 0, 365, 0),
+    selfMaxCompletedPercent: clampInt(unified.selfMaxCompletedPercent ?? settings.selfMaxCompletedPercent ?? 100, 0, 100, 100)
   };
 }
 
@@ -379,7 +392,7 @@ export function paymentTimeoutSettings() {
 // CR-2026-作业链路：教师端发布作业与服务层共用后台的截止时间参数（1–720 小时）。
 export function homeworkDeadlineSettings() {
   const settings = readStored();
-  return { deadlineHours: clampInt(settings.homeworkDeadlineHours ?? 72, 1, 720, 72) };
+  return { deadlineHours: clampInt(settings.homeworkDeadlineHours ?? 72, 24, 720, 72) };
 }
 
 // CR-2026-104：文件上传规格由「参数配置」维护，上传校验、提示文案与后台上传入口读取同一份配置。

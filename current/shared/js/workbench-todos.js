@@ -2,6 +2,7 @@ import { readDemoState, writeDemoState } from './demo-store.js';
 import { applicationSeed } from './course-seed.js';
 import { graduationSeed } from './graduation-seed.js';
 import { readAdminSession } from './admin-auth.js';
+import { unreadAdminMessageCount } from './admin-inbox.js';
 
 const TODO_COLLECTION = 'adminTodos';
 const roleTypes = {
@@ -67,6 +68,10 @@ function render() {
   const count = rows.length;
   root.querySelector('[data-todo-count]')?.replaceChildren(document.createTextNode(String(count)));
   root.querySelector('[data-overdue-count]')?.replaceChildren(document.createTextNode(String(rows.filter((item) => item.priority === 'P0').length)));
+  const unreadMessages = unreadAdminMessageCount();
+  root.querySelector('[data-message-count]')?.replaceChildren(document.createTextNode(String(unreadMessages)));
+  const badge = document.querySelector('[data-admin-message-count]');
+  if (badge) { badge.textContent = String(unreadMessages); badge.hidden = unreadMessages === 0; }
   const list = root.querySelector('[data-todo-list]');
   if (!list) return;
   list.innerHTML = rows.length ? rows.map((item) => `<a class="mobile-list-item workbench-todo-row" href="${escapeHtml(item.targetUrl)}?todoId=${encodeURIComponent(item.id)}"><div><strong>${escapeHtml(item.title)} <span class="tag ${item.priority === 'P0' ? 'red' : 'brand'}">${item.priority}</span></strong><small>${escapeHtml(item.summary)} · ${escapeHtml(item.assigneeRole)}</small></div><span class="button">查看</span></a>`).join('') : '<div class="empty">当前角色暂无待处理事项。</div>';

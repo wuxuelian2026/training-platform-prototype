@@ -56,10 +56,15 @@ export const FINANCE_FIELD_SPEC = {
     },
     'finance/refunds': {
       groups: [
+        { heading: '退款记录筛选字段', fields: [
+          { id: 'FD-FINANCE-042', label: '课程', type: '关联对象选择（可搜索）', length: '可选课程', required: '否', note: '审批处理与退款执行页签共用；选项来自退款单关联课程' },
+          { id: 'FD-FINANCE-043', label: '班级', type: '关联对象选择（可搜索）', length: '可选班级', required: '否', note: '审批处理与退款执行页签共用；选项来自退款单关联班级' },
+          { id: 'FD-FINANCE-044', label: '订单号', type: '文本', length: '≤ 50 字', required: '否', note: '与学员姓名独立筛选，支持模糊匹配', constraints: { maxLength: 50 } },
+          { id: 'FD-FINANCE-045', label: '学员', type: '文本', length: '≤ 30 字', required: '否', note: '与订单号独立筛选，支持姓名模糊匹配', constraints: { maxLength: 30 } }
+        ] },
         { heading: '退款审批字段', fields: [
           { id: 'FD-FINANCE-009', label: '审批结果', type: '单选', length: '通过 / 拒绝', required: '是', note: '决定退款是否继续' },
           { id: 'FD-FINANCE-010', label: '拒绝原因', type: '文本', length: '≤ 200 字', required: '拒绝时必填', note: '填写后同步给申请人', constraints: { maxLength: 200 } },
-          { id: 'FD-FINANCE-011', label: '退款方式', type: '下拉', length: '原路退回 / 线下退回', required: '是', note: '默认原路退回' },
           { id: 'FD-FINANCE-012', label: '财务备注', type: '文本', length: '≤ 200 字', required: '否', note: '选填', constraints: { maxLength: 200 } }
         ] },
         // CR-2026-036：线下退款登记（登记的是已发生的线下退款事实，不是发起退款申请）。
@@ -80,9 +85,9 @@ export const FINANCE_FIELD_SPEC = {
         'CR-2026-036：线下退款没有渠道回调，登记成功即视为退款完成，订单状态直接转为「已退款」，不经过「退款中」；登记失败不产生任何记录。',
         'CR-2026-036：面授订单登记后取消报名并释放名额；视频订单登记后回收该账号对课程的学习权限，已产生的学习记录、排课、考勤与计薪保留不改写。',
         'CR-2026-052：视频订单退款资格为购课期限内且观看课时不超过后台参数上限；满足时只允许按实付金额全额退款，线下登记同样复核资格。',
-        '退款状态在收到渠道成功回调前保持“退款中”，不得提前标记“已退款”。',
+        '退款状态在收到渠道成功回调前不得标记“已退款”；渠道失败、超时或超过自动重试上限时进入“退款异常”。',
         '同一支付流水只允许发起一次退款，退款申请与支付流水按唯一约束关联。',
-        '退款失败或超时保留原状态并允许重试，重试复用同一业务键。'
+        '退款异常可重新提交；重试时复用原退款单、商户退款请求号和业务幂等键，不新建退款记录。'
       ]
     }
   }

@@ -9,6 +9,7 @@ import { classRefundSettings, demoId, demoTime, readDemoState, transitionVideoEn
 import { classLessonProgress } from './class-lifecycle.js';
 import { isEnrollmentActive } from './class-roster.js';
 import { mergeClassSeed } from './class-seed.js';
+import { emitNotificationEvent } from './notification-store.js';
 
 export const REFUND_STATUS = { PENDING: '待审批', PROCESSING: '退款中', EXCEPTION: '退款异常', DONE: '已退款', REJECTED: '已拒绝' };
 export const REFUND_ORIGIN = { LEARNER: '学员申请', ENROLLMENT: '学籍异动', OFFLINE: '线下登记', SYSTEM: '系统' };
@@ -69,18 +70,20 @@ function recordRefundAudit(refund, action, fromStatus, toStatus, operator = {}, 
 
 function notifyRefundAccount(refund, event, title, summary, body = summary) {
   if (!refund.accountId) return;
+  const statusVersion = `${refund.status}:${refund.completedAt || refund.reviewedAt || refund.exceptionAt || demoTime()}`;
+  emitNotificationEvent({
+    event: 'refund_status_changed', sourceType: 'refund', sourceId: refund.id, version: statusVersion,
+    dedupeKey: `refund_status:${refund.id}:${refund.status}:${refund.retryCount || 0}`,
+    title, content: body, audience: 'learner', audienceLabel: '学员',
+    className: refund.classId ? (classById(refund.classId)?.name || refund.classId) : '',
+    recipients: [{ recipientId: refund.accountId, recipientType: '学员', name: refund.studentName || refund.accountId, scope: '退款状态变更时申请人快照' }],
+    target: `/learner/pages/order-detail.html?orderId=${encodeURIComponent(refund.orderId || refund.orderNo)}`
+  });
+  // 兼容现有教师/学员消息聚合读取；新后台消息中心以共享通知记录为准。
   appendRefundFact('refundNotifications', {
     id: `refund-notice:${refund.id}:${event}`,
-    audience: 'learner',
-    recipientId: refund.accountId,
-    type: event,
-    title,
-    summary,
-    body,
-    createdAt: demoTime(),
-    read: false,
-    refundId: refund.id,
-    orderId: refund.orderId || refund.orderNo,
+    audience: 'learner', recipientId: refund.accountId, type: event, title, summary, body,
+    createdAt: demoTime(), read: false, refundId: refund.id, orderId: refund.orderId || refund.orderNo,
     target: `/learner/pages/order-detail.html?orderId=${encodeURIComponent(refund.orderId || refund.orderNo)}`
   });
 }
@@ -198,6 +201,8 @@ function refundNo() {
  * @returns {{ok: boolean, refund?: object, order?: object, reason?: string, existing?: object}}
  */
 export function createRefundRequest(input = {}) {
+  const requestReason = String(input.reason || '').trim();
+  if (!requestReason) return { ok: false, reason: 'REFUND_REASON_REQUIRED' };
   const order = orderById(input.orderId);
   if (!order) return { ok: false, reason: 'ORDER_NOT_FOUND' };
   if (order.status === REFUND_STATUS.DONE) return { ok: false, reason: 'ORDER_ALREADY_REFUNDED' };
@@ -237,7 +242,7 @@ export function createRefundRequest(input = {}) {
     totalLessons: suggestion?.total ?? null,
     rule: suggestion?.rule || '视频课程全额退款规则',
     policySnapshot: suggestion?.policy ? { ...suggestion.policy } : null,
-    reason: String(input.reason || '').trim() || (isClass ? '学员申请面授退款' : '学员申请视频课程退款'),
+    reason: requestReason,
     channel: input.channel || order.payMethod || '原路退回',
     time: now,
     requestedAt: now,
@@ -349,7 +354,6 @@ export function settleRefund(refundId, decision, operator = {}) {
   recordRefundAudit(next, decision, refund.status, next.status, operator, failReason || next.remark);
   if (decision === '通过') notifyRefundAccount(next, '退款审批通过', '退款审批已通过', `退款单 ${next.no} 已进入渠道退款处理。`);
   if (decision === '拒绝') notifyRefundAccount(next, '退款审批拒绝', '退款申请未通过', `退款单 ${next.no} 未通过：${failReason}`);
-  if (decision === '异常') notifyRefundAccount(next, '退款处理异常', '退款处理延迟', `退款单 ${next.no} 处理延迟，工作人员正在核对。`);
   if (decision === '完成') notifyRefundAccount(next, '退款已完成', '退款已完成', `退款单 ${next.no} 已完成，请留意退款账户入账情况。`);
 
   let nextOrder = order;

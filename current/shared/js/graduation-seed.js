@@ -8,7 +8,7 @@ export const graduationSeed = [{
     { id: 'learner-zhou', name: '周予安', attendance: '80%', homework: '90%', comment: '基本动作掌握较稳，组合衔接仍需加强。', suggestion: '补齐缺勤课次后重点练习身韵连接和重心转换。', status: '审核中' },
     { id: 'learner-chen', name: '陈一诺', attendance: '85%', homework: '75%', comment: '课堂参与积极，基础动作完成度较好。', suggestion: '补交缺失作业，并针对转身稳定性进行集中练习。', status: '审核中' },
     { id: 'learner-zhao', name: '赵明月', attendance: '100%', homework: '100%', comment: '身韵表达自然，能够准确完成课程组合并形成稳定的舞台表现。', suggestion: '可继续进行进阶组合训练，提升动作细节与呼吸配合。', status: '已通过', auditBy: '教务管理员', auditAt: '2026-09-09 10:20', auditNote: '考勤、作业与教师评语符合结业要求。' },
-    { id: 'learner-wu', name: '吴桐', attendance: '50%', homework: '40%', comment: '已完成前半段基础训练。', suggestion: '如后续恢复学习，建议从柔韧与力量基础重新衔接。', status: '已取消结业' }
+    { id: 'learner-wu', name: '吴桐', attendance: '50%', homework: '40%', comment: '已完成前半段基础训练。', suggestion: '如后续恢复学习，建议从柔韧与力量基础重新衔接。', status: '审核中' }
   ]
 }, {
   id: 'graduation-vocal', className: '成人声乐班', course: '声乐基础', teacher: '陈晨', operational: '已结束', classStatus: '已归档', endDate: '2026-09-07', learners: [

@@ -41,14 +41,16 @@ export const ACADEMIC_FIELD_SPEC = {
 
     'academic/messages': {
       groups: [
-        { heading: '发送通知字段', fields: [
-          { id: 'FD-ACADEMIC-008', label: '通知类型', type: '下拉', length: '预置类型', required: '是', note: '决定通知模板与送达范围' },
-          { id: 'FD-ACADEMIC-009', label: '目标班级', type: '下拉', length: '可选班级', required: '是', note: '选定后发送到该班级学员' },
-          { id: 'FD-ACADEMIC-010', label: '通知标题', type: '文本', length: '≤ 50 字', required: '是', note: '消息列表标题', constraints: { maxLength: 50 } },
+        { heading: '自动通知记录字段', fields: [
+          { id: 'FD-ACADEMIC-008', label: '通知类型', type: '系统派生', length: '预置类型', required: '系统派生', note: '由触发事件规则决定' },
+          { id: 'FD-ACADEMIC-009', label: '目标班级', type: '系统派生', length: '关联班级', required: '按事件', note: '来自触发业务对象，不由后台手动选择' },
+          { id: 'FD-ACADEMIC-010', label: '通知标题', type: '系统派生', length: '≤ 50 字', required: '系统派生', note: '由事件模板生成', constraints: { maxLength: 50 } },
           { id: 'FD-ACADEMIC-012', label: '通知内容', type: '文本（长文本）', length: '≤ 2000 字', required: '是', note: '通知正文使用普通长文本输入，按纯文本保存并在教师端、学员端保留换行展示；输入框实时提示字数并阻止超限保存（2026-09-29）', constraints: { maxLength: 2000 } },
-          { id: 'FD-ACADEMIC-039', label: '发送方式', type: '单选', length: '立即发送 / 定时发送', required: '否', note: '默认立即发送；选择定时发送时必须填写发送时间', constraints: { options: ['立即发送', '定时发送'] } },
-          { id: 'FD-ACADEMIC-011', label: '发送时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '定时发送时必填', note: '发送方式为定时发送时必填', constraints: { format: 'YYYY-MM-DD HH:mm', requiredWhen: 'FD-ACADEMIC-039=定时发送' } },
-          { id: 'FD-ACADEMIC-013', label: '发送范围', type: '单选', length: '全部学员 / 仅在读学员', required: '是', note: '决定接收人范围' },
+          { id: 'FD-ACADEMIC-039', label: '发送方式', type: '系统派生', length: '立即发送 / 定时提醒', required: '系统派生', note: '由事件规则决定，后台不手动选择' },
+          { id: 'FD-ACADEMIC-011', label: '计划发送时间', type: '日期时间（只读）', length: 'YYYY-MM-DD HH:mm', required: '按事件', note: '即时事件为业务成功时间；提醒事件按规则计算', constraints: { format: 'YYYY-MM-DD HH:mm', readOnly: true } },
+          { id: 'FD-ACADEMIC-013', label: '接收人快照', type: '系统派生', length: '逐人记录', required: '系统派生', note: '按事件发生时业务关系冻结' },
+          { id: 'FD-ACADEMIC-087', label: '去重键', type: '系统派生', length: '唯一字符串', required: '系统派生', note: '同一业务事件只能生成一条通知，状态版本变化才允许重新生成', constraints: { unique: true } },
+          { id: 'FD-ACADEMIC-088', label: '触发事件', type: '系统派生', length: '事件编码', required: '系统派生', note: '记录生成通知的业务操作' },
           { id: 'FD-ACADEMIC-086', label: '通知来源', type: '状态（只读）', length: '人工通知 / 系统通知', required: '系统派生', note: '人工通知由教务发起；系统通知由退款、合同、作业、结业、工资等业务动作自动产生，两者共用同一份发送记录与投递明细', constraints: { readOnly: true, derived: true } }
         ] }
       ],
@@ -78,10 +80,10 @@ export const ACADEMIC_FIELD_SPEC = {
     'academic/graduation': {
       groups: [{ heading: '结业审核列表字段', fields: [
         { id: 'FD-ACADEMIC-060', label: '班级结业状态', type: '下拉', length: '预置结业状态', required: '否', note: '按班级结业处理状态筛选' },
-        { id: 'FD-ACADEMIC-061', label: '授课教师', type: '下拉', length: '在职或历史授课教师', required: '否', note: '按班级授课教师筛选' },
-        { id: 'FD-ACADEMIC-062', label: '结课时间', type: '日期区间', length: 'YYYY-MM-DD', required: '否', note: '按班级结课日期筛选', constraints: { format: 'YYYY-MM-DD' } },
-        { id: 'FD-ACADEMIC-063', label: '关键词', type: '文本', length: '≤ 50 字', required: '否', note: '匹配班级名称或编号', constraints: { maxLength: 50 } },
-        { id: 'FD-ACADEMIC-064', label: '学员结业判定', type: '状态（只读）', length: '建议结业 / 审核中 / 已通过 / 已取消结业', required: '系统派生', note: '建议结业为按出勤率与作业提交率给出的初判，仅作复核参考；学员结业取值以状态源 SM-STUDENT-GRADUATION 为准（CR-2026-154 收敛为审核中／已通过／已取消结业）', constraints: { readOnly: true, derived: true } },
+        { id: 'FD-ACADEMIC-061', label: '班级', type: '可搜索选择框', length: '可选结业班级', required: '否', note: '按班级名称搜索或从候选班级中选择' },
+        { id: 'FD-ACADEMIC-062', label: '课程', type: '可搜索选择框', length: '可选面授课程', required: '否', note: '按课程名称搜索或从候选课程中选择' },
+        { id: 'FD-ACADEMIC-063', label: '授课教师', type: '可搜索选择框', length: '在职或历史授课教师', required: '否', note: '按教师姓名搜索或从候选教师中选择' },
+        { id: 'FD-ACADEMIC-064', label: '结课时间', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '按班级结课日期筛选', constraints: { format: 'YYYY-MM-DD' } },
       ] }], notes: ['结业审核以学员为粒度，班级列表仅展示汇总结果。']
     },
     'academic/homework': {
@@ -97,13 +99,28 @@ export const ACADEMIC_FIELD_SPEC = {
     'academic/reports': {
       groups: [{ heading: '学习报告列表字段', fields: [
         { id: 'FD-ACADEMIC-071', label: '报告状态', type: '下拉', length: '草稿 / 已发布 / 已撤回', required: '否', note: '按学员端可见性筛选' },
-        { id: 'FD-ACADEMIC-072', label: '课程名称', type: '文本', length: '≤ 50 字', required: '否', note: '按课程名称筛选', constraints: { maxLength: 50 } },
+        { id: 'FD-ACADEMIC-072', label: '课程', type: '关联对象选择（可搜索）', length: '可选课程', required: '否', note: '按报告关联的面授课程筛选；选项来自报告关联关系' },
+        { id: 'FD-ACADEMIC-099', label: '班级', type: '关联对象选择（可搜索）', length: '可选班级', required: '否', note: '按报告关联的面授班级筛选；选项来自报告关联关系' },
+        { id: 'FD-ACADEMIC-100', label: '授课教师', type: '关联对象选择（可搜索）', length: '可选教师', required: '否', note: '按报告关联的授课教师筛选；选项来自报告关联关系' },
         { id: 'FD-ACADEMIC-073', label: '学员姓名', type: '文本', length: '≤ 30 字', required: '否', note: '按学员姓名筛选', constraints: { maxLength: 30 } },
         { id: 'FD-ACADEMIC-074', label: '更新时间', type: '日期区间', length: 'YYYY-MM-DD', required: '否', note: '按报告更新时间筛选', constraints: { format: 'YYYY-MM-DD' } },
         { id: 'FD-ACADEMIC-075', label: '报告编号', type: '文本（只读）', length: '系统生成', required: '系统生成', note: '报告唯一编号', constraints: { readOnly: true, system: true } },
-        { id: 'FD-ACADEMIC-076', label: '生成状态', type: '状态（只读）', length: '待生成 / 生成中 / 已生成 / 生成失败', required: '系统派生', note: '生成失败允许重试', constraints: { readOnly: true, derived: true } },
         { id: 'FD-ACADEMIC-077', label: '报告版本', type: '整数（只读）', length: '正整数', required: '系统生成', note: '内容变更生成新版本，历史版本保留', constraints: { readOnly: true, derived: true, integer: true } }
       ] }], notes: ['未确认结业的学员不生成正式报告；撤回只影响学员端可见性。']
+    },
+    'academic/certificates': {
+      groups: [{ heading: '结业证书列表与快照字段', fields: [
+        { id: 'FD-ACADEMIC-089', label: '证书编号', type: '文本（只读）', length: '系统生成', required: '系统生成', note: '全局唯一的结业证书编号', constraints: { readOnly: true, system: true } },
+        { id: 'FD-ACADEMIC-090', label: '学员', type: '关联对象（只读）', length: '学员姓名与标识', required: '系统派生', note: '取结业审核通过的学员快照', constraints: { readOnly: true, derived: true } },
+        { id: 'FD-ACADEMIC-091', label: '课程', type: '关联对象（只读）', length: '课程名称', required: '系统派生', note: '生成时保存面授课程快照', constraints: { readOnly: true, derived: true } },
+        { id: 'FD-ACADEMIC-098', label: '班级', type: '关联对象（只读）', length: '班级名称', required: '系统派生', note: '生成时保存面授班级快照', constraints: { readOnly: true, derived: true } },
+        { id: 'FD-ACADEMIC-092', label: '结业日期', type: '日期（只读）', length: 'YYYY-MM-DD', required: '系统派生', note: '取班级结课日期', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD' } },
+        { id: 'FD-ACADEMIC-093', label: '证书状态', type: '状态（只读）', length: '已生成 / 已作废', required: '系统派生', note: '结业确认成功后一次性生成；列表仅展示已生成和已作废记录', constraints: { readOnly: true, derived: true } },
+        { id: 'FD-ACADEMIC-094', label: '模板版本', type: '文本（只读）', length: '系统默认固定模板版本', required: '系统生成', note: 'MVP 不支持模板编辑和切换；用于历史快照追溯', constraints: { readOnly: true, system: true } },
+        { id: 'FD-ACADEMIC-095', label: 'PDF 快照文件', type: '文件（只读）', length: 'PDF', required: '已生成时必有', note: '生成成功后固化保存；学员端仅对已生成且未作废记录开放查看下载', constraints: { readOnly: true, derived: true } },
+        { id: 'FD-ACADEMIC-096', label: '生成时间', type: '日期时间（只读）', length: 'YYYY-MM-DD HH:mm', required: '生成成功时记录', note: '证书 PDF 快照生成成功时间', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD HH:mm' } },
+        { id: 'FD-ACADEMIC-097', label: '作废原因', type: '文本（只读）', length: '≤ 200 字', required: '作废时必填', note: '记录作废理由，操作人和操作时间同时留痕', constraints: { readOnly: true, maxLength: 200 } }
+      ] }], notes: ['MVP 仅一套系统默认固定模板，不提供可视化模板编辑器；证书生成成功后保存 PDF 快照。']
     },
     'academic/timetable': {
       groups: [{ heading: '课表筛选与视图字段', fields: [

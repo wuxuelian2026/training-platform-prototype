@@ -3,7 +3,7 @@ name: Deploy training prototype
 on:
   push:
     branches:
-      - main
+      - iteration-2
   workflow_dispatch:
 
 permissions:
