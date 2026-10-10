@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 页面类型与小节模板。
 //
 // 页面说明不再用一种模板套所有页面，而是按页面类型选择小节集合：
@@ -9,8 +13,7 @@
 //
 // 与「表单复杂度」的关系：类型决定小节集合，layout 决定字段表是否按步拆分，
 // 两者正交。已纳入 spec/fields 的表单页由字段规格渲染，其余页面按本文件的模板渲染。
-
-export const PAGE_TYPES = {
+const PAGE_TYPES = {
   // 列表页：以查询、浏览与行内操作为主
   'academic/attendance': 'list',
   'academic/graduation': 'list',
@@ -122,19 +125,17 @@ export const PAGE_TYPES = {
   'teacher/salary-detail': 'detail',
   'teacher/settings': 'config'
 };
-
-export const SECTION_TEMPLATES = {
+const SECTION_TEMPLATES = {
   list: ['查询说明', '状态与流转', '操作说明', '业务规则'],
   detail: ['展示字段与来源', '状态', '可执行操作', '业务规则'],
   dashboard: ['指标口径', '维度与筛选', '下钻', '数据更新时机'],
   config: ['字段说明', '生效范围与影响'],
   form: ['字段说明', '提交与校验说明']
 };
-
-export const pageTypeOf = (pageKey) => PAGE_TYPES[pageKey] || 'list';
+const pageTypeOf = (pageKey) => PAGE_TYPES[pageKey] || 'list';
 
 // 模块级兜底规则：页面没有按页面写实口径时，渲染层用本模块的一句话规则补「业务规则」小节。
-export const MODULE_HELP_CONTENT = {
+const MODULE_HELP_CONTENT = {
   dashboard: '工作台汇总待处理事项，点击事项进入对应业务页面。',
   teachers: '教师资料、在职情况（离职日期）、账号状态、证书和合同分别维护；当前能力用于判断是否可申报或排课。',
   courses: '课程申报通过后进入课程库；课程内容、资源和专业目录分别维护。',
@@ -151,7 +152,7 @@ export const MODULE_HELP_CONTENT = {
 
 // 按页面写实口径：键是页面路径，值是「小节标题 → 条目」。
 // 状态段由 spec/states 数据驱动，不在这里重复；这里只写查询、操作、字段与业务规则口径。
-export const PAGE_HELP_CONTENT = {
+const PAGE_HELP_CONTENT = {
   'teachers/list': {
     查询说明: [
       '关键词：按教师姓名、手机号或工号查询；手机号按脱敏值展示；默认按最近授课时间倒序。',
@@ -495,12 +496,12 @@ export const PAGE_HELP_CONTENT = {
     ],
     业务规则: [
       '库存由入库和出库流水计算，不直接手工改写库存数。',
-      '已产生的流水不可修改；登记错误以冲销方式更正。',
+      '已产生的流水不可修改、删除或在线修正；错误记录需人工核对并按后续变更流程处理。',
       '同一物资的历史入库记录保留，不随物资停用而删除。',
       '入库记录不设独立状态；提交入库登记后生成入库流水并增加对应物资库存。',
       '入库单号在提交时按规则生成，提交后不可修改。',
       '入库单价仅随流水记录，MVP 不进行库存成本核算；退货、调拨、盘点、借还与多仓库不在本期范围。',
-      '登记错误通过新增反向流水修正，原流水只读保留并记录修正原因。',
+      '流水提交后只读，不提供删除、修改或修正入口；错误记录需人工核对并按后续变更流程处理。',
     ],
   },
   'inventory/outbound-records': {
@@ -514,11 +515,11 @@ export const PAGE_HELP_CONTENT = {
     业务规则: [
       '出库数量不得大于当前库存，超出时阻止提交。',
       '库存由入库和出库流水计算，不直接手工改写库存数。',
-      '已产生的流水不可修改；登记错误以冲销方式更正。',
+      '已产生的流水不可修改、删除或在线修正；错误记录需人工核对并按后续变更流程处理。',
       '出库记录不设独立状态；提交出库登记后生成出库流水并扣减对应物资库存。',
       '出库单号在提交时按规则生成，提交后不可修改。',
       '调拨、盘点、报废、借还与多仓库不在本期范围，不得通过“其他”类型隐式实现。',
-      '登记错误通过新增反向流水修正，原流水只读保留并记录修正原因。',
+      '流水提交后只读，不提供删除、修改或修正入口；错误记录需人工核对并按后续变更流程处理。',
     ],
   },
   'courses/applications': {
@@ -1198,7 +1199,7 @@ export const PAGE_HELP_CONTENT = {
       '分类名称、上级分类、分类编码与排序见本页字段表；分类层级不超过两级。',
     ],
     生效范围与影响: [
-      '分类用于物资建档与台账统计，已被物资引用的分类不允许直接删除，需先停用或迁移物资。',
+      '分类用于物资建档与台账统计；仅无物资、流水和业务引用的分类允许物理删除，存在引用时只能停用。',
       '停用分类不再出现在新建物资的可选项，历史台账保留原分类值。',
       '列表状态使用启用／停用开关，切换后立即生效；有引用的分类仍允许停用，不允许删除。',
       '分类列表按父子层级以树形表格展示，子分类在分类名称列缩进显示，不单独展示上级分类列。',
@@ -1645,7 +1646,7 @@ export const PAGE_HELP_CONTENT = {
     ],
     业务规则: [
       '库存由入库和出库流水计算，不直接手工改写库存数；已产生出入库流水的物资保留历史台账，不删除。',
-      '已产生流水的物资只允许停用，停用后不再参与新出入库，历史流水仍可查询。',
+      '仅库存为0且无出入库流水、无业务引用的物资允许物理删除；其他物资只能停用，停用后不再参与新出入库，历史流水仍可查询。',
       '批量导入不得覆盖当前库存、启用状态或历史流水；新物资库存为 0，导入中的物资编号必须唯一且分类、单位、预警阈值合法。库存不高于预警阈值统一显示为“库存不足”，停用物资不再参与新的出入库。',
     ],
   },
@@ -1660,3 +1661,12 @@ export const PAGE_HELP_CONTENT = {
     ],
   }
 };
+
+
+__classicExports["PAGE_TYPES"] = PAGE_TYPES;
+__classicExports["SECTION_TEMPLATES"] = SECTION_TEMPLATES;
+__classicExports["pageTypeOf"] = pageTypeOf;
+__classicExports["MODULE_HELP_CONTENT"] = MODULE_HELP_CONTENT;
+__classicExports["PAGE_HELP_CONTENT"] = PAGE_HELP_CONTENT;
+  __classicModules["spec/pages/page-types.js"] = __classicExports;
+})(globalThis);

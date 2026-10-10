@@ -11,13 +11,14 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { loadClassicModule } from './load-classic-modules.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repoRoot = path.resolve(root, '../..');
 const checkOnly = process.argv.includes('--check');
 
-const { STATE_MACHINES, stateLabelsOf } = await import(pathToFileURL(path.join(root, 'spec/states/index.js')).href);
+const { STATE_MACHINES, stateLabelsOf } = await loadClassicModule('spec/states/index.js');
 
 const target = {
   marker: 'STATES index',

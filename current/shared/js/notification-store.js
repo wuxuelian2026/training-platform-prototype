@@ -1,14 +1,16 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 统一通知存储（2026-09-29）：后台「消息推送」、教师端与学员端消息中心共用同一份
 // 通知主记录与逐人投递记录。发送时冻结接收人快照；补发只针对发送失败对象且幂等。
-import { demoTime, messageRetrySettings, readDemoState, writeDemoState } from './demo-store.js';
-
-export const NOTIFICATION_STATUS = { PENDING: '待发送', SENT: '已发送', FAILED: '发送失败', CANCELED: '已取消' };
-export const DELIVERY_STATUS = { PENDING: '待发送', DELIVERED: '已送达', FAILED: '发送失败' };
-export const NOTIFICATION_SOURCE = { MANUAL: '人工通知', SYSTEM: '系统通知' };
+const { demoTime, messageRetrySettings, readDemoState, writeDemoState } = __classicRequire("shared/js/demo-store.js");
+const NOTIFICATION_STATUS = { PENDING: '待发送', SENT: '已发送', FAILED: '发送失败', CANCELED: '已取消' };
+const DELIVERY_STATUS = { PENDING: '待发送', DELIVERED: '已送达', FAILED: '发送失败' };
+const NOTIFICATION_SOURCE = { MANUAL: '人工通知', SYSTEM: '系统通知' };
 // 通知由业务事件自动产生；后台只查看结果、处理失败投递，不直接新增业务通知。
-export const NOTIFICATION_TYPES = ['课次调整', '上课提醒', '作业发布', '作业截止提醒', '作业撤回', '作业提交提醒', '退款状态变更', '结业审核结果', '工资发布', '课程申报结果', '证书审核结果', '合同待签署'];
-
-export const NOTIFICATION_RULES = {
+const NOTIFICATION_TYPES = ['课次调整', '上课提醒', '作业发布', '作业截止提醒', '作业撤回', '作业提交提醒', '退款状态变更', '结业审核结果', '工资发布', '课程申报结果', '证书审核结果', '合同待签署'];
+const NOTIFICATION_RULES = {
   lesson_rescheduled: { type: '调课通知', trigger: '调课保存并发布后立即', frequency: '同一课次版本一次', schedule: 'immediate' },
   lesson_reminder: { type: '上课提醒', trigger: '课次开始前 24 小时', frequency: '每课次一次', schedule: 'before_lesson_24h' },
   homework_published: { type: '作业发布提醒', trigger: '作业发布成功后立即', frequency: '同一 homeworkId 一次', schedule: 'immediate' },
@@ -95,7 +97,7 @@ const buildTemplateDemo = ([type, title, content, audience], index) => ({
 });
 
 /** 通知整体状态由逐人投递结果派生，不单独维护一份会与投递记录分叉的状态。 */
-export function notificationStatusOf(deliveries = []) {
+function notificationStatusOf(deliveries = []) {
   if (!deliveries.length) return NOTIFICATION_STATUS.FAILED;
   const failed = deliveries.filter((row) => row.status === DELIVERY_STATUS.FAILED).length;
   const pending = deliveries.filter((row) => row.status === DELIVERY_STATUS.PENDING).length;
@@ -134,13 +136,13 @@ function retryDueAt(row, settings) {
 }
 
 /** 当前自动重试策略（来自系统管理 → 参数配置），供页面说明与详情展示。 */
-export function retryPolicy() {
+function retryPolicy() {
   const settings = messageRetrySettings();
   return { maxAttempts: settings.maxAttempts, intervalsMinutes: [...settings.intervalsMinutes] };
 }
 
 /** 首次读取时补齐演示通知与投递记录；已存在的记录不会被覆盖，保证补发结果可保留。 */
-export function ensureNotificationSeed() {
+function ensureNotificationSeed() {
   const existing = new Set((readDemoState().notifications || []).map((item) => item.id));
   const allDemoNotifications = [...DEMO_NOTIFICATIONS, ...DEMO_TEMPLATE_TYPES.map(buildTemplateDemo)];
   const missing = allDemoNotifications.filter((item) => !existing.has(item.notification.id));
@@ -165,7 +167,7 @@ export function ensureNotificationSeed() {
 }
 
 /** 通知列表：附带逐人投递统计，供后台列表与详情共用。 */
-export function listNotifications() {
+function listNotifications() {
   ensureNotificationSeed();
   const state = readDemoState();
   const logs = state.notificationDeliveryLogs || [];
@@ -184,7 +186,7 @@ export function listNotifications() {
 }
 
 /** 某条通知的逐人投递记录，供后台详情展示。 */
-export function notificationDeliveryRows(notificationId) {
+function notificationDeliveryRows(notificationId) {
   ensureNotificationSeed();
   const settings = messageRetrySettings();
   return (readDemoState().notificationDeliveryLogs || [])
@@ -196,7 +198,7 @@ export function notificationDeliveryRows(notificationId) {
  * 创建通知并冻结接收人快照。
  * 立即发送生成「已送达」投递记录；定时发送先落「待发送」，到点后由发送任务补投递结果。
  */
-export function sendNotification(payload) {
+function sendNotification(payload) {
   const recipients = payload.recipients || [];
   const now = demoTime();
   const id = payload.id || `message-${Date.now()}`;
@@ -249,7 +251,7 @@ export function sendNotification(payload) {
  * 业务事件统一入口。事件幂等由 dedupeKey 保证；接收人由业务侧在事件成功后冻结。
  * 规则只描述产品口径，不偷偷创建延时任务；需要提前提醒的事件由调度器按 schedule 计算 scheduledAt。
  */
-export function emitNotificationEvent({ event, sourceType, sourceId, version = '', dedupeKey, title, content, className = '', audience = 'learner', audienceLabel = '学员', audienceRule = '事件发生时接收人快照', recipients = [], target = '', scheduledAt = '' } = {}) {
+function emitNotificationEvent({ event, sourceType, sourceId, version = '', dedupeKey, title, content, className = '', audience = 'learner', audienceLabel = '学员', audienceRule = '事件发生时接收人快照', recipients = [], target = '', scheduledAt = '' } = {}) {
   const rule = NOTIFICATION_RULES[event];
   if (!rule) return { ok: false, reason: 'NOTIFICATION_RULE_NOT_FOUND' };
   const key = dedupeKey || `${event}:${sourceId || 'unknown'}:${version || 'v1'}`;
@@ -266,7 +268,7 @@ export function emitNotificationEvent({ event, sourceType, sourceId, version = '
 }
 
 /** 业务撤回、取消或失效时调用：阻止尚未投递的相关通知，并保留取消记录供追溯。 */
-export function suppressPendingNotifications(sourceType, sourceId, reason = '业务已取消或失效') {
+function suppressPendingNotifications(sourceType, sourceId, reason = '业务已取消或失效') {
   if (!sourceId) return 0;
   let count = 0;
   writeDemoState((next) => {
@@ -291,7 +293,7 @@ export function suppressPendingNotifications(sourceType, sourceId, reason = '业
  * 人工补发：只重投发送失败的接收人，已送达对象不重复推送；重复点击不会产生重复投递。
  * 返回本次实际重投的接收人数。
  */
-export function resendFailedDeliveries(notificationId) {
+function resendFailedDeliveries(notificationId) {
   ensureNotificationSeed();
   let attempted = 0;
   writeDemoState((next) => {
@@ -325,7 +327,7 @@ export function resendFailedDeliveries(notificationId) {
  * 阅读回写：教师端/学员端打开消息或全部已读后，把阅读时间写回对应投递记录。
  * 入参为移动端消息行，需带 sharedNotificationId 与 sharedRecipientId。
  */
-export function syncNotificationReads(rows = []) {
+function syncNotificationReads(rows = []) {
   const readIds = new Set(rows
     .filter((row) => row?.sharedNotificationId && row?.sharedRecipientId && row.read)
     .map((row) => deliveryLogId(row.sharedNotificationId, row.sharedRecipientId)));
@@ -339,7 +341,7 @@ export function syncNotificationReads(rows = []) {
 }
 
 /** 取消尚未到点的定时通知：不再向任何接收人发送，记录保留为「已取消」便于追溯。 */
-export function cancelScheduledNotification(notificationId) {
+function cancelScheduledNotification(notificationId) {
   ensureNotificationSeed();
   let canceled = false;
   writeDemoState((next) => {
@@ -360,7 +362,7 @@ export function cancelScheduledNotification(notificationId) {
  * 通知任务：把已到点的定时通知投递出去，并按参数配置对失败投递执行自动重试。
  * 页面加载与刷新时各执行一次；返回本次实际发送与被自动重试的接收人数，便于页面提示。
  */
-export function processNotificationTasks(now = demoTime()) {
+function processNotificationTasks(now = demoTime()) {
   ensureNotificationSeed();
   const settings = messageRetrySettings();
   const state = readDemoState();
@@ -409,3 +411,24 @@ export function processNotificationTasks(now = demoTime()) {
   });
   return { sent, retried };
 }
+
+
+__classicExports["notificationStatusOf"] = notificationStatusOf;
+__classicExports["retryPolicy"] = retryPolicy;
+__classicExports["ensureNotificationSeed"] = ensureNotificationSeed;
+__classicExports["listNotifications"] = listNotifications;
+__classicExports["notificationDeliveryRows"] = notificationDeliveryRows;
+__classicExports["sendNotification"] = sendNotification;
+__classicExports["emitNotificationEvent"] = emitNotificationEvent;
+__classicExports["suppressPendingNotifications"] = suppressPendingNotifications;
+__classicExports["resendFailedDeliveries"] = resendFailedDeliveries;
+__classicExports["syncNotificationReads"] = syncNotificationReads;
+__classicExports["cancelScheduledNotification"] = cancelScheduledNotification;
+__classicExports["processNotificationTasks"] = processNotificationTasks;
+__classicExports["NOTIFICATION_STATUS"] = NOTIFICATION_STATUS;
+__classicExports["DELIVERY_STATUS"] = DELIVERY_STATUS;
+__classicExports["NOTIFICATION_SOURCE"] = NOTIFICATION_SOURCE;
+__classicExports["NOTIFICATION_TYPES"] = NOTIFICATION_TYPES;
+__classicExports["NOTIFICATION_RULES"] = NOTIFICATION_RULES;
+  __classicModules["shared/js/notification-store.js"] = __classicExports;
+})(globalThis);

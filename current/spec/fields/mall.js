@@ -1,9 +1,12 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 商城运营字段规格 · 唯一事实源
 // 由 scripts/migrate-literal-fields.mjs 从页面说明字面量迁移生成，迁移后请只维护本文件。
 // 字段口径变更后运行 `npm run check:spec` 校验一致性。
-import { COURSE_DISPLAY_FIELDS, COURSE_TEACHING_FIELDS, courseFieldRows } from './courses.js';
-
-export const MALL_FIELD_SPEC = {
+const { COURSE_DISPLAY_FIELDS, COURSE_TEACHING_FIELDS, courseFieldRows } = __classicRequire("spec/fields/courses.js");
+const MALL_FIELD_SPEC = {
   module: '商城运营',
   pages: {
     // 轮播图表单：简单表单，字段少且无系统校验，合并为一张表。
@@ -106,3 +109,8 @@ export const MALL_FIELD_SPEC = {
     }
   }
 };
+
+
+__classicExports["MALL_FIELD_SPEC"] = MALL_FIELD_SPEC;
+  __classicModules["spec/fields/mall.js"] = __classicExports;
+})(globalThis);

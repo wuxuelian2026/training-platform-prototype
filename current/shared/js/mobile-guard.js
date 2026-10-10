@@ -1,8 +1,12 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // CR-2026-039：小程序两端登录态统一口径。
 //
 // 规则：需要登录才能看到内容的页面，未登录一律直接跳转登录页，并带回跳地址；
 // 学员端「我的」页保留登录入口卡片与菜单，不做跳转（发现类内容页同样可未登录浏览）。
-import { relativePath } from './paths.js';
+const { relativePath } = __classicRequire("shared/js/paths.js");
 
 const LOGIN_KEY = 'hbyx-mini-logged-in';
 const ROLE_KEY = 'hbyx-mini-role';
@@ -12,25 +16,33 @@ const LEARNER_PUBLIC_PAGES = new Set([
   'index', 'courses', 'course-detail', 'teachers', 'teacher-detail',
   'fast-registration', 'fast-registration-detail', 'login', 'profile'
 ]);
-
-export const isMiniLoggedIn = () => sessionStorage.getItem(LOGIN_KEY) === '1';
-export const isMiniRole = (role) => sessionStorage.getItem(ROLE_KEY) === role;
-export const isLearnerPublicPage = (pageName) => LEARNER_PUBLIC_PAGES.has(String(pageName || '').replace('.html', ''));
-
-export const miniPageName = (path) => (String(path || location.pathname).split('/').pop() || '').replace('.html', '');
-
-export function miniLoginUrl(role, redirect) {
+const isMiniLoggedIn = () => sessionStorage.getItem(LOGIN_KEY) === '1';
+const isMiniRole = (role) => sessionStorage.getItem(ROLE_KEY) === role;
+const isLearnerPublicPage = (pageName) => LEARNER_PUBLIC_PAGES.has(String(pageName || '').replace('.html', ''));
+const miniPageName = (path) => (String(path || location.pathname).split('/').pop() || '').replace('.html', '');
+function miniLoginUrl(role, redirect) {
   const target = redirect ? `&redirect=${encodeURIComponent(redirect)}` : '';
   return relativePath(`/login.html?role=${encodeURIComponent(role)}${target}`);
 }
 
 // 回跳地址使用根相对路径，登录页 safeRedirect 只接受 '/' 开头且非 '//' 的地址。
-export function currentMiniRedirect() {
+function currentMiniRedirect() {
   return location.pathname.startsWith('/') ? `${location.pathname}${location.search}` : '';
 }
 
 // 返回 true 表示已发起跳转，调用方不再渲染页面内容。
-export function redirectMiniLogin(role) {
+function redirectMiniLogin(role) {
   location.replace(miniLoginUrl(role, currentMiniRedirect()));
   return true;
 }
+
+
+__classicExports["miniLoginUrl"] = miniLoginUrl;
+__classicExports["currentMiniRedirect"] = currentMiniRedirect;
+__classicExports["redirectMiniLogin"] = redirectMiniLogin;
+__classicExports["isMiniLoggedIn"] = isMiniLoggedIn;
+__classicExports["isMiniRole"] = isMiniRole;
+__classicExports["isLearnerPublicPage"] = isLearnerPublicPage;
+__classicExports["miniPageName"] = miniPageName;
+  __classicModules["shared/js/mobile-guard.js"] = __classicExports;
+})(globalThis);

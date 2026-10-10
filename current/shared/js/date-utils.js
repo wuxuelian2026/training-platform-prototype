@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 本地日期工具。
 //
 // 为什么需要它：直接用 `new Date().toISOString().slice(0, 10)` 会把本地时间换算成 UTC，
@@ -7,14 +11,14 @@
 const pad = (value) => String(value).padStart(2, '0');
 
 /** 按本地日历格式化为 YYYY-MM-DD；传入空值或非法日期返回空串。 */
-export const toLocalDateString = (value = new Date()) => {
+const toLocalDateString = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
 
 /** 在给定日期上加 n 周，返回本地日历日期字符串。 */
-export const addWeeksLocal = (dateText, weeks) => {
+const addWeeksLocal = (dateText, weeks) => {
   const date = new Date(`${String(dateText).slice(0, 10)}T00:00:00`);
   if (Number.isNaN(date.getTime())) return '';
   date.setDate(date.getDate() + Number(weeks) * 7);
@@ -22,11 +26,19 @@ export const addWeeksLocal = (dateText, weeks) => {
 };
 
 /** 按本地时间格式化为 YYYY-MM-DD HH:mm；传入空值或非法日期返回空串。 */
-export const toLocalDateTimeString = (value = new Date()) => {
+const toLocalDateTimeString = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return `${toLocalDateString(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
 /** 按本地日历取月份 YYYY-MM，常用于 date/month 输入的上下限。 */
-export const toLocalMonthString = (value = new Date()) => toLocalDateString(value).slice(0, 7);
+const toLocalMonthString = (value = new Date()) => toLocalDateString(value).slice(0, 7);
+
+
+__classicExports["toLocalDateString"] = toLocalDateString;
+__classicExports["addWeeksLocal"] = addWeeksLocal;
+__classicExports["toLocalDateTimeString"] = toLocalDateTimeString;
+__classicExports["toLocalMonthString"] = toLocalMonthString;
+  __classicModules["shared/js/date-utils.js"] = __classicExports;
+})(globalThis);

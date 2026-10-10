@@ -1,9 +1,13 @@
-import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
-import { sessionsFrom, teacherFactsById, teacherFactsByName } from './teacher-facts.js';
-import { certificateDedupKey, certificateSourceLabel } from './certificate-source.js';
-import { certificateExpirySettings, readDemoState } from './demo-store.js';
-import { DEMO_TODAY, demoDateTime } from './demo-clock.js';
-import { toLocalDateString } from './date-utils.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { machinesForPage, stateLabelsOf } = __classicRequire("spec/states/index.js");
+const { sessionsFrom, teacherFactsById, teacherFactsByName } = __classicRequire("shared/js/teacher-facts.js");
+const { certificateDedupKey, certificateSourceLabel } = __classicRequire("shared/js/certificate-source.js");
+const { certificateExpirySettings, readDemoState } = __classicRequire("shared/js/demo-store.js");
+const { DEMO_TODAY, demoDateTime } = __classicRequire("shared/js/demo-clock.js");
+const { toLocalDateString } = __classicRequire("shared/js/date-utils.js");
 
 const table = document.querySelector('#certificates-table');
 const filterForm = document.querySelector('#certificate-filter');
@@ -542,3 +546,7 @@ rows.forEach(updateActionCell);
 syncCertificateSourceCells();
 rows.forEach(updateFileVersionCell);
 applyFilters();
+
+
+  __classicModules["shared/js/certificates.js"] = __classicExports;
+})(globalThis);

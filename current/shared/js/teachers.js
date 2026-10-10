@@ -1,18 +1,22 @@
-import { relativePath } from './paths.js';
-import { readAdminSession } from './admin-auth.js';
-import { mountRichEditor } from './rich-editor.js';
-import { contractSettings, demoId, demoTime, fileSpecSettings, readDemoState, upsertDemoRecord, writeDemoState } from './demo-store.js';
-import { contractDocumentHtml } from './contract-document.js';
-import { contractSignDeadline } from './contract-terms.js';
-import { readXlsxSheetRows } from './xlsx-lite.js';
-import { teacherFactsById } from './teacher-facts.js';
-import { classSeed } from './class-seed.js';
-import { certificateDedupKey, findDuplicateCertificate } from './certificate-source.js';
-import { permissionsOfRole } from './permissions.js';
-import { TEACHER_PROFILE_EDITABLE_FIELDS, TEACHER_PROFILE_LABELS, teacherProfileMask } from './teacher-profile-fields.js';
-import { explainTeacherCapacity, summarizeTeacherCapacity } from './teacher-capacity.js';
-import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
-import { DEMO_TODAY } from './demo-clock.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { relativePath } = __classicRequire("shared/js/paths.js");
+const { readAdminSession } = __classicRequire("shared/js/admin-auth.js");
+const { mountRichEditor } = __classicRequire("shared/js/rich-editor.js");
+const { contractSettings, demoId, demoTime, fileSpecSettings, readDemoState, upsertDemoRecord, writeDemoState } = __classicRequire("shared/js/demo-store.js");
+const { contractDocumentHtml } = __classicRequire("shared/js/contract-document.js");
+const { contractSignDeadline } = __classicRequire("shared/js/contract-terms.js");
+const { readXlsxSheetRows } = __classicRequire("shared/js/xlsx-lite.js");
+const { teacherFactsById } = __classicRequire("shared/js/teacher-facts.js");
+const { classSeed } = __classicRequire("shared/js/class-seed.js");
+const { certificateDedupKey, findDuplicateCertificate } = __classicRequire("shared/js/certificate-source.js");
+const { permissionsOfRole } = __classicRequire("shared/js/permissions.js");
+const { TEACHER_PROFILE_EDITABLE_FIELDS, TEACHER_PROFILE_LABELS, teacherProfileMask } = __classicRequire("shared/js/teacher-profile-fields.js");
+const { explainTeacherCapacity, summarizeTeacherCapacity } = __classicRequire("shared/js/teacher-capacity.js");
+const { machinesForPage, stateLabelsOf } = __classicRequire("spec/states/index.js");
+const { DEMO_TODAY } = __classicRequire("shared/js/demo-clock.js");
 
 const teacherRoot = document.querySelector('[data-teacher-page]');
 const teacherPage = teacherRoot?.dataset.teacherPage;
@@ -1590,3 +1594,7 @@ if (teacherPage === 'create' && !initTeacherWizard()) initTeacherCreate();
 if (teacherPage === 'contracts') initContracts();
 if (teacherPage === 'schedule') initSchedule();
 if (teacherPage === 'profile') initProfile();
+
+
+  __classicModules["shared/js/teachers.js"] = __classicExports;
+})(globalThis);

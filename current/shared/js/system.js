@@ -1,5 +1,9 @@
-import { DATA_SCOPES, PERMISSION_POINTS, permissionById, permissionPointsByModule, permissionsOfRole } from './permissions.js';
-import { CERTIFICATE_EXPIRY_WINDOW_OPTIONS, certificateExpirySettings, classRefundSettings, contractSettings, dataDictionary, fileSpecSettings, homeworkDeadlineSettings, messageRetrySettings, paymentTimeoutSettings, readDemoState, refundSettings, writeDemoState, writeDictionary } from './demo-store.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { DATA_SCOPES, PERMISSION_POINTS, permissionById, permissionPointsByModule, permissionsOfRole } = __classicRequire("shared/js/permissions.js");
+const { CERTIFICATE_EXPIRY_WINDOW_OPTIONS, certificateExpirySettings, classRefundSettings, contractSettings, dataDictionary, fileSpecSettings, homeworkDeadlineSettings, messageRetrySettings, paymentTimeoutSettings, readDemoState, refundSettings, writeDemoState, writeDictionary } = __classicRequire("shared/js/demo-store.js");
 
 const systemRoot = document.querySelector('[data-system-page]');
 const systemPage = systemRoot?.dataset.systemPage;
@@ -409,3 +413,7 @@ function mountTimetableSettingsCard() {
 }
 if (systemPage === 'settings') { renderSettings(); mountContractSettingsCard(); mountCertificateSettingsCard(); mountTimetableSettingsCard(); mountConfigurableLimitCards(); }
 if (systemPage === 'dictionaries') renderDictionaries();
+
+
+  __classicModules["shared/js/system.js"] = __classicExports;
+})(globalThis);

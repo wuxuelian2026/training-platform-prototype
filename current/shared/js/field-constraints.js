@@ -1,10 +1,14 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 由字段规格派生的输入约束。
 //
 // 页面说明里的“长度”只是文案，这里把同一份规格落成实际的输入限制，
 // 避免出现“说明写了 ≤ 50 字，但输入框不拦”的口径与实现不一致。
 // 匹配方式：按字段容器（.form-field / .course-field / .sales-field）的标签文本对齐规格，
 // 因此静态 HTML 和运行时渲染的弹窗表单都能覆盖。
-import { fieldsOfPage } from '../../spec/fields/index.js';
+const { fieldsOfPage } = __classicRequire("spec/fields/index.js");
 
 const CONTROL_SELECTOR = 'input, select, textarea';
 // 后台用 form-field / course-field / sales-field，小程序两端统一用 mp-field。
@@ -32,8 +36,7 @@ const labelTextOf = (wrapper) => {
   clone.querySelectorAll('.sub-cell, .required-mark, small').forEach((badge) => badge.remove());
   return clone.textContent;
 };
-
-export const applyFieldConstraints = (root, pageKey) => {
+const applyFieldConstraints = (root, pageKey) => {
   const fields = fieldsOfPage(pageKey);
   if (!fields.length || !root) return { total: 0, matched: 0, applied: 0, unmatched: [] };
 
@@ -81,7 +84,7 @@ export const applyFieldConstraints = (root, pageKey) => {
 
 // 三端统一的挂载入口：页面渲染后先应用一次，随后按 DOM 变化做防抖重跑，
 // 覆盖运行时生成的弹窗与列表重绘。与后台壳层的做法保持一致。
-export const mountFieldConstraints = (pageKey, root = document.body) => {
+const mountFieldConstraints = (pageKey, root = document.body) => {
   let timer;
   const run = () => applyFieldConstraints(root, pageKey);
   run();
@@ -92,3 +95,9 @@ export const mountFieldConstraints = (pageKey, root = document.body) => {
   observer.observe(root, { childList: true, subtree: true });
   return () => observer.disconnect();
 };
+
+
+__classicExports["applyFieldConstraints"] = applyFieldConstraints;
+__classicExports["mountFieldConstraints"] = mountFieldConstraints;
+  __classicModules["shared/js/field-constraints.js"] = __classicExports;
+})(globalThis);

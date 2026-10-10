@@ -1,10 +1,14 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // CR-2026-027：后台权限点与数据范围（单一事实源）。
 //
 // 权限由「角色权限管理」页面的勾选决定，PRD 里的五个角色只是**预置初始数据**，
 // 不是强制限制：菜单可见性、按钮可见性与数据范围全部读取本文件的权限点，不再按角色名判断。
 //
 // 编号规则：PERM-<模块>-<三位序号>；每个权限点包含所属模块、业务对象、动作、可配置的数据范围与说明。
-export const DATA_SCOPES = [
+const DATA_SCOPES = [
   { key: 'all', label: '全部', note: '不限制，覆盖全部数据' },
   { key: 'campus', label: '指定校区', note: '仅可操作所选校区的数据，可多选', multi: true },
   { key: 'major', label: '指定专业', note: '仅可操作所选专业（含其下级分类）的数据，可多选', multi: true },
@@ -16,8 +20,7 @@ const VIEW = ['all', 'campus', 'major', 'self'];
 const MANAGE = ['all', 'campus', 'major', 'self'];
 const TEACHING = ['all', 'campus', 'major'];
 const SYSTEM = ['all'];
-
-export const PERMISSION_POINTS = [
+const PERMISSION_POINTS = [
   { id: 'PERM-WORKBENCH-001', module: '工作台', object: '我的待办', action: '查看', scopes: ['all', 'self'], note: '查看本人待办（迭代2工作台承接全部待办类型）' },
   { id: 'PERM-TEACHER-001', module: '师资中心', object: '教师', action: '查看', scopes: VIEW, note: '查看教师列表、详情、证书与合同摘要' },
   { id: 'PERM-TEACHER-002', module: '师资中心', object: '教师档案', action: '档案维护', scopes: MANAGE, note: '新增、编辑教师档案；保存草稿与完成建档' },
@@ -45,7 +48,6 @@ export const PERMISSION_POINTS = [
   { id: 'PERM-INVENTORY-001', module: '物资中心', object: '物资分类', action: '分类管理', scopes: SYSTEM, note: '维护物资分类与启停' },
   { id: 'PERM-INVENTORY-002', module: '物资中心', object: '物资', action: '物资管理', scopes: TEACHING, note: '新增与编辑物资档案' },
   { id: 'PERM-INVENTORY-003', module: '物资中心', object: '出入库', action: '出入库登记', scopes: TEACHING, note: '入库与出库登记' },
-  { id: 'PERM-INVENTORY-005', module: '物资中心', object: '库存流水', action: '流水修正', scopes: SYSTEM, note: '通过新增反向流水修正登记错误' },
   { id: 'PERM-ACADEMIC-001', module: '面授运营', object: '场地', action: '场地管理', scopes: TEACHING, note: '场地档案维护与批量导入' },
   { id: 'PERM-ACADEMIC-002', module: '面授运营', object: '排班', action: '排班管理', scopes: TEACHING, note: '从面授班级待排课入口创建排班、保存草稿与发布' },
   { id: 'PERM-ACADEMIC-003', module: '面授运营', object: '课表', action: '课表管理', scopes: TEACHING, note: '课表矩阵查看与导出' },
@@ -81,8 +83,7 @@ const BASELINE_ROLE = ALL_PERMISSIONS.filter((id) => !RESTRICTED_POINTS.includes
 // CR-2026-117：教务主管预置按权限矩阵收敛——系统管理只保留「查看学员用户」，其余权限点不变。
 const ACADEMIC_LEAD_POINTS = ALL_PERMISSIONS.filter((id) => !['PERM-SYSTEM-001', 'PERM-SYSTEM-003', 'PERM-SYSTEM-004', 'PERM-SYSTEM-005', 'PERM-TRADE-004', 'PERM-TRADE-005'].includes(id));
 const FINANCE_POINTS = [...new Set([...BASELINE_ROLE, 'PERM-TRADE-004', 'PERM-TRADE-005'])];
-
-export const ROLE_PRESETS = [
+const ROLE_PRESETS = [
   { key: 'super_admin', name: '超级管理员', description: '全局配置、系统运维（预置初始数据）', permissions: ALL_PERMISSIONS },
   { key: 'research_lead', name: '教研主管', description: '课程质量、教师资质审核（预置初始数据）', permissions: BASELINE_ROLE },
   // CR-2026-117：教务主管预置按权限矩阵收敛——系统管理只保留「查看学员用户」，其余权限点不变。
@@ -90,8 +91,7 @@ export const ROLE_PRESETS = [
   { key: 'course_consultant', name: '课程顾问', description: '客户跟进与销售转化（预置初始数据）', permissions: BASELINE_ROLE },
   { key: 'finance', name: '财务', description: '财务核算与对账（预置初始数据）', permissions: FINANCE_POINTS }
 ];
-
-export const permissionPointsByModule = () => {
+const permissionPointsByModule = () => {
   const grouped = new Map();
   PERMISSION_POINTS.forEach((point) => {
     if (!grouped.has(point.module)) grouped.set(point.module, []);
@@ -99,15 +99,14 @@ export const permissionPointsByModule = () => {
   });
   return [...grouped.entries()].map(([module, points]) => ({ module, points }));
 };
-
-export const permissionById = (id) => PERMISSION_POINTS.find((item) => item.id === id) || null;
-export const scopeLabels = (point) => (point?.scopes || ['all']).map((key) => DATA_SCOPES.find((scope) => scope.key === key)?.label || key);
-export const rolePreset = (roleKey) => ROLE_PRESETS.find((item) => item.key === roleKey) || null;
-export const permissionsOfRole = (roleKey) => rolePreset(roleKey)?.permissions || [];
-export const roleHasPermission = (roleKey, permissionId) => permissionsOfRole(roleKey).includes(permissionId);
+const permissionById = (id) => PERMISSION_POINTS.find((item) => item.id === id) || null;
+const scopeLabels = (point) => (point?.scopes || ['all']).map((key) => DATA_SCOPES.find((scope) => scope.key === key)?.label || key);
+const rolePreset = (roleKey) => ROLE_PRESETS.find((item) => item.key === roleKey) || null;
+const permissionsOfRole = (roleKey) => rolePreset(roleKey)?.permissions || [];
+const roleHasPermission = (roleKey, permissionId) => permissionsOfRole(roleKey).includes(permissionId);
 
 // 页面 → 访问所需权限点：缺失时由后台壳层渲染统一的「暂无权限」空态。
-export const ADMIN_PAGE_PERMISSIONS = {
+const ADMIN_PAGE_PERMISSIONS = {
   '/admin/pages/teachers/list.html': ['PERM-TEACHER-001'],
   '/admin/pages/teachers/create.html': ['PERM-TEACHER-002'],
   '/admin/pages/teachers/profile.html': ['PERM-TEACHER-001'],
@@ -147,15 +146,14 @@ export const ADMIN_PAGE_PERMISSIONS = {
   '/admin/pages/system/settings.html': ['PERM-SYSTEM-004'],
   '/admin/pages/system/dictionaries.html': ['PERM-SYSTEM-005']
 };
-
-export const pagePermissionState = (pathname, roleKey) => {
+const pagePermissionState = (pathname, roleKey) => {
   const required = ADMIN_PAGE_PERMISSIONS[pathname] || [];
   const missing = required.filter((id) => !roleHasPermission(roleKey, id));
   return { required, missing, allowed: missing.length === 0 };
 };
 
 // 按钮级门禁：页面里标记 data-perm="PERM-…" 的控件在缺少权限时隐藏并禁用。
-export const applyPermissionGates = (roleKey, scope = document) => {
+const applyPermissionGates = (roleKey, scope = document) => {
   let hidden = 0;
   scope.querySelectorAll?.('[data-perm]').forEach((element) => {
     const ids = String(element.dataset.perm || '').split(/\s+/).filter(Boolean);
@@ -168,3 +166,19 @@ export const applyPermissionGates = (roleKey, scope = document) => {
   });
   return hidden;
 };
+
+
+__classicExports["DATA_SCOPES"] = DATA_SCOPES;
+__classicExports["PERMISSION_POINTS"] = PERMISSION_POINTS;
+__classicExports["ROLE_PRESETS"] = ROLE_PRESETS;
+__classicExports["permissionPointsByModule"] = permissionPointsByModule;
+__classicExports["permissionById"] = permissionById;
+__classicExports["scopeLabels"] = scopeLabels;
+__classicExports["rolePreset"] = rolePreset;
+__classicExports["permissionsOfRole"] = permissionsOfRole;
+__classicExports["roleHasPermission"] = roleHasPermission;
+__classicExports["ADMIN_PAGE_PERMISSIONS"] = ADMIN_PAGE_PERMISSIONS;
+__classicExports["pagePermissionState"] = pagePermissionState;
+__classicExports["applyPermissionGates"] = applyPermissionGates;
+  __classicModules["shared/js/permissions.js"] = __classicExports;
+})(globalThis);

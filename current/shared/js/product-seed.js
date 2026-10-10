@@ -1,7 +1,10 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // I1-DEC-24 / RM-F-01: the video product is the single source of the learner-facing price, preview
 // policy and shelf visibility. Admin and learner read the same baseline records.
-
-export const productSeed = [
+const productSeed = [
   {
     id: 'product-1', courseId: 'COURSE-CR-2026-0002', name: '声乐演唱技巧', course: '声乐演唱技巧',
     price: '1280.00', sales: '86', status: '已上架', updated: '2026-08-20', preview: '允许试看', previewHours: '第1课时',
@@ -32,22 +35,28 @@ export const productSeed = [
     displayDetail: '围绕琵琶基础指法与简单乐曲设计的分段视频课程。', tags: ['民乐', '视频课程'], shelfAt: '2026-09-20 10:00', priceChanges: [], courseVersion: 1
   }
 ];
-
-export function cloneProductSeed() {
+function cloneProductSeed() {
   return productSeed.map(item => ({ ...item, priceChanges: (item.priceChanges || []).map(change => ({ ...change })) }));
 }
 
 // Products are keyed by course id: the shared store wins, the seed is the baseline.
-export function productForCourse(shared, courseId) {
+function productForCourse(shared, courseId) {
   const stored = (shared?.products || []).filter(item => item && typeof item === 'object');
   const override = [...stored].reverse().find(item => item.courseId === courseId);
   if (override) return { ...(productSeed.find(item => item.courseId === courseId) || {}), ...override };
   return productSeed.find(item => item.courseId === courseId) || null;
 }
-
-export function allProducts(shared) {
+function allProducts(shared) {
   const stored = (shared?.products || []).filter(item => item && typeof item === 'object');
   const merged = productSeed.map(seed => ({ ...seed, ...(stored.find(item => item.id === seed.id) || {}) }));
   stored.filter(item => !productSeed.some(seed => seed.id === item.id)).forEach(item => merged.push(item));
   return merged;
 }
+
+
+__classicExports["cloneProductSeed"] = cloneProductSeed;
+__classicExports["productForCourse"] = productForCourse;
+__classicExports["allProducts"] = allProducts;
+__classicExports["productSeed"] = productSeed;
+  __classicModules["shared/js/product-seed.js"] = __classicExports;
+})(globalThis);

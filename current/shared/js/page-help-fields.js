@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 后台页面说明的字段表。键是相对 /admin/pages/ 的页面路径。
 //
 // 字段事实源分工：
@@ -8,9 +12,8 @@
 //
 // 通用长度口径（PRD 未定义时使用）：姓名 2-30 字、短文本 ≤50 字、多行文本 ≤500 字、
 // 富文本 ≤2000 字、备注 ≤200 字、邮箱 ≤64 字符、银行卡号 16-19 位。
-import { PAGE_FIELD_SPECS, toPageSpec } from '../../spec/fields/index.js';
-
-export const FIELD_PAGE_COLUMNS = ['参数名', '类型', '长度', '是否必填', '说明'];
+const { PAGE_FIELD_SPECS, toPageSpec } = __classicRequire("spec/fields/index.js");
+const FIELD_PAGE_COLUMNS = ['参数名', '类型', '长度', '是否必填', '说明'];
 
 const STRUCTURED_PAGE_TABLES = Object.fromEntries(
   Object.entries(PAGE_FIELD_SPECS).map(([pageKey, page]) => [pageKey, toPageSpec(page, pageKey)])
@@ -18,8 +21,15 @@ const STRUCTURED_PAGE_TABLES = Object.fromEntries(
 
 // 过渡态容器：所有页面都已迁移到 spec/fields/，这里保持空对象。
 // 若临时新增未迁移页面，可在此登记；检查脚本会把「字面量与结构化同时定义同一页面」判为重复定义。
-export const LITERAL_PAGE_TABLES = {};
+const LITERAL_PAGE_TABLES = {};
 
 // 已迁移到 spec/fields/ 的模块优先；同一页面若同时存在字面量与结构化定义，
 // 以结构化规格为准，并由 `npm run check:page-spec` 报出重复定义。
-export const PAGE_FIELD_TABLES = { ...LITERAL_PAGE_TABLES, ...STRUCTURED_PAGE_TABLES };
+const PAGE_FIELD_TABLES = { ...LITERAL_PAGE_TABLES, ...STRUCTURED_PAGE_TABLES };
+
+
+__classicExports["FIELD_PAGE_COLUMNS"] = FIELD_PAGE_COLUMNS;
+__classicExports["LITERAL_PAGE_TABLES"] = LITERAL_PAGE_TABLES;
+__classicExports["PAGE_FIELD_TABLES"] = PAGE_FIELD_TABLES;
+  __classicModules["shared/js/page-help-fields.js"] = __classicExports;
+})(globalThis);

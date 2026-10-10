@@ -1,12 +1,15 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 教师事实层：教师、证书（含适用专业）、合同覆盖课程、已开班次。
 //
 // 这些是客观事实，不含任何“可申报／可排课”结论。结论统一由 teacher-capacity.js
 // 的 explainTeacherCapacity() 按（教师 × 专业 × 课程 × 日期）计算，
 // 供教师列表、教师详情、排课工作台、证书页共用，避免各页面各写一套判断。
-import { classSeed } from './class-seed.js';
-import { toLocalDateString } from './date-utils.js';
-
-export const TEACHER_FACTS = [
+const { classSeed } = __classicRequire("shared/js/class-seed.js");
+const { toLocalDateString } = __classicRequire("shared/js/date-utils.js");
+const TEACHER_FACTS = [
   {
     id: 'teacher-wang', name: '王玥', profileStatus: '已建档', accountStatus: 'active',
     majors: ['中国舞', '民族民间舞'],
@@ -236,14 +239,13 @@ export const TEACHER_FACTS = [
     contracts: []
   }
 ];
-
-export const teacherFactsByName = (name) => TEACHER_FACTS.find((item) => item.name === name) || null;
-export const teacherFactsById = (id) => TEACHER_FACTS.find((item) => item.id === id) || null;
+const teacherFactsByName = (name) => TEACHER_FACTS.find((item) => item.name === name) || null;
+const teacherFactsById = (id) => TEACHER_FACTS.find((item) => item.id === id) || null;
 
 // CR-2026-022 §2.3：学员端（名师列表／教师详情）展示字段的唯一取值来源。
 // 只允许读取下列教师档案字段，小程序端不得再自造 tagline / intro / profile / tags 之类的字段；
 // 学习经历、工作经历、获奖情况属于内部资料，不在学员端展示。
-export const TEACHER_PUBLIC_PROFILE_FIELD_IDS = {
+const TEACHER_PUBLIC_PROFILE_FIELD_IDS = {
   name: 'FD-TEACHER-002',
   majors: 'FD-TEACHER-010',
   teachingYears: 'FD-TEACHER-011',
@@ -251,10 +253,8 @@ export const TEACHER_PUBLIC_PROFILE_FIELD_IDS = {
   tagline: 'FD-TEACHER-024',
   introduction: 'FD-TEACHER-025'
 };
-
-export const TEACHER_PUBLIC_PROFILE_KEYS = Object.keys(TEACHER_PUBLIC_PROFILE_FIELD_IDS);
-
-export const teacherPublicProfileById = (id) => {
+const TEACHER_PUBLIC_PROFILE_KEYS = Object.keys(TEACHER_PUBLIC_PROFILE_FIELD_IDS);
+const teacherPublicProfileById = (id) => {
   const facts = teacherFactsById(id);
   if (!facts) return null;
   return {
@@ -276,7 +276,7 @@ const addDays = (iso, days) => {
 };
 
 // 已开班次：由班级种子派生的课时日期（未发布的班级不计入）。
-export const TEACHER_LESSON_SESSIONS = classSeed
+const TEACHER_LESSON_SESSIONS = classSeed
   .filter((item) => item.status && item.status !== '未发布' && item.firstLessonDate && item.lessons)
   .flatMap((item) => Array.from({ length: Number(item.lessons) }, (_, index) => ({
     classId: item.id,
@@ -287,6 +287,18 @@ export const TEACHER_LESSON_SESSIONS = classSeed
   })));
 
 // 指定教师、专业在某个日期之后（含当天）仍要上的课次。
-export const sessionsFrom = ({ teacher, major, from }) => TEACHER_LESSON_SESSIONS
+const sessionsFrom = ({ teacher, major, from }) => TEACHER_LESSON_SESSIONS
   .filter((session) => session.teacher === teacher && (!major || session.major === major) && (!from || session.date >= from))
   .sort((a, b) => a.date.localeCompare(b.date));
+
+
+__classicExports["TEACHER_FACTS"] = TEACHER_FACTS;
+__classicExports["teacherFactsByName"] = teacherFactsByName;
+__classicExports["teacherFactsById"] = teacherFactsById;
+__classicExports["TEACHER_PUBLIC_PROFILE_FIELD_IDS"] = TEACHER_PUBLIC_PROFILE_FIELD_IDS;
+__classicExports["TEACHER_PUBLIC_PROFILE_KEYS"] = TEACHER_PUBLIC_PROFILE_KEYS;
+__classicExports["teacherPublicProfileById"] = teacherPublicProfileById;
+__classicExports["TEACHER_LESSON_SESSIONS"] = TEACHER_LESSON_SESSIONS;
+__classicExports["sessionsFrom"] = sessionsFrom;
+  __classicModules["shared/js/teacher-facts.js"] = __classicExports;
+})(globalThis);

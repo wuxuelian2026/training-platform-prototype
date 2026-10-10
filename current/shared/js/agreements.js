@@ -1,4 +1,8 @@
-import { mountRichEditor, richTextValue } from './rich-editor.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { mountRichEditor, richTextValue } = __classicRequire("shared/js/rich-editor.js");
 
 const agreementRoot = document.querySelector('[data-agreements-page]');
 
@@ -102,3 +106,7 @@ if (agreementRoot) {
 
   render();
 }
+
+
+  __classicModules["shared/js/agreements.js"] = __classicExports;
+})(globalThis);

@@ -1,9 +1,13 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // D-03（ZK-D-17 9.1）：后台轮播图管理列表读取 banner-seed 与 demo-store，与学员端首页轮播同源。
-import { mergeBanners } from './banner-seed.js';
-import { readDemoState, upsertDemoRecord } from './demo-store.js';
-import { courseArchiveSeed } from './course-display.js';
-import { allProducts } from './product-seed.js';
-import { TEACHER_FACTS } from './teacher-facts.js';
+const { mergeBanners } = __classicRequire("shared/js/banner-seed.js");
+const { readDemoState, upsertDemoRecord } = __classicRequire("shared/js/demo-store.js");
+const { courseArchiveSeed } = __classicRequire("shared/js/course-display.js");
+const { allProducts } = __classicRequire("shared/js/product-seed.js");
+const { TEACHER_FACTS } = __classicRequire("shared/js/teacher-facts.js");
 
 const root = document.querySelector('[data-banner-page]');
 let activeBanner = null;
@@ -221,3 +225,7 @@ root?.addEventListener('change', (event) => {
   if (error) error.hidden = true;
 });
 render();
+
+
+  __classicModules["shared/js/banners.js"] = __classicExports;
+})(globalThis);

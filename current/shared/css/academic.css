@@ -58,6 +58,13 @@
 .academic-report-content { min-height: 160px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 4px; background: #fafafa; line-height: 1.8; }
 .academic-report-content p { margin: 0 0 8px; }
 .academic-report-content p:last-child { margin-bottom: 0; }
+.academic-certificate-preview { min-height: 390px; padding: 44px 54px 38px; border: 1px solid #d9c49a; background: #fffdf7; color: #33291d; text-align: center; }
+.academic-certificate-preview h2 { margin: 0 0 48px; font-family: serif; font-size: 32px; letter-spacing: 8px; }
+.academic-certificate-preview .certificate-student { margin: 0 0 34px; font-size: 22px; font-weight: 700; }
+.academic-certificate-preview .certificate-text { max-width: 620px; margin: 0 auto 58px; font-size: 17px; line-height: 2.1; text-align: left; text-indent: 2em; }
+.academic-certificate-preview .certificate-school { margin: 0; font-size: 16px; font-weight: 700; text-align: right; }
+.academic-certificate-preview .certificate-date { margin: 12px 0 0; font-size: 15px; text-align: right; }
+.academic-certificate-preview-dialog { width: min(860px, calc(100vw - 32px)); }
 .academic-status-callout { margin: 0 0 16px; padding: 12px 14px; border: 1px solid #ffe7ba; border-radius: 6px; background: #fffaf0; color: #7a4b00; }
 .academic-dialog { width: min(820px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 0; border-radius: 8px; background: transparent; box-shadow: var(--shadow); }
 .academic-planner-dialog { width: min(1180px, calc(100vw - 32px)); }

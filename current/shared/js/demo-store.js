@@ -1,5 +1,9 @@
-import { toCanonicalCourseId } from './course-seed.js';
-import { DEMO_NOW, DEMO_TODAY } from './demo-clock.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { toCanonicalCourseId } = __classicRequire("shared/js/course-seed.js");
+const { DEMO_NOW, DEMO_TODAY } = __classicRequire("shared/js/demo-clock.js");
 
 const STORAGE_KEY = 'hbyx-iteration1-demo-v1';
 // v2 (CR-2026-003 / I1-DEC-19): retire the legacy parallel course numbering; demo data restarts from seed.
@@ -341,8 +345,7 @@ function save(next) {
   window.dispatchEvent(new CustomEvent('hbyx-demo-state-change', { detail: clone(state) }));
   return state;
 }
-
-export function readDemoState() {
+function readDemoState() {
   state = readStored();
   return state;
 }
@@ -355,7 +358,7 @@ const clampInt = (value, min, max, fallback) => {
 // CR-2026-052 / CR-2026-104：视频退款规则由后台参数配置维护——
 // 退款申请窗口（自然日，1–30，默认 7）与最多观看课时数（0–999，默认 3）都可配置，
 // 学员端资格校验与后台线下登记读取同一份配置。
-export function videoRefundSettings() {
+function videoRefundSettings() {
   const settings = readStored().videoRefundSettings || {};
   const unified = readStored().refundSettings || {};
   return {
@@ -364,8 +367,7 @@ export function videoRefundSettings() {
     selfMaxCompletedPercent: clampInt(unified.selfMaxCompletedPercent ?? 100, 0, 100, 100)
   };
 }
-
-export function refundSettings() {
+function refundSettings() {
   const settings = readStored().refundSettings || {};
   return {
     windowDays: clampInt(settings.windowDays ?? 7, 0, 365, 7),
@@ -374,7 +376,7 @@ export function refundSettings() {
 }
 
 // 面授退款参数只决定资格；MVP 退款金额固定为订单实收全额。
-export function classRefundSettings() {
+function classRefundSettings() {
   const settings = readStored().classRefundSettings || {};
   const unified = refundSettings();
   return {
@@ -384,19 +386,19 @@ export function classRefundSettings() {
 }
 
 // CR-2026-104：待支付订单支付时限由「参数配置」维护，默认 30 分钟（1–1440）。
-export function paymentTimeoutSettings() {
+function paymentTimeoutSettings() {
   const settings = readStored().orderSettings || {};
   return { paymentTimeoutMinutes: clampInt(settings.paymentTimeoutMinutes ?? 30, 1, 1440, 30) };
 }
 
 // CR-2026-作业链路：教师端发布作业与服务层共用后台的截止时间参数（1–720 小时）。
-export function homeworkDeadlineSettings() {
+function homeworkDeadlineSettings() {
   const settings = readStored();
   return { deadlineHours: clampInt(settings.homeworkDeadlineHours ?? 72, 24, 720, 72) };
 }
 
 // CR-2026-104：文件上传规格由「参数配置」维护，上传校验、提示文案与后台上传入口读取同一份配置。
-export function fileSpecSettings() {
+function fileSpecSettings() {
   const settings = readStored().fileSpecSettings || {};
   return {
     imageMb: clampInt(settings.imageMb ?? 10, 1, 1024, 10),
@@ -407,7 +409,7 @@ export function fileSpecSettings() {
 }
 
 // CR-2026-104：消息失败重试策略由「参数配置」维护，最多重试 1–5 次，间隔为分钟序列（升序去重）。
-export function messageRetrySettings() {
+function messageRetrySettings() {
   const settings = readStored().messageRetrySettings || {};
   const intervals = [...new Set((Array.isArray(settings.intervalsMinutes) ? settings.intervalsMinutes : [])
     .map((value) => Math.round(Number(value)))
@@ -419,7 +421,7 @@ export function messageRetrySettings() {
 }
 
 // CR-2026-083：合同签署截止期限由后台「参数配置」维护，默认 7 天，取值范围 1–30 天。
-export function contractSettings() {
+function contractSettings() {
   const settings = readStored().contractSettings || {};
   const days = Math.round(Number(settings.signDeadlineDays ?? 7));
   return { signDeadlineDays: Number.isFinite(days) ? Math.min(30, Math.max(1, days)) : 7 };
@@ -427,8 +429,8 @@ export function contractSettings() {
 
 // CR-2026-112：证书到期提醒窗口由后台「参数配置」维护，只允许 7／15／30／60 四个取值，默认 30 天。
 // 非法值（任意整数注入、旧数据脏值）一律回落到 30，后台证书列表与教师端证书提醒读取同一份配置。
-export const CERTIFICATE_EXPIRY_WINDOW_OPTIONS = [7, 15, 30, 60];
-export function certificateExpirySettings() {
+const CERTIFICATE_EXPIRY_WINDOW_OPTIONS = [7, 15, 30, 60];
+function certificateExpirySettings() {
   const settings = readStored().certificateSettings || {};
   const days = Math.round(Number(settings.expiryReminderDays ?? 30));
   return { expiryReminderDays: CERTIFICATE_EXPIRY_WINDOW_OPTIONS.includes(days) ? days : 30 };
@@ -436,7 +438,7 @@ export function certificateExpirySettings() {
 
 // CR-2026-100：课时时长字典由「系统管理 → 参数配置」维护，读取时按正整数去重升序兜底。
 // CR-2026-102：排课策略参数读取时按范围兜底：转场最小间隔 1–120 分钟、跨校区额外预留 0–120 分钟。
-export function timetableSettings() {
+function timetableSettings() {
   const settings = readStored().timetableSettings || {};
   const clamp = (value, min, max, fallback) => {
     const number = Math.round(Number(value));
@@ -469,7 +471,7 @@ function normalizeDictionaryEntry(type, entry) {
 }
 
 /** 全部字典（按字典类型键），供数据字典维护页与各消费方读取。 */
-export function dataDictionary() {
+function dataDictionary() {
   const stored = readStored().dataDictionary || {};
   const types = [...new Set([...Object.keys(DICTIONARY_FALLBACK), ...Object.keys(stored)])];
   return Object.fromEntries(types.map((type) => {
@@ -479,17 +481,17 @@ export function dataDictionary() {
 }
 
 /** 指定字典类型的字典项列表。 */
-export function dictionaryItems(type) {
+function dictionaryItems(type) {
   return dataDictionary()[type]?.items || [];
 }
 
 /** 指定字典类型的默认项（课时时长的默认取值走这里）。 */
-export function dictionaryDefault(type) {
+function dictionaryDefault(type) {
   return dataDictionary()[type]?.defaultItem;
 }
 
 /** 写入某个字典类型的字典项与默认项，保存后即时生效。 */
-export function writeDictionary(type, { items, defaultItem } = {}) {
+function writeDictionary(type, { items, defaultItem } = {}) {
   return writeDemoState((next) => {
     const current = normalizeDictionaryEntry(type, (next.dataDictionary || {})[type]);
     const merged = normalizeDictionaryEntry(type, {
@@ -509,39 +511,32 @@ export function writeDictionary(type, { items, defaultItem } = {}) {
 
 // CR-2026-100 / CR-2026-103：课时时长读取数据字典 lesson_duration，
 // 排班、班级默认值与课程编排共用同一份字典。
-export function lessonDurationSettings() {
+function lessonDurationSettings() {
   return { options: dictionaryItems('lesson_duration'), defaultMinutes: dictionaryDefault('lesson_duration') };
 }
-
-export function writeDemoState(mutator) {
+function writeDemoState(mutator) {
   const next = clone(readStored());
   const result = mutator(next) || next;
   return save(result);
 }
-
-export function getCurrentAccountId() {
+function getCurrentAccountId() {
   return readStored().currentAccountId || 'account-001';
 }
-
-export function setCurrentAccountId(accountId) {
+function setCurrentAccountId(accountId) {
   const source = readStored();
   if (!source.accounts.some(account => account.id === accountId)) return source;
   return save({ ...source, currentAccountId: accountId });
 }
-
-export function accountStudents(accountId = getCurrentAccountId()) {
+function accountStudents(accountId = getCurrentAccountId()) {
   return readStored().students.filter(student => student.accountId === accountId);
 }
-
-export function demoId(prefix) {
+function demoId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
-
-export function demoTime() {
+function demoTime() {
   return DEMO_NOW;
 }
-
-export function upsertDemoRecord(collection, record) {
+function upsertDemoRecord(collection, record) {
   return writeDemoState(next => {
     const rows = Array.isArray(next[collection]) ? next[collection] : [];
     const index = rows.findIndex(item => item.id === record.id);
@@ -551,8 +546,7 @@ export function upsertDemoRecord(collection, record) {
     return next;
   });
 }
-
-export function updateDemoRecord(collection, id, patch) {
+function updateDemoRecord(collection, id, patch) {
   return writeDemoState(next => {
     const rows = Array.isArray(next[collection]) ? next[collection] : [];
     const item = rows.find(row => row.id === id);
@@ -561,8 +555,7 @@ export function updateDemoRecord(collection, id, patch) {
     return next;
   });
 }
-
-export function removeDemoRecord(collection, id) {
+function removeDemoRecord(collection, id) {
   return writeDemoState(next => {
     next[collection] = (next[collection] || []).filter(item => item.id !== id);
     return next;
@@ -572,7 +565,7 @@ export function removeDemoRecord(collection, id) {
 // 视频学习授权状态迁移，对应字典 SM-VIDEO-ENTITLEMENT：
 // 退款审核期间「冻结」，退款失败或超时「解冻」（回到生效），退款完成置「已失效」。
 // 记录一律保留并写入时间、原因与来源单号，用于按订单凭证追溯；不删除历史授权。
-export function transitionVideoEntitlement(accountId, courseId, nextStatus, meta = {}) {
+function transitionVideoEntitlement(accountId, courseId, nextStatus, meta = {}) {
   if (!accountId || !courseId || !nextStatus) return false;
   let hit = false;
   writeDemoState(next => {
@@ -607,8 +600,7 @@ export function transitionVideoEntitlement(accountId, courseId, nextStatus, meta
   });
   return hit;
 }
-
-export function resetDemoData() {
+function resetDemoData() {
   // I1-DEF-008: 学员端 keeps its own per-tab demo cache, so "恢复初始数据" has to clear it as well or a
   // reset browser would still merge stale course and order copies back in.
   try {
@@ -616,8 +608,7 @@ export function resetDemoData() {
   } catch { /* storage may be unavailable; the shared store reset still applies. */ }
   return save(defaultState());
 }
-
-export function subscribeDemoState(callback) {
+function subscribeDemoState(callback) {
   const onStorage = event => {
     if (event.key === STORAGE_KEY) callback(readDemoState());
   };
@@ -640,3 +631,36 @@ if (typeof window !== 'undefined') {
     key: STORAGE_KEY
   };
 }
+
+
+__classicExports["readDemoState"] = readDemoState;
+__classicExports["videoRefundSettings"] = videoRefundSettings;
+__classicExports["refundSettings"] = refundSettings;
+__classicExports["classRefundSettings"] = classRefundSettings;
+__classicExports["paymentTimeoutSettings"] = paymentTimeoutSettings;
+__classicExports["homeworkDeadlineSettings"] = homeworkDeadlineSettings;
+__classicExports["fileSpecSettings"] = fileSpecSettings;
+__classicExports["messageRetrySettings"] = messageRetrySettings;
+__classicExports["contractSettings"] = contractSettings;
+__classicExports["certificateExpirySettings"] = certificateExpirySettings;
+__classicExports["timetableSettings"] = timetableSettings;
+__classicExports["dataDictionary"] = dataDictionary;
+__classicExports["dictionaryItems"] = dictionaryItems;
+__classicExports["dictionaryDefault"] = dictionaryDefault;
+__classicExports["writeDictionary"] = writeDictionary;
+__classicExports["lessonDurationSettings"] = lessonDurationSettings;
+__classicExports["writeDemoState"] = writeDemoState;
+__classicExports["getCurrentAccountId"] = getCurrentAccountId;
+__classicExports["setCurrentAccountId"] = setCurrentAccountId;
+__classicExports["accountStudents"] = accountStudents;
+__classicExports["demoId"] = demoId;
+__classicExports["demoTime"] = demoTime;
+__classicExports["upsertDemoRecord"] = upsertDemoRecord;
+__classicExports["updateDemoRecord"] = updateDemoRecord;
+__classicExports["removeDemoRecord"] = removeDemoRecord;
+__classicExports["transitionVideoEntitlement"] = transitionVideoEntitlement;
+__classicExports["resetDemoData"] = resetDemoData;
+__classicExports["subscribeDemoState"] = subscribeDemoState;
+__classicExports["CERTIFICATE_EXPIRY_WINDOW_OPTIONS"] = CERTIFICATE_EXPIRY_WINDOW_OPTIONS;
+  __classicModules["shared/js/demo-store.js"] = __classicExports;
+})(globalThis);

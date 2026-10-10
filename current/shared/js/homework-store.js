@@ -1,12 +1,16 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 作业链路共享演示存储。
 // 作业定义和学员提交记录分离；两端只通过 demo-store 的 localStorage 交换数据，
 // 页面级 sessionStorage 仅保留登录和筛选等会话状态，不再承载业务作业记录。
-import { activeEnrollmentsOf, classRosterFor, enrollmentExitStatus, studentNameOf } from './class-roster.js';
-import { mergeClassSeed } from './class-seed.js';
-import { demoId, demoTime, fileSpecSettings, readDemoState, writeDemoState } from './demo-store.js';
-import { DEMO_NOW, demoDateTime } from './demo-clock.js';
-import { teacherAccounts } from './course-seed.js';
-import { emitNotificationEvent, suppressPendingNotifications } from './notification-store.js';
+const { activeEnrollmentsOf, classRosterFor, enrollmentExitStatus, studentNameOf } = __classicRequire("shared/js/class-roster.js");
+const { mergeClassSeed } = __classicRequire("shared/js/class-seed.js");
+const { demoId, demoTime, fileSpecSettings, readDemoState, writeDemoState } = __classicRequire("shared/js/demo-store.js");
+const { DEMO_NOW, demoDateTime } = __classicRequire("shared/js/demo-clock.js");
+const { teacherAccounts } = __classicRequire("shared/js/course-seed.js");
+const { emitNotificationEvent, suppressPendingNotifications } = __classicRequire("shared/js/notification-store.js");
 
 const formatRules = {
   图片: ({ type = '', name = '' }) => type === '图片' || type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(name),
@@ -140,25 +144,22 @@ function mergeRows(collection) {
   stored.forEach((row) => byId.set(row.id, { ...(byId.get(row.id) || {}), ...row, review: { ...(byId.get(row.id)?.review || {}), ...(row.review || {}) } }));
   return [...byId.values()];
 }
-
-export function listHomework(filters = {}) {
+function listHomework(filters = {}) {
   return mergeRows('homeworks')
     .filter((item) => (!filters.classId || item.classId === filters.classId) && (!filters.lessonIndex || String(item.lessonIndex) === String(filters.lessonIndex)) && (!filters.publishedBy || item.publishedBy === filters.publishedBy))
     .sort((a, b) => String(b.updatedAt || b.publishedAt).localeCompare(String(a.updatedAt || a.publishedAt)));
 }
 
 // 作业生命周期只保留三种对外状态，截止时间变化后由共享数据源重新派生。
-export function homeworkLifecycleStatus(homework, now = DEMO_NOW) {
+function homeworkLifecycleStatus(homework, now = DEMO_NOW) {
   if (homework?.status === '已撤回') return '已撤回';
   if (homework?.status === '草稿') return '草稿';
   return homeworkIsOverdue(homework, now) ? '已结束' : '进行中';
 }
-
-export function getHomework(homeworkId) {
+function getHomework(homeworkId) {
   return listHomework().find((item) => item.id === homeworkId) || null;
 }
-
-export function listSubmissions(homeworkId) {
+function listSubmissions(homeworkId) {
   const rows = mergeRows('homeworkSubmissions').filter((item) => item.homeworkId === homeworkId);
   const homework = getHomework(homeworkId);
   if (!homework || !rows.length) return rows;
@@ -169,8 +170,7 @@ export function listSubmissions(homeworkId) {
     return exitStatus ? { ...row, rosterExited: true, rosterExitNote: exitStatus } : row;
   });
 }
-
-export function getStudentSubmission(homeworkId, studentId, studentName = '') {
+function getStudentSubmission(homeworkId, studentId, studentName = '') {
   const current = listSubmissions(homeworkId).find((item) => item.studentId === studentId || (!studentId && item.studentName === studentName)) || null;
   if (!current?.draft || !['已提交', '已点评'].includes(current.status)) return current;
   // 正式提交后的草稿只作为下笔内容回填，不改变对外状态：教师仍看到上一次正式提交。
@@ -183,19 +183,17 @@ function getStoredStudentSubmission(homeworkId, studentId, studentName = '') {
 
 // 截止判定（2026-09-24 结算）：按分钟粒度比较，到达截止时刻的当分钟仍可提交（含），
 // 超过该分钟即只读；原型内所有时间均为 Asia/Shanghai 本地时间字符串，秒位不参与判定。
-export function homeworkIsOverdue(homework, now = DEMO_NOW) {
+function homeworkIsOverdue(homework, now = DEMO_NOW) {
   const deadline = demoDateTime(homework?.deadline);
   const current = demoDateTime(now);
   if (!Number.isFinite(deadline.getTime()) || !Number.isFinite(current.getTime())) return false;
   return Math.floor(current.getTime() / 60000) > Math.floor(deadline.getTime() / 60000);
 }
-
-export function homeworkFormatAllowed(homework, attachment = {}) {
+function homeworkFormatAllowed(homework, attachment = {}) {
   const candidate = { type: String(attachment.type || ''), name: String(attachment.name || '') };
   return (homework?.formats || []).some((format) => formatRules[format]?.(candidate));
 }
-
-export function homeworkFileLimitMb(attachment = {}) {
+function homeworkFileLimitMb(attachment = {}) {
   const settings = fileSpecSettings();
   const type = String(attachment.type || '').toLowerCase();
   const name = String(attachment.name || '').toLowerCase();
@@ -224,8 +222,7 @@ function validateSubmission(homework, input, existing) {
     if (Number(attachment.size || 0) > homeworkFileLimitMb(attachment) * 1024 * 1024) throw new Error('HOMEWORK_FILE_TOO_LARGE');
   }
 }
-
-export function submissionSummary(homeworkId) {
+function submissionSummary(homeworkId) {
   const rows = listSubmissions(homeworkId);
   // 发布后退班／转班／退学的学员不计入应交分母，只保留记录与提示。
   const counted = rows.filter((row) => !row.rosterExited);
@@ -245,7 +242,7 @@ export function submissionSummary(homeworkId) {
  * - 再次发布同一作业沿用原快照，发布后新增学员不补入应交名单；
  * - 发布后退班／转班／退学的学员保留应交记录，但不计入提交率分母，后台可见人数差。
  */
-export function homeworkRosterDrift(homeworkId) {
+function homeworkRosterDrift(homeworkId) {
   const homework = getHomework(homeworkId);
   const snapshot = Array.isArray(homework?.rosterSnapshot) ? homework.rosterSnapshot : [];
   const snapshotIds = new Set(snapshot.map((row) => row.studentId));
@@ -276,8 +273,7 @@ function expectedSubmissionRows(homework, now, students = null) {
     review: { status: '未点评', comment: '', reviewedAt: '', reviewerId: '', reviewerName: '' }
   }));
 }
-
-export function publishHomework(input) {
+function publishHomework(input) {
   const now = demoTime();
   const deadline = demoDateTime(input.deadline);
   if (!input.publishedBy) throw new Error('HOMEWORK_OPERATOR_FORBIDDEN');
@@ -325,8 +321,7 @@ export function publishHomework(input) {
   });
   return record;
 }
-
-export function updateHomeworkDeadline(homeworkId, deadline, operator = {}) {
+function updateHomeworkDeadline(homeworkId, deadline, operator = {}) {
   const homework = getHomework(homeworkId);
   const nextDeadline = demoDateTime(deadline);
   const oldDeadline = demoDateTime(homework?.deadline);
@@ -350,8 +345,7 @@ export function updateHomeworkDeadline(homeworkId, deadline, operator = {}) {
   });
   return updated;
 }
-
-export function withdrawHomework(homeworkId, reason, operator = {}) {
+function withdrawHomework(homeworkId, reason, operator = {}) {
   const homework = getHomework(homeworkId);
   if (!homework) throw new Error('HOMEWORK_NOT_FOUND');
   assertHomeworkOperator(homework, operator.id);
@@ -373,12 +367,10 @@ export function withdrawHomework(homeworkId, reason, operator = {}) {
   suppressPendingNotifications('homework', homeworkId, '作业已撤回，不再发送待发送提醒');
   return updated;
 }
-
-export function saveDraftSubmission(input) {
+function saveDraftSubmission(input) {
   return saveSubmission({ ...input, status: '草稿' });
 }
-
-export function submitHomework(input) {
+function submitHomework(input) {
   const record = saveSubmission({ ...input, status: '已提交', submittedAt: input.submittedAt || demoTime(), review: { status: '未点评', comment: '', reviewedAt: '', reviewerId: '', reviewerName: '' } });
   writeDemoState((next) => {
     const homework = (next.homeworks || []).find((item) => item.id === input.homeworkId);
@@ -427,8 +419,7 @@ function saveSubmission(input) {
   writeDemoState((next) => { next.homeworkSubmissions = [...(next.homeworkSubmissions || []).filter((item) => item.id !== record.id), record]; return next; });
   return record;
 }
-
-export function reviewSubmission(submissionId, comment, reviewer = {}) {
+function reviewSubmission(submissionId, comment, reviewer = {}) {
   const current = mergeRows('homeworkSubmissions').find((item) => item.id === submissionId);
   if (!current || !['已提交', '已点评'].includes(current.status)) return null;
   const homework = getHomework(current.homeworkId);
@@ -451,8 +442,7 @@ export function reviewSubmission(submissionId, comment, reviewer = {}) {
   });
   return record;
 }
-
-export function syncHomeworkNotificationReads(rows = []) {
+function syncHomeworkNotificationReads(rows = []) {
   const readById = new Map(rows.filter((row) => row?.id).map((row) => [row.id, Boolean(row.read)]));
   if (!readById.size) return;
   writeDemoState((next) => {
@@ -462,11 +452,32 @@ export function syncHomeworkNotificationReads(rows = []) {
     return next;
   });
 }
-
-export function homeworkForLesson(classId, lessonIndex) {
+function homeworkForLesson(classId, lessonIndex) {
   return listHomework({ classId, lessonIndex });
 }
-
-export function homeworkSeedData() {
+function homeworkSeedData() {
   return { homeworks: seedRows().homeworks, homeworkSubmissions: seedRows().homeworkSubmissions };
 }
+
+
+__classicExports["listHomework"] = listHomework;
+__classicExports["homeworkLifecycleStatus"] = homeworkLifecycleStatus;
+__classicExports["getHomework"] = getHomework;
+__classicExports["listSubmissions"] = listSubmissions;
+__classicExports["getStudentSubmission"] = getStudentSubmission;
+__classicExports["homeworkIsOverdue"] = homeworkIsOverdue;
+__classicExports["homeworkFormatAllowed"] = homeworkFormatAllowed;
+__classicExports["homeworkFileLimitMb"] = homeworkFileLimitMb;
+__classicExports["submissionSummary"] = submissionSummary;
+__classicExports["homeworkRosterDrift"] = homeworkRosterDrift;
+__classicExports["publishHomework"] = publishHomework;
+__classicExports["updateHomeworkDeadline"] = updateHomeworkDeadline;
+__classicExports["withdrawHomework"] = withdrawHomework;
+__classicExports["saveDraftSubmission"] = saveDraftSubmission;
+__classicExports["submitHomework"] = submitHomework;
+__classicExports["reviewSubmission"] = reviewSubmission;
+__classicExports["syncHomeworkNotificationReads"] = syncHomeworkNotificationReads;
+__classicExports["homeworkForLesson"] = homeworkForLesson;
+__classicExports["homeworkSeedData"] = homeworkSeedData;
+  __classicModules["shared/js/homework-store.js"] = __classicExports;
+})(globalThis);

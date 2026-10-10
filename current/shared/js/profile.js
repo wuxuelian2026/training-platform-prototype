@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 const profileRoot = document.querySelector('[data-profile-page]');
 
 const profileData = {
@@ -58,3 +62,7 @@ function bindProfileEvents() {
 }
 
 renderProfile();
+
+
+  __classicModules["shared/js/profile.js"] = __classicExports;
+})(globalThis);

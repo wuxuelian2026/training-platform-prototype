@@ -1,9 +1,12 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // D-03（ZK-D-17 9.1）：轮播图 Mock 种子，字段对齐 10-数据库模型与约束.md 的 banner 定义。
 // 后台轮播图管理列表与学员端首页轮播共用这一份种子，避免两端各写一套演示数据。
 // 学员端首页轮播只展示图片与点击跳转：标题与描述都由运营做进图片里，页面不再叠加文案。
 // `status` 只允许状态机 SM-BANNER 的「启用 / 停用」，未启用的轮播图即停用状态。
-
-export const bannerSeed = [
+const bannerSeed = [
   // 后台行名（name）只用于运营侧辨识，学员端不展示；title／desc／copy 保留为历史兼容字段，学员端不再渲染。
   {
     id: 'banner-001',
@@ -62,13 +65,12 @@ export const bannerSeed = [
     copy: { kicker: '名师推荐', title: '跟着好老师稳步进阶', text: '查看教师专业方向、教龄与已发布课程，按需选择。', mark: '师' }
   }
 ];
-
-export function cloneBannerSeed() {
+function cloneBannerSeed() {
   return bannerSeed.map((item) => ({ ...item, copy: { ...item.copy } }));
 }
 
 // 后台与学员端共用的合并口径：种子为默认值，demo-store 中的同 id 记录覆盖种子。
-export function mergeBanners(shared) {
+function mergeBanners(shared) {
   const stored = (shared?.banners || []).filter((item) => item && typeof item === 'object');
   const merged = bannerSeed.map((seed) => ({ ...seed, ...(stored.find((item) => item.id === seed.id) || {}) }));
   stored.filter((item) => !bannerSeed.some((seed) => seed.id === item.id)).forEach((item) => merged.push({ ...item }));
@@ -76,7 +78,7 @@ export function mergeBanners(shared) {
 }
 
 // 学员端首页只展示排序后的启用状态轮播图，无可用数据时返回空数组（由页面渲染空态）。
-export function resolveHomeBanners(shared) {
+function resolveHomeBanners(shared) {
   return mergeBanners(shared)
     .filter((item) => item.status === '启用')
     .sort((left, right) => Number(left.sort || 0) - Number(right.sort || 0))
@@ -85,3 +87,11 @@ export function resolveHomeBanners(shared) {
     .map((item) => ({ id: item.id, name: item.name, imageFile: item.imageFile || '', jumpTarget: item.jumpTarget || '' }))
     .filter((item) => Boolean(item.imageFile || item.name));
 }
+
+
+__classicExports["cloneBannerSeed"] = cloneBannerSeed;
+__classicExports["mergeBanners"] = mergeBanners;
+__classicExports["resolveHomeBanners"] = resolveHomeBanners;
+__classicExports["bannerSeed"] = bannerSeed;
+  __classicModules["shared/js/banner-seed.js"] = __classicExports;
+})(globalThis);

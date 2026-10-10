@@ -1,8 +1,11 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // RM-F-01: one publishable-course catalog shared by the admin mall module and the learner app.
 // Course ids here are the same ids the course library shows (course entity id / lightweight archive id).
-import { courseMockSeed } from './course-seed.js';
-
-export const courseCatalogSeed = [
+const { courseMockSeed } = __classicRequire("shared/js/course-seed.js");
+const courseCatalogSeed = [
   { id: 'COURSE-CR-2026-0002', name: '声乐演唱技巧', type: '视频课程', archive: '完整课程', status: '已完成', major: '声乐演唱', teacher: '陈晨', hours: 12 },
   { id: 'COURSE-006', name: '艺术歌曲示范课', type: '视频课程', archive: '完整课程', status: '已完成', major: '声乐演唱', teacher: '陈晨', hours: 8 },
   { id: 'COURSE-VIDEO-DEMO-001', name: '童声合唱入门', type: '视频课程', archive: '完整课程', status: '已完成', major: '童声合唱', teacher: '陈晨', hours: 8 },
@@ -30,7 +33,12 @@ export const courseCatalogSeed = [
     ages: [...course.ages]
   }))
 ];
-
-export function cloneCourseCatalogSeed() {
+function cloneCourseCatalogSeed() {
   return courseCatalogSeed.map(item => ({ ...item }));
 }
+
+
+__classicExports["cloneCourseCatalogSeed"] = cloneCourseCatalogSeed;
+__classicExports["courseCatalogSeed"] = courseCatalogSeed;
+  __classicModules["shared/js/course-catalog-seed.js"] = __classicExports;
+})(globalThis);

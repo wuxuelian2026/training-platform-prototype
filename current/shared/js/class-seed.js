@@ -1,11 +1,14 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // Canonical offline-class seed shared by the admin CRM and the learner app.
 // P0-1: one class entity keeps one primary key, one name and one enrollment count on both ends.
 // 2026-09-22 裁定：移除「快速报名入口／快速频道开关」，学员端可见性只由展示状态决定。
-
-import { venueSeed } from './venue-seed.js';
-import { courseTotalHours } from './course-hours.js';
-import { demoOwnerForMajor } from './demo-categories.js';
-import { DEMO_TODAY } from './demo-clock.js';
+const { venueSeed } = __classicRequire("shared/js/venue-seed.js");
+const { courseTotalHours } = __classicRequire("shared/js/course-hours.js");
+const { demoOwnerForMajor } = __classicRequire("shared/js/demo-categories.js");
+const { DEMO_TODAY } = __classicRequire("shared/js/demo-clock.js");
 
 // CR-2026-056 面授班级阶段状态 Mock 数据 + CR-2026-134 演示场景重构。
 // 排课阶段：待排课 3 条、排课中 3 条（CR-2026-134 起归芭蕾舞教师徐帆），其余为已完成排课 22 条。
@@ -198,7 +201,7 @@ const readyPaintingClass = (() => {
   ];
   return classRecord({ id: 'class-mock-ready-painting-01', name: '秋季少儿国画待招生1班', courseId: 'COURSE-CR-2026-0003', course: '少儿国画入门', major: '中国画', teacher: '李青', scheduleStatus: '已发布', enrollStart: '2026-10-01 09:00', deadline: '2026-10-31 23:59', firstLessonDate: sessions[0].date, sessions, enrolled: 4, weekdays: ['周四'], scheduleHistory, updatedAt: '2026-09-20 10:00' });
 })();
-export const classSeed = [
+const classSeed = [
   ...pendingScheduleClasses,
   ...arrangingClasses,
   ...completedEnrollmentNotStarted,
@@ -209,14 +212,13 @@ export const classSeed = [
   ...classSceneClasses,
   readyPaintingClass
 ];
-
-export function cloneClassSeed() {
+function cloneClassSeed() {
   return classSeed.map(item => ({ ...item, weekdays: [...(item.weekdays || [])], sessions: (item.sessions || []).map(session => ({ ...session })) }));
 }
 // 三端同源（CR-2026-132／CR-2026-138）：教务在后台课次调整后写入演示状态，教师端与学员端必须读同一份数据，
 // 否则会出现「学员端已显示调整后的日期、教师端仍显示原日期」的分叉。
 // 本模块不直接读演示状态，由调用方把演示状态里的班级记录传进来，避免与 demo-store 形成循环依赖。
-export function mergeClassSeed(overlay = []) {
+function mergeClassSeed(overlay = []) {
   const byId = new Map(classSeed.map((item) => [item.id, { ...item }]));
   (overlay || []).forEach((item) => {
     byId.set(item.id, { ...(byId.get(item.id) || {}), ...item });
@@ -226,3 +228,10 @@ export function mergeClassSeed(overlay = []) {
   if (endedDance) byId.set('class-mock-ended-pending-01', { ...endedDance, enrolled: 5 });
   return [...byId.values()];
 }
+
+
+__classicExports["cloneClassSeed"] = cloneClassSeed;
+__classicExports["mergeClassSeed"] = mergeClassSeed;
+__classicExports["classSeed"] = classSeed;
+  __classicModules["shared/js/class-seed.js"] = __classicExports;
+})(globalThis);

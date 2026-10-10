@@ -1,5 +1,9 @@
-import { readAdminSession } from './admin-auth.js';
-import { listNotifications, notificationDeliveryRows } from './notification-store.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { readAdminSession } = __classicRequire("shared/js/admin-auth.js");
+const { listNotifications, notificationDeliveryRows } = __classicRequire("shared/js/notification-store.js");
 
 const ROLE_LABELS = {
   super_admin: '超级管理员',
@@ -24,8 +28,7 @@ const matchesAdmin = (delivery, session) => {
 
 // 后台消息只展示知会类通知；需要动作的业务事件必须进入工作台待办。
 const isInformational = (notification) => notification?.requiresAction !== true && notification?.todoType == null;
-
-export function adminMessageRows(session = readAdminSession()) {
+function adminMessageRows(session = readAdminSession()) {
   if (!session) return [];
   return listNotifications().map((notification) => {
     if (!isInformational(notification)) return null;
@@ -34,7 +37,12 @@ export function adminMessageRows(session = readAdminSession()) {
     return { notification, deliveries, unread: deliveries.some((delivery) => !delivery.readAt && delivery.status !== '发送失败') };
   }).filter(Boolean);
 }
-
-export function unreadAdminMessageCount(session = readAdminSession()) {
+function unreadAdminMessageCount(session = readAdminSession()) {
   return adminMessageRows(session).filter((row) => row.unread).length;
 }
+
+
+__classicExports["adminMessageRows"] = adminMessageRows;
+__classicExports["unreadAdminMessageCount"] = unreadAdminMessageCount;
+  __classicModules["shared/js/admin-inbox.js"] = __classicExports;
+})(globalThis);

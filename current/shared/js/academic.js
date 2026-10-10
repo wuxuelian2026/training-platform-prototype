@@ -1,19 +1,23 @@
-import { demoId, demoTime, readDemoState, writeDemoState, removeDemoRecord, timetableSettings, upsertDemoRecord } from './demo-store.js';
-import { cloneCourseCatalogSeed } from './course-catalog-seed.js';
-import { classSeed, mergeClassSeed } from './class-seed.js';
-import { readXlsxSheetRows } from './xlsx-lite.js';
-import { toLocalDateString } from './date-utils.js';
-import { DEMO_NOW, DEMO_TODAY, demoDateTime } from './demo-clock.js';
-import { mergeVenues, resolveVenueId } from './venue-seed.js';
-import { SEMESTERS, semesterAnchorOf, semesterRangeOf } from './batch-seed.js';
-import { TEACHER_FACTS } from './teacher-facts.js';
-import { explainTeacherCapacity } from './teacher-capacity.js';
-import { NOTIFICATION_SOURCE, NOTIFICATION_TYPES, cancelScheduledNotification, emitNotificationEvent, listNotifications, notificationDeliveryRows, processNotificationTasks, resendFailedDeliveries, retryPolicy } from './notification-store.js';
-import { defaultLessonDuration, lessonDurationValues, TIMELINE_END, TIMELINE_START, TIMELINE_STEP_MINUTES, TIMELINE_TICK_COUNT, isWithinTimeline, lessonDurationOptions, lessonEndTime, snapToStep, toMinutes, toTime } from './timetable-settings.js';
-import { classEnrollmentCondition, classScheduleChangeAllowed, classScheduleStatus, classTeachingStatus, lessonStatusOf } from './class-lifecycle.js';
-import { homeworkLifecycleStatus, homeworkRosterDrift, listHomework, listSubmissions, submissionSummary } from './homework-store.js';
-import { graduationSeed as graduation } from './graduation-seed.js';
-import { CERTIFICATE_STATUS, ensureCompletionCertificate, listCompletionCertificates, voidCompletionCertificate } from './completion-certificate-store.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { demoId, demoTime, readDemoState, writeDemoState, removeDemoRecord, timetableSettings, upsertDemoRecord } = __classicRequire("shared/js/demo-store.js");
+const { cloneCourseCatalogSeed } = __classicRequire("shared/js/course-catalog-seed.js");
+const { classSeed, mergeClassSeed } = __classicRequire("shared/js/class-seed.js");
+const { readXlsxSheetRows } = __classicRequire("shared/js/xlsx-lite.js");
+const { toLocalDateString } = __classicRequire("shared/js/date-utils.js");
+const { DEMO_NOW, DEMO_TODAY, demoDateTime } = __classicRequire("shared/js/demo-clock.js");
+const { mergeVenues, resolveVenueId } = __classicRequire("shared/js/venue-seed.js");
+const { SEMESTERS, semesterAnchorOf, semesterRangeOf } = __classicRequire("shared/js/batch-seed.js");
+const { TEACHER_FACTS } = __classicRequire("shared/js/teacher-facts.js");
+const { explainTeacherCapacity } = __classicRequire("shared/js/teacher-capacity.js");
+const { NOTIFICATION_SOURCE, NOTIFICATION_TYPES, cancelScheduledNotification, emitNotificationEvent, listNotifications, notificationDeliveryRows, processNotificationTasks, resendFailedDeliveries, retryPolicy } = __classicRequire("shared/js/notification-store.js");
+const { defaultLessonDuration, lessonDurationValues, TIMELINE_END, TIMELINE_START, TIMELINE_STEP_MINUTES, TIMELINE_TICK_COUNT, isWithinTimeline, lessonDurationOptions, lessonEndTime, snapToStep, toMinutes, toTime } = __classicRequire("shared/js/timetable-settings.js");
+const { classEnrollmentCondition, classScheduleChangeAllowed, classScheduleStatus, classTeachingStatus, lessonStatusOf } = __classicRequire("shared/js/class-lifecycle.js");
+const { homeworkLifecycleStatus, homeworkRosterDrift, listHomework, listSubmissions, submissionSummary } = __classicRequire("shared/js/homework-store.js");
+const { graduationSeed: graduation } = __classicRequire("shared/js/graduation-seed.js");
+const { CERTIFICATE_STATUS, ensureCompletionCertificate, listCompletionCertificates, voidCompletionCertificate } = __classicRequire("shared/js/completion-certificate-store.js");
 
 const academicRoot = document.querySelector('[data-academic-page]');
 const academicPage = academicRoot?.dataset.academicPage;
@@ -395,7 +399,7 @@ function schedulingClasses() {
   (shared.classes || []).forEach(item => byId.set(item.id, { ...(byId.get(item.id) || {}), ...item }));
   return [...byId.values()];
 }
-export function openSchedulePlanner(prefill = {}) {
+function openSchedulePlanner(prefill = {}) {
   const classes = schedulingClasses();
   const selectedClass = classes.find(item => item.id === (prefill.classId || prefill.id)) || classes.find(item => classScheduleStatus(item) !== '已完成') || classes[0];
   if (!selectedClass) { showToast('请先在“面授班级”创建班级。', 'warning'); return; }
@@ -511,7 +515,7 @@ function sessionAdjustmentConflicts(classRecord, sessionIndex, candidate, ignore
     roomConflict: sessionRoomId(item, session) === candidate.roomId
   }));
 }
-export function openSessionAdjustment(prefill = {}) {
+function openSessionAdjustment(prefill = {}) {
   const classRecord = schedulingClasses().find(item => item.id === (prefill.classId || prefill.id));
   if (!classRecord) { showToast('未找到需要调整的班级。', 'error'); return; }
   const adjustable = (classRecord.sessions || []).filter(sessionCanAdjust);
@@ -1677,7 +1681,7 @@ function renderCompletionCertificates() {
   const classes = rows.map((item) => item.className);
   const courses = rows.map((item) => item.course);
   pageFrame('结业证书', '系统默认固定模板 · 生成后固化 PDF 快照', '', filterPanel('certificate-filter', select('证书状态', 'status', [CERTIFICATE_STATUS.ISSUED, CERTIFICATE_STATUS.VOID]) + searchableSelect('学员', 'studentName', students, false, '搜索并选择学员') + searchableSelect('班级', 'className', classes, false, '搜索并选择班级') + searchableSelect('课程', 'course', courses, false, '搜索并选择课程')) + table('<thead><tr><th>证书编号</th><th>学员</th><th>课程</th><th>班级</th><th>结业日期</th><th>状态</th><th>生成时间</th><th>操作</th></tr></thead>'));
-  const row = (item) => `<td><strong>${escapeHtml(item.number)}</strong></td><td>${escapeHtml(item.studentName)}</td><td>${escapeHtml(item.course)}</td><td>${escapeHtml(item.className)}</td><td>${escapeHtml(item.completionDate || '—')}</td><td>${tag(item.status)}</td><td>${escapeHtml(item.generatedAt || '—')}</td><td class="action-cell"><button class="text-button" data-academic-action="certificate-view">查看</button>${item.status === CERTIFICATE_STATUS.ISSUED ? '<button class="text-button danger-link" data-academic-action="certificate-void">作废</button>' : ''}</td>`;
+  const row = (item) => `<td><strong>${escapeHtml(item.number)}</strong></td><td>${escapeHtml(item.studentName)}</td><td>${escapeHtml(item.course)}</td><td>${escapeHtml(item.className)}</td><td>${escapeHtml(item.completionDate || '—')}</td><td>${tag(item.status)}</td><td>${escapeHtml(item.generatedAt || '—')}</td><td class="action-cell">${item.pdfSnapshot ? '<button class="text-button" data-academic-action="certificate-preview">预览</button>' : ''}<button class="text-button" data-academic-action="certificate-view">查看</button>${item.status === CERTIFICATE_STATUS.ISSUED ? '<button class="text-button danger-link" data-academic-action="certificate-void">作废</button>' : ''}</td>`;
   renderRows(rows, row);
   bindAttendanceSearchSelects(document.querySelector('#certificate-filter'));
   applyFilter('certificate-filter', rows, (form) => (item) => (!form.status?.value || item.status === form.status.value) && (!form.studentName?.value || item.studentName === form.studentName.value) && (!form.className?.value || item.className === form.className.value) && (!form.course?.value || item.course === form.course.value), row);
@@ -1987,6 +1991,17 @@ function handleAction(action, row) {
   }
   if (action === 'report-publish') { const dialog = openDialog('确认发布学习报告', '发布后学员端将可见，并产生报告已发布待办。', `<p>确认发布“${escapeHtml(row.student)}”的学习报告？发布不会改变其已通过结业状态和证书。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-confirm-action="report-publish">确认发布</button>'); dialog.dataset.rowId = row.id; return dialog; }
   if (action === 'report-export') return showToast('报告清单导出任务已创建。');
+  if (action === 'certificate-preview') {
+    const formatDate = (value) => {
+      const match = String(value || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      return match ? `${match[1]}年${Number(match[2])}月${Number(match[3])}日` : 'XXXX年X月X日';
+    };
+    const startDate = row.startDate || row.courseStartDate || row.completionDate;
+    const endDate = row.endDate || row.courseEndDate || row.completionDate;
+    const issueDate = row.completionDate || row.issuedAt || row.generatedAt;
+    const body = `<article class="academic-certificate-preview"><h2>结业证书</h2><p class="certificate-student">${escapeHtml(row.studentName)}同学</p><p class="certificate-text">于${formatDate(startDate)}至${formatDate(endDate)}，参加“${escapeHtml(row.course)}”课程，已完成全部课程的进修，考评合格，准予结业，特发此证。</p><p class="certificate-school">湖北艺术职业学院·继续教育学院</p><p class="certificate-date">${formatDate(issueDate)}</p></article>`;
+    return openDialog(`结业证书预览 · ${escapeHtml(row.studentName)}`, `固定模板 PDF 快照 · ${row.status === CERTIFICATE_STATUS.VOID ? '已作废，仅供后台历史查看' : '已生成'}`, body, '<button type="button" class="button" data-dialog-close>关闭</button>', 'academic-certificate-preview-dialog');
+  }
   if (action === 'certificate-view') return openDialog(`结业证书 · ${escapeHtml(row.studentName)}`, '固定模板生成的 PDF 快照；历史快照不随模板调整变化。', `<div class="academic-detail-list"><div><span>证书编号</span><strong>${escapeHtml(row.number)}</strong></div><div><span>学员</span><strong>${escapeHtml(row.studentName)}</strong></div><div><span>课程 / 班级</span><strong>${escapeHtml(row.course)} / ${escapeHtml(row.className)}</strong></div><div><span>结业日期</span><strong>${escapeHtml(row.completionDate || '—')}</strong></div><div><span>状态</span><strong>${tag(row.status)}</strong></div><div><span>模板</span><strong>系统默认固定模板 v${row.version || 1}</strong></div><div><span>PDF 快照</span><strong>${row.pdfSnapshot ? escapeHtml(row.fileName || '已生成') : '尚未生成'}</strong></div><div><span>作废原因</span><strong>${escapeHtml(row.voidReason || '—')}</strong></div></div>`, '<button type="button" class="button" data-dialog-close>关闭</button>');
   if (action === 'certificate-void') { const dialog = openSimpleForm('作废结业证书', '作废后学员端不可继续查看或下载，历史记录保留。', field('作废原因', 'reason', 'text', '请输入作废原因', true), (form) => { const reason = String(form.get('reason') || '').trim(); if (!reason) return; voidCompletionCertificate(row.id, reason); closeDialog(); renderCompletionCertificates(); showToast('结业证书已作废。'); }); return dialog; }
 }
@@ -2125,3 +2140,9 @@ if (academicPage === 'messages') renderMessages();
 if (academicPage === 'graduation') renderGraduation();
 if (academicPage === 'reports') renderReports();
 if (academicPage === 'certificates') renderCompletionCertificates();
+
+
+__classicExports["openSchedulePlanner"] = openSchedulePlanner;
+__classicExports["openSessionAdjustment"] = openSessionAdjustment;
+  __classicModules["shared/js/academic.js"] = __classicExports;
+})(globalThis);

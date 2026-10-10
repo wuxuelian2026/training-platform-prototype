@@ -1,13 +1,17 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 后台登录页交互（原型 Mock）。
 //
 // 字段口径来自 spec/fields/admin.js；登录态由 shared/js/admin-auth.js 写入。
 // 角色不再由页面单独选择：每个后台账号自身绑定一个角色，登录后身份取该账号的角色。
 // 校验口径：账号停用拒绝登录；账号不存在、密码错误分别提示；
 // 登录成功进入工作台（admin/index.html），工作台本身属迭代2。
-import { relativePath } from './paths.js';
-import { mountFieldConstraints } from './field-constraints.js';
-import { mountPageHelp } from './page-help.js';
-import { ADMIN_DEMO_PASSWORD, ADMIN_HOME_PATH, ADMIN_ROLE_LABELS, adminDemoAccounts, findAdminDemoAccount, writeAdminSession } from './admin-auth.js';
+const { relativePath } = __classicRequire("shared/js/paths.js");
+const { mountFieldConstraints } = __classicRequire("shared/js/field-constraints.js");
+const { mountPageHelp } = __classicRequire("shared/js/page-help.js");
+const { ADMIN_DEMO_PASSWORD, ADMIN_HOME_PATH, ADMIN_ROLE_LABELS, adminDemoAccounts, findAdminDemoAccount, writeAdminSession } = __classicRequire("shared/js/admin-auth.js");
 
 const PAGE_KEY = 'admin/login';
 // 「记住密码」在原型中把演示账号与口令存在本地，便于连续演示；
@@ -91,3 +95,7 @@ form?.addEventListener('submit', (event) => {
 mountFieldConstraints(PAGE_KEY);
 // 页面说明入口：内容来自 spec/fields/，与后台其它页面共用同一份字段口径。
 mountPageHelp({ pageKey: PAGE_KEY, title: document.title });
+
+
+  __classicModules["shared/js/admin-login.js"] = __classicExports;
+})(globalThis);

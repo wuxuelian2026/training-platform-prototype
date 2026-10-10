@@ -1,10 +1,13 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 教师端字段规格 · 唯一事实源
 //
 // 与后台共用同一套字段体系：相同的编号规则（FD-<模块>-三位序号）、相同的约束键、
 // 相同的页面说明机制。页面路径相对 /teacher/pages/，登录页属于根目录 login.html。
-import { COURSE_TEACHING_FIELDS, courseFieldRows } from './courses.js';
-
-export const TEACHER_APP_FIELD_SPEC = {
+const { COURSE_TEACHING_FIELDS, courseFieldRows } = __classicRequire("spec/fields/courses.js");
+const TEACHER_APP_FIELD_SPEC = {
   module: '教师端小程序',
   pages: {
     // CR-2026-022：教师端“我的档案”由纯只读调整为“只读身份字段 + 本人可维护字段”，
@@ -143,3 +146,8 @@ export const TEACHER_APP_FIELD_SPEC = {
     }
   }
 };
+
+
+__classicExports["TEACHER_APP_FIELD_SPEC"] = TEACHER_APP_FIELD_SPEC;
+  __classicModules["spec/fields/teacher.js"] = __classicExports;
+})(globalThis);

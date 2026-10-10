@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // CR009-QA-01：教师批量导入需要“校验结果随文件内容变化”的能力，原型层用最小实现读取
 // .xlsx（ZIP 容器）中数据区的单元格文本，仅用于行级计数与必填/字典/重复校验。
 // 边界：只读第一张工作表（或 xl/worksheets/sheet1.xml）的单元格文本，不解析样式、公式、
@@ -101,7 +105,7 @@ function parseSheetRows(sheetXml, sharedStrings) {
  * @param {ArrayBuffer} buffer 上传文件的二进制内容
  * @returns {Promise<{rowNumber:number, cells:string[]}[]|null>} 失败（非 ZIP 或无法解压）返回 null
  */
-export async function readXlsxSheetRows(buffer) {
+async function readXlsxSheetRows(buffer) {
   if (!buffer || !(buffer instanceof ArrayBuffer) || buffer.byteLength < EOCD_MIN_SIZE) return null;
   const zip = readZipEntries(buffer);
   if (!zip || !zip.entries.size) return null;
@@ -143,8 +147,7 @@ function zipStored(files) {
   const centralSize = central.reduce((sum, item) => sum + item.length, 0); const end = new ArrayBuffer(22); const endView = new DataView(end); endView.setUint32(0, 0x06054b50, true); endView.setUint16(8, files.length, true); endView.setUint16(10, files.length, true); endView.setUint32(12, centralSize, true); endView.setUint32(16, offset, true);
   return new Blob([...local, ...central, new Uint8Array(end)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
-
-export function writeXlsxSheetRows(rows) {
+function writeXlsxSheetRows(rows) {
   const escape = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const cells = rows.map((row, rowIndex) => `<row r="${rowIndex + 1}">${row.map((value, columnIndex) => `<c r="${String.fromCharCode(65 + columnIndex)}${rowIndex + 1}" t="inlineStr"><is><t>${escape(value)}</t></is></c>`).join('')}</row>`).join('');
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${cells}</sheetData></worksheet>`;
@@ -156,5 +159,11 @@ export function writeXlsxSheetRows(rows) {
     { name: 'xl/worksheets/sheet1.xml', content: sheet }
   ]);
 }
+readXlsxSheetRows;
 
-export default readXlsxSheetRows;
+
+__classicExports["readXlsxSheetRows"] = readXlsxSheetRows;
+__classicExports["writeXlsxSheetRows"] = writeXlsxSheetRows;
+__classicExports["readXlsxSheetRows"] = readXlsxSheetRows;
+  __classicModules["shared/js/xlsx-lite.js"] = __classicExports;
+})(globalThis);

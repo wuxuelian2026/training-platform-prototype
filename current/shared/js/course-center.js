@@ -1,14 +1,18 @@
-import { relativePath } from './paths.js';
-import { demoId, demoTime, dictionaryDefault, dictionaryItems, fileSpecSettings, readDemoState, removeDemoRecord, updateDemoRecord, upsertDemoRecord } from './demo-store.js';
-import { applicationSeed, courseIdForApplication, courseMockSeed, teacherAccounts, toCanonicalCourseId } from './course-seed.js';
-import { courseArchiveKey, courseEditLock, courseEditLockLabel } from './course-version.js';
-import { courseAgesText, courseArchiveFor, persistCourseTeaching } from './course-display.js';
-import { courseArchiveSeed } from './course-display.js';
-import { defaultLessonDuration, lessonDurationValues } from './timetable-settings.js';
-import { TEACHER_FACTS } from './teacher-facts.js';
-import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
-import { readAdminSession } from './admin-auth.js';
-import { permissionsOfRole } from './permissions.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { relativePath } = __classicRequire("shared/js/paths.js");
+const { demoId, demoTime, dictionaryDefault, dictionaryItems, fileSpecSettings, readDemoState, removeDemoRecord, updateDemoRecord, upsertDemoRecord } = __classicRequire("shared/js/demo-store.js");
+const { applicationSeed, courseIdForApplication, courseMockSeed, teacherAccounts, toCanonicalCourseId } = __classicRequire("shared/js/course-seed.js");
+const { courseArchiveKey, courseEditLock, courseEditLockLabel } = __classicRequire("shared/js/course-version.js");
+const { courseAgesText, courseArchiveFor, persistCourseTeaching } = __classicRequire("shared/js/course-display.js");
+const { courseArchiveSeed } = __classicRequire("shared/js/course-display.js");
+const { defaultLessonDuration, lessonDurationValues } = __classicRequire("shared/js/timetable-settings.js");
+const { TEACHER_FACTS } = __classicRequire("shared/js/teacher-facts.js");
+const { machinesForPage, stateLabelsOf } = __classicRequire("spec/states/index.js");
+const { readAdminSession } = __classicRequire("shared/js/admin-auth.js");
+const { permissionsOfRole } = __classicRequire("shared/js/permissions.js");
 
 const courseRoot = document.querySelector('[data-course-page]');
 
@@ -1331,3 +1335,7 @@ function deleteCatalog(type, id, value) {
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+
+
+  __classicModules["shared/js/course-center.js"] = __classicExports;
+})(globalThis);

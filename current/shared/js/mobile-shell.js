@@ -1,4 +1,8 @@
-import { normalizePrototypeLinks, relativePath } from './paths.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { normalizePrototypeLinks, relativePath } = __classicRequire("shared/js/paths.js");
 
 const root = document.querySelector('[data-mobile-shell]');
 const content = document.querySelector('#page-content');
@@ -25,5 +29,9 @@ root.querySelector('[data-mobile-back]')?.addEventListener('click', () => {
   location.href = relativePath(fallbackPath);
 });
 
-if (app === 'learner') import('./learner.js');
-if (app === 'teacher') import('./teacher.js');
+if (app === 'learner') __classicRequire("shared/js/learner.js");
+if (app === 'teacher') __classicRequire("shared/js/teacher.js");
+
+
+  __classicModules["shared/js/mobile-shell.js"] = __classicExports;
+})(globalThis);

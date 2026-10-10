@@ -1,28 +1,32 @@
-import { relativePath } from './paths.js';
-import { mountFieldConstraints } from './field-constraints.js';
-import { mountPageHelp } from './page-help.js';
-import { toLocalDateString } from './date-utils.js';
-import { mountMobileSettings } from './mobile-settings.js';
-import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
-import { certificateExpirySettings, demoId, demoTime, dictionaryItems, fileSpecSettings, getCurrentAccountId, homeworkDeadlineSettings, readDemoState, upsertDemoRecord, writeDemoState } from './demo-store.js';
-import { DEMO_NOW, DEMO_TODAY, demoDateTime } from './demo-clock.js';
-import { classSeed, mergeClassSeed } from './class-seed.js';
-import { venueSeed } from './venue-seed.js';
-import { classRosterFor } from './class-roster.js';
-import { lessonStatusOf, sessionsInScheduleOrder } from './class-lifecycle.js';
-import { classAttendanceSummary, classHomeworkSummary, countedSessionsOf, lessonAttendance, lessonHomework, studentAttendanceHistory, studentAttendanceRate, studentHomeworkHistory, studentHomeworkRate } from './lesson-records.js';
-import { getHomework, homeworkForLesson, homeworkLifecycleStatus, homeworkRosterDrift, listHomework, listSubmissions, publishHomework, reviewSubmission, submissionSummary, syncHomeworkNotificationReads, updateHomeworkDeadline, withdrawHomework } from './homework-store.js';
-import { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } from './course-seed.js';
-import { syncNotificationReads } from './notification-store.js';
-import { courseAgesText } from './course-display.js';
-import { teacherFactsById } from './teacher-facts.js';
-import { isMiniLoggedIn, isMiniRole, redirectMiniLogin } from './mobile-guard.js';
-import { certificateSourceLabel, findDuplicateCertificate } from './certificate-source.js';
-import { contractDocumentHtml } from './contract-document.js';
-import { contractSignDeadline } from './contract-terms.js';
-import { teachingResourcesForClass } from './teaching-resources.js';
-import { applyFieldConstraints } from './field-constraints.js';
-import { TEACHER_PROFILE_EDITABLE_FIELDS as teacherProfileEditableFields, TEACHER_PROFILE_GROUPS as teacherProfileGroups, TEACHER_PROFILE_GROUP_NOTE as teacherProfileGroupNote, teacherProfileMask } from './teacher-profile-fields.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { relativePath } = __classicRequire("shared/js/paths.js");
+const { mountFieldConstraints } = __classicRequire("shared/js/field-constraints.js");
+const { mountPageHelp } = __classicRequire("shared/js/page-help.js");
+const { toLocalDateString } = __classicRequire("shared/js/date-utils.js");
+const { mountMobileSettings } = __classicRequire("shared/js/mobile-settings.js");
+const { mountMobileMessageDetail, mountMobileMessageList } = __classicRequire("shared/js/mobile-messages.js");
+const { certificateExpirySettings, demoId, demoTime, dictionaryItems, fileSpecSettings, getCurrentAccountId, homeworkDeadlineSettings, readDemoState, upsertDemoRecord, writeDemoState } = __classicRequire("shared/js/demo-store.js");
+const { DEMO_NOW, DEMO_TODAY, demoDateTime } = __classicRequire("shared/js/demo-clock.js");
+const { classSeed, mergeClassSeed } = __classicRequire("shared/js/class-seed.js");
+const { venueSeed } = __classicRequire("shared/js/venue-seed.js");
+const { classRosterFor } = __classicRequire("shared/js/class-roster.js");
+const { lessonStatusOf, sessionsInScheduleOrder } = __classicRequire("shared/js/class-lifecycle.js");
+const { classAttendanceSummary, classHomeworkSummary, countedSessionsOf, lessonAttendance, lessonHomework, studentAttendanceHistory, studentAttendanceRate, studentHomeworkHistory, studentHomeworkRate } = __classicRequire("shared/js/lesson-records.js");
+const { getHomework, homeworkForLesson, homeworkLifecycleStatus, homeworkRosterDrift, listHomework, listSubmissions, publishHomework, reviewSubmission, submissionSummary, syncHomeworkNotificationReads, updateHomeworkDeadline, withdrawHomework } = __classicRequire("shared/js/homework-store.js");
+const { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } = __classicRequire("shared/js/course-seed.js");
+const { syncNotificationReads } = __classicRequire("shared/js/notification-store.js");
+const { courseAgesText } = __classicRequire("shared/js/course-display.js");
+const { teacherFactsById } = __classicRequire("shared/js/teacher-facts.js");
+const { isMiniLoggedIn, isMiniRole, redirectMiniLogin } = __classicRequire("shared/js/mobile-guard.js");
+const { certificateSourceLabel, findDuplicateCertificate } = __classicRequire("shared/js/certificate-source.js");
+const { contractDocumentHtml } = __classicRequire("shared/js/contract-document.js");
+const { contractSignDeadline } = __classicRequire("shared/js/contract-terms.js");
+const { teachingResourcesForClass } = __classicRequire("shared/js/teaching-resources.js");
+const { applyFieldConstraints } = __classicRequire("shared/js/field-constraints.js");
+const { TEACHER_PROFILE_EDITABLE_FIELDS: teacherProfileEditableFields, TEACHER_PROFILE_GROUPS: teacherProfileGroups, TEACHER_PROFILE_GROUP_NOTE: teacherProfileGroupNote, teacherProfileMask } = __classicRequire("shared/js/teacher-profile-fields.js");
 
 // CR-2026-104：证书文件规格读取「参数配置 → 文件上传规格」，与后台证书录入同一份配置。
 function certificateFileSpecText() {
@@ -2370,3 +2374,7 @@ mountFieldConstraints('teacher/' + (teacherPath.split('/').pop() || '').replace(
 
 // 页面说明入口：内容来自 spec/fields/，与后台共用同一份字段口径。
 mountPageHelp({ pageKey: 'teacher/' + (teacherPath.split('/').pop() || '').replace('.html', ''), title: document.title });
+
+
+  __classicModules["shared/js/teacher.js"] = __classicExports;
+})(globalThis);

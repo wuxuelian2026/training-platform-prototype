@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // CR-2026-022：教师档案字段模型（唯一事实源）。
 //
 // 教师端“我的档案”编辑表单与后台教师详情页的“本人维护字段／变更审计”共用这一份定义，
@@ -6,7 +10,7 @@
 //   - 其余档案字段教师本人可维护，保存后直接生效并逐字段写入审计。
 
 /** 仅学校后台维护、教师端只读的字段（黑名单）。 */
-export const TEACHER_PROFILE_READONLY_FIELDS = [
+const TEACHER_PROFILE_READONLY_FIELDS = [
   { key: 'name', label: '姓名', reason: '身份标识，与身份证、证书和合同保持一致' },
   { key: 'employeeNo', label: '工号', reason: '系统生成且全局唯一' },
   { key: 'idCard', label: '身份证号', reason: '身份标识，加密存储并做唯一校验' },
@@ -15,7 +19,7 @@ export const TEACHER_PROFILE_READONLY_FIELDS = [
 ];
 
 /** 教师本人可维护的档案字段（黑名单以外的全部字段）。 */
-export const TEACHER_PROFILE_EDITABLE_FIELDS = [
+const TEACHER_PROFILE_EDITABLE_FIELDS = [
   { key: 'gender', label: '性别', group: '基础信息', control: 'select', options: ['女', '男'], note: '与建档枚举一致' },
   { key: 'birthMonth', label: '出生年月', group: '基础信息', control: 'month' },
   { key: 'politicalStatus', label: '政治面貌', group: '基础信息', control: 'select', options: ['中共党员', '中共预备党员', '共青团员', '民主党派', '群众'] },
@@ -37,18 +41,25 @@ export const TEACHER_PROFILE_EDITABLE_FIELDS = [
   { key: 'tagline', label: '一句话简介', group: '经历与介绍', control: 'textarea', maxLength: 200, optional: true, note: '学员端教师详情展示' },
   { key: 'introduction', label: '简介', group: '经历与介绍', control: 'textarea', maxLength: 2000, optional: true, note: '学员端“个人简介”正文' }
 ];
-
-export const TEACHER_PROFILE_GROUPS = ['基础信息', '联系方式', '收付款信息', '经历与介绍'];
-
-export const TEACHER_PROFILE_GROUP_NOTE = { 收付款信息: '仅用于工资发放', 经历与介绍: '本人填写，仅内部管理与教师端展示；学校认定以证书与合同为准' };
+const TEACHER_PROFILE_GROUPS = ['基础信息', '联系方式', '收付款信息', '经历与介绍'];
+const TEACHER_PROFILE_GROUP_NOTE = { 收付款信息: '仅用于工资发放', 经历与介绍: '本人填写，仅内部管理与教师端展示；学校认定以证书与合同为准' };
 
 /** 展示与审计中需要脱敏的字段。 */
-export const TEACHER_PROFILE_MASK_KEYS = ['mobile', 'emergencyMobile', 'bankCard'];
-
-export const TEACHER_PROFILE_LABELS = Object.fromEntries(TEACHER_PROFILE_EDITABLE_FIELDS.map((field) => [field.key, field.label]));
-
-export const teacherProfileMask = (key, value) => {
+const TEACHER_PROFILE_MASK_KEYS = ['mobile', 'emergencyMobile', 'bankCard'];
+const TEACHER_PROFILE_LABELS = Object.fromEntries(TEACHER_PROFILE_EDITABLE_FIELDS.map((field) => [field.key, field.label]));
+const teacherProfileMask = (key, value) => {
   const text = String(value ?? '');
   if (!TEACHER_PROFILE_MASK_KEYS.includes(key) || text.length < 5) return text;
   return text.length <= 7 ? `${text.slice(0, 2)}****${text.slice(-1)}` : `${text.slice(0, 3)}****${text.slice(-4)}`;
 };
+
+
+__classicExports["TEACHER_PROFILE_READONLY_FIELDS"] = TEACHER_PROFILE_READONLY_FIELDS;
+__classicExports["TEACHER_PROFILE_EDITABLE_FIELDS"] = TEACHER_PROFILE_EDITABLE_FIELDS;
+__classicExports["TEACHER_PROFILE_GROUPS"] = TEACHER_PROFILE_GROUPS;
+__classicExports["TEACHER_PROFILE_GROUP_NOTE"] = TEACHER_PROFILE_GROUP_NOTE;
+__classicExports["TEACHER_PROFILE_MASK_KEYS"] = TEACHER_PROFILE_MASK_KEYS;
+__classicExports["TEACHER_PROFILE_LABELS"] = TEACHER_PROFILE_LABELS;
+__classicExports["teacherProfileMask"] = teacherProfileMask;
+  __classicModules["shared/js/teacher-profile-fields.js"] = __classicExports;
+})(globalThis);

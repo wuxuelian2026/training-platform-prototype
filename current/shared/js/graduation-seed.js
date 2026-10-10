@@ -1,8 +1,12 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 结业（graduation）共享种子：后台 academic.js 与学员端 learner.js 同源取数，
 // 避免学习报告在两端各存一份导致口径分叉（见 CR-2026-149）。
 // 关联班级按 className 匹配真实班级档案（class-seed.js）：
 //   「暑期中国舞基础1班」= class-mock-ended-pending-01（中国舞进阶训练／王玥）。
-export const graduationSeed = [{
+const graduationSeed = [{
   id: 'graduation-dance', className: '暑期中国舞基础1班', course: '中国舞进阶训练', teacher: '王玥', operational: '已结束', classStatus: '待复核', endDate: '2026-09-08', learners: [
     { id: 'learner-lin', name: '林知夏', attendance: '80%', homework: '80%', comment: '课堂参与积极，基本功和组合衔接持续进步。', suggestion: '保持每周练习，关注动作细节和节奏稳定性。', status: '审核中' },
     { id: 'learner-zhou', name: '周予安', attendance: '80%', homework: '90%', comment: '基本动作掌握较稳，组合衔接仍需加强。', suggestion: '补齐缺勤课次后重点练习身韵连接和重心转换。', status: '审核中' },
@@ -16,3 +20,8 @@ export const graduationSeed = [{
     { id: 'learner-chen', name: '陈一诺', attendance: '100%', homework: '92%', comment: '学习目标达成。', suggestion: '尝试更多曲目。', status: '已通过' }
   ]
 }];
+
+
+__classicExports["graduationSeed"] = graduationSeed;
+  __classicModules["shared/js/graduation-seed.js"] = __classicExports;
+})(globalThis);

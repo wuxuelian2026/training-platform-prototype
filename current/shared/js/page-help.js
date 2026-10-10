@@ -1,11 +1,15 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 页面说明入口（三端共用）。
 //
 // 后台由 admin-shell.js 注入；教师端、学员端和登录页通过本模块挂载同一套
 // 悬浮按钮与说明弹窗，保证三端的字段口径来自同一份 spec/fields/。
 // 样式复用 shared/css/shell.css 里的 .page-help-* 规则。
-import { FIELD_PAGE_COLUMNS, PAGE_FIELD_TABLES } from './page-help-fields.js';
-import { MODULE_HELP_CONTENT, PAGE_HELP_CONTENT, SECTION_TEMPLATES, pageTypeOf } from '../../spec/pages/page-types.js';
-import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
+const { FIELD_PAGE_COLUMNS, PAGE_FIELD_TABLES } = __classicRequire("shared/js/page-help-fields.js");
+const { MODULE_HELP_CONTENT, PAGE_HELP_CONTENT, SECTION_TEMPLATES, pageTypeOf } = __classicRequire("spec/pages/page-types.js");
+const { machinesForPage, stateLabelsOf } = __classicRequire("spec/states/index.js");
 
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
@@ -80,8 +84,7 @@ const buildContent = (pageKey) => {
   });
   return blocks.map((block) => (block.rows ? tableSection(block.heading, block.rows) : listSection(block.heading, block.items))).join('');
 };
-
-export const mountPageHelp = ({ pageKey, title, root = document.body }) => {
+const mountPageHelp = ({ pageKey, title, root = document.body }) => {
   if (!root || root.querySelector('[data-page-help-trigger]')) return;
 
   const button = document.createElement('button');
@@ -105,3 +108,8 @@ export const mountPageHelp = ({ pageKey, title, root = document.body }) => {
     if (event.target === dialog) dialog.close();
   });
 };
+
+
+__classicExports["mountPageHelp"] = mountPageHelp;
+  __classicModules["shared/js/page-help.js"] = __classicExports;
+})(globalThis);

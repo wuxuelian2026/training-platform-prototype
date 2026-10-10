@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 const DEFAULT_EDITOR_OPTIONS = {
   name: 'content',
   placeholder: '请输入内容',
@@ -12,7 +16,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => 
 // 富文本清洗：去掉脚本、内联事件与 javascript: 伪协议；编辑器、后台只读预览与学员端渲染共用同一份规则。
 // 白名单之外的标签：脚本、样式表、内嵌框架、嵌入对象与表单控件一律移除（含其内容）。
 const BLOCKED_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'select', 'textarea', 'link', 'meta', 'base'];
-export const sanitizeRichText = (markup) => {
+const sanitizeRichText = (markup) => {
   let output = String(markup ?? '');
   BLOCKED_TAGS.forEach((tag) => {
     output = output
@@ -25,13 +29,13 @@ export const sanitizeRichText = (markup) => {
     .replace(/javascript:/gi, '');
 };
 // 富文本取值：清洗后没有任何文字或媒体（图片／视频／表格）时按未填写处理，编辑器空态常留下 <br>。
-export const richTextValue = (markup) => {
+const richTextValue = (markup) => {
   const cleaned = sanitizeRichText(String(markup ?? '')).trim();
   if (!cleaned) return '';
   return richTextPlain(cleaned) || /<(img|video|table)\b/i.test(cleaned) ? cleaned : '';
 };
 // 富文本转纯文本：用于列表摘要、版本快照等只需要文字的场合。
-export function richTextPlain(markup) {
+function richTextPlain(markup) {
   return sanitizeRichText(markup)
     .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr)[^>]*>/gi, ' ')
     .replace(/<[^>]*>/g, '')
@@ -43,7 +47,7 @@ export function richTextPlain(markup) {
     .trim();
 }
 // 富文本转 HTML：标记值按清洗后的 HTML 返回，纯文本值按换行分段返回段落。
-export function richTextToHtml(value, fallback = '') {
+function richTextToHtml(value, fallback = '') {
   const raw = String(value ?? '').trim();
   if (!raw) return fallback;
   if (isRichMarkup(raw)) return sanitizeRichText(raw);
@@ -51,7 +55,7 @@ export function richTextToHtml(value, fallback = '') {
   return paragraphs.length ? paragraphs.map((line) => '<p>' + escapeHtml(line) + '</p>').join('') : fallback;
 }
 // 判定一个字段值是不是富文本标记：纯文本（含换行）继续按段落渲染，标记值按 HTML 渲染。
-export const isRichMarkup = (value) => /<(p|div|br|strong|b|em|i|u|s|h[1-6]|ul|ol|li|blockquote|table|thead|tbody|tr|td|th|img|a|span|figure|figcaption|hr)\b/i.test(String(value ?? ''));
+const isRichMarkup = (value) => /<(p|div|br|strong|b|em|i|u|s|h[1-6]|ul|ol|li|blockquote|table|thead|tbody|tr|td|th|img|a|span|figure|figcaption|hr)\b/i.test(String(value ?? ''));
 const escapeAttribute = (value) => escapeHtml(value).replace(/`/g, '&#96;');
 
 const toolbarTemplate = `
@@ -88,8 +92,7 @@ const toolbarTemplate = `
   <button type="button" class="editor-tool" data-command="redo" aria-label="重做" title="重做">↷</button>
   <button type="button" class="editor-tool" data-editor-fullscreen aria-label="全屏编辑" title="全屏编辑">⛶</button>
   <div class="editor-more-menu" data-editor-more-menu hidden><button type="button" data-command="strikeThrough">删除线</button><button type="button" data-command="removeFormat">清除格式</button><button type="button" data-command="outdent">减少缩进</button></div>`;
-
-export class RichEditor {
+class RichEditor {
   constructor(element, options = {}) {
     this.host = element;
     this.initialMarkup = element.innerHTML;
@@ -229,6 +232,17 @@ export class RichEditor {
   focus() { this.editor.focus(); }
   destroy() { this.listeners.forEach((remove) => remove()); this.host.className = this.initialClassName; this.host.innerHTML = this.initialMarkup; delete this.host.richEditor; }
 }
+function mountRichEditor(element, options = {}) { if (!element) return null; if (element.richEditor instanceof RichEditor) return element.richEditor; const editor = new RichEditor(element, options); element.richEditor = editor; return editor; }
+function mountRichEditors(root = document, options = {}) { return [...root.querySelectorAll('[data-rich-editor]')].map((element) => mountRichEditor(element, options)); }
 
-export function mountRichEditor(element, options = {}) { if (!element) return null; if (element.richEditor instanceof RichEditor) return element.richEditor; const editor = new RichEditor(element, options); element.richEditor = editor; return editor; }
-export function mountRichEditors(root = document, options = {}) { return [...root.querySelectorAll('[data-rich-editor]')].map((element) => mountRichEditor(element, options)); }
+
+__classicExports["richTextPlain"] = richTextPlain;
+__classicExports["richTextToHtml"] = richTextToHtml;
+__classicExports["mountRichEditor"] = mountRichEditor;
+__classicExports["mountRichEditors"] = mountRichEditors;
+__classicExports["RichEditor"] = RichEditor;
+__classicExports["sanitizeRichText"] = sanitizeRichText;
+__classicExports["richTextValue"] = richTextValue;
+__classicExports["isRichMarkup"] = isRichMarkup;
+  __classicModules["shared/js/rich-editor.js"] = __classicExports;
+})(globalThis);

@@ -1,8 +1,11 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 物资中心字段规格 · 唯一事实源
 // 由 scripts/migrate-literal-fields.mjs 从页面说明字面量迁移生成，迁移后请只维护本文件。
 // 字段口径变更后运行 `npm run check:spec` 校验一致性。
-
-export const INVENTORY_FIELD_SPEC = {
+const INVENTORY_FIELD_SPEC = {
   module: '物资中心',
   pages: {
     'inventory/stock-in': {
@@ -24,7 +27,7 @@ export const INVENTORY_FIELD_SPEC = {
         '提交成功后增加对应物资库存，并生成一条入库流水。',
         '一次提交只允许变更一次库存并生成一条流水；提交处理中按钮锁定，重复提交不重复记账。',
         '入库流水的单号、数量、单价、日期、类型和经办人不可修改，记录可在入库记录中查询。',
-        '登记错误不通过删除处理，需以冲销方式更正。'
+        '登记错误不通过删除、修改或在线修正处理，需人工核对并按后续变更流程处理。'
       ]
     },
     'inventory/stock-out': {
@@ -47,7 +50,7 @@ export const INVENTORY_FIELD_SPEC = {
         '提交成功后扣减对应物资库存，并生成一条出库流水。',
         '一次提交只允许变更一次库存并生成一条流水；提交处理中按钮锁定，重复提交不重复记账。',
         '出库流水的单号、数量、日期、类型和经办人不可修改，记录可在出库记录中查询。',
-        '登记错误不通过删除处理，需以冲销方式更正。'
+        '登记错误不通过删除、修改或在线修正处理，需人工核对并按后续变更流程处理。'
       ]
     },
     'inventory/materials': {
@@ -66,20 +69,20 @@ export const INVENTORY_FIELD_SPEC = {
       notes: [
         '新增物资库存固定为0，库存只能由入库和出库流水变更，不直接手工改写库存数。',
         '库存状态按库存不足、正常展示；库存不高于预警阈值统一归为库存不足并优先提示。',
-        '已产生出入库流水的物资保留历史记录，不删除台账；物资仅允许停用。'
+        '物资允许物理删除，但仅限库存为0且不存在任何出入库流水或业务引用；不满足条件时只能停用。'
       ]
     },
     'inventory/categories': {
       groups: [
         { heading: '新增分类字段', fields: [
           { id: 'FD-INVENTORY-027', label: '分类名称', type: '文本', length: '2–30 字', required: '是', note: '如 乐器类', constraints: { minLength: 2, maxLength: 30 } },
-          { id: 'FD-INVENTORY-028', label: '上级分类', type: '下拉', length: '可选上级', required: '否', note: '留空表示一级分类' },
+          { id: 'FD-INVENTORY-028', label: '上级分类', type: '下拉', length: '可选一级分类', required: '否', note: '留空表示一级分类；已有二级分类的分类不可再作为上级，最多两级' },
           { id: 'FD-INVENTORY-029', label: '分类编码', type: '文本', length: '≤ 30 字', required: '否', note: '选填，用于外部对照', constraints: { maxLength: 30 } },
           { id: 'FD-INVENTORY-030', label: '排序', type: '数字', length: '0 及以上整数', required: '否', note: '数字越小越靠前', constraints: { min: 0, integer: true } }
         ] }
       ],
       notes: [
-        '已被物资引用的分类不允许直接删除，需先停用或迁移物资。',
+        '分类允许物理删除，但仅限不存在物资、流水或业务引用；不满足条件时只能停用。',
         '分类层级不宜超过两级，避免台账统计口径分裂。'
       ]
     },
@@ -92,7 +95,7 @@ export const INVENTORY_FIELD_SPEC = {
         { id: 'FD-INVENTORY-036', label: '入库单号', type: '文本（只读）', length: 'RKYYYYMMDDxxxx', required: '系统生成', note: '提交时生成且不可修改', constraints: { readOnly: true, system: true } },
         { id: 'FD-INVENTORY-037', label: '入库数量', type: '数字（只读）', length: '正整数', required: '系统记录', note: '入库流水数量', constraints: { readOnly: true, integer: true } },
         { id: 'FD-INVENTORY-038', label: '入库日期', type: '日期（只读）', length: 'YYYY-MM-DD', required: '系统记录', note: '入库流水日期', constraints: { readOnly: true, format: 'YYYY-MM-DD' } }
-      ] }], notes: ['流水只读，登记错误通过新增反向流水冲销。']
+      ] }], notes: ['流水提交后只读，不可删除、直接修改或在线修正；错误记录需人工核对并按后续变更流程处理。']
     },
     'inventory/outbound-records': {
       groups: [{ heading: '出库记录查询字段', fields: [
@@ -103,7 +106,12 @@ export const INVENTORY_FIELD_SPEC = {
         { id: 'FD-INVENTORY-049', label: '出库单号', type: '文本（只读）', length: 'CKYYYYMMDDxxxx', required: '系统生成', note: '提交时生成且不可修改', constraints: { readOnly: true, system: true } },
         { id: 'FD-INVENTORY-050', label: '出库数量', type: '数字（只读）', length: '正整数', required: '系统记录', note: '出库流水数量', constraints: { readOnly: true, integer: true } },
         { id: 'FD-INVENTORY-051', label: '用途说明', type: '文本（只读）', length: '≤ 200 字', required: '系统记录', note: '出库登记用途说明', constraints: { readOnly: true, maxLength: 200 } }
-      ] }], notes: ['出库数量不得超过当时可用库存；流水只读，错误通过反向流水冲销。']
+      ] }], notes: ['出库数量不得超过当时可用库存；流水提交后只读，不可删除、直接修改或在线修正。']
     }
   }
 };
+
+
+__classicExports["INVENTORY_FIELD_SPEC"] = INVENTORY_FIELD_SPEC;
+  __classicModules["spec/fields/inventory.js"] = __classicExports;
+})(globalThis);

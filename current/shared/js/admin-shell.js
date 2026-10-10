@@ -1,11 +1,15 @@
-import { normalizePrototypeLinks, relativePath } from './paths.js';
-import { ADMIN_PAGE_PERMISSIONS, applyPermissionGates, pagePermissionState, permissionById, permissionsOfRole, roleHasPermission } from './permissions.js';
-import { FIELD_PAGE_COLUMNS, PAGE_FIELD_TABLES } from './page-help-fields.js';
-import { mountFieldConstraints } from './field-constraints.js';
-import { MODULE_HELP_CONTENT, PAGE_HELP_CONTENT, SECTION_TEMPLATES, pageTypeOf } from '../../spec/pages/page-types.js';
-import { machinesForPage, stateLabelsOf } from '../../spec/states/index.js';
-import { ADMIN_LOGIN_PATH, ADMIN_ROLE_LABELS, clearAdminSession, readAdminSession } from './admin-auth.js';
-import { unreadAdminMessageCount } from './admin-inbox.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { normalizePrototypeLinks, relativePath } = __classicRequire("shared/js/paths.js");
+const { ADMIN_PAGE_PERMISSIONS, applyPermissionGates, pagePermissionState, permissionById, permissionsOfRole, roleHasPermission } = __classicRequire("shared/js/permissions.js");
+const { FIELD_PAGE_COLUMNS, PAGE_FIELD_TABLES } = __classicRequire("shared/js/page-help-fields.js");
+const { mountFieldConstraints } = __classicRequire("shared/js/field-constraints.js");
+const { MODULE_HELP_CONTENT, PAGE_HELP_CONTENT, SECTION_TEMPLATES, pageTypeOf } = __classicRequire("spec/pages/page-types.js");
+const { machinesForPage, stateLabelsOf } = __classicRequire("spec/states/index.js");
+const { ADMIN_LOGIN_PATH, ADMIN_ROLE_LABELS, clearAdminSession, readAdminSession } = __classicRequire("shared/js/admin-auth.js");
+const { unreadAdminMessageCount } = __classicRequire("shared/js/admin-inbox.js");
 
 const root = document.querySelector('[data-admin-shell]');
 const content = document.querySelector('#page-content');
@@ -433,3 +437,7 @@ const enhanceFilterForms = () => {
 };
 enhanceFilterForms();
 new MutationObserver(enhanceFilterForms).observe(document.body, { childList: true, subtree: true });
+
+
+  __classicModules["shared/js/admin-shell.js"] = __classicExports;
+})(globalThis);

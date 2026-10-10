@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 课程中心字段规格 · 唯一事实源
 // 由 scripts/migrate-literal-fields.mjs 从页面说明字面量迁移生成，迁移后请只维护本文件。
 // 字段口径变更后运行 `npm run check:spec` 校验一致性。
@@ -6,12 +10,11 @@
 //   教学属性（难度等级、适合年龄）：教师申报填写 → 后台编排带出可改 → 写入课程档案（CR-2026-014）。
 //   运营素材（课程封面、图文详情、课程标签、C 端推荐语）：发布视频商品 / 发布面授班级时维护，写入各自的售卖单元（CR-2026-020）。
 // 需要引用这两个数组的页面用 courseFieldRows() 生成带本页唯一编号的字段行，不要复制定义。
-export const COURSE_TEACHING_FIELDS = [
+const COURSE_TEACHING_FIELDS = [
   { label: '难度等级', type: '下拉', length: '启蒙 / 初级 / 中级 / 高级 / 考级冲刺', required: '是', note: '教学属性，教师申报时维护；后台编排可修改，发布环节只读带入', constraints: { options: ['启蒙', '初级', '中级', '高级', '考级冲刺'] } },
   { label: '适合年龄', type: '多选', length: '全年龄段 / 少儿 / 青少年 / 成人', required: '是', note: '教学属性，教师申报时维护；后台编排可修改，发布环节只读带入', constraints: { options: ['全年龄段', '少儿', '青少年', '成人'], multi: true } }
 ];
-
-export const COURSE_DISPLAY_FIELDS = [
+const COURSE_DISPLAY_FIELDS = [
   { label: '课程封面', type: '图片上传', length: '单个图片', required: '发布时必填', note: '售卖单元级存储；草稿可为空，首次上架商品或发布班级前必须上传', constraints: { maxFiles: 1, image: true } },
   { label: '图文详情', type: '富文本', length: '≤ 2000 字', required: '否', note: '售卖单元级存储，学员端课程详情展示；长度上限按纯文本字数统计，在编辑器内实时提示并阻止超限保存', constraints: { maxLength: 2000, richText: true } },
   { label: '课程标签', type: '标签输入', length: '单个标签 ≤ 12 字', required: '否', note: '售卖单元级存储，列表卡片与详情页展示' },
@@ -19,13 +22,12 @@ export const COURSE_DISPLAY_FIELDS = [
 ];
 
 // 页面字段表要求编号在本页唯一：引用共享定义时按页前缀与起始序号生成当前页的行。
-export const courseFieldRows = (prefix, startIndex, fields, override = {}) => fields.map((field, index) => ({
+const courseFieldRows = (prefix, startIndex, fields, override = {}) => fields.map((field, index) => ({
   ...field,
   ...override,
   id: `FD-${prefix}-${String(startIndex + index).padStart(3, '0')}`
 }));
-
-export const COURSE_FIELD_SPEC = {
+const COURSE_FIELD_SPEC = {
   module: '课程中心',
   pages: {
     // 说明：门类/分类/专业三级共用同一张表单。此前的 FD-COURSE-001（门类名称）、
@@ -180,3 +182,11 @@ export const COURSE_FIELD_SPEC = {
     }
   }
 };
+
+
+__classicExports["COURSE_TEACHING_FIELDS"] = COURSE_TEACHING_FIELDS;
+__classicExports["COURSE_DISPLAY_FIELDS"] = COURSE_DISPLAY_FIELDS;
+__classicExports["courseFieldRows"] = courseFieldRows;
+__classicExports["COURSE_FIELD_SPEC"] = COURSE_FIELD_SPEC;
+  __classicModules["spec/fields/courses.js"] = __classicExports;
+})(globalThis);

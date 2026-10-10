@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { lessonStatusOf, sessionsInScheduleOrder } from '../shared/js/class-lifecycle.js';
+import { loadClassicModule } from './load-classic-modules.mjs';
+
+const { lessonStatusOf, sessionsInScheduleOrder } = await loadClassicModule('shared/js/class-lifecycle.js');
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const files = Object.fromEntries(await Promise.all(

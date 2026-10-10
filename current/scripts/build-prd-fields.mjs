@@ -12,14 +12,15 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { loadClassicModule } from './load-classic-modules.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repoRoot = path.resolve(root, '../..');
 const checkOnly = process.argv.includes('--check');
 const toStdout = process.argv.includes('--stdout');
 
-const { PAGE_FIELD_SPECS } = await import(pathToFileURL(path.join(root, 'spec/fields/index.js')).href);
+const { PAGE_FIELD_SPECS } = await loadClassicModule('spec/fields/index.js');
 
 // 页面 → PRD 文件与标记名
 const PRD_TARGETS = [

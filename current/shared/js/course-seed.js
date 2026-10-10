@@ -1,8 +1,12 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // Canonical course-construction seed shared by the teacher app and the admin course center.
 // I1-DEC-19: one application id (CR-YYYY-NNNN) spans both ends; the course id is derived from it.
-import { TEACHER_FACTS } from './teacher-facts.js';
-import { explainTeacherCapacity } from './teacher-capacity.js';
-import { demoOwnerForMajor } from './demo-categories.js';
+const { TEACHER_FACTS } = __classicRequire("shared/js/teacher-facts.js");
+const { explainTeacherCapacity } = __classicRequire("shared/js/teacher-capacity.js");
+const { demoOwnerForMajor } = __classicRequire("shared/js/demo-categories.js");
 
 const teacherAccountMeta = {
   'teacher-wang': { no: 'JS20260901', unit: '湖北艺术职业学院', professional: '舞蹈表演', major: '中国舞' },
@@ -15,7 +19,7 @@ const teacherAccountMeta = {
 };
 
 // 教师端演示账号与课程申报数据使用同一份“当前可申报”判定，避免账号状态变化后仍生成新申报。
-export const teacherAccounts = TEACHER_FACTS
+const teacherAccounts = TEACHER_FACTS
   .filter((facts) => teacherAccountMeta[facts.id] && explainTeacherCapacity(facts, { purpose: 'apply' }).status === 'available')
   .map((facts) => ({
     id: facts.id,
@@ -27,27 +31,24 @@ export const teacherAccounts = TEACHER_FACTS
     major: teacherAccountMeta[facts.id].major,
     years: `${facts.teachingYears}年`
   }));
-
-export function courseIdForApplication(applicationId) {
+function courseIdForApplication(applicationId) {
   return `COURSE-${applicationId}`;
 }
 
 // I1-DEC-19 retired the parallel course numbering. Demo browsers that still hold pre-rename localStorage
 // keep course references on the old ids, so the retired ids stay resolvable as aliases instead of forcing
 // reviewers to clear storage by hand (I1-DEF-008).
-export const legacyCourseIdAliases = {
+const legacyCourseIdAliases = {
   'COURSE-001': 'COURSE-CR-2026-0001',
   'COURSE-002': 'COURSE-CR-2026-0002',
   'COURSE-003': 'COURSE-CR-2026-0003',
   'COURSE-004': 'COURSE-CR-2026-0004',
   'COURSE-005': 'COURSE-CR-2026-0005'
 };
-
-export function toCanonicalCourseId(id) {
+function toCanonicalCourseId(id) {
   return legacyCourseIdAliases[id] || id;
 }
-
-export function defaultTeacherId() {
+function defaultTeacherId() {
   return teacherAccounts[0].id;
 }
 
@@ -180,13 +181,12 @@ const applyDemoOwner = (item) => {
     teacherInfo: `${account.name} · ${account.title} · ${account.professional} · ${account.unit}`
   };
 };
-export function courseMockSeed() {
+function courseMockSeed() {
   return teacherAccounts.flatMap((teacher, teacherIndex) =>
     Array.from({ length: 10 }, (_, itemIndex) => mockCourse(teacher, teacherIndex, itemIndex))
   ).map(applyDemoOwner);
 }
-
-export function applicationSeed() {
+function applicationSeed() {
   return ([
     { id: 'CR-2026-0001', name: '舞蹈基本功', type: '面授课程', major: '中国舞', professional: '舞蹈表演', hours: 16, status: '待审核', date: '2026-09-08', submittedAt: '2026-09-08 09:14', intro: '从身体控制、节奏训练到基本舞姿，建立少儿中国舞的基础训练体系。', attachment: '课程申报说明.pdf', file: '课程申报说明.pdf', teacher: '王玥', teacherNo: 'JS20260901', teacherUnit: '湖北艺术职业学院', teacherTitle: '副教授', teacherProfessional: '舞蹈表演', teacherInfo: '王玥 · 副教授 · 舞蹈表演 · 湖北艺术职业学院', difficulty: '初级', ages: ['少儿'], courseId: 'COURSE-CR-2026-0001', review: '', reviewedBy: '', reviewedAt: '' },
     { id: 'CR-2026-0002', name: '声乐演唱技巧', type: '视频课程', major: '声乐演唱', professional: '声乐演唱', hours: 12, status: '已通过', date: '2026-09-07', submittedAt: '2026-09-07 15:36', intro: '围绕气息、共鸣、咬字与作品处理，帮助学习者建立完整演唱方法。', attachment: '声乐课程大纲.docx', file: '声乐课程大纲.docx', teacher: '陈晨', teacherNo: 'JS20260902', teacherUnit: '湖北艺术职业学院', teacherTitle: '讲师', teacherProfessional: '声乐演唱', teacherInfo: '陈晨 · 讲师 · 声乐演唱 · 湖北艺术职业学院', difficulty: '中级', ages: ['青少年', '成人'], courseId: 'COURSE-CR-2026-0002', review: '审批通过', reviewedBy: '教研管理员', reviewedAt: '2026-09-05 15:30' },
@@ -197,3 +197,14 @@ export function applicationSeed() {
     ...teacherApplicationMocks()
   ]).map(applyDemoOwner);
 }
+
+
+__classicExports["courseIdForApplication"] = courseIdForApplication;
+__classicExports["toCanonicalCourseId"] = toCanonicalCourseId;
+__classicExports["defaultTeacherId"] = defaultTeacherId;
+__classicExports["courseMockSeed"] = courseMockSeed;
+__classicExports["applicationSeed"] = applicationSeed;
+__classicExports["teacherAccounts"] = teacherAccounts;
+__classicExports["legacyCourseIdAliases"] = legacyCourseIdAliases;
+  __classicModules["shared/js/course-seed.js"] = __classicExports;
+})(globalThis);

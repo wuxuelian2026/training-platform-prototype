@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 课程展示信息（CR-2026-020：运营素材下沉到售卖单元）。
 //
 // 教学属性（难度等级、适合年龄）仍由课程档案承载，教师在申报时维护、后台编排可改、发布时只读带入；
@@ -6,8 +10,8 @@
 //
 // 本模块是课程档案与售卖单元展示素材的统一读写入口，供 course-center.js（课程库）、
 // sales-crm.js（发布表单）与 learner.js（学员端展示）共用。
-import { readDemoState, upsertDemoRecord } from './demo-store.js';
-import { courseMockSeed, toCanonicalCourseId } from './course-seed.js';
+const { readDemoState, upsertDemoRecord } = __classicRequire("shared/js/demo-store.js");
+const { courseMockSeed, toCanonicalCourseId } = __classicRequire("shared/js/course-seed.js");
 
 // 版本条目：CR-2026-025 要求历史版本整体快照可查（字段值、编排结构摘要、操作人与时间）。
 const archiveVersion = (version, at, operator, changes, snapshot) => ({ version, at, operator, changes, snapshot });
@@ -44,8 +48,7 @@ const COURSE_OUTLINES = {
     { name: '第二章：入门乐曲', desc: '将基本指法应用到简单旋律中。', lessons: [{ name: '旋律练习', target: '完整演奏一段入门旋律', duration: 45, kind: '综合', description: '结合节拍和指法完成入门乐曲练习。', resources: [] }] }
   ]
 };
-
-export const VIDEO_DEMO_COURSES = [
+const VIDEO_DEMO_COURSES = [
   { id: 'COURSE-VIDEO-DEMO-001', name: '童声合唱入门', major: '童声合唱', teacher: '陈晨', hours: 8, difficulty: '初级', ages: ['少儿'], price: '498.00', outline: [{ name: '第一章：歌唱准备', desc: '建立呼吸、发声与节拍基础。', lessons: [{ name: '呼吸与站姿', target: '完成基础呼吸练习', duration: 32, kind: '示范', description: '认识合唱站姿和呼吸方法。', resources: ['res-001'] }, { name: '节拍模唱', target: '跟随节拍完成短句模唱', duration: 35, kind: '练习', description: '通过节拍练习建立合唱感。', resources: [] }] }, { name: '第二章：声部配合', desc: '学习简单声部进入与配合。', lessons: [{ name: '旋律线条', target: '完成一段旋律演唱', duration: 40, kind: '综合', description: '练习旋律连贯和音准控制。', resources: [] }] }] },
   { id: 'COURSE-VIDEO-DEMO-002', name: '钢琴即兴伴奏基础', major: '钢琴', teacher: '林月', hours: 10, difficulty: '中级', ages: ['青少年', '成人'], price: '880.00', outline: [{ name: '第一章：和弦基础', desc: '掌握常用和弦连接。', lessons: [{ name: '三和弦构成', target: '识别并弹奏常用三和弦', duration: 45, kind: '理论', description: '讲解三和弦结构和键盘位置。', resources: [] }, { name: '和弦连接', target: '完成基础和弦连接练习', duration: 48, kind: '示范', description: '通过示范掌握平稳连接。', resources: [] }] }, { name: '第二章：伴奏织体', desc: '将和弦应用到伴奏中。', lessons: [{ name: '分解和弦伴奏', target: '完成一段分解和弦伴奏', duration: 50, kind: '练习', description: '练习常用分解和弦型。', resources: [] }] }] },
   { id: 'COURSE-VIDEO-DEMO-003', name: '少儿水彩画入门', major: '少儿绘画', teacher: '李青', hours: 6, difficulty: '启蒙', ages: ['少儿'], price: '368.00', outline: [{ name: '第一章：色彩体验', desc: '认识水彩工具和基础色彩。', lessons: [{ name: '工具与用水', target: '正确使用水彩工具', duration: 30, kind: '示范', description: '认识画笔、颜料和用水方法。', resources: [] }, { name: '三原色练习', target: '完成三原色调色练习', duration: 35, kind: '练习', description: '通过调色认识色彩变化。', resources: [] }] }, { name: '第二章：主题创作', desc: '综合运用色彩完成主题画。', lessons: [{ name: '我的小花园', target: '完成一幅水彩主题画', duration: 55, kind: '创作', description: '从构图到上色完成小幅创作。', resources: [] }] }] },
@@ -162,13 +165,12 @@ const COURSE_ARCHIVE_SEED = [
     versions: [archiveVersion(1, '2026-09-21 10:00', '教研管理员', ['建档', '编排结构'], { name: course.name, archive: '完整课程', type: '视频课程', major: course.major, teacher: course.teacher, hours: course.hours, difficulty: course.difficulty, ages: [...course.ages], structure: `${course.outline.length} 个章节 · ${course.outline.reduce((sum, chapter) => sum + chapter.lessons.length, 0)} 个课时`, outline: course.outline })]
   }))
 ];
-
-export const COURSE_DISPLAY_UNSET = '未配置';
+const COURSE_DISPLAY_UNSET = '未配置';
 // 运营四字段：只写在售卖单元（商品或班级）记录上，不写课程档案。
-export const SALE_UNIT_DISPLAY_KEYS = ['cover', 'coverFile', 'detail', 'tags', 'recommendation'];
+const SALE_UNIT_DISPLAY_KEYS = ['cover', 'coverFile', 'detail', 'tags', 'recommendation'];
 
 // 档案种子按 I1-DEC-19 的课程主键归一，避免后台与学员端读到退役编号。
-export function courseArchiveSeed() {
+function courseArchiveSeed() {
   // 深拷贝版本轨：调用方会刷新当前版本快照，不能共享种子里的同一份对象。
   return COURSE_ARCHIVE_SEED.map((record) => ({
     ...record,
@@ -189,8 +191,7 @@ export function courseArchiveSeed() {
     }))
   }));
 }
-
-export function courseArchiveDefaults(course = {}) {
+function courseArchiveDefaults(course = {}) {
   return {
     id: `LIB-${course.id || Date.now()}`,
     sourceCourseId: toCanonicalCourseId(course.id),
@@ -209,7 +210,7 @@ export function courseArchiveDefaults(course = {}) {
 }
 
 // 课程档案读取：存储记录覆盖种子基线，存储里没有的课程按传入的课程对象新建默认档案。
-export function courseArchiveFor(course) {
+function courseArchiveFor(course) {
   const courseId = toCanonicalCourseId(typeof course === 'string' ? course : course?.id);
   if (!courseId) return null;
   const shared = readDemoState();
@@ -223,7 +224,7 @@ export function courseArchiveFor(course) {
 }
 
 // 商品、班级和订单按自身保存的版本读取课程属性；未传版本时才读取当前版本。
-export function courseArchiveVersionFor(course, version) {
+function courseArchiveVersionFor(course, version) {
   const current = courseArchiveFor(course);
   const requested = Number(version);
   if (!current || !Number.isInteger(requested) || requested < 1) return current;
@@ -233,24 +234,22 @@ export function courseArchiveVersionFor(course, version) {
 }
 
 // 运营四项是否已配置：售卖单元的课程封面配置后，二次发布默认只读带入。
-export function courseDisplayConfigured(unit) {
+function courseDisplayConfigured(unit) {
   return Boolean(unit && unit.cover && unit.cover !== COURSE_DISPLAY_UNSET);
 }
-
-export function courseDisplayTags(unit) {
+function courseDisplayTags(unit) {
   const tags = unit?.tags;
   if (Array.isArray(tags)) return tags.filter(Boolean);
   return String(tags || '').split(/[，,、\s]+/).filter(Boolean);
 }
-
-export function courseAgesText(record) {
+function courseAgesText(record) {
   const ages = record?.ages;
   if (Array.isArray(ages)) return ages.filter(Boolean).join('、');
   return String(ages || '');
 }
 
 // 写入课程档案的教学属性：只维护难度等级与适合年龄，不触碰运营素材与售卖字段。
-export function persistCourseTeaching(course, patch) {
+function persistCourseTeaching(course, patch) {
   const current = courseArchiveFor(course) || courseArchiveDefaults(typeof course === 'string' ? { id: course } : course);
   const record = { ...current, ...patch, sourceCourseId: toCanonicalCourseId(current.sourceCourseId) };
   if (!Array.isArray(record.ages)) record.ages = String(record.ages || '').split(/[，,、\s]+/).filter(Boolean);
@@ -261,7 +260,7 @@ export function persistCourseTeaching(course, patch) {
 // —— 售卖单元（商品 / 班级）展示素材的读写 ——
 
 // 按课程取在售商品记录：视频课程的对外展示素材来自它自己的商品。
-export function productForCourse(courseId) {
+function productForCourse(courseId) {
   const canonical = toCanonicalCourseId(typeof courseId === 'string' ? courseId : courseId?.id);
   if (!canonical) return null;
   const products = (readDemoState().products || []).filter((row) => row && typeof row === 'object');
@@ -269,14 +268,14 @@ export function productForCourse(courseId) {
 }
 
 // 按班级 ID 取班级记录：面授班级的对外展示素材来自它自己的班级记录。
-export function classRecordFor(classId) {
+function classRecordFor(classId) {
   if (!classId) return null;
   const classes = (readDemoState().classes || []).filter((row) => row && typeof row === 'object');
   return classes.find((row) => row.id === classId) || null;
 }
 
 // 归一化售卖单元的展示素材：未配置时给出空态，标签统一为数组。
-export function saleUnitDisplay(unit) {
+function saleUnitDisplay(unit) {
   return {
     cover: unit?.cover || COURSE_DISPLAY_UNSET,
     coverFile: unit?.coverFile || '',
@@ -287,7 +286,7 @@ export function saleUnitDisplay(unit) {
 }
 
 // 写入售卖单元的展示素材：商品写 products，班级写 classes。
-export function persistSaleUnitDisplay(collection, record) {
+function persistSaleUnitDisplay(collection, record) {
   const patch = { ...record };
   if (patch.coverFile) patch.cover = '已配置';
   if (!patch.cover) patch.cover = COURSE_DISPLAY_UNSET;
@@ -297,7 +296,27 @@ export function persistSaleUnitDisplay(collection, record) {
 }
 
 // 发布环节只读带入的申报教学属性。
-export function courseTeachingSummary(course) {
+function courseTeachingSummary(course) {
   const archive = courseArchiveFor(course);
   return { difficulty: archive?.difficulty || '', ages: courseAgesText(archive) };
 }
+
+
+__classicExports["courseArchiveSeed"] = courseArchiveSeed;
+__classicExports["courseArchiveDefaults"] = courseArchiveDefaults;
+__classicExports["courseArchiveFor"] = courseArchiveFor;
+__classicExports["courseArchiveVersionFor"] = courseArchiveVersionFor;
+__classicExports["courseDisplayConfigured"] = courseDisplayConfigured;
+__classicExports["courseDisplayTags"] = courseDisplayTags;
+__classicExports["courseAgesText"] = courseAgesText;
+__classicExports["persistCourseTeaching"] = persistCourseTeaching;
+__classicExports["productForCourse"] = productForCourse;
+__classicExports["classRecordFor"] = classRecordFor;
+__classicExports["saleUnitDisplay"] = saleUnitDisplay;
+__classicExports["persistSaleUnitDisplay"] = persistSaleUnitDisplay;
+__classicExports["courseTeachingSummary"] = courseTeachingSummary;
+__classicExports["VIDEO_DEMO_COURSES"] = VIDEO_DEMO_COURSES;
+__classicExports["COURSE_DISPLAY_UNSET"] = COURSE_DISPLAY_UNSET;
+__classicExports["SALE_UNIT_DISPLAY_KEYS"] = SALE_UNIT_DISPLAY_KEYS;
+  __classicModules["shared/js/course-display.js"] = __classicExports;
+})(globalThis);

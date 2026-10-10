@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 课次考勤与作业记录（单一口径，CR-2026-136）。
 //
 // 背景：教师端班级详情的「平均出勤率／作业提交率」原先按名册上的演示值取平均，与课次详情里
@@ -7,10 +11,10 @@
 //
 // 记录本身仍是演示派生值（按 班级#课次#学员 稳定散列，同一组合每次结果一致，不会刷新跳变）；
 // 待考勤／作业记录落库后再把取数换成真实记录，页面无需改动。
-import { classRosterFor } from './class-roster.js';
-import { isSessionPast } from './class-lifecycle.js';
-import { homeworkForLesson, listSubmissions } from './homework-store.js';
-import { readDemoState } from './demo-store.js';
+const { classRosterFor } = __classicRequire("shared/js/class-roster.js");
+const { isSessionPast } = __classicRequire("shared/js/class-lifecycle.js");
+const { homeworkForLesson, listSubmissions } = __classicRequire("shared/js/homework-store.js");
+const { readDemoState } = __classicRequire("shared/js/demo-store.js");
 
 function hashSeed(text) {
   let hash = 2166136261;
@@ -18,19 +22,18 @@ function hashSeed(text) {
   return hash >>> 0;
 }
 function roll(seed) { return hashSeed(seed) % 100; }
-
-export function classSessionsOf(classItem) { return (classItem && classItem.sessions) || []; }
+function classSessionsOf(classItem) { return (classItem && classItem.sessions) || []; }
 // 计入统计的课次：已上过（CR-2026-138：课次只有待上课／上课中／已完成三态，统计只对已上课次聚合）。
-export function countedSessionsOf(classItem) {
+function countedSessionsOf(classItem) {
   return classSessionsOf(classItem).filter((session) => isSessionPast(session));
 }
-export function classRosterOfRecords(classItem) {
+function classRosterOfRecords(classItem) {
   // 班级人数取 students（教师端投影）或 enrolled（种子／学员端记录），两者都没有时只用报名分班记录。
   return classItem ? classRosterFor(classItem.id, Number(classItem.students || classItem.enrolled || 0)) : [];
 }
 
 // 单课次考勤：按 班级#课次#学员 稳定派生，分布约 已到 84%／迟到 8%／请假 4%／缺勤 4%。
-export function lessonAttendance(classItem, sessionIndex) {
+function lessonAttendance(classItem, sessionIndex) {
   const execution = (readDemoState().lessonExecutions || []).find((item) => item.classId === classItem?.id && Number(item.sessionIndex) === Number(sessionIndex));
   return classRosterOfRecords(classItem).map((student) => {
     const recordedStatus = execution?.attendance?.[student.name];
@@ -40,7 +43,7 @@ export function lessonAttendance(classItem, sessionIndex) {
     return { id: student.id, name: student.name, status, counted: status === '已到' || status === '迟到', student, demo: true };
   });
 }
-export function lessonAttendanceStatus(classItem, sessionIndex, student) {
+function lessonAttendanceStatus(classItem, sessionIndex, student) {
   const row = lessonAttendance(classItem, sessionIndex).find((item) => item.id === student.id || item.name === student.name);
   return row ? row.status : '已到';
 }
@@ -48,7 +51,7 @@ export function lessonAttendanceStatus(classItem, sessionIndex, student) {
 // 单课次作业：只统计必交作业（MVP 口径 2，2026-09-24 冻结）；选交作业展示但不进提交率分母。
 // countable=false 表示该课次存在作业但全为选交，不纳入提交率统计。
 // 班级无共享作业时仍按 demoHomework 派生演示值（countable=true，维持原型演示）。
-export function lessonHomework(classItem, sessionIndex) {
+function lessonHomework(classItem, sessionIndex) {
   const shared = homeworkForLesson(classItem?.id, sessionIndex);
   const required = shared.filter((item) => item.required !== false);
   if (required.length) {
@@ -89,7 +92,7 @@ export function lessonHomework(classItem, sessionIndex) {
     countable: true, demo: true
   };
 }
-export function lessonHomeworkSubmitted(classItem, sessionIndex, student) {
+function lessonHomeworkSubmitted(classItem, sessionIndex, student) {
   const required = homeworkForLesson(classItem?.id, sessionIndex).filter((item) => item.required !== false);
   // 课次维度：该课次全部必交作业均已提交才算已提交；课次内只有选交作业时不计入。
   if (required.length) {
@@ -104,14 +107,14 @@ export function lessonHomeworkSubmitted(classItem, sessionIndex, student) {
 }
 
 // 班级级聚合：指标口径 = 所有已上课次的考勤／作业记录聚合。
-export function classAttendanceSummary(classItem) {
+function classAttendanceSummary(classItem) {
   const lessons = countedSessionsOf(classItem);
   const roster = classRosterOfRecords(classItem);
   const expected = lessons.length * roster.length;
   const present = lessons.reduce((sum, session) => sum + lessonAttendance(classItem, session.index).filter((row) => row.counted).length, 0);
   return { lessons: lessons.length, expected, present, rate: expected ? Math.round((present / expected) * 100) : null };
 }
-export function classHomeworkSummary(classItem) {
+function classHomeworkSummary(classItem) {
   // MVP 口径 2：分母 = 各课次「必交作业应交人数」之和，选交作业课次不进分母。
   const stats = countedSessionsOf(classItem)
     .map((session) => lessonHomework(classItem, session.index))
@@ -122,13 +125,13 @@ export function classHomeworkSummary(classItem) {
 }
 
 // 学员级聚合：分母为已上课次（请假计入应出勤但不计有效出勤，与页面口径说明一致）。
-export function studentAttendanceRate(classItem, student) {
+function studentAttendanceRate(classItem, student) {
   const lessons = countedSessionsOf(classItem);
   if (!lessons.length) return null;
   const present = lessons.filter((session) => ['已到', '迟到'].includes(lessonAttendanceStatus(classItem, session.index, student))).length;
   return Math.round((present / lessons.length) * 100);
 }
-export function studentHomeworkRate(classItem, student) {
+function studentHomeworkRate(classItem, student) {
   const lessons = countedSessionsOf(classItem);
   if (!lessons.length) return null;
   const required = lessons.flatMap((session) => homeworkForLesson(classItem?.id, session.index).filter((item) => item.required !== false));
@@ -142,14 +145,31 @@ export function studentHomeworkRate(classItem, student) {
   const submitted = lessons.filter((session) => lessonHomeworkSubmitted(classItem, session.index, student)).length;
   return Math.round((submitted / lessons.length) * 100);
 }
-export function studentAttendanceHistory(classItem, student, limit = 4) {
+function studentAttendanceHistory(classItem, student, limit = 4) {
   return countedSessionsOf(classItem).slice(-limit).reverse().map((session) => ({
     index: session.index, date: session.date, status: lessonAttendanceStatus(classItem, session.index, student)
   }));
 }
-export function studentHomeworkHistory(classItem, student, limit = 5) {
+function studentHomeworkHistory(classItem, student, limit = 5) {
   return countedSessionsOf(classItem).slice(-limit).reverse().map((session) => {
     const submitted = lessonHomeworkSubmitted(classItem, session.index, student);
     return { lesson: session.index, date: session.date, submitted, note: submitted ? '教师已点评：完成情况良好，注意节奏与细节。' : '未提交，请提醒学员补交。' };
   });
 }
+
+
+__classicExports["classSessionsOf"] = classSessionsOf;
+__classicExports["countedSessionsOf"] = countedSessionsOf;
+__classicExports["classRosterOfRecords"] = classRosterOfRecords;
+__classicExports["lessonAttendance"] = lessonAttendance;
+__classicExports["lessonAttendanceStatus"] = lessonAttendanceStatus;
+__classicExports["lessonHomework"] = lessonHomework;
+__classicExports["lessonHomeworkSubmitted"] = lessonHomeworkSubmitted;
+__classicExports["classAttendanceSummary"] = classAttendanceSummary;
+__classicExports["classHomeworkSummary"] = classHomeworkSummary;
+__classicExports["studentAttendanceRate"] = studentAttendanceRate;
+__classicExports["studentHomeworkRate"] = studentHomeworkRate;
+__classicExports["studentAttendanceHistory"] = studentAttendanceHistory;
+__classicExports["studentHomeworkHistory"] = studentHomeworkHistory;
+  __classicModules["shared/js/lesson-records.js"] = __classicExports;
+})(globalThis);

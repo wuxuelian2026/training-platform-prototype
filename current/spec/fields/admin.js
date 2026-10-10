@@ -1,10 +1,13 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 后台登录字段规格 · 唯一事实源
 //
 // 后台登录页（admin/login.html）与后台壳层共用本文件：
 // 页面说明弹窗的字段表、输入约束都由 spec/fields/ 派生，不在页面里再写一份口径。
 // 登录态见 shared/js/admin-auth.js；本规格只描述页面字段与校验口径。
-
-export const ADMIN_FIELD_SPEC = {
+const ADMIN_FIELD_SPEC = {
   module: '后台登录',
   pages: {
     'admin/login': {
@@ -30,3 +33,8 @@ export const ADMIN_FIELD_SPEC = {
     }
   }
 };
+
+
+__classicExports["ADMIN_FIELD_SPEC"] = ADMIN_FIELD_SPEC;
+  __classicModules["spec/fields/admin.js"] = __classicExports;
+})(globalThis);

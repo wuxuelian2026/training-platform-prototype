@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 退款单共享存储（2026-09-24 结算）。
 //
 // 设计口径：
@@ -5,14 +9,13 @@
 // - 学员端「我的订单」自助申请、后台「学籍异动」同步发起、后台「线下登记」都只负责创建退款单；
 // - 同一订单同时只能存在一张未结退款单（待审批／退款中），重复发起复用既有单，避免重复退款；
 // - 退款完成才改学籍与名额，并回写订单；拒绝只回滚订单，不自动恢复学籍（由教务确认）。
-import { classRefundSettings, demoId, demoTime, readDemoState, transitionVideoEntitlement, upsertDemoRecord, writeDemoState } from './demo-store.js';
-import { classLessonProgress } from './class-lifecycle.js';
-import { isEnrollmentActive } from './class-roster.js';
-import { mergeClassSeed } from './class-seed.js';
-import { emitNotificationEvent } from './notification-store.js';
-
-export const REFUND_STATUS = { PENDING: '待审批', PROCESSING: '退款中', EXCEPTION: '退款异常', DONE: '已退款', REJECTED: '已拒绝' };
-export const REFUND_ORIGIN = { LEARNER: '学员申请', ENROLLMENT: '学籍异动', OFFLINE: '线下登记', SYSTEM: '系统' };
+const { classRefundSettings, demoId, demoTime, readDemoState, transitionVideoEntitlement, upsertDemoRecord, writeDemoState } = __classicRequire("shared/js/demo-store.js");
+const { classLessonProgress } = __classicRequire("shared/js/class-lifecycle.js");
+const { isEnrollmentActive } = __classicRequire("shared/js/class-roster.js");
+const { mergeClassSeed } = __classicRequire("shared/js/class-seed.js");
+const { emitNotificationEvent } = __classicRequire("shared/js/notification-store.js");
+const REFUND_STATUS = { PENDING: '待审批', PROCESSING: '退款中', EXCEPTION: '退款异常', DONE: '已退款', REJECTED: '已拒绝' };
+const REFUND_ORIGIN = { LEARNER: '学员申请', ENROLLMENT: '学籍异动', OFFLINE: '线下登记', SYSTEM: '系统' };
 const OPEN_STATUSES = [REFUND_STATUS.PENDING, REFUND_STATUS.PROCESSING, REFUND_STATUS.EXCEPTION];
 const numberOr = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 
@@ -20,21 +23,18 @@ function sharedRows(collection) {
   const rows = readDemoState()[collection];
   return Array.isArray(rows) ? rows.filter((row) => row && typeof row === 'object') : [];
 }
-
-export function listRefunds() {
+function listRefunds() {
   return sharedRows('refunds');
 }
-
-export function refundsForOrder(orderId) {
+function refundsForOrder(orderId) {
   return listRefunds().filter((row) => row.orderId === orderId || row.orderNo === orderId);
 }
 
 /** 该订单当前未结的退款单（待审批／退款中）。 */
-export function openRefundForOrder(orderId) {
+function openRefundForOrder(orderId) {
   return refundsForOrder(orderId).find((row) => OPEN_STATUSES.includes(row.status)) || null;
 }
-
-export function refundedTotalForOrder(orderId) {
+function refundedTotalForOrder(orderId) {
   return refundsForOrder(orderId).filter((row) => row.status === REFUND_STATUS.DONE).reduce((sum, row) => sum + numberOr(row.amount), 0);
 }
 
@@ -89,15 +89,13 @@ function notifyRefundAccount(refund, event, title, summary, body = summary) {
 }
 
 /** 在途退款金额，仅用于兼容旧页面展示；MVP 不支持累计或分批退款。 */
-export function pendingRefundTotalForOrder(orderId) {
+function pendingRefundTotalForOrder(orderId) {
   return refundsForOrder(orderId).filter((row) => OPEN_STATUSES.includes(row.status)).reduce((sum, row) => sum + numberOr(row.amount), 0);
 }
-
-export function orderById(orderId) {
+function orderById(orderId) {
   return sharedRows('orders').find((row) => row.id === orderId || row.number === orderId) || null;
 }
-
-export function classById(classId) {
+function classById(classId) {
   return mergeClassSeed(sharedRows('classes')).find((row) => row.id === classId) || null;
 }
 
@@ -164,7 +162,7 @@ function createRefundExceptionTodo(refund, reason, now) {
  * 面授退款资格判定：申请窗口和已消课比例只决定是否可退。
  * 通过资格校验后固定退订单实收全额，不计算部分退款。
  */
-export function classRefundSuggestion({ order, classRecord, requestedAt = demoTime(), selfService = true } = {}) {
+function classRefundSuggestion({ order, classRecord, requestedAt = demoTime(), selfService = true } = {}) {
   const policy = classRefundSettings();
   const paid = numberOr(order?.amount);
   const progress = classLessonProgress(classRecord || {});
@@ -200,7 +198,7 @@ function refundNo() {
  * 创建退款单。所有入口（学员自助、学籍异动、线下登记）都走这里。
  * @returns {{ok: boolean, refund?: object, order?: object, reason?: string, existing?: object}}
  */
-export function createRefundRequest(input = {}) {
+function createRefundRequest(input = {}) {
   const requestReason = String(input.reason || '').trim();
   if (!requestReason) return { ok: false, reason: 'REFUND_REASON_REQUIRED' };
   const order = orderById(input.orderId);
@@ -310,7 +308,7 @@ function settleClassEnrollment(refund, now) {
  * decision：通过／拒绝用于待审批；完成／异常用于退款中；重试用于退款异常。
  * @returns {{ok: boolean, reason?: string, refund?: object, order?: object, enrollment?: object}}
  */
-export function settleRefund(refundId, decision, operator = {}) {
+function settleRefund(refundId, decision, operator = {}) {
   const refund = listRefunds().find((row) => row.id === refundId || row.no === refundId);
   if (!refund) return { ok: false, reason: 'REFUND_NOT_FOUND' };
   if (refund.status === REFUND_STATUS.DONE) return { ok: false, reason: 'REFUND_ALREADY_SETTLED', refund };
@@ -409,7 +407,7 @@ export function settleRefund(refundId, decision, operator = {}) {
  * 登记已在线下完成的终结退款。MVP 一单只允许一次退款，完成后订单终结。
  * 即时完成仍通过 createRefundRequest() 和 settleRefund() 推进，页面不直接改订单、学籍或授权。
  */
-export function registerCompletedOfflineRefund(input = {}) {
+function registerCompletedOfflineRefund(input = {}) {
   const order = orderById(input.orderId);
   if (!order) return { ok: false, reason: 'ORDER_NOT_FOUND' };
   const paidAmount = numberOr(order.amount);
@@ -448,7 +446,7 @@ export function registerCompletedOfflineRefund(input = {}) {
 }
 
 /** 把共享退款单并回已有的展示数组（后台退款记录页使用）。 */
-export function mergeRefundsInto(rows, { keepSeed = true } = {}) {
+function mergeRefundsInto(rows, { keepSeed = true } = {}) {
   const byId = new Map(listRefunds().map((row) => [row.id, row]));
   const merged = rows.map((row) => (byId.has(row.id) ? { ...row, ...byId.get(row.id) } : row));
   const known = new Set(merged.map((row) => row.id));
@@ -457,7 +455,7 @@ export function mergeRefundsInto(rows, { keepSeed = true } = {}) {
 }
 
 /** 将既有静态演示退款单登记进共享集合，保证审批出口能找到记录。 */
-export function ensureRefundRecords(rows = []) {
+function ensureRefundRecords(rows = []) {
   const existing = new Set(listRefunds().map((row) => row.id));
   let changed = false;
   writeDemoState((next) => {
@@ -472,3 +470,22 @@ export function ensureRefundRecords(rows = []) {
   });
   return changed;
 }
+
+
+__classicExports["listRefunds"] = listRefunds;
+__classicExports["refundsForOrder"] = refundsForOrder;
+__classicExports["openRefundForOrder"] = openRefundForOrder;
+__classicExports["refundedTotalForOrder"] = refundedTotalForOrder;
+__classicExports["pendingRefundTotalForOrder"] = pendingRefundTotalForOrder;
+__classicExports["orderById"] = orderById;
+__classicExports["classById"] = classById;
+__classicExports["classRefundSuggestion"] = classRefundSuggestion;
+__classicExports["createRefundRequest"] = createRefundRequest;
+__classicExports["settleRefund"] = settleRefund;
+__classicExports["registerCompletedOfflineRefund"] = registerCompletedOfflineRefund;
+__classicExports["mergeRefundsInto"] = mergeRefundsInto;
+__classicExports["ensureRefundRecords"] = ensureRefundRecords;
+__classicExports["REFUND_STATUS"] = REFUND_STATUS;
+__classicExports["REFUND_ORIGIN"] = REFUND_ORIGIN;
+  __classicModules["shared/js/refund-store.js"] = __classicExports;
+})(globalThis);

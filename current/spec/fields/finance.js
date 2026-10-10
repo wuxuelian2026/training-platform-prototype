@@ -1,8 +1,11 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 财务中心字段规格 · 唯一事实源
 // 由 scripts/migrate-literal-fields.mjs 从页面说明字面量迁移生成，迁移后请只维护本文件。
 // 字段口径变更后运行 `npm run check:spec` 校验一致性。
-
-export const FINANCE_FIELD_SPEC = {
+const FINANCE_FIELD_SPEC = {
   module: '财务中心',
   pages: {
     'finance/salary': {
@@ -92,3 +95,8 @@ export const FINANCE_FIELD_SPEC = {
     }
   }
 };
+
+
+__classicExports["FINANCE_FIELD_SPEC"] = FINANCE_FIELD_SPEC;
+  __classicModules["spec/fields/finance.js"] = __classicExports;
+})(globalThis);

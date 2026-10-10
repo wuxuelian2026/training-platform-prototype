@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 const appDirectories = new Set(['admin', 'teacher', 'learner', 'visualization']);
 
 function splitSuffix(target) {
@@ -6,7 +10,7 @@ function splitSuffix(target) {
 }
 
 // Resolve a route relative to the prototype root, including GitHub Pages project paths.
-export function relativePath(target) {
+function relativePath(target) {
   if (!target || !String(target).startsWith('/')) return target;
 
   const { pathname, suffix } = splitSuffix(target);
@@ -28,8 +32,7 @@ export function relativePath(target) {
 
   return `${segments.join('/') || '.'}${suffix}`;
 }
-
-export function normalizePrototypeLinks(root = document) {
+function normalizePrototypeLinks(root = document) {
   root.querySelectorAll?.('a[href], area[href], form[action]').forEach((element) => {
     const attribute = element.hasAttribute('href') ? 'href' : 'action';
     const value = element.getAttribute(attribute);
@@ -42,3 +45,9 @@ if (typeof window !== 'undefined' && window.MutationObserver) {
   observer.observe(document.documentElement, { childList: true, subtree: true });
   normalizePrototypeLinks();
 }
+
+
+__classicExports["relativePath"] = relativePath;
+__classicExports["normalizePrototypeLinks"] = normalizePrototypeLinks;
+  __classicModules["shared/js/paths.js"] = __classicExports;
+})(globalThis);

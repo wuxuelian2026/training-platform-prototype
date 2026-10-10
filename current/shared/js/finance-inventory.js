@@ -1,9 +1,13 @@
-import { readDemoState, refundSettings, upsertDemoRecord } from './demo-store.js';
-import { REFUND_ORIGIN, createRefundRequest, ensureRefundRecords, mergeRefundsInto, registerCompletedOfflineRefund, settleRefund } from './refund-store.js';
-import { DEMO_TODAY, demoDateTime } from './demo-clock.js';
-import { readAdminSession } from './admin-auth.js';
-import { readXlsxSheetRows } from './xlsx-lite.js';
-import { writeXlsxSheetRows } from './xlsx-lite.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { readDemoState, refundSettings, removeDemoRecord, upsertDemoRecord } = __classicRequire("shared/js/demo-store.js");
+const { REFUND_ORIGIN, createRefundRequest, ensureRefundRecords, mergeRefundsInto, registerCompletedOfflineRefund, settleRefund } = __classicRequire("shared/js/refund-store.js");
+const { DEMO_TODAY, demoDateTime } = __classicRequire("shared/js/demo-clock.js");
+const { readAdminSession } = __classicRequire("shared/js/admin-auth.js");
+const { readXlsxSheetRows } = __classicRequire("shared/js/xlsx-lite.js");
+const { writeXlsxSheetRows } = __classicRequire("shared/js/xlsx-lite.js");
 
 const opsRoot = document.querySelector('[data-finance-page], [data-inventory-page]');
 const opsPage = opsRoot?.dataset.financePage || opsRoot?.dataset.inventoryPage;
@@ -193,12 +197,18 @@ const seededOutboundRecords = [
   { id: 'outbound-3', no: 'CK202609010001', name: '折叠画架', quantity: 4, type: '其他', recipient: '教务部门', purpose: '教室布置', date: '2026-09-01', operator: '周仓管', remark: '历史基础出库' }
 ];
 const inventoryState = readDemoState();
+if (Array.isArray(inventoryState.categories) && inventoryState.categories.length) categories.splice(0, categories.length, ...inventoryState.categories);
 const materials = inventoryState.materials?.length ? inventoryState.materials : seededMaterials.map((item) => ({ ...item, status: item.status || '启用' }));
 const inboundRecords = inventoryState.inboundRecords?.length ? inventoryState.inboundRecords : seededInboundRecords;
 const outboundRecords = inventoryState.outboundRecords?.length ? inventoryState.outboundRecords : seededOutboundRecords;
 function persistInventory(collection, record) { upsertDemoRecord(collection, record); }
+function categoryMaterialCount(category) { return materials.filter((item) => item.category === category.name || item.categoryId === category.id).length; }
+function categoryHasReferences(category) { return categoryMaterialCount(category) > 0 || inboundRecords.some((item) => item.categoryId === category.id || item.category === category.name) || outboundRecords.some((item) => item.categoryId === category.id || item.category === category.name); }
+function materialHasReferences(material) { return inboundRecords.some((item) => item.materialId === material.id || item.name === material.name) || outboundRecords.some((item) => item.materialId === material.id || item.name === material.name); }
+function categoryOptions(excludeId = '') { return categories.filter((item) => item.id !== excludeId && item.status !== '停用' && item.parent === '—').map((item) => item.name); }
 function inventoryMaterialOptions() { return materials.filter((item) => item.status !== '停用'); }
 if (!inventoryState.materials?.length) materials.forEach((item) => persistInventory('materials', item));
+if (!inventoryState.categories?.length) categories.forEach((item) => persistInventory('categories', item));
 if (!inventoryState.inboundRecords?.length) inboundRecords.forEach((item) => persistInventory('inboundRecords', item));
 if (!inventoryState.outboundRecords?.length) outboundRecords.forEach((item) => persistInventory('outboundRecords', item));
 function salaryTaxIncluded(row) { return Math.max(0, row.payable - row.deduction); }
@@ -253,31 +263,31 @@ function refundPhases(item) {
 function renderCategories() {
   opsData = categories;
   pageFrame('物资分类管理', '', '<button class="button primary" data-ops-action="category-create">新增分类</button>', filterPanel('category-filter', select('分类状态', 'status', ['启用', '停用']) + field('关键词', 'keyword', 'text', '分类名称 / 编码', true)) + table('<thead><tr><th>分类名称</th><th>分类编码</th><th>物资种类数</th><th>排序</th><th>状态</th><th>操作</th></tr></thead>'));
-  const row = (item) => `<td><div class="ops-category-tree ${item.parent === '—' ? 'is-root' : 'is-child'}"><span class="ops-category-branch" aria-hidden="true">${item.parent === '—' ? '▾' : '└'}</span><strong>${item.name}</strong></div></td><td>${item.code}</td><td>${item.count}</td><td>${item.sort}</td><td><label class="ops-table-switch"><input type="checkbox" data-ops-action="category-toggle" aria-label="${item.status === '启用' ? '停用' : '启用'}${item.name}" ${item.status === '启用' ? 'checked' : ''}><span aria-hidden="true"></span><em>${item.status}</em></label></td><td class="action-cell"><button class="text-button" data-ops-action="category-edit">编辑</button><button class="text-button" data-ops-action="category-view">查看物资</button>${item.count === 0 ? '<button class="text-button danger-link" data-ops-action="category-delete">删除</button>' : '<span class="muted">有引用不可删</span>'}</td>`;
+  const row = (item) => { const referenced = categoryHasReferences(item); return `<td><div class="ops-category-tree ${item.parent === '—' ? 'is-root' : 'is-child'}"><span class="ops-category-branch" aria-hidden="true">${item.parent === '—' ? '▾' : '└'}</span><strong>${esc(item.name)}</strong></div></td><td>${esc(item.code)}</td><td>${categoryMaterialCount(item)}</td><td>${item.sort}</td><td><label class="ops-table-switch"><input type="checkbox" data-ops-action="category-toggle" aria-label="${item.status === '启用' ? '停用' : '启用'}${esc(item.name)}" ${item.status === '启用' ? 'checked' : ''}><span aria-hidden="true"></span><em>${item.status}</em></label></td><td class="action-cell"><button class="text-button" data-ops-action="category-edit">编辑</button><button class="text-button" data-ops-action="category-view">查看物资</button>${!referenced ? '<button class="text-button danger-link" data-ops-action="category-delete">删除</button>' : '<span class="muted">有引用不可删</span>'}</td>`; };
   renderRows(opsData, row);
   bindFilter('category-filter', opsData, (form) => { const { status, keyword } = form; return (item) => (!status.value || item.status === status.value) && (!keyword.value.trim() || `${item.name}${item.code}`.includes(keyword.value.trim())); }, row);
 }
 function renderMaterials() {
   opsData = materials;
   pageFrame('物资管理', '', '<div class="ops-actions"><button class="button" data-ops-action="material-import">批量导入</button><button class="button" data-ops-action="material-export">导出</button><button class="button primary" data-ops-action="material-create">新增物资</button></div>', metrics([['全部物资', materials.length, '物资种类总数'], ['正常库存', materials.filter((m) => materialStatus(m) === '正常').length, '库存高于阈值'], ['库存不足', materials.filter((m) => materialStatus(m) === '库存不足').length, '库存不高于阈值']]) + filterPanel('material-filter', select('物资分类', 'category', ['教学用品', '画材类']) + select('库存状态', 'status', ['正常', '库存不足']) + select('启用状态', 'lifecycle', ['启用', '停用']) + field('关键词', 'keyword', 'text', '物资名称 / 编号', true)) + table('<thead><tr><th>物资编号</th><th>物资名称</th><th>分类</th><th>规格 / 单位</th><th>当前库存</th><th>预警阈值</th><th>存放位置</th><th>库存状态</th><th>启用状态</th><th>操作</th></tr></thead>'));
-  const row = (item) => { const status = materialStatus(item); return `<td>${item.code}</td><td><strong>${item.name}</strong></td><td>${item.category}</td><td>${item.spec}<br><span class="muted">${item.unit}</span></td><td>${item.stock}</td><td>${item.threshold}</td><td>${item.location}</td><td>${tag(status)}</td><td>${tag(item.status || '启用')}</td><td class="action-cell"><button class="text-button" data-ops-action="material-view">查看</button><button class="text-button" data-ops-action="material-edit">编辑</button>${item.status === '停用' ? '<button class="text-button" data-ops-action="material-enable">启用</button>' : `<a class="text-button" href="/admin/pages/inventory/stock-in.html?material=${item.id}">入库</a><a class="text-button" href="/admin/pages/inventory/stock-out.html?material=${item.id}">出库</a><button class="text-button danger-link" data-ops-action="material-disable">停用</button>`}</td>`; };
+  const row = (item) => { const status = materialStatus(item); const deletable = item.stock === 0 && !materialHasReferences(item); return `<td>${item.code}</td><td><strong>${esc(item.name)}</strong></td><td>${esc(item.category)}</td><td>${esc(item.spec)}<br><span class="muted">${esc(item.unit)}</span></td><td>${item.stock}</td><td>${item.threshold}</td><td>${esc(item.location)}</td><td>${tag(status)}</td><td>${tag(item.status || '启用')}</td><td class="action-cell"><button class="text-button" data-ops-action="material-view">查看</button><button class="text-button" data-ops-action="material-edit">编辑</button>${item.status === '停用' ? '<button class="text-button" data-ops-action="material-enable">启用</button>' : `<a class="text-button" href="/admin/pages/inventory/stock-in.html?material=${item.id}">入库</a><a class="text-button" href="/admin/pages/inventory/stock-out.html?material=${item.id}">出库</a><button class="text-button danger-link" data-ops-action="material-disable">停用</button>`}${deletable ? '<button class="text-button danger-link" data-ops-action="material-delete">删除</button>' : '<span class="muted">有引用不可删</span>'}</td>`; };
   renderRows([...opsData].sort((a, b) => ({ '库存不足': 0, 正常: 1 }[materialStatus(a)] - ({ '库存不足': 0, 正常: 1 }[materialStatus(b)])) || a.name.localeCompare(b.name, 'zh-CN')), row);
   bindFilter('material-filter', opsData, (form) => { const { category, status, lifecycle, keyword } = form; return (item) => (!category.value || item.category === category.value) && (!status.value || materialStatus(item) === status.value) && (!lifecycle.value || (item.status || '启用') === lifecycle.value) && (!keyword.value.trim() || `${item.code}${item.name}`.includes(keyword.value.trim())); }, row);
 }
 function renderInbound() {
   opsData = inboundRecords;
-  pageFrame('入库记录', '', '<button class="button" data-ops-action="inbound-export">导出入库记录</button><a class="button primary" href="/admin/pages/inventory/stock-in.html">入库登记</a>', filterPanel('inbound-filter', select('物资名称', 'name', ['舞蹈练功垫', '水彩颜料', '五线谱本']) + select('入库类型', 'type', ['采购入库', '其他']) + field('入库日期起', 'dateFrom', 'date') + field('入库日期止', 'dateTo', 'date') + field('供应商', 'supplier', 'text', '供应商名称') + field('经办人', 'operator', 'text', '经办人', true)) + table('<thead><tr><th>入库单号</th><th>物资名称</th><th>入库数量</th><th>入库单价</th><th>供应商</th><th>入库类型</th><th>入库日期</th><th>经办人</th><th>备注</th></tr></thead>'));
+  pageFrame('入库记录', '', '<button class="button" data-ops-action="inbound-export">导出入库记录</button><a class="button primary" href="/admin/pages/inventory/stock-in.html">入库登记</a>', filterPanel('inbound-filter', select('物资名称', 'name', ['舞蹈练功垫', '水彩颜料', '五线谱本']) + select('入库类型', 'type', ['采购入库', '其他']) + field('入库日期起', 'dateFrom', 'date') + field('入库日期止', 'dateTo', 'date') + field('供应商', 'supplier', 'text', '供应商名称') + searchableSelect('经办人', 'operator', inboundRecords.map((item) => item.operator), true)) + table('<thead><tr><th>入库单号</th><th>物资名称</th><th>入库数量</th><th>入库单价</th><th>供应商</th><th>入库类型</th><th>入库日期</th><th>经办人</th><th>备注</th></tr></thead>'));
   const row = (item) => `<td>${item.no}</td><td>${item.name}</td><td>${item.quantity}</td><td>${money(item.price)}</td><td>${item.supplier}</td><td>${item.type}</td><td>${item.date}</td><td>${item.operator}</td><td>${item.remark}</td>`;
   renderRows(opsData, row);
-  bindFilter('inbound-filter', opsData, (form) => { const { name, type, dateFrom, dateTo, supplier, operator } = form; return (item) => (!name.value || item.name === name.value) && (!type.value || item.type === type.value) && (!dateFrom.value || item.date >= dateFrom.value) && (!dateTo.value || item.date <= dateTo.value) && (!supplier.value.trim() || item.supplier.includes(supplier.value.trim())) && (!operator.value.trim() || item.operator.includes(operator.value.trim())); }, row);
+  bindFilter('inbound-filter', opsData, (form) => { const { name, type, dateFrom, dateTo, supplier, operator } = form; return (item) => (!name.value || item.name === name.value) && (!type.value || item.type === type.value) && (!dateFrom.value || item.date >= dateFrom.value) && (!dateTo.value || item.date <= dateTo.value) && (!supplier.value.trim() || item.supplier.includes(supplier.value.trim())) && (!operator.value || item.operator === operator.value); }, row);
 }
 function renderOutbound() {
   opsData = outboundRecords;
-  const content = filterPanel('outbound-filter', select('物资名称', 'name', ['舞蹈练功垫', '水彩颜料', '折叠画架']) + select('出库类型', 'type', ['教学领用', '其他']) + field('领用人', 'recipient', 'text', '教师 / 学员 / 部门') + field('经办人', 'operator', 'text', '经办人', true)) + table('<thead><tr><th>出库单号</th><th>物资名称</th><th>出库数量</th><th>出库类型</th><th>领用人</th><th>用途说明</th><th>出库日期</th><th>经办人</th><th>备注</th><th>操作</th></tr></thead>');
+  const content = filterPanel('outbound-filter', select('物资名称', 'name', ['舞蹈练功垫', '水彩颜料', '折叠画架']) + select('出库类型', 'type', ['教学领用', '其他']) + field('领用人', 'recipient', 'text', '教师 / 学员 / 部门') + searchableSelect('经办人', 'operator', outboundRecords.map((item) => item.operator), true)) + table('<thead><tr><th>出库单号</th><th>物资名称</th><th>出库数量</th><th>出库类型</th><th>领用人</th><th>用途说明</th><th>出库日期</th><th>经办人</th><th>备注</th></tr></thead>');
   pageFrame('出库记录', '', '<div class="ops-page-head-actions"><button class="button" data-ops-action="outbound-export">导出出库记录</button><a class="button primary" href="/admin/pages/inventory/stock-out.html">出库登记</a></div>', content);
-  const row = (item) => `<td>${item.no}</td><td>${item.name}</td><td>${item.quantity}</td><td>${item.type}</td><td>${item.recipient}</td><td>${item.purpose}</td><td>${item.date}</td><td>${item.operator}</td><td>${item.remark}</td><td class="action-cell">${item.reversed ? '<span class="muted">已修正</span>' : '<button class="text-button" data-ops-action="inventory-reverse">修正</button>'}</td>`;
+  const row = (item) => `<td>${item.no}</td><td>${item.name}</td><td>${item.quantity}</td><td>${item.type}</td><td>${item.recipient}</td><td>${item.purpose}</td><td>${item.date}</td><td>${item.operator}</td><td>${item.remark}</td>`;
   renderRows(opsData, row);
-  bindFilter('outbound-filter', opsData, (form) => { const { name, type, dateFrom, dateTo, recipient, operator } = form; return (item) => (!name.value || item.name === name.value) && (!type.value || item.type === type.value) && (!dateFrom.value || item.date >= dateFrom.value) && (!dateTo.value || item.date <= dateTo.value) && (!recipient.value.trim() || item.recipient.includes(recipient.value.trim())) && (!operator.value.trim() || item.operator.includes(operator.value.trim())); }, row);
+  bindFilter('outbound-filter', opsData, (form) => { const { name, type, dateFrom, dateTo, recipient, operator } = form; return (item) => (!name.value || item.name === name.value) && (!type.value || item.type === type.value) && (!dateFrom.value || item.date >= dateFrom.value) && (!dateTo.value || item.date <= dateTo.value) && (!recipient.value.trim() || item.recipient.includes(recipient.value.trim())) && (!operator.value || item.operator === operator.value); }, row);
 }
 function renderStockForm(direction) {
   const isIn = direction === 'in'; const title = isIn ? '入库登记' : '出库登记';
@@ -385,17 +395,36 @@ function handleAction(action, row) {
   if (action === 'inbound-export') return showToast(`已按当前筛选条件生成入库记录导出，共${opsData.length}条；生产环境需记录导出人、时间和筛选条件。`);
   if (action === 'outbound-export') return showToast(`已按当前筛选条件生成出库记录导出，共${opsData.length}条；生产环境需记录导出人、时间和筛选条件。`);
   if (action === 'refund-offline-create') return openOfflineRefundForm();
-  if (action === 'inventory-reverse') return openInventoryReverse(row);
-  if (action === 'category-create' || action === 'category-edit') return openSimpleForm(action === 'category-create' ? '新增分类' : '编辑分类', '分类编码可用于对接财务系统，父级为空时作为一级分类。', field('分类名称', 'name', 'text', '如 乐器类') + select('上级分类', 'parent', ['教学用品', '画材类'], false, true) + '<label class="form-field"><span>分类编码 <b class="required-mark">*</b></span><input type="text" name="code" placeholder="请输入分类编码" required></label>' + field('排序', 'sort', 'number', '数字越小越靠前'), (form) => { if (!String(form.get('code') || '').trim()) return showToast('请填写分类编码。', 'warning'); closeDialog(); showToast('分类信息已保存。'); });
+  if (action === 'category-create' || action === 'category-edit') {
+    const editing = action === 'category-edit' ? row : null;
+    const body = `<label class="form-field"><span>分类名称 <b class="required-mark">*</b></span><input name="name" required maxlength="30" value="${esc(editing?.name || '')}" placeholder="如 乐器类"></label>${select('上级分类', 'parent', categoryOptions(editing?.id || ''), false, true, editing?.parent === '—' ? '' : editing?.parent || '')}<label class="form-field"><span>分类编码</span><input type="text" name="code" maxlength="30" value="${esc(editing?.code || '')}" placeholder="请输入分类编码"></label>${field('排序', 'sort', 'number', '数字越小越靠前')}<p class="ops-form-help wide">最多支持两级分类；同级分类名称和编码不可重复。</p>`;
+    return openSimpleForm(editing ? '编辑分类' : '新增分类', '分类编码可用于对接财务系统，父级为空时作为一级分类。', body, (form) => {
+      const name = String(form.get('name') || '').trim();
+      const parent = String(form.get('parent') || '').trim() || '—';
+      const code = String(form.get('code') || '').trim();
+      const sort = Number(form.get('sort') || 0);
+      if (name.length < 2) return showToast('分类名称至少填写2个字。', 'warning');
+      if (!Number.isInteger(sort) || sort < 0) return showToast('排序必须为0及以上整数。', 'warning');
+      if (parent !== '—' && !categories.some((item) => item.name === parent && item.parent === '—')) return showToast('上级分类选择无效。', 'warning');
+      if (parent !== '—' && categories.some((item) => item.name === parent && item.parent !== '—')) return showToast('当前上级分类不是一级分类，不能建立第三级。', 'warning');
+      const duplicate = categories.find((item) => item.id !== editing?.id && item.parent === parent && (item.name === name || (code && item.code === code)));
+      if (duplicate) return showToast('同级分类名称或编码已存在。', 'warning');
+      const target = editing || { id: `category-${Date.now()}`, count: 0, status: '启用' };
+      Object.assign(target, { name, parent, code, sort });
+      if (!editing) categories.push(target);
+      persistInventory('categories', target);
+      closeDialog(); renderCategories(); showToast(editing ? '分类信息已更新。' : '分类已新增。');
+    });
+  }
   if (action === 'category-toggle') { row.status = row.status === '启用' ? '停用' : '启用'; persistInventory('categories', row); renderCategories(); return showToast(row.status === '停用' ? '分类已停用，不再用于新建物资。' : '分类已启用，可用于新建物资。'); }
   if (action === 'category-view') return detail(`${row.name} · 关联物资`, '查看当前分类下的物资种类。', [['分类编码', row.code], ['上级分类', row.parent], ['物资种类数', `${row.count} 种`], ['分类状态', tag(row.status)], ['引用关系', row.count ? '已有物资引用' : '暂无物资引用']]);
-  if (action === 'category-delete') { if (row.count > 0) return openDialog('无法删除分类', '删除前需要校验引用关系。', `<p class="ops-danger">该分类下存在 ${row.count} 种物资，请先移出或删除后再操作。</p>`); const dialog = openDialog('确认删除分类', '删除后分类记录不可恢复。', `<p>确认删除分类“${esc(row.name)}”？</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" data-confirm-action="category-delete">确认删除</button>'); dialog.dataset.rowId = row.id; return dialog; }
+  if (action === 'category-delete') { if (categoryHasReferences(row)) return openDialog('无法删除分类', '删除前需要校验物资和流水引用。', '<p class="ops-danger">该分类已被物资或历史流水引用，只能停用，不能物理删除。</p>'); const dialog = openDialog('确认删除分类', '删除后分类记录不可恢复。', `<p>确认删除分类“${esc(row.name)}”？</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" data-confirm-action="category-delete">确认删除</button>'); dialog.dataset.rowId = row.id; return dialog; }
   if (action === 'material-view') return detail(`${row.name} · 物资详情`, '展示基础信息、库存信息和最近出入库记录。', [['物资编号', row.code], ['物资分类', row.category], ['规格 / 单位', `${row.spec} / ${row.unit}`], ['存放位置', row.location], ['当前库存', String(row.stock)], ['预警阈值', String(row.threshold)], ['库存状态', tag(materialStatus(row))], ['物资描述', row.description]]);
   if (action === 'material-import') return openMaterialImport();
   if (action === 'material-export') return exportMaterials();
   if (action === 'material-create' || action === 'material-edit') return openSimpleForm(action === 'material-create' ? '新增物资' : '编辑物资', '物资不涉及审批，保存后立即生效；新增物资库存固定为0，需通过入库登记增加库存。', field('物资名称', 'name', 'text', '请输入物资名称') + select('物资分类', 'category', ['教学用品', '画材类'], false, false) + field('规格型号', 'spec', 'text', '如 HB 2B') + select('单位', 'unit', ['个', '本', '套', '支', '台', '件', '盒', '箱', '瓶'], false, false) + field('预警阈值', 'threshold', 'number', '默认10') + field('存放位置', 'location', 'text', '仓库 / 教室') + field('物资描述', 'description', 'text', '选填') + '<label class="form-field wide"><span>物资图片</span><label class="upload-control"><input type="file" accept="image/*" aria-label="物资图片" />上传图片</label></label>', (form) => { const isCreate = action === 'material-create'; const target = row || {}; Object.assign(target, { id: target.id || `material-${Date.now()}`, code: target.code || `WZ-${String(Date.now()).slice(-4)}`, name: String(form.get('name') || '').trim(), category: form.get('category') || '教学用品', spec: String(form.get('spec') || '').trim(), unit: form.get('unit') || '件', threshold: Number(form.get('threshold') || 10), location: String(form.get('location') || '').trim(), description: String(form.get('description') || '').trim(), stock: isCreate ? 0 : target.stock, status: target.status || '启用' }); if (!target.name) return showToast('请填写物资名称。', 'warning'); if (isCreate) materials.unshift(target); persistInventory('materials', target); closeDialog(); renderMaterials(); showToast('物资信息已保存。'); });
   if (action === 'material-disable' || action === 'material-enable') { row.status = action === 'material-enable' ? '启用' : '停用'; persistInventory('materials', row); renderMaterials(); return showToast(row.status === '停用' ? '物资已停用，不能继续出入库。' : '物资已启用。'); }
-  if (action === 'material-delete') { if (row.stock > 0) return openDialog('无法删除物资', '删除前需要校验当前库存。', `<p class="ops-danger">该物资尚有 ${row.stock} 件库存，请先出库清零后再删除。</p>`); const dialog = openDialog('确认删除物资', '删除只允许作用于库存为 0 且未被业务引用的物资。', `<p>确认删除“${esc(row.name)}”？历史出入库流水不会被删除。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" data-confirm-action="material-delete">确认删除</button>'); dialog.dataset.rowId = row.id; return dialog; }
+  if (action === 'material-delete') { if (row.stock > 0) return openDialog('无法删除物资', '删除前需要校验当前库存。', `<p class="ops-danger">该物资尚有 ${row.stock} 件库存，请先出库清零后再删除。</p>`); if (materialHasReferences(row)) return openDialog('无法删除物资', '删除前需要校验历史流水和业务引用。', '<p class="ops-danger">该物资已有历史出入库流水或业务引用，只能停用，不能物理删除。</p>'); const dialog = openDialog('确认删除物资', '仅允许删除库存为0且没有任何流水或业务引用的物资。', `<p>确认删除“${esc(row.name)}”？</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" data-confirm-action="material-delete">确认删除</button>'); dialog.dataset.rowId = row.id; return dialog; }
 }
 function confirmPublishSalary(row) {
   if (row.tax == null) return showToast('请先完成核算并填写个税。', 'warning');
@@ -417,40 +446,11 @@ function openRefundReview(row) {
   syncReviewFields();
   formElement.addEventListener('submit', (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const result = form.get('result'); if (result === '拒绝' && !String(form.get('rejectReason') || '').trim()) { showToast('拒绝退款时必须填写拒绝原因。', 'warning'); return; } const outcome = settleRefund(row.id, result, { name: operatorName(), rejectReason: String(form.get('rejectReason') || ''), remark: String(form.get('remark') || '') }); if (!outcome.ok) { showToast(outcome.reason === 'REFUND_ALREADY_SETTLED' ? '该退款单已完成，不能重复操作。' : '退款审批提交失败，请检查必填项。', 'warning'); return; } closeDialog(); if (result === '通过') { const url = new URL(location.href); url.searchParams.set('tab', 'processing'); history.replaceState({}, '', url); } renderRefunds(); showToast(result === '通过' ? '退款审批已通过，沿用申请时记录的退款渠道，订单进入退款中。' : '退款申请已拒绝，订单回滚为已支付，学籍保持现状待教务确认。'); }); return dialog;
 }
-function openInventoryReverse(row) {
-  const isInbound = opsPage === 'inbound';
-  const material = materials.find((item) => item.id === row.materialId || item.name === row.name);
-  if (!material) return showToast('未找到关联物资。', 'warning');
-  const body = field('原单号', 'originalNo', 'text', row.no) + field('修正后数量', 'correctedQuantity', 'number', String(row.quantity)) + field('修正原因', 'reason', 'text', '请输入修正原因', true);
-  return openSimpleForm('修正出入库流水', '原流水保留不变；系统先生成反向流水冲销原单，再生成一条修正后的正确流水。', body, (form) => {
-    const reason = String(form.get('reason') || '').trim();
-    const correctedQuantity = Number(form.get('correctedQuantity'));
-    if (row.reversed) return showToast('该流水已修正，不能重复修正。', 'warning');
-    if (!reason) return showToast('修正原因必填。', 'warning');
-    if (!Number.isInteger(correctedQuantity) || correctedQuantity <= 0) return showToast('修正后数量必须为正整数。', 'warning');
-    if (isInbound && material.stock < row.quantity) return showToast('当前库存不足，无法冲销原入库流水。', 'warning');
-    const stamp = Date.now();
-    const dateCode = new Date(stamp).toISOString().slice(0, 10).replaceAll('-', '');
-    const suffix = String(stamp).slice(-4);
-    const operator = readAdminSession()?.name || '当前用户';
-    const correctionId = `inventory-correction-${stamp}`;
-    const reverse = isInbound
-      ? { id: `outbound-reverse-${stamp}`, no: `CK${dateCode}${suffix}`, name: material.name, materialId: material.id, quantity: row.quantity, type: '其他', purpose: `冲销${row.no}`, recipient: '系统修正', supplier: '—', price: row.price || 0, date: DEMO_TODAY, operator, remark: `反向修正：${reason}`, correctionId, correctionOf: row.no }
-      : { id: `inbound-reverse-${stamp}`, no: `RK${dateCode}${suffix}`, name: material.name, materialId: material.id, quantity: row.quantity, type: '其他', supplier: '系统修正', price: row.price || 0, date: DEMO_TODAY, operator, remark: `反向修正：${reason}`, correctionId, correctionOf: row.no };
-    const corrected = isInbound
-      ? { id: `inbound-corrected-${stamp}`, no: `RK${dateCode}${String(Number(suffix) + 1).padStart(4, '0')}`, name: material.name, materialId: material.id, quantity: correctedQuantity, price: row.price || 0, supplier: row.supplier || '—', type: row.type || '其他', date: row.date || DEMO_TODAY, operator, remark: `修正后记录：${reason}`, correctionId, correctionOf: row.no }
-      : { id: `outbound-corrected-${stamp}`, no: `CK${dateCode}${String(Number(suffix) + 1).padStart(4, '0')}`, name: material.name, materialId: material.id, quantity: correctedQuantity, type: row.type || '其他', recipient: row.recipient || '—', purpose: row.purpose || '—', date: row.date || DEMO_TODAY, operator, remark: `修正后记录：${reason}`, correctionId, correctionOf: row.no };
-    if (isInbound) { material.stock -= row.quantity; material.stock += correctedQuantity; outboundRecords.unshift(reverse); inboundRecords.unshift(corrected); persistInventory('outboundRecords', reverse); persistInventory('inboundRecords', corrected); }
-    else { material.stock += row.quantity; if (correctedQuantity > material.stock) return showToast(`修正后出库数量不能超过可用库存 ${material.stock} 件。`, 'warning'); material.stock -= correctedQuantity; inboundRecords.unshift(reverse); outboundRecords.unshift(corrected); persistInventory('inboundRecords', reverse); persistInventory('outboundRecords', corrected); }
-    row.reversed = true; row.correctionId = correctionId; row.correctedQuantity = correctedQuantity; row.correctionReason = reason; persistInventory(isInbound ? 'inboundRecords' : 'outboundRecords', row); persistInventory('materials', material); closeDialog(); isInbound ? renderInbound() : renderOutbound(); showToast('流水已修正，原单已保留并生成冲销流水和正确流水。');
-  });
-}
-
 document.addEventListener('click', (event) => {
   if (!opsRoot) return;
   if (event.target.closest('[data-dialog-close]')) { closeDialog(); return; }
   const confirm = event.target.closest('[data-confirm-action]');
-  if (confirm) { const dialog = confirm.closest('dialog'); const action = confirm.dataset.confirmAction; const id = dialog?.dataset.rowId; const row = id && id !== '__batch__' ? salaries.find((item) => item.id === id) || opsData.find((item) => item.id === id) : null; if (action === 'salary-batch-publish') { const ready = salaries.filter((item) => item.status === '待发布' && item.tax != null); ready.forEach((item) => { item.status = '已发布'; item.paymentStatus = '已发布'; item.batchId = ''; item.paidAt = ''; item.failureReason = ''; }); closeDialog(); renderSalary(); showToast(`已发布${ready.length}条工资单，实际转账由财务在线下流程完成。`); } if (action === 'salary-publish' && row) { if (row.tax == null) { closeDialog(); showToast('请先完成核算并填写个税。', 'warning'); return; } row.status = '已发布'; row.paymentStatus = '已发布'; row.batchId = ''; row.paidAt = ''; row.failureReason = ''; closeDialog(); renderSalary(); showToast('工资单已发布，教师端可见，工资单已发布。'); } if (action === 'refund-complete' && row) { const outcome = settleRefund(row.id, '完成', { name: operatorName(), remark: '渠道退款已完成，报名资格已取消。' }); if (!outcome.ok) { closeDialog(); showToast(outcome.reason === 'REFUND_ALREADY_SETTLED' ? '该退款单已完成，不能重复操作。' : '退款完成操作失败，请稍后重试。', 'warning'); return; } closeDialog(); renderRefunds(); if (outcome.refund?.orderType === '视频课程' || row.orderType === '视频课程') showToast('退款已完成，订单转为已退款，学习权限已回收。'); else showToast(outcome.seatReleased ? '退款已完成，学籍转为已退班并释放名额。' : '退款已完成；学籍此前已退出，本次未重复释放名额。'); } if (action === 'category-delete' && row) { categories.splice(categories.findIndex((item) => item.id === row.id), 1); closeDialog(); renderCategories(); showToast('分类已删除。'); } if (action === 'material-delete' && row) { materials.splice(materials.findIndex((item) => item.id === row.id), 1); closeDialog(); renderMaterials(); showToast('物资已删除。'); } return; }
+  if (confirm) { const dialog = confirm.closest('dialog'); const action = confirm.dataset.confirmAction; const id = dialog?.dataset.rowId; const row = id && id !== '__batch__' ? salaries.find((item) => item.id === id) || opsData.find((item) => item.id === id) : null; if (action === 'salary-batch-publish') { const ready = salaries.filter((item) => item.status === '待发布' && item.tax != null); ready.forEach((item) => { item.status = '已发布'; item.paymentStatus = '已发布'; item.batchId = ''; item.paidAt = ''; item.failureReason = ''; }); closeDialog(); renderSalary(); showToast(`已发布${ready.length}条工资单，实际转账由财务在线下流程完成。`); } if (action === 'salary-publish' && row) { if (row.tax == null) { closeDialog(); showToast('请先完成核算并填写个税。', 'warning'); return; } row.status = '已发布'; row.paymentStatus = '已发布'; row.batchId = ''; row.paidAt = ''; row.failureReason = ''; closeDialog(); renderSalary(); showToast('工资单已发布，教师端可见，工资单已发布。'); } if (action === 'refund-complete' && row) { const outcome = settleRefund(row.id, '完成', { name: operatorName(), remark: '渠道退款已完成，报名资格已取消。' }); if (!outcome.ok) { closeDialog(); showToast(outcome.reason === 'REFUND_ALREADY_SETTLED' ? '该退款单已完成，不能重复操作。' : '退款完成操作失败，请稍后重试。', 'warning'); return; } closeDialog(); renderRefunds(); if (outcome.refund?.orderType === '视频课程' || row.orderType === '视频课程') showToast('退款已完成，订单转为已退款，学习权限已回收。'); else showToast(outcome.seatReleased ? '退款已完成，学籍转为已退班并释放名额。' : '退款已完成；学籍此前已退出，本次未重复释放名额。'); } if (action === 'category-delete' && row) { if (categoryHasReferences(row)) { closeDialog(); showToast('该分类已有引用，不能删除。', 'warning'); return; } categories.splice(categories.findIndex((item) => item.id === row.id), 1); removeDemoRecord('categories', row.id); closeDialog(); renderCategories(); showToast('分类已删除。'); } if (action === 'material-delete' && row) { if (row.stock !== 0 || materialHasReferences(row)) { closeDialog(); showToast('该物资存在库存或引用，不能删除。', 'warning'); return; } materials.splice(materials.findIndex((item) => item.id === row.id), 1); removeDemoRecord('materials', row.id); closeDialog(); renderMaterials(); showToast('物资已删除。'); } return; }
   const button = event.target.closest('[data-ops-action]'); if (!button) return;
   const action = button.dataset.opsAction;
   if (action === 'refund-tab') { const url = new URL(location.href); url.searchParams.set('tab', button.dataset.tab); history.replaceState({}, '', url); renderRefunds(); return; }
@@ -467,3 +467,7 @@ if (opsPage === 'inbound') renderInbound();
 if (opsPage === 'outbound') renderOutbound();
 if (opsPage === 'stock-in') renderStockForm('in');
 if (opsPage === 'stock-out') renderStockForm('out');
+
+
+  __classicModules["shared/js/finance-inventory.js"] = __classicExports;
+})(globalThis);

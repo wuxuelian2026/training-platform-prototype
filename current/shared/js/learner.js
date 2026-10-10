@@ -1,27 +1,31 @@
-import { relativePath } from './paths.js';
-import { mountFieldConstraints } from './field-constraints.js';
-import { mountPageHelp } from './page-help.js';
-import { toLocalDateTimeString, toLocalMonthString } from './date-utils.js';
-import { mountMobileSettings } from './mobile-settings.js';
-import { mountMobileMessageDetail, mountMobileMessageList } from './mobile-messages.js';
-import { accountStudents, demoId, demoTime, fileSpecSettings, getCurrentAccountId, paymentTimeoutSettings, readDemoState, refundSettings, subscribeDemoState, transitionVideoEntitlement, upsertDemoRecord, updateDemoRecord, writeDemoState } from './demo-store.js';
-import { DEMO_NOW, DEMO_TODAY, demoDateTime } from './demo-clock.js';
-import { classSeed } from './class-seed.js';
-import { graduationSeed } from './graduation-seed.js';
-import { isEnrollmentActive } from './class-roster.js';
-import { venueSeed } from './venue-seed.js';
-import { lessonAttendanceStatus } from './lesson-records.js';
-import { getHomework, listHomework, getStudentSubmission, homeworkFileLimitMb, homeworkLifecycleStatus, listSubmissions, saveDraftSubmission, submitHomework as submitHomeworkRecord, syncHomeworkNotificationReads } from './homework-store.js';
-import { resolveHomeBanners } from './banner-seed.js';
-import { isLearnerPublicPage, isMiniLoggedIn, isMiniRole, miniPageName, redirectMiniLogin } from './mobile-guard.js';
-import { toCanonicalCourseId } from './course-seed.js';
-import { REFUND_ORIGIN, classRefundSuggestion, createRefundRequest, openRefundForOrder, refundsForOrder } from './refund-store.js';
-import { syncNotificationReads } from './notification-store.js';
-import { allProducts, productForCourse } from './product-seed.js';
-import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseArchiveSeed, courseArchiveVersionFor, saleUnitDisplay, VIDEO_DEMO_COURSES } from './course-display.js';
-import { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } from './teacher-facts.js';
-import { isRichMarkup, richTextToHtml, sanitizeRichText } from './rich-editor.js';
-import { classLessonProgress, classSalesProjection, classTeachingStatus, lessonStatusOf, sessionsInScheduleOrder } from './class-lifecycle.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { relativePath } = __classicRequire("shared/js/paths.js");
+const { mountFieldConstraints } = __classicRequire("shared/js/field-constraints.js");
+const { mountPageHelp } = __classicRequire("shared/js/page-help.js");
+const { toLocalDateTimeString, toLocalMonthString } = __classicRequire("shared/js/date-utils.js");
+const { mountMobileSettings } = __classicRequire("shared/js/mobile-settings.js");
+const { mountMobileMessageDetail, mountMobileMessageList } = __classicRequire("shared/js/mobile-messages.js");
+const { accountStudents, demoId, demoTime, fileSpecSettings, getCurrentAccountId, paymentTimeoutSettings, readDemoState, refundSettings, subscribeDemoState, transitionVideoEntitlement, upsertDemoRecord, updateDemoRecord, writeDemoState } = __classicRequire("shared/js/demo-store.js");
+const { DEMO_NOW, DEMO_TODAY, demoDateTime } = __classicRequire("shared/js/demo-clock.js");
+const { classSeed } = __classicRequire("shared/js/class-seed.js");
+const { graduationSeed } = __classicRequire("shared/js/graduation-seed.js");
+const { isEnrollmentActive } = __classicRequire("shared/js/class-roster.js");
+const { venueSeed } = __classicRequire("shared/js/venue-seed.js");
+const { lessonAttendanceStatus } = __classicRequire("shared/js/lesson-records.js");
+const { getHomework, listHomework, getStudentSubmission, homeworkFileLimitMb, homeworkLifecycleStatus, listSubmissions, saveDraftSubmission, submitHomework: submitHomeworkRecord, syncHomeworkNotificationReads } = __classicRequire("shared/js/homework-store.js");
+const { resolveHomeBanners } = __classicRequire("shared/js/banner-seed.js");
+const { isLearnerPublicPage, isMiniLoggedIn, isMiniRole, miniPageName, redirectMiniLogin } = __classicRequire("shared/js/mobile-guard.js");
+const { toCanonicalCourseId } = __classicRequire("shared/js/course-seed.js");
+const { REFUND_ORIGIN, classRefundSuggestion, createRefundRequest, openRefundForOrder, refundsForOrder } = __classicRequire("shared/js/refund-store.js");
+const { syncNotificationReads } = __classicRequire("shared/js/notification-store.js");
+const { allProducts, productForCourse } = __classicRequire("shared/js/product-seed.js");
+const { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseArchiveSeed, courseArchiveVersionFor, saleUnitDisplay, VIDEO_DEMO_COURSES } = __classicRequire("shared/js/course-display.js");
+const { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } = __classicRequire("shared/js/teacher-facts.js");
+const { isRichMarkup, richTextToHtml, sanitizeRichText } = __classicRequire("shared/js/rich-editor.js");
+const { classLessonProgress, classSalesProjection, classTeachingStatus, lessonStatusOf, sessionsInScheduleOrder } = __classicRequire("shared/js/class-lifecycle.js");
 
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
@@ -2476,3 +2480,7 @@ mountFieldConstraints('learner/' + (path.split('/').pop() || '').replace('.html'
 
 // 页面说明入口：内容来自 spec/fields/，与后台共用同一份字段口径。
 mountPageHelp({ pageKey: 'learner/' + (path.split('/').pop() || '').replace('.html', ''), title: document.title });
+
+
+  __classicModules["shared/js/learner.js"] = __classicExports;
+})(globalThis);

@@ -4,14 +4,24 @@
 
 本项目用于产品评审、业务流程确认和开发沟通，不代表最终生产系统。
 
-## 本地运行
+## 本地预览
+
+`current/` 是唯一需要维护和提交的原型目录。当前源码已经转换为经典脚本，其他成员拉取 Git 后不需要安装 Node.js，也不需要启动本地服务，直接双击以下文件即可预览：
+
+```text
+current/index.html
+```
+
+也可以直接打开 `current/learner/index.html`、`current/admin/login.html`、`current/teacher/index.html` 或 `current/visualization/index.html`。`本地预览版/` 不参与维护和提交。
+
+## 工程构建
 
 ### 环境要求
 
 - Node.js 18 或更高版本
 - npm
 
-### 启动开发服务
+### 启动开发服务（可选）
 
 ```bash
 cd current
@@ -79,6 +89,7 @@ npm run preview
 ## GitHub 发布注意事项
 
 - 不要提交 `node_modules/` 和构建生成的 `dist/`。
+- GitHub Pages 直接发布 `current/` 静态源码；`npm run build` 仅用于构建检查，不是本地双击预览和 Pages 的运行时依赖。
 - 上传前确认没有真实手机号、身份证号、账号、密码、接口密钥或其他敏感资料。
 - PRD、客户确认版文档、内部会议材料等资料应单独管理，不要随原型公开发布。
 - 如果使用 GitHub Pages 发布在线演示，需要检查页面中的绝对路径，并确认项目子路径下的页面跳转正常。

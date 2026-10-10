@@ -1,9 +1,12 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 面授运营与CRM管理字段规格 · 唯一事实源
 // 由 scripts/migrate-literal-fields.mjs 从页面说明字面量迁移生成，迁移后请只维护本文件。
 // 字段口径变更后运行 `npm run check:spec` 校验一致性。
-import { COURSE_DISPLAY_FIELDS, COURSE_TEACHING_FIELDS, courseFieldRows } from './courses.js';
-
-export const CRM_FIELD_SPEC = {
+const { COURSE_DISPLAY_FIELDS, COURSE_TEACHING_FIELDS, courseFieldRows } = __classicRequire("spec/fields/courses.js");
+const CRM_FIELD_SPEC = {
   module: '面授运营 / CRM管理',
   pages: {
     // CR-2026-043：面授班级只维护班级主体、招生和展示信息，教学排课在 面授班级的排课抽屉 完成。
@@ -162,3 +165,8 @@ export const CRM_FIELD_SPEC = {
     }
   }
 };
+
+
+__classicExports["CRM_FIELD_SPEC"] = CRM_FIELD_SPEC;
+  __classicModules["spec/fields/crm.js"] = __classicExports;
+})(globalThis);

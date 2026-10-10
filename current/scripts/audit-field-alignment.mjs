@@ -9,13 +9,14 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { loadClassicModule } from './load-classic-modules.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repoRoot = path.resolve(root, '../..');
 const prdDir = path.join(repoRoot, 'PRD/原始完整版PRD-拆分版');
 
-const { PAGE_FIELD_SPECS } = await import(pathToFileURL(path.join(root, 'spec/fields/index.js')).href);
+const { PAGE_FIELD_SPECS } = await loadClassicModule('spec/fields/index.js');
 
 const specLabelsOf = (pageKey) =>
   (PAGE_FIELD_SPECS[pageKey]?.groups || []).flatMap((group) => group.fields.map((field) => field.label));

@@ -40,6 +40,22 @@ jobs:
         working-directory: current
         run: npm run build
 
+      - name: Prepare current static source for Pages
+        shell: bash
+        run: |
+          rm -rf /tmp/pages-site
+          mkdir -p /tmp/pages-site
+          rsync -a \
+            --exclude='node_modules/' \
+            --exclude='dist/' \
+            --exclude='.vite/' \
+            --exclude='scripts/' \
+            --exclude='package.json' \
+            --exclude='package-lock.json' \
+            --exclude='vite.config.js' \
+            --exclude='.gitignore' \
+            current/ /tmp/pages-site/
+
       - name: Build frozen iteration 1 preview
         shell: bash
         run: |
@@ -49,13 +65,13 @@ jobs:
           cd /tmp/iteration-1-source
           npm install --no-audit --no-fund --cache /tmp/iteration-1-dependencies
           npm run build
-          mkdir -p "$GITHUB_WORKSPACE/current/dist/iteration-1"
-          cp -R dist/. "$GITHUB_WORKSPACE/current/dist/iteration-1/"
+          mkdir -p /tmp/pages-site/iteration-1
+          cp -R dist/. /tmp/pages-site/iteration-1/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: current/dist
+          path: /tmp/pages-site
 
   deploy:
     environment:

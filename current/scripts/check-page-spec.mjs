@@ -8,17 +8,18 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { loadClassicModule } from './load-classic-modules.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const specFile = path.join(root, 'shared/js/page-help-fields.js');
 const pagesDir = path.join(root, 'admin/pages');
 const SHORT_TEXT_LIMIT = 12;
 
-const { FIELD_PAGE_COLUMNS, LITERAL_PAGE_TABLES, PAGE_FIELD_TABLES } = await import(pathToFileURL(specFile).href);
-const { PAGE_FIELD_SPECS, allSpecFields } = await import(pathToFileURL(path.join(root, 'spec/fields/index.js')).href);
-const { PAGE_HELP_CONTENT, PAGE_TYPES, SECTION_TEMPLATES } = await import(pathToFileURL(path.join(root, 'spec/pages/page-types.js')).href);
-const { machinesForPage, stateLabelIndex, STATE_MACHINES } = await import(pathToFileURL(path.join(root, 'spec/states/index.js')).href);
+const { FIELD_PAGE_COLUMNS, LITERAL_PAGE_TABLES, PAGE_FIELD_TABLES } = await loadClassicModule('shared/js/page-help-fields.js');
+const { PAGE_FIELD_SPECS, allSpecFields } = await loadClassicModule('spec/fields/index.js');
+const { PAGE_HELP_CONTENT, PAGE_TYPES, SECTION_TEMPLATES } = await loadClassicModule('spec/pages/page-types.js');
+const { machinesForPage, stateLabelIndex, STATE_MACHINES } = await loadClassicModule('spec/states/index.js');
 
 const walkHtml = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
   const full = path.join(dir, entry.name);

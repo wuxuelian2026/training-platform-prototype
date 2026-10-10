@@ -9,8 +9,9 @@ globalThis.CustomEvent = class CustomEvent {
   constructor(type, init) { this.type = type; this.detail = init?.detail; }
 };
 
-const store = await import('../shared/js/demo-store.js');
-const refunds = await import('../shared/js/refund-store.js');
+const { loadClassicModule } = await import('./load-classic-modules.mjs');
+const store = await loadClassicModule('shared/js/demo-store.js');
+const refunds = await loadClassicModule('shared/js/refund-store.js');
 
 const passed = [];
 function check(condition, label) {

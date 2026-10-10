@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // CR-2026-028：证书文件来源的唯一映射与查重口径。
 //
 // 文件来源（file_source_type）回答“这份文件是谁放进系统的”，与审核结果
@@ -13,22 +17,28 @@ const SOURCE_LABELS = {
   system_generated: '系统生成',
   系统生成: '系统生成'
 };
-
-export const certificateSourceLabel = (value) => SOURCE_LABELS[String(value || '').trim()] || '—';
+const certificateSourceLabel = (value) => SOURCE_LABELS[String(value || '').trim()] || '—';
 
 // 存储态仍保留旧枚举（后台录入／教师端上传），对外展示统一走 certificateSourceLabel。
-export const CERTIFICATE_SOURCE_OPTIONS = ['学校录入', '本人上传', '系统生成'];
+const CERTIFICATE_SOURCE_OPTIONS = ['学校录入', '本人上传', '系统生成'];
 
 // 唯一性口径：同一教师下“证书类型 + 证书编号”同时相同即视为重复。
 // 编号比较忽略大小写与首尾空白，避免 WD-2019-0028 与 wd-2019-0028 绕过防重。
-export const certificateDedupKey = (certificate) => {
+const certificateDedupKey = (certificate) => {
   const type = String(certificate?.type || '').trim();
   const number = String(certificate?.number || '').trim().toUpperCase();
   return type && number ? `${type}::${number}` : '';
 };
-
-export function findDuplicateCertificate(certificates, candidate, excludeId = '') {
+function findDuplicateCertificate(certificates, candidate, excludeId = '') {
   const key = certificateDedupKey(candidate);
   if (!key) return null;
   return (certificates || []).find((item) => item.id !== excludeId && certificateDedupKey(item) === key) || null;
 }
+
+
+__classicExports["findDuplicateCertificate"] = findDuplicateCertificate;
+__classicExports["certificateSourceLabel"] = certificateSourceLabel;
+__classicExports["CERTIFICATE_SOURCE_OPTIONS"] = CERTIFICATE_SOURCE_OPTIONS;
+__classicExports["certificateDedupKey"] = certificateDedupKey;
+  __classicModules["shared/js/certificate-source.js"] = __classicExports;
+})(globalThis);

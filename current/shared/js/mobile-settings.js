@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 function maskPhone(value) {
   const phone = String(value || '138****2026');
   return /^1[3-9]\d{9}$/.test(phone) ? `${phone.slice(0, 3)}****${phone.slice(-4)}` : phone;
@@ -59,8 +63,7 @@ function settingsDialog(type, options) {
   });
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
 }
-
-export function mountMobileSettings(options) {
+function mountMobileSettings(options) {
   const { container, loggedIn, navigate, loginUrl, onLogout, toast } = options;
   const phone = options.phone || '138****2026';
   const wechatAuthorized = options.wechatAuthorized !== false;
@@ -82,3 +85,8 @@ export function mountMobileSettings(options) {
   }));
   container.querySelector('#settings-logout')?.addEventListener('click', () => settingsDialog('logout', { ...options, phone, wechatAuthorized, onLogout, toast, rerender }));
 }
+
+
+__classicExports["mountMobileSettings"] = mountMobileSettings;
+  __classicModules["shared/js/mobile-settings.js"] = __classicExports;
+})(globalThis);

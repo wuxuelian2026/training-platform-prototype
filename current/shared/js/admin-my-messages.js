@@ -1,5 +1,9 @@
-import { adminMessageRows } from './admin-inbox.js';
-import { readAdminSession } from './admin-auth.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { adminMessageRows } = __classicRequire("shared/js/admin-inbox.js");
+const { readAdminSession } = __classicRequire("shared/js/admin-auth.js");
 
 const root = document.querySelector('[data-my-messages-page]');
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -14,3 +18,7 @@ function render() {
 }
 
 render();
+
+
+  __classicModules["shared/js/admin-my-messages.js"] = __classicExports;
+})(globalThis);

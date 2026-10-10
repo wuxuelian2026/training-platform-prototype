@@ -1,18 +1,22 @@
-import { demoId, demoTime, readDemoState, removeDemoRecord, resetDemoData, subscribeDemoState, updateDemoRecord, upsertDemoRecord } from './demo-store.js';
-import { DEMO_TODAY } from './demo-clock.js';
-import { cloneClassSeed } from './class-seed.js';
-import { cloneBatchSeed } from './batch-seed.js';
-import { cloneCourseCatalogSeed } from './course-catalog-seed.js';
-import { addWeeksLocal, toLocalDateString } from './date-utils.js';
-import { cloneProductSeed } from './product-seed.js';
-import { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseDisplayConfigured, courseDisplayTags, persistSaleUnitDisplay, productForCourse, saleUnitDisplay } from './course-display.js';
-import { mountRichEditor, richTextToHtml, richTextValue } from './rich-editor.js';
-import { classCapacityStatus, classDisplayStatus, classEnrollmentCondition, classEnrollmentStatus, classLessonProgress, classScheduleChangeAllowed, classScheduleStatus, classStageEligible, classStageProjection, classTeachingStatus, deriveClassStatus } from './class-lifecycle.js';
-import { mergeVenues, resolveVenueId } from './venue-seed.js';
-import { defaultLessonDuration, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions as buildLessonDurationOptions, lessonEndTime, snapToStep } from './timetable-settings.js';
-import { openSchedulePlanner, openSessionAdjustment } from './academic.js';
-import { isEnrollmentActive } from './class-roster.js';
-import { REFUND_ORIGIN, classRefundSuggestion, createRefundRequest, openRefundForOrder } from './refund-store.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { demoId, demoTime, readDemoState, removeDemoRecord, resetDemoData, subscribeDemoState, updateDemoRecord, upsertDemoRecord } = __classicRequire("shared/js/demo-store.js");
+const { DEMO_TODAY } = __classicRequire("shared/js/demo-clock.js");
+const { cloneClassSeed } = __classicRequire("shared/js/class-seed.js");
+const { cloneBatchSeed } = __classicRequire("shared/js/batch-seed.js");
+const { cloneCourseCatalogSeed } = __classicRequire("shared/js/course-catalog-seed.js");
+const { addWeeksLocal, toLocalDateString } = __classicRequire("shared/js/date-utils.js");
+const { cloneProductSeed } = __classicRequire("shared/js/product-seed.js");
+const { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseDisplayConfigured, courseDisplayTags, persistSaleUnitDisplay, productForCourse, saleUnitDisplay } = __classicRequire("shared/js/course-display.js");
+const { mountRichEditor, richTextToHtml, richTextValue } = __classicRequire("shared/js/rich-editor.js");
+const { classCapacityStatus, classDisplayStatus, classEnrollmentCondition, classEnrollmentStatus, classLessonProgress, classScheduleChangeAllowed, classScheduleStatus, classStageEligible, classStageProjection, classTeachingStatus, deriveClassStatus } = __classicRequire("shared/js/class-lifecycle.js");
+const { mergeVenues, resolveVenueId } = __classicRequire("shared/js/venue-seed.js");
+const { defaultLessonDuration, TIMELINE_END, TIMELINE_START, isWithinTimeline, lessonDurationOptions: buildLessonDurationOptions, lessonEndTime, snapToStep } = __classicRequire("shared/js/timetable-settings.js");
+const { openSchedulePlanner, openSessionAdjustment } = __classicRequire("shared/js/academic.js");
+const { isEnrollmentActive } = __classicRequire("shared/js/class-roster.js");
+const { REFUND_ORIGIN, classRefundSuggestion, createRefundRequest, openRefundForOrder } = __classicRequire("shared/js/refund-store.js");
 
 const businessRoot = document.querySelector('[data-business-page]');
 const businessPage = businessRoot?.dataset.businessPage;
@@ -1594,3 +1598,7 @@ if (businessPage === 'classes') {
 }
 if (businessPage === 'trials') renderTrials();
 if (businessPage === 'leads') renderLeads();
+
+
+  __classicModules["shared/js/sales-crm.js"] = __classicExports;
+})(globalThis);

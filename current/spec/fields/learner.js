@@ -1,9 +1,12 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 学员端字段规格 · 唯一事实源
 //
 // 学员端与教师端共用入口 login.html（页内提供身份切换，默认学员端）。
 // 字段体系与后台一致：编号 FD-<模块>-三位序号，约束键与页面说明机制共用。
-
-export const LEARNER_APP_FIELD_SPEC = {
+const LEARNER_APP_FIELD_SPEC = {
   module: '学员端小程序',
   pages: {
     'learner/login': {
@@ -133,3 +136,8 @@ export const LEARNER_APP_FIELD_SPEC = {
     }
   }
 };
+
+
+__classicExports["LEARNER_APP_FIELD_SPEC"] = LEARNER_APP_FIELD_SPEC;
+  __classicModules["spec/fields/learner.js"] = __classicExports;
+})(globalThis);

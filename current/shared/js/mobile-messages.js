@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
@@ -31,8 +35,7 @@ function relatedActionLabel(row) {
 function lockedContent(options) {
   return `<div class="mp-stack"><section class="mp-locked"><span class="mp-avatar" aria-hidden="true">信</span><strong>登录后查看消息通知</strong><p>${escapeHtml(options.lockedCopy || '登录后可查看课程、教学和账号相关消息。')}</p><a class="mp-button" href="${escapeHtml(options.link(options.loginUrl))}">去登录</a></section></div>`;
 }
-
-export function mountMobileMessageList(options) {
+function mountMobileMessageList(options) {
   const { container, messages, loggedIn, link, detailPath, save, toast } = options;
   if (!loggedIn) { container.innerHTML = lockedContent(options); return; }
   const unreadCount = messages.filter(row => !row.read).length;
@@ -56,8 +59,7 @@ export function mountMobileMessageList(options) {
   });
   draw();
 }
-
-export function mountMobileMessageDetail(options) {
+function mountMobileMessageDetail(options) {
   const { container, messages, loggedIn, link, listPath, save } = options;
   if (!loggedIn) { container.innerHTML = lockedContent(options); return; }
   const messageId = new URLSearchParams(location.search).get('messageId');
@@ -71,3 +73,9 @@ export function mountMobileMessageDetail(options) {
   const related = row.target ? `<section class="mp-card"><div class="mp-section-head"><h3>相关内容</h3>${pill('已读', 'gray')}</div><p class="mp-muted">点击下方按钮查看这条消息对应的业务内容。</p><a class="mp-button full" href="${escapeHtml(link(row.target))}">${escapeHtml(relatedActionLabel(row))}</a></section>` : '';
   container.innerHTML = `<div class="mp-stack"><section class="mp-card"><div class="mp-message-detail-top"><span class="mp-message-icon ${messageTone(row.type)}" aria-hidden="true">${messageIcon(row.type)}</span><div><span class="mp-muted">${escapeHtml(row.type)}</span><h2>${escapeHtml(row.title)}</h2><small>${escapeHtml(row.createdAt)}</small></div></div></section><section class="mp-card"><article class="mp-message-content"><p>${escapeHtml(row.body).replace(/\n/g, '<br />')}</p></article></section>${related}<a class="mp-button secondary full" href="${escapeHtml(link(listPath))}">返回消息列表</a></div>`;
 }
+
+
+__classicExports["mountMobileMessageList"] = mountMobileMessageList;
+__classicExports["mountMobileMessageDetail"] = mountMobileMessageDetail;
+  __classicModules["shared/js/mobile-messages.js"] = __classicExports;
+})(globalThis);

@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 师资模块字段规格 · 唯一事实源
 //
 // 用途：后台页面说明表格、后续 PRD 字段表、原型输入校验，都由这里派生。
@@ -20,8 +24,7 @@ const CERTIFICATE_FILE_SOURCE_FIELD = { id: 'FD-TEACHER-068', label: '文件来�
 const CERTIFICATE_NUMBER_UNIQUE_FIELD = { id: 'FD-TEACHER-070', label: '证书编号', type: '文本', length: '≤ 40 字', required: '是', note: '同一教师下“证书类型 + 证书编号”唯一；两个录入入口保存前查重，命中不得静默创建第二条记录', constraints: { maxLength: 40, unique: '同一教师下 证书类型 + 证书编号' } };
 const CERTIFICATE_DUPLICATE_VIEW_FIELD = { id: 'FD-TEACHER-071', label: '查看既有记录', type: '按钮', length: '—', required: '查重命中时展示', note: '查重比对范围是该教师已保存的全部证书记录；后台命中后定位到教师详情页「账号」页签并高亮该条记录，教师端命中提示“该证书已存在”并引导到既有记录或对原记录重新上传', constraints: { action: true } };
 const CERTIFICATE_SOURCE_FILTER_FIELD = { id: 'FD-TEACHER-069', label: '文件来源筛选', type: '下拉', length: '全部 / 学校录入 / 本人上传 / 系统生成', required: '否', note: '后台证书列表按文件来源过滤，默认全部', constraints: { options: ['全部', '学校录入', '本人上传', '系统生成'] } };
-
-export const CERTIFICATE_FIELDS = {
+const CERTIFICATE_FIELDS = {
   // 录入字段：第二步与证书列表页的新增录入共用同一套字段与校验。
   entry: [
     { id: 'FD-TEACHER-026', label: '证书名称', type: '文本', length: '≤ 50 字', required: '是', note: '证书证件上的正式名称，用于教师列表、教师详情与教师端“我的证书”展示', constraints: { maxLength: 50 } },
@@ -47,8 +50,7 @@ export const CERTIFICATE_FIELDS = {
   fileSource: CERTIFICATE_FILE_SOURCE_FIELD,
   duplicateView: CERTIFICATE_DUPLICATE_VIEW_FIELD
 };
-
-export const TEACHER_FIELD_SPEC = {
+const TEACHER_FIELD_SPEC = {
   module: '师资中心',
   pages: {
     'teachers/create': {
@@ -249,3 +251,9 @@ export const TEACHER_FIELD_SPEC = {
     }
   }
 };
+
+
+__classicExports["CERTIFICATE_FIELDS"] = CERTIFICATE_FIELDS;
+__classicExports["TEACHER_FIELD_SPEC"] = TEACHER_FIELD_SPEC;
+  __classicModules["spec/fields/teachers.js"] = __classicExports;
+})(globalThis);

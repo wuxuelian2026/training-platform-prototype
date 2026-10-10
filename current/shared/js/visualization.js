@@ -1,3 +1,7 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 const dashboardData = {
   year: {
     date: '2026年度 · 截至09月09日',
@@ -182,3 +186,7 @@ renderTable('#course-ranking', courseData, 'course');
 renderTable('#teacher-ranking', teacherData, 'teacher');
 renderMajor('revenue');
 applyTrend('year');
+
+
+  __classicModules["shared/js/visualization.js"] = __classicExports;
+})(globalThis);

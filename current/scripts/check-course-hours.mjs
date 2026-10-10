@@ -3,9 +3,11 @@
 //   班级总课时 = 课程库该课程的总课时；已排课时「课次数 = 总课时」（一个课时一个课次）。
 // 拦截项：班级课时与课程库不一致、课次数与总课时不一致、课时表与课程库不一致。
 // 提示项（不拦截）：课程库课程档案自身「总课时」与「大纲课时合计」不一致——属后台大纲待补录，需产品/教研定夺。
-import { classSeed } from '../shared/js/class-seed.js';
-import { courseArchiveFor } from '../shared/js/course-display.js';
-import { courseTotalHours } from '../shared/js/course-hours.js';
+import { loadClassicModule } from './load-classic-modules.mjs';
+
+const { classSeed } = await loadClassicModule('shared/js/class-seed.js');
+const { courseArchiveFor } = await loadClassicModule('shared/js/course-display.js');
+const { courseTotalHours } = await loadClassicModule('shared/js/course-hours.js');
 
 const classes = Array.isArray(classSeed) ? classSeed : Object.values(classSeed);
 const problems = [];

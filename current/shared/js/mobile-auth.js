@@ -1,8 +1,12 @@
-import { relativePath } from './paths.js';
-import { mountFieldConstraints } from './field-constraints.js';
-import { mountPageHelp } from './page-help.js';
-import { getCurrentAccountId, setCurrentAccountId } from './demo-store.js';
-import { teacherAccounts } from './course-seed.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { relativePath } = __classicRequire("shared/js/paths.js");
+const { mountFieldConstraints } = __classicRequire("shared/js/field-constraints.js");
+const { mountPageHelp } = __classicRequire("shared/js/page-help.js");
+const { getCurrentAccountId, setCurrentAccountId } = __classicRequire("shared/js/demo-store.js");
+const { teacherAccounts } = __classicRequire("shared/js/course-seed.js");
 
 const roleKey = 'hbyx-mini-role';
 const roleButtons = document.querySelectorAll('[data-role]');
@@ -97,3 +101,7 @@ mountFieldConstraints('learner/login');
 
 // 页面说明入口：内容来自 spec/fields/，与后台共用同一份字段口径。
 mountPageHelp({ pageKey: 'learner/login', title: document.title });
+
+
+  __classicModules["shared/js/mobile-auth.js"] = __classicExports;
+})(globalThis);

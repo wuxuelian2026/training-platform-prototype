@@ -13,14 +13,15 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { loadClassicModule } from './load-classic-modules.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const dryRun = process.argv.includes('--dry');
 const sourceIndex = process.argv.indexOf('--source');
 const sourceFile = sourceIndex >= 0 ? process.argv[sourceIndex + 1] : path.join(root, 'shared/js/page-help-fields.js');
 
-const { LITERAL_PAGE_TABLES } = await import(pathToFileURL(sourceFile).href);
+const { LITERAL_PAGE_TABLES } = await loadClassicModule('shared/js/page-help-fields.js');
 
 const MODULE_OF_PREFIX = {
   inventory: { file: 'inventory.js', exportName: 'INVENTORY_FIELD_SPEC', label: '物资中心', idPrefix: 'INVENTORY' },

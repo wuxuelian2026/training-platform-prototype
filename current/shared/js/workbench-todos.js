@@ -1,8 +1,12 @@
-import { readDemoState, writeDemoState } from './demo-store.js';
-import { applicationSeed } from './course-seed.js';
-import { graduationSeed } from './graduation-seed.js';
-import { readAdminSession } from './admin-auth.js';
-import { unreadAdminMessageCount } from './admin-inbox.js';
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
+const { readDemoState, writeDemoState } = __classicRequire("shared/js/demo-store.js");
+const { applicationSeed } = __classicRequire("shared/js/course-seed.js");
+const { graduationSeed } = __classicRequire("shared/js/graduation-seed.js");
+const { readAdminSession } = __classicRequire("shared/js/admin-auth.js");
+const { unreadAdminMessageCount } = __classicRequire("shared/js/admin-inbox.js");
 
 const TODO_COLLECTION = 'adminTodos';
 const roleTypes = {
@@ -80,3 +84,7 @@ function render() {
 document.addEventListener('DOMContentLoaded', render);
 window.addEventListener('hbyx-demo-state-change', render);
 document.querySelector('[data-workbench-refresh]')?.addEventListener('click', render);
+
+
+  __classicModules["shared/js/workbench-todos.js"] = __classicExports;
+})(globalThis);

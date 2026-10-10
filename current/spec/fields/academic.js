@@ -1,8 +1,11 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 面授运营 / 教务执行监管字段规格 · 唯一事实源
 // 由 scripts/migrate-literal-fields.mjs 从页面说明字面量迁移生成，迁移后请只维护本文件。
 // 字段口径变更后运行 `npm run check:spec` 校验一致性。
-
-export const ACADEMIC_FIELD_SPEC = {
+const ACADEMIC_FIELD_SPEC = {
   module: '面授运营 / 教务执行监管',
   pages: {
     'academic/venues': {
@@ -136,3 +139,8 @@ export const ACADEMIC_FIELD_SPEC = {
     }
   }
 };
+
+
+__classicExports["ACADEMIC_FIELD_SPEC"] = ACADEMIC_FIELD_SPEC;
+  __classicModules["spec/fields/academic.js"] = __classicExports;
+})(globalThis);

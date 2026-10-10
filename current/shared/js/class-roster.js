@@ -1,9 +1,13 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // 班级名册同源（CR-2026-133）：教师端班级详情／课次详情的学员名册改为按班级报名分班记录派生，
 // 不再直接使用与班级无关的固定演示名单。
 //
 // 说明：出勤率与作业提交率目前仍是演示派生值（按姓名稳定取），
 // 待「考勤记录 / 作业记录」同源后再改为按记录统计，口径见 CR-2026-133。
-import { readDemoState } from './demo-store.js';
+const { readDemoState } = __classicRequire("shared/js/demo-store.js");
 
 // 演示名册池：既有 20 名学员及其演示指标，用于把名册补足到班级报名人数。
 const DEMO_ROSTER = [
@@ -17,21 +21,21 @@ const DEMO_ROSTER = [
 // 2026-09-24 结算：报名记录只有处于「在读」状态才进名册；退班／转班／退学／取消报名一律移出当前名册，
 // 已发布的作业仍保留这些学员的应交记录，由作业侧标记为「发布后已退出」。
 // 「已退款」仅兼容旧演示数据；新链路保持学籍主状态为已退班／已退学等，退款结果写 refundRelationStatus。
-export const ENROLLMENT_EXIT_STATUSES = ['已取消', '已退班', '已转班', '已退学', '已退款'];
-export function isEnrollmentActive(status) {
+const ENROLLMENT_EXIT_STATUSES = ['已取消', '已退班', '已转班', '已退学', '已退款'];
+function isEnrollmentActive(status) {
   return !ENROLLMENT_EXIT_STATUSES.includes(String(status || ''));
 }
 /** 返回该学员在班级报名记录中的退出状态；在读或查不到记录时返回空字符串。 */
-export function enrollmentExitStatus(classId, studentId) {
+function enrollmentExitStatus(classId, studentId) {
   const row = (readDemoState().enrollments || []).find((item) => item.classId === classId && item.studentId === studentId);
   return row && !isEnrollmentActive(row.status) ? row.status : '';
 }
 /** 班级下仍在读的报名分班记录（退出记录不在其中）。 */
-export function activeEnrollmentsOf(classId) {
+function activeEnrollmentsOf(classId) {
   return (readDemoState().enrollments || []).filter((item) => item.classId === classId && isEnrollmentActive(item.status));
 }
 /** 学员姓名（用于名册漂移提示）。 */
-export function studentNameOf(studentId) {
+function studentNameOf(studentId) {
   return (readDemoState().students || []).find((item) => item.id === studentId)?.name || studentId;
 }
 
@@ -56,7 +60,7 @@ function enrolledStudentsOf(classId) {
 }
 
 // 名册 = 报名分班学员（置顶）+ 演示名册池补足到班级报名人数；按姓名去重。
-export function classRosterFor(classId, size = 0) {
+function classRosterFor(classId, size = 0) {
   // CR-2026-151：结业审核共享种子中的暑期中国舞基础1班固定为 5 名学员，名册必须与审核数据一致。
   if (classId === 'class-mock-ended-pending-01') {
     const names = new Set(['林知夏', '周予安', '陈一诺', '赵明月', '吴桐']);
@@ -75,3 +79,13 @@ export function classRosterFor(classId, size = 0) {
   if (Number(size || 0) > 0) return roster.slice(0, Number(size));
   return roster;
 }
+
+
+__classicExports["isEnrollmentActive"] = isEnrollmentActive;
+__classicExports["enrollmentExitStatus"] = enrollmentExitStatus;
+__classicExports["activeEnrollmentsOf"] = activeEnrollmentsOf;
+__classicExports["studentNameOf"] = studentNameOf;
+__classicExports["classRosterFor"] = classRosterFor;
+__classicExports["ENROLLMENT_EXIT_STATUSES"] = ENROLLMENT_EXIT_STATUSES;
+  __classicModules["shared/js/class-roster.js"] = __classicExports;
+})(globalThis);

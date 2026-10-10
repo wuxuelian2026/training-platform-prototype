@@ -1,5 +1,9 @@
+(function (global) {
+  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
+  const __classicExports = {};
+  const __classicRequire = (id) => __classicModules[id];
 // CR-2026-043: one shared projection for class visibility, enrollment and status.
-import { DEMO_NOW as DEMO_NOW_TEXT, demoDateTime } from './demo-clock.js';
+const { DEMO_NOW: DEMO_NOW_TEXT, demoDateTime } = __classicRequire("shared/js/demo-clock.js");
 
 // 演示「当前时间」统一取 demo-clock 一处，避免班级阶段派生、课表与学员端各用一套今天。
 const DEMO_NOW = demoDateTime(DEMO_NOW_TEXT);
@@ -9,24 +13,21 @@ function asDate(value) {
   const date = new Date(String(value).replace(' ', 'T'));
   return Number.isNaN(date.getTime()) ? null : date;
 }
-
-export function isSchedulePublished(record) {
+function isSchedulePublished(record) {
   return record?.scheduleStatus === '已发布' || (Number(record?.scheduleVersion) > 0 && Array.isArray(record?.sessions) && record.sessions.length > 0);
 }
 
 // CR-2026-054：班级拆成排课、招生、教学三个并行阶段；旧 status/display 值仅作为兼容输入。
-export function classScheduleStatus(record) {
+function classScheduleStatus(record) {
   if (!record || record.scheduleStatus === '未排班' || record.scheduleStatus === '待排课') return '待排课';
   if (record.scheduleStatus === '草稿' || record.scheduleStatus === '排班草稿' || record.scheduleStatus === '排课中') return '排课中';
   return isSchedulePublished(record) ? '已完成' : '待排课';
 }
-
-export function classDisplayStatus(record) {
+function classDisplayStatus(record) {
   const value = record?.displayStatus || record?.display || '';
   return ['显示', '已展示', '展示中'].includes(value) ? '显示' : '隐藏';
 }
-
-export function classEnrollmentStatus(record, now = DEMO_NOW) {
+function classEnrollmentStatus(record, now = DEMO_NOW) {
   // 展示状态只控制学员端渠道可见性，不参与后台招生生命周期计算。
   if (!record || !isSchedulePublished(record) || record.status === '已取消' || record.canceledAt) return '未开始';
   const start = asDate(record.enrollStart);
@@ -38,8 +39,7 @@ export function classEnrollmentStatus(record, now = DEMO_NOW) {
   if (closure && now >= closure) return '已结束';
   return '进行中';
 }
-
-export function classStageEligible(record, stage, now = DEMO_NOW) {
+function classStageEligible(record, stage, now = DEMO_NOW) {
   const schedule = classScheduleStatus(record);
   const enrollment = classEnrollmentStatus(record, now);
   if (stage === 'schedule') return true;
@@ -47,14 +47,12 @@ export function classStageEligible(record, stage, now = DEMO_NOW) {
   if (stage === 'teaching') return schedule === '已完成' && enrollment === '已结束';
   return false;
 }
-
-export function classCapacityStatus(record) {
+function classCapacityStatus(record) {
   const capacity = Number(record?.capacity || 0);
   const enrolled = Number(record?.enrolled || 0);
   return capacity > 0 && enrolled >= capacity ? '是' : '否';
 }
-
-export function classTeachingStatus(record, now = DEMO_NOW) {
+function classTeachingStatus(record, now = DEMO_NOW) {
   if (!record || record.status === '已取消' || record.canceledAt) return '未进入教学';
   if (classScheduleStatus(record) !== '已完成' || classEnrollmentStatus(record, now) !== '已结束') return '未进入教学';
   const first = asDate(record.sessions?.[0]?.date || record.firstLessonDate);
@@ -66,7 +64,7 @@ export function classTeachingStatus(record, now = DEMO_NOW) {
 
 // 整班排班变更只允许发生在排课已完成、但教学执行尚未开始的班级。
 // 列表按钮与排班页拦截共用此判断，避免出现“看得到按钮但不能操作”。
-export function classScheduleChangeAllowed(record, now = DEMO_NOW) {
+function classScheduleChangeAllowed(record, now = DEMO_NOW) {
   return Boolean(
     record &&
     record.status !== '已取消' &&
@@ -75,8 +73,7 @@ export function classScheduleChangeAllowed(record, now = DEMO_NOW) {
     classTeachingStatus(record, now) === '未进入教学'
   );
 }
-
-export function classLessonProgress(record, now = DEMO_NOW) {
+function classLessonProgress(record, now = DEMO_NOW) {
   const sessions = Array.isArray(record?.sessions) ? record.sessions : [];
   const total = Number(record?.lessons || sessions.length || 0);
   const completed = sessions.filter(session => isSessionPast(session, now)).length;
@@ -86,7 +83,7 @@ export function classLessonProgress(record, now = DEMO_NOW) {
 // 课次是否已结束：种子与排课结果里的 status 可能仍是占位的「待上课」，
 // 后台课表按日期派生状态，学员端沿用同一判定，避免课表与上课记录各算一套。
 // ZK-B-14：课次不设「已取消」状态；现行三态口径见 CR-2026-138／141，不再保留该状态的防御分支。
-export function isSessionPast(session, now = DEMO_NOW) {
+function isSessionPast(session, now = DEMO_NOW) {
   if (['已完成', '已上课', 'completed'].includes(session?.status)) return true;
   const endAt = asDate(`${session?.date || ''} ${session?.endTime || session?.end || '23:59'}`);
   return endAt ? now >= endAt : false;
@@ -94,7 +91,7 @@ export function isSessionPast(session, now = DEMO_NOW) {
 
 // CR-2026-141：课次状态三端同源——按计划日期与计划起止时间派生，不由教师操作改写。
 // 待上课：未到计划开始时间；上课中：处于计划起止区间；已完成：已过计划结束时间。
-export function lessonStatusOf(session, now = DEMO_NOW) {
+function lessonStatusOf(session, now = DEMO_NOW) {
   if (!session?.date) return '待上课';
   const startAt = asDate(`${session.date} ${session.startTime || session.start || '00:00'}`);
   const endAt = asDate(`${session.date} ${session.endTime || session.end || '23:59'}`);
@@ -106,15 +103,14 @@ export function lessonStatusOf(session, now = DEMO_NOW) {
 
 // CR-2026-138 CR138-05：课次调整后，课次数组不再保持日期顺序；
 // 「下一节课」「课次列表」等展示与派生统一按调整后的日期 + 开始时间排序，旧日期不重复出现。
-export function sessionsInScheduleOrder(sessions) {
+function sessionsInScheduleOrder(sessions) {
   return [...(sessions || [])].sort((a, b) => {
     const left = `${a?.date || ''} ${a?.startTime || a?.start || ''}`;
     const right = `${b?.date || ''} ${b?.startTime || b?.start || ''}`;
     return left.localeCompare(right);
   });
 }
-
-export function classStageProjection(record, now = DEMO_NOW) {
+function classStageProjection(record, now = DEMO_NOW) {
   return {
     scheduleStatus: classScheduleStatus(record),
     enrollmentStatus: classEnrollmentStatus(record, now),
@@ -123,8 +119,7 @@ export function classStageProjection(record, now = DEMO_NOW) {
     teachingStatus: classTeachingStatus(record, now)
   };
 }
-
-export function classIsVisible(record) {
+function classIsVisible(record) {
   return Boolean(record && record.status !== '已取消' && isSchedulePublished(record) && classDisplayStatus(record) === '显示');
 }
 
@@ -134,7 +129,7 @@ function unavailable(code, message) {
 
 // 学员端可见性只由班级展示状态（显示／隐藏）决定：一份投影同时服务课程选班、快速报名列表与报名详情。
 // 2026-09-22 裁定：移除「快速报名入口／快速频道开关」，班级可见不再有第二个开关。
-export function classSalesProjection(record, now = DEMO_NOW) {
+function classSalesProjection(record, now = DEMO_NOW) {
   const published = isSchedulePublished(record);
   const cancelled = record?.status === '已取消' || record?.canceledAt;
   const visible = Boolean(record && published && !cancelled && classDisplayStatus(record) === '显示');
@@ -178,7 +173,7 @@ export function classSalesProjection(record, now = DEMO_NOW) {
 // CR-2026-047 §5.2：班级主状态收窄为 6 值单向链——待排课／待发布／招生中／进行中／已结束／已取消。
 // 容量与报名窗口不再参与主链（原先容量短路了教学周期，导致满员班的「进行中／已结束」不可达）；
 // 首次发布后主状态进入「招生中」且不回退，发布后的排班变更由「排班版本」列表达。
-export function classMainStatus(record, now = DEMO_NOW) {
+function classMainStatus(record, now = DEMO_NOW) {
   if (!record) return '待排课';
   if (record.status === '已取消' || record.canceledAt) return '已取消';
   if (!isSchedulePublished(record)) return record.scheduleStatus === '草稿' ? '待发布' : '待排课';
@@ -192,7 +187,7 @@ export function classMainStatus(record, now = DEMO_NOW) {
 
 // CR-2026-047 §5.3：报名条件是仅在「招生中」阶段有效的派生标签，不落库、不进入主状态；
 // 主状态进入「进行中／已结束」后冻结为「已截止」。后台与学员端「已满员」必须来自同一次派生。
-export function classEnrollmentCondition(record, now = DEMO_NOW) {
+function classEnrollmentCondition(record, now = DEMO_NOW) {
   const main = classMainStatus(record, now);
   if (main === '待排课' || main === '待发布') return '未开始';
   if (main === '已取消' || main === '已结束' || main === '进行中') return '已截止';
@@ -204,9 +199,8 @@ export function classEnrollmentCondition(record, now = DEMO_NOW) {
 }
 
 // 旧调用名兼容：取值随本单更名为「待排课／待发布」，行为规则不变。
-export const deriveClassStatus = classMainStatus;
-
-export function classEnrollment(record, now = DEMO_NOW) {
+const deriveClassStatus = classMainStatus;
+function classEnrollment(record, now = DEMO_NOW) {
   const projection = classSalesProjection(record, now);
   return {
     ...projection,
@@ -215,3 +209,26 @@ export function classEnrollment(record, now = DEMO_NOW) {
     reason: projection.unavailableReason?.message || ''
   };
 }
+
+
+__classicExports["isSchedulePublished"] = isSchedulePublished;
+__classicExports["classScheduleStatus"] = classScheduleStatus;
+__classicExports["classDisplayStatus"] = classDisplayStatus;
+__classicExports["classEnrollmentStatus"] = classEnrollmentStatus;
+__classicExports["classStageEligible"] = classStageEligible;
+__classicExports["classCapacityStatus"] = classCapacityStatus;
+__classicExports["classTeachingStatus"] = classTeachingStatus;
+__classicExports["classScheduleChangeAllowed"] = classScheduleChangeAllowed;
+__classicExports["classLessonProgress"] = classLessonProgress;
+__classicExports["isSessionPast"] = isSessionPast;
+__classicExports["lessonStatusOf"] = lessonStatusOf;
+__classicExports["sessionsInScheduleOrder"] = sessionsInScheduleOrder;
+__classicExports["classStageProjection"] = classStageProjection;
+__classicExports["classIsVisible"] = classIsVisible;
+__classicExports["classSalesProjection"] = classSalesProjection;
+__classicExports["classMainStatus"] = classMainStatus;
+__classicExports["classEnrollmentCondition"] = classEnrollmentCondition;
+__classicExports["classEnrollment"] = classEnrollment;
+__classicExports["deriveClassStatus"] = deriveClassStatus;
+  __classicModules["shared/js/class-lifecycle.js"] = __classicExports;
+})(globalThis);
