@@ -19,7 +19,8 @@
     "check:params": "node scripts/check-parameter-consistency.mjs",
     "check:course-hours": "node scripts/check-course-hours.mjs",
     "check:lesson-chain": "node scripts/check-lesson-chain.mjs",
-    "check:refund": "node scripts/check-refund-flow.mjs"
+    "check:refund": "node scripts/check-refund-flow.mjs",
+    "check:mobile-scripts": "node scripts/check-mobile-scripts.mjs"
   },
   "devDependencies": {
     "vite": "^6.1.0"

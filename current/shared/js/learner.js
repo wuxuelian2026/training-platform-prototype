@@ -1986,7 +1986,7 @@ function renderSeatFailureOrder(order, item, student) {
     card(`<div class="mp-order-detail-status">${pill(order.status === '已退款' ? '报名未成功，退款已完成' : '报名未成功，退款处理中', order.status === '已退款' ? 'green' : 'amber')}<span class="mp-muted">面授课程订单</span></div><div class="mp-order-status-copy">支付成功且支付记录已到账，${order.status === '已退款' ? '退款渠道已确认全额原路退款完成。' : '已发起全额原路退款，等待渠道回调。'}</div>`),
     card(`<div class="mp-section-head"><h3>处理结果</h3>${pill('未生成报名/分班', 'gray')}</div><p>支付记录已到账，系统已自动发起免审批全额原路退款。未生成报名和分班记录，未增加班级人数，不自动调班、不保留资金。</p><dl class="mp-order-detail-facts"><div><dt>订单号</dt><dd>${esc(order.id)}</dd></div><div><dt>当前学员</dt><dd>${esc(student.name)}</dd></div><div><dt>支付记录</dt><dd>已到账</dd></div><div><dt>退款状态</dt><dd>${order.status === '已退款' ? '已完成' : order.refundStatus || '处理中'}</dd></div><div><dt>退款方式</dt><dd>免审批全额原路退款</dd></div></dl>`),
     card(`<div class="mp-section-head"><h3>可重新选择的班级</h3><span class="mp-muted">同专业 · 适龄 · 有余位</span></div>${candidateMarkup}`),
-    `<div class="mp-actions"><button class="mp-button secondary" type="button" data-action="refund-retry-fail" data-order-id="${esc(order.id)}">模拟退款失败并重试</button><button class="mp-button" type="button" data-action="refund-success" data-order-id="${esc(order.id)}">模拟退款成功回调</button></div><a class="mp-button secondary full" href="/learner/pages/fast-registration.html">${candidates.length ? '返回班级列表' : '返回班级列表 / 查看退款进度'}</a>`
+    `<a class="mp-button secondary full" href="/learner/pages/fast-registration.html">${candidates.length ? '返回班级列表' : '返回班级列表 / 查看退款进度'}</a>`
   ));
 }
 function learningRecords() {
@@ -2355,32 +2355,7 @@ function showConsultDialog() {
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
 }
 function switchStudent() { state.currentStudentId = state.currentStudentId === 'student-001' ? 'student-002' : 'student-001'; saveState(); toast(`已切换当前学员：${currentStudent().name}`); setTimeout(() => renderProfile(), 300); }
-document.addEventListener('click', event => {
-  const action = event.target.closest('[data-action]')?.dataset.action;
-  if (!['refund-success', 'refund-retry-fail'].includes(action)) return;
-  state = readState();
-  const orderId = event.target.closest('[data-order-id]')?.dataset.orderId;
-  const order = state.orders.find(row => row.id === orderId);
-  const item = order ? orderCourse(order) : null;
-  if (!order || order.status !== '退款中' || !item) return;
-  const success = action === 'refund-success';
-  order.paymentRecordId = order.paymentRecordId || `PAY-${order.id}`;
-  order.merchantRefundNo = order.merchantRefundNo || `MR-${order.paymentRecordId}`;
-  order.refundBusinessKey = order.refundBusinessKey || `${item.type === 'video' ? 'video' : 'seat'}_refund:${order.paymentRecordId}`;
-  if (!success) order.refundRetryCount = Number(order.refundRetryCount || 0) + 1;
-  order.refundStatus = success ? '已完成' : '重试中';
-  order.status = success ? '已退款' : '退款中';
-  order.refundedAt = success ? demoTime() : '';
-  order.paymentReason = success
-    ? `${item.type === 'video' ? '视频课程退款' : '退款渠道'}成功回调，退款已完成；${item.type === 'video' ? '学习授权已置为已失效并留痕，学习记录与订单凭证保留。' : '未生成报名和分班，未增加人数。'}`
-    : '退款渠道失败或超时，订单保持退款中，已按同一业务键重试；学习授权已解冻恢复生效。';
-  upsertDemoRecord('orders', order);
-  // 字典 SM-VIDEO-ENTITLEMENT：成功置已失效并留痕，失败或超时解冻恢复生效；两种路径都保留授权记录。
-  syncVideoEntitlementForRefund(order, item, success ? '已失效' : '生效', success ? '视频退款完成，学习授权已失效' : '退款失败或超时，学习授权解冻恢复生效');
-  saveState();
-  renderOrderDetail();
-  toast(success ? '退款成功回调已确认，学习授权已失效' : '退款失败或超时，订单保持退款中，学习授权已解冻，可按原业务键重试');
-});
+// 退款审批、渠道执行和重试均由后台交易中心处理；学员端只读展示退款进度。
 document.addEventListener('click', event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
   if (!action) return;

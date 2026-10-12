@@ -869,7 +869,7 @@ function renderOrders() {
   };
   const matchesMetric = (row) => {
     if (!metricFilter) return true;
-    if (metricFilter === 'today') return String(row.time || '').startsWith('2026-09-08');
+    if (metricFilter === 'today') return String(row.time || '').startsWith(DEMO_TODAY);
     return metricFilter === '退款中' ? refundStatusOf(row) === '退款中' : paymentStatusOf(row) === metricFilter;
   };
   const filterRows = (form, type = '') => renderRows(businessData, rows, (row) => matchesMetric(row) && inRange(row, form) && (!type || row.type === type) && (!form.status.value || paymentStatusOf(row) === form.status.value) && (!form.refundStatus.value || refundStatusOf(row) === form.refundStatus.value) && (!form.account.value.trim() || `${row.account || ''}${row.accountPhone || ''}`.includes(form.account.value.trim())) && (!form.student.value.trim() || String(row.student || '').includes(form.student.value.trim())) && (!form.className.value.trim() || String(row.linked || '').includes(form.className.value.trim())) && (!form.keyword.value.trim() || `${row.number}${row.name}`.includes(form.keyword.value.trim())));
@@ -878,7 +878,7 @@ function renderOrders() {
   const metricData = (type) => {
     const scoped = businessData.filter((row) => !type || row.type === type);
     const count = (status) => scoped.filter((row) => status === '退款中' ? refundStatusOf(row) === status : paymentStatusOf(row) === status).length;
-    return [['今日订单', scoped.filter((row) => String(row.time || '').startsWith('2026-09-08')).length, type ? `${type}订单` : '视频与面授合计', 0, 'today'], ['待支付', count('待支付'), '待完成支付', 0, '待支付'], ['退款中', count('退款中'), '符合规则的退款申请', 0, '退款中'], ['已支付', count('已支付'), '交易已完成', scoped.length ? Math.round((count('已支付') / scoped.length) * 100) : 0, '已支付']];
+    return [['今日订单', scoped.filter((row) => String(row.time || '').startsWith(DEMO_TODAY)).length, type ? `${type}订单` : '视频与面授合计', 0, 'today'], ['待支付', count('待支付'), '待完成支付', 0, '待支付'], ['退款中', count('退款中'), '符合规则的退款申请', 0, '退款中'], ['已支付', count('已支付'), '交易已完成', scoped.length ? Math.round((count('已支付') / scoped.length) * 100) : 0, '已支付']];
   };
   const bindMetricCards = () => document.querySelectorAll('[data-order-metric]').forEach((card) => card.addEventListener('click', () => {
     metricFilter = metricFilter === card.dataset.orderMetric ? '' : card.dataset.orderMetric;
@@ -1142,8 +1142,7 @@ function openOrderDetail(row) {
     ...linkedRefunds.map((item) => ({ number: item.no, source: item.source || '线上', method: item.channel, amount: item.amount, status: item.status, at: item.time, reason: item.reason }))
   ];
   const refundRows = refundRecords.length
-    // UI 复核 CR-2026-032：退款分区补齐退款金额、退款状态与预计到账三项，与退款记录页口径一致。
-    ? `<div class="table-wrap"><table><thead><tr><th>退款单号</th><th>退款方式</th><th>退款渠道</th><th>退款金额</th><th>退款状态</th><th>预计到账</th><th>申请时间</th><th>退款原因</th></tr></thead><tbody>${refundRecords.map((item) => `<tr><td>${escapeHtml(item.number)}</td><td>${escapeHtml(item.source || '线上')}</td><td>${escapeHtml(item.method || '—')}</td><td>¥${escapeHtml(Number(item.amount ?? 0).toFixed(2))}</td><td>${escapeHtml(item.status || '—')}</td><td>${escapeHtml(item.expectedAt || '以渠道回执为准')}</td><td>${escapeHtml(item.at || '—')}</td><td>${escapeHtml(item.reason || '—')}</td></tr>`).join('')}</tbody></table></div>`
+    ? `<div class="table-wrap"><table><thead><tr><th>退款单号</th><th>退款方式</th><th>退款渠道</th><th>退款金额</th><th>退款状态</th><th>到账时间</th><th>申请时间</th><th>退款原因</th></tr></thead><tbody>${refundRecords.map((item) => { const completed = item.status === '已退款'; const arrival = completed ? (item.completedAt || item.at || '—') : (item.expectedAt || '以渠道回执为准'); return `<tr><td>${escapeHtml(item.number)}</td><td>${escapeHtml(item.source || '线上')}</td><td>${escapeHtml(item.method || '—')}</td><td>¥${escapeHtml(Number(item.amount ?? 0).toFixed(2))}</td><td>${escapeHtml(item.status || '—')}</td><td>${escapeHtml(arrival)}</td><td>${escapeHtml(item.at || '—')}</td><td>${escapeHtml(item.reason || '—')}</td></tr>`; }).join('')}</tbody></table></div>`
     : '';
   const logRows = (row.logs || []).map((log) => `<tr><td>${escapeHtml(log.at)}</td><td>${escapeHtml(log.role)}</td><td>${escapeHtml(`${log.from} → ${log.to}`)}</td><td>${escapeHtml(log.reason || '—')}</td></tr>`).join('');
   const section = (title, content) => (content ? `<section class="course-detail-section wide"><h3>${title}</h3>${content}</section>` : '');

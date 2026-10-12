@@ -262,10 +262,8 @@ const defaultState = () => ({
   enrollments: [...teachingDemoEnrollments(), ...enrollingDemoEnrollments(), ...balletDemoEnrollments()],
   videoEntitlements: [],
   progress: {},
-  // CR-2026-052：视频退款规则由后台参数配置，客户端与财务端读取同一份演示状态。
-  videoRefundSettings: { windowDays: 7, maxLessons: 3 },
   // 视频课程和面授课程共用退款申请窗口与已消课比例。
-  refundSettings: { windowDays: 7, selfMaxCompletedPercent: 100 },
+  refundSettings: { windowDays: 0, selfMaxCompletedPercent: 100 },
   // 2026-09-24：面授退款策略只对新申请生效；退款单创建时保存策略快照。
   classRefundSettings: {
     windowDays: 0,
@@ -355,22 +353,19 @@ const clampInt = (value, min, max, fallback) => {
   return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
 };
 
-// CR-2026-052 / CR-2026-104：视频退款规则由后台参数配置维护——
-// 退款申请窗口（自然日，1–30，默认 7）与最多观看课时数（0–999，默认 3）都可配置，
-// 学员端资格校验与后台线下登记读取同一份配置。
+// 退款资格由统一参数配置维护，视频与面授共用申请窗口和最大已消课比例。
 function videoRefundSettings() {
   const settings = readStored().videoRefundSettings || {};
   const unified = readStored().refundSettings || {};
   return {
-    windowDays: clampInt(unified.windowDays ?? settings.windowDays ?? 7, 0, 365, 7),
-    maxLessons: clampInt(settings.maxLessons ?? 3, 0, 999, 3),
+    windowDays: clampInt(unified.windowDays ?? settings.windowDays ?? 0, 0, 365, 0),
     selfMaxCompletedPercent: clampInt(unified.selfMaxCompletedPercent ?? 100, 0, 100, 100)
   };
 }
 function refundSettings() {
   const settings = readStored().refundSettings || {};
   return {
-    windowDays: clampInt(settings.windowDays ?? 7, 0, 365, 7),
+    windowDays: clampInt(settings.windowDays ?? 0, 0, 365, 0),
     selfMaxCompletedPercent: clampInt(settings.selfMaxCompletedPercent ?? 100, 0, 100, 100)
   };
 }

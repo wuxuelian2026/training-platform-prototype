@@ -29,9 +29,5 @@ root.querySelector('[data-mobile-back]')?.addEventListener('click', () => {
   location.href = relativePath(fallbackPath);
 });
 
-if (app === 'learner') __classicRequire("shared/js/learner.js");
-if (app === 'teacher') __classicRequire("shared/js/teacher.js");
-
-
   __classicModules["shared/js/mobile-shell.js"] = __classicExports;
 })(globalThis);

@@ -43,11 +43,11 @@ function enrollmentOf(testCase) {
 check(defaults.windowDays === 0 && defaults.selfMaxCompletedPercent === 100, '默认退款期限和消课比例参数正确');
 
 const applyCase = seedClassCase('apply');
-const application = refunds.createRefundRequest({ orderId: applyCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER, requestedBy: '学员' });
+const application = refunds.createRefundRequest({ orderId: applyCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER, requestedBy: '学员', reason: '时间安排冲突' });
 check(application.ok && refunds.listRefunds().some((row) => row.id === application.refund.id), '申请退款生成共享退款单');
 check(application.order.status === '退款中' && application.refund.status === '待审批', '申请后订单与退款单状态正确');
 check(enrollmentOf(applyCase).status === '已分班' && enrollmentOf(applyCase).refundRelationStatus === '待审批', '申请后学籍保持在读并记录退款关联状态');
-check(refunds.createRefundRequest({ orderId: applyCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER }).reason === 'REFUND_ALREADY_OPEN', '同订单重复申请被拦截');
+check(refunds.createRefundRequest({ orderId: applyCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER, reason: '时间安排冲突' }).reason === 'REFUND_ALREADY_OPEN', '同订单重复申请被拦截');
 
 const approved = refunds.settleRefund(application.refund.id, '通过', { name: '教务主管', channel: '原路退回' });
 check(approved.ok && approved.refund.status === '退款中', '审批通过进入退款中');
@@ -60,7 +60,7 @@ check(store.readDemoState().refundAuditLogs.filter((row) => row.refundId === app
 check(store.readDemoState().refundNotifications.some((row) => row.refundId === application.refund.id && row.type === '退款已完成'), '退款完成生成学员通知事件');
 
 const rejectedCase = seedClassCase('reject');
-const rejectedRequest = refunds.createRefundRequest({ orderId: rejectedCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER });
+const rejectedRequest = refunds.createRefundRequest({ orderId: rejectedCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER, reason: '时间安排冲突' });
 const rejected = refunds.settleRefund(rejectedRequest.refund.id, '拒绝', { name: '教务主管', rejectReason: '不符合退款规则' });
 check(rejected.ok && rejected.order.status === '已支付', '退款拒绝后订单恢复已支付');
 check(enrollmentOf(rejectedCase).status === '已分班' && enrollmentOf(rejectedCase).refundRelationStatus === '已拒绝', '自助退款拒绝后学籍仍在读');
@@ -74,7 +74,7 @@ for (const type of ['退班', '退学']) {
       check(refunds.classById(testCase.classId).enrolled === 4, `${type}不退费时人数保持异动后的值`);
       continue;
     }
-    const request = refunds.createRefundRequest({ orderId: testCase.orderId, origin: refunds.REFUND_ORIGIN.ENROLLMENT, requestedBy: '教务异动登记' });
+    const request = refunds.createRefundRequest({ orderId: testCase.orderId, origin: refunds.REFUND_ORIGIN.ENROLLMENT, requestedBy: '教务异动登记', reason: '学籍异动' });
     check(request.ok && request.refund.businessKey === `refund:${testCase.orderId}`, `${type}同步退费生成订单级幂等键`);
     refunds.settleRefund(request.refund.id, '通过', { name: '教务主管', channel: '原路退回' });
     const done = refunds.settleRefund(request.refund.id, '完成', { name: '财务' });
@@ -85,13 +85,13 @@ for (const type of ['退班', '退学']) {
 }
 
 const exitedRejectCase = seedClassCase('exited-reject', { status: '已退学', enrolled: 4 });
-const exitedRejectRequest = refunds.createRefundRequest({ orderId: exitedRejectCase.orderId, origin: refunds.REFUND_ORIGIN.ENROLLMENT });
+const exitedRejectRequest = refunds.createRefundRequest({ orderId: exitedRejectCase.orderId, origin: refunds.REFUND_ORIGIN.ENROLLMENT, reason: '学籍异动' });
 const exitedReject = refunds.settleRefund(exitedRejectRequest.refund.id, '拒绝', { name: '教务主管', rejectReason: '资料不完整' });
 check(exitedReject.academicTodo?.status === '待处理', '已退出学籍退款被拒生成教务待办');
 check(enrollmentOf(exitedRejectCase).status === '已退学', '退款被拒不自动恢复已退出学籍');
 
 const exceptionCase = seedClassCase('exception');
-const exceptionRequest = refunds.createRefundRequest({ orderId: exceptionCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER });
+const exceptionRequest = refunds.createRefundRequest({ orderId: exceptionCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER, reason: '时间安排冲突' });
 refunds.settleRefund(exceptionRequest.refund.id, '通过', { name: '教务主管', channel: '原路退回' });
 const exception = refunds.settleRefund(exceptionRequest.refund.id, '异常', { name: '财务', exceptionReason: '渠道超时' });
 check(exception.ok && exception.refund.status === '退款异常' && exception.academicTodo?.status === '待处理', '渠道超时进入退款异常并生成待办');
@@ -110,13 +110,13 @@ function seedVideoCase(suffix) {
 }
 
 const videoRejectCase = seedVideoCase('reject');
-const videoRejectRequest = refunds.createRefundRequest({ orderId: videoRejectCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER });
+const videoRejectRequest = refunds.createRefundRequest({ orderId: videoRejectCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER, reason: '重复购买' });
 check(store.readDemoState().videoEntitlements.find((row) => row.courseId === videoRejectCase.courseId).status === '冻结', '视频退款申请冻结学习授权');
 refunds.settleRefund(videoRejectRequest.refund.id, '拒绝', { name: '教务主管', rejectReason: '不符合规则' });
 check(store.readDemoState().videoEntitlements.find((row) => row.courseId === videoRejectCase.courseId).status === '生效', '视频退款拒绝恢复学习授权');
 
 const videoDoneCase = seedVideoCase('done');
-const videoDoneRequest = refunds.createRefundRequest({ orderId: videoDoneCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER });
+const videoDoneRequest = refunds.createRefundRequest({ orderId: videoDoneCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER, reason: '重复购买' });
 refunds.settleRefund(videoDoneRequest.refund.id, '通过', { name: '教务主管', channel: '原路退回' });
 refunds.settleRefund(videoDoneRequest.refund.id, '完成', { name: '财务' });
 check(store.readDemoState().videoEntitlements.find((row) => row.courseId === videoDoneCase.courseId).status === '已失效', '视频退款完成回收学习授权');
@@ -126,6 +126,6 @@ check(refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amo
 const offline = refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 120, reason: '协商终结退款', channel: '银行转账', voucher: 'refund.pdf', operator: { name: '周财务', role: '财务' } });
 check(offline.ok && offline.refund.status === '已退款' && offline.refund.source === '线下', '线下退款经统一服务直接终结');
 check(offline.order.status === '已退款' && enrollmentOf(offlineCase).status === '已退班', '线下退款联动订单与学籍');
-check(refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 120 }).reason === 'ORDER_ALREADY_REFUNDED', '线下退款完成后拦截第二次退款');
+check(refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 120, reason: '重复登记' }).reason === 'ORDER_ALREADY_REFUNDED', '线下退款完成后拦截第二次退款');
 
 console.log(`退款闭环回归通过：${passed.length} 项`);
