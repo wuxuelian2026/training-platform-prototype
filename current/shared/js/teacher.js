@@ -230,7 +230,7 @@ const teacherGraduationDefaults = [
   { id: 'graduation-002', student: '周予安', avatar: '周', className: '暑期中国舞基础1班', course: '中国舞进阶训练', professional: '中国舞', completedAt: '2026-09-02', submittedAt: '2026-09-03 10:20', status: '审核中', attendanceRate: 80, homeworkRate: 90, lessons: '18/20', comment: '基本动作掌握较稳，组合衔接仍需加强。', advice: '补齐缺勤课次后重点练习身韵连接和重心转换。', timeline: [{ title: '提交结业申请', time: '2026-09-03 10:20', text: '结业材料已提交教务复核。' }, { title: '待后台审核', time: '2026-09-03 14:10', text: '教务正在核对考勤、作业与教师评语；不达标的补课或退费由教务线下处理。' }] },
   { id: 'graduation-003', student: '陈一诺', avatar: '陈', className: '暑期中国舞基础1班', course: '中国舞进阶训练', professional: '中国舞', completedAt: '2026-09-02', submittedAt: '2026-09-03 10:20', status: '审核中', attendanceRate: 85, homeworkRate: 75, lessons: '19/20', comment: '课堂参与积极，基础动作完成度较好。', advice: '补交缺失作业，并针对转身稳定性进行集中练习。', timeline: [{ title: '提交结业申请', time: '2026-09-03 10:20', text: '结业材料已提交教务复核。' }, { title: '待后台审核', time: '2026-09-03 14:10', text: '教务正在核对考勤、作业与教师评语；不达标的补课或退费由教务线下处理。' }] },
   { id: 'graduation-004', student: '赵明月', avatar: '赵', className: '暑期中国舞基础1班', course: '中国舞进阶训练', professional: '中国舞', completedAt: '2026-08-20', submittedAt: '2026-08-21 09:05', reviewedAt: '2026-08-23 15:30', status: '已通过', attendanceRate: 100, homeworkRate: 100, lessons: '16/16', comment: '身韵表达自然，能够准确完成课程组合并形成稳定的舞台表现。', advice: '可继续进行进阶组合训练，提升动作细节与呼吸配合。', result: '数据复核通过，学员结业成果正在生成。', timeline: [{ title: '提交结业申请', time: '2026-08-21 09:05', text: '结业材料已提交教务复核。' }, { title: '复核通过', time: '2026-08-23 15:30', text: '学员已通过结业复核。' }] },
-  { id: 'graduation-005', student: '吴桐', avatar: '吴', className: '暑期中国舞基础1班', course: '中国舞进阶训练', professional: '中国舞', completedAt: '2026-07-28', submittedAt: '2026-07-29 13:10', reviewedAt: '2026-07-30 10:00', status: '已取消结业', attendanceRate: 50, homeworkRate: 40, lessons: '5/10', comment: '已完成前半段基础训练。', advice: '如后续恢复学习，建议从柔韧与力量基础重新衔接。', cancelReason: '学员办理退学及剩余课时退款，不再参与本班结业。', timeline: [{ title: '提交结业申请', time: '2026-07-29 13:10', text: '结业材料已提交教务复核。' }, { title: '取消结业', time: '2026-07-30 10:00', text: '因退学退款终止本次结业流程。' }] }
+  { id: 'graduation-005', student: '吴桐', avatar: '吴', className: '暑期中国舞基础1班', course: '中国舞进阶训练', professional: '中国舞', completedAt: '2026-07-28', submittedAt: '2026-07-29 13:10', status: '审核中', attendanceRate: 50, homeworkRate: 40, lessons: '5/10', comment: '已完成前半段基础训练。', advice: '如后续恢复学习，建议从柔韧与力量基础重新衔接。', timeline: [{ title: '提交结业申请', time: '2026-07-29 13:10', text: '结业材料已提交教务复核。' }, { title: '待后台审核', time: '2026-07-30 10:00', text: '教务正在核对考勤、作业与教师评语；不达标的补课或退费由教务线下处理。' }] }
 ];
 const teacherLessonDefaults = {
   status: '待上课', started: false, executionEnded: false, startedAt: '', startedAtMs: 0, endedAt: '',
@@ -332,6 +332,12 @@ if (adminEnteredCertificates.length) {
   teacherState.certificates = [...teacherState.certificates, ...adminEnteredCertificates.filter(item => !knownCertificateIds.has(item.id))];
 }
 teacherState.graduationRecords = Array.isArray(teacherState.graduationRecords) ? teacherState.graduationRecords : demoLocalize(teacherGraduationDefaults).map(item => ({ ...item }));
+// 旧演示会话回归现行双状态口径，保留申请资料，不将未通过的申请计为完成。
+teacherState.graduationRecords = teacherState.graduationRecords.map(item => {
+  if (item.status !== '已取消结业') return item;
+  const { cancelReason, reviewedAt, ...record } = item;
+  return { ...record, status: '审核中', timeline: (item.timeline || []).filter(event => event.title !== '取消结业') };
+});
 // 兼容此前已写入会话的旧演示记录，避免刷新后仍显示与后台种子不一致的林知夏数据。
 teacherState.graduationRecords = teacherState.graduationRecords.map((item) => item.id === 'graduation-001' && item.className === '暑期中国舞基础1班'
   ? { ...item, attendanceRate: 80, homeworkRate: 80, comment: '课堂参与积极，基本功和组合衔接持续进步。', advice: '保持每周练习，关注动作细节和节奏稳定性。' }
@@ -952,10 +958,11 @@ function renderClassGraduationApply() {
     if (incomplete) { error.hidden = false; error.textContent = `请完善${incomplete.name}的综合评语和成长建议`; return; }
     const lastSession = [...(classItem.sessions || [])].reverse()[0] || {};
     const submittedAt = demoTime();
+    const batchId = demoId('graduation-batch');
     const created = details.map(({ name, comment, advice }) => {
       const student = classRosterOf(classItem).find((item) => item.name === name) || {};
       return {
-        id: demoId('graduation'), student: name, avatar: name.slice(0, 1), className: classItem.name, course: classItem.course,
+        id: demoId('graduation'), batchId, classId: classItem.id, student: name, avatar: name.slice(0, 1), className: classItem.name, course: classItem.course,
         professional: classItem.professional || '', completedAt: lastSession.date || DEMO_TODAY, submittedAt,
         status: '审核中', attendanceRate: student.attendance ?? '—', homeworkRate: student.homework ?? '—',
         lessons: `${classItem.total}/${classItem.total}`, comment, advice,
@@ -1462,10 +1469,9 @@ function renderProfile() {
     return;
   }
   // 旧版本会话可能缺少部分教师事务数组；页面只读统计不应因此中断整个“我的”页渲染。
-  const graduationRecords = Array.isArray(teacherState.graduationRecords) ? teacherState.graduationRecords : [];
   const messages = Array.isArray(teacherState.messages) ? teacherState.messages : [];
   const contracts = Array.isArray(teacherState.contracts) ? teacherState.contracts : [];
-  const graduationPending = graduationRecords.filter(item => item.status === '审核中').length;
+  const graduationPending = teacherGraduationBatches().filter(item => item.pending > 0).length;
   const unreadMessages = messages.filter(item => !item.read).length;
   const archive = teacherProfileRow({ mark: '档', title: '个人档案', description: '查看并维护本人基础资料', href: '/teacher/pages/profile-detail.html', value: '可编辑', tone: 'green' });
   const affairs = [
@@ -1879,7 +1885,7 @@ function graduationStatusTone(status) {
 function graduationStatusCopy(record) {
   if (record.status === '审核中') return '后台正在核对考勤、作业和教师评语';
   if (record.status === '已通过') return record.result || '数据复核通过，结业成果正在生成';
-  return record.cancelReason;
+  return '后台正在核对考勤、作业和教师评语';
 }
 // 结业记录允许来自教师端本地草稿或后台同步数据；统一补齐展示字段，避免单条脏数据阻断整页渲染。
 function enrichGraduationRecord(record = {}) {
@@ -1901,20 +1907,39 @@ function graduationRecordCard(record) {
   const cardAction = '查看详情';
   return `<a class="teacher-graduation-card" href="${relativePath(`/teacher/pages/graduation-detail.html?graduation=${record.id}`)}"><div class="teacher-graduation-card-head"><div class="teacher-graduation-student"><span aria-hidden="true">${tEsc(record.avatar)}</span><div><h3>${tEsc(record.student)}</h3><p>${tEsc(record.className)}</p></div></div>${tPill(record.status, graduationStatusTone(record.status))}</div><div class="teacher-graduation-course"><strong>${tEsc(record.course)}</strong><span>${tEsc(record.professional)}</span></div><dl class="teacher-graduation-metrics"><div><dt>出勤率</dt><dd>${record.attendanceRate}%</dd></div><div><dt>作业提交率</dt><dd>${record.homeworkRate}%</dd></div><div><dt>完成课次</dt><dd>${tEsc(record.lessons)}</dd></div></dl><div class="teacher-graduation-card-foot"><span>${tEsc(record.submittedAt)} 提交</span><strong>${cardAction}<i aria-hidden="true">›</i></strong></div></a>`;
 }
+function teacherGraduationBatches() {
+  const batches = new Map();
+  for (const record of demoLocalize(teacherState.graduationRecords).map(enrichGraduationRecord)) {
+    const classKey = record.classId || classIdForName(record.className) || record.className;
+    // 历史记录无批次号时按同班同次提交归组；缺少提交时间时不猜测批次。
+    const legacyBatch = record.submittedAt !== '—' ? record.submittedAt : record.id;
+    const id = JSON.stringify([classKey, record.batchId || legacyBatch]);
+    if (!batches.has(id)) batches.set(id, { id, className: record.className, course: record.course, professional: record.professional, submittedAt: record.submittedAt, records: [] });
+    batches.get(id).records.push(record);
+  }
+  return [...batches.values()].map(batch => {
+    const total = batch.records.length;
+    const passed = batch.records.filter(record => record.status === '已通过').length;
+    return { ...batch, total, passed, pending: total - passed, status: passed === total ? '已完成' : '处理中' };
+  }).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+}
+function graduationBatchCard(batch) {
+  const href = relativePath(`/teacher/pages/graduation-detail.html?batch=${encodeURIComponent(batch.id)}`);
+  return `<a class="teacher-graduation-card teacher-graduation-batch" href="${tEsc(href)}"><div class="teacher-graduation-card-head"><div class="teacher-graduation-batch-title"><h3>${tEsc(batch.className)}</h3><p>${tEsc(batch.course)} · ${tEsc(batch.professional)}</p></div>${tPill(batch.status, batch.pending ? 'brand' : 'green')}</div><dl class="teacher-graduation-metrics"><div><dt>申请人数</dt><dd>${batch.total} 人</dd></div><div><dt>审核中</dt><dd>${batch.pending} 人</dd></div><div><dt>已通过</dt><dd>${batch.passed}/${batch.total} 人</dd></div></dl><div class="teacher-graduation-card-foot"><span>${tEsc(batch.submittedAt)} 提交</span><strong>查看申请<i aria-hidden="true">›</i></strong></div></a>`;
+}
 function renderTeacherGraduations() {
-  const records = demoLocalize([...teacherState.graduationRecords]).map(enrichGraduationRecord).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  const records = teacherGraduationBatches();
   const classOptions = [...new Set(records.map(item => item.className).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
   const filters = [
     ['全部', records.length],
-    ['处理中', records.filter(item => item.status === '审核中').length],
-    ['已完成', records.filter(item => ['已通过', '已取消结业'].includes(item.status)).length]
+    ['处理中', records.filter(item => item.status === '处理中').length],
+    ['已完成', records.filter(item => item.status === '已完成').length]
   ];
-  const visible = records.filter(item => (teacherGraduationFilter === '全部' || (teacherGraduationFilter === '处理中' ? item.status === '审核中' : ['已通过', '已取消结业'].includes(item.status))) && (teacherGraduationClassFilter === '全部' || item.className === teacherGraduationClassFilter));
+  const visible = records.filter(item => (teacherGraduationFilter === '全部' || item.status === teacherGraduationFilter) && (teacherGraduationClassFilter === '全部' || item.className === teacherGraduationClassFilter));
   tLayout(tStack(
-    `<section class="teacher-graduation-overview"><div><span>已提交申请</span><strong>${records.length}</strong><small>人</small></div><p>申请按学员复核<br>处理完成后置为已通过</p></section>`,
     `<nav class="teacher-graduation-filters" aria-label="结业申请筛选">${filters.map(([name, count]) => `<button type="button" class="${teacherGraduationFilter === name ? 'active' : ''}" data-graduation-filter="${name}" aria-pressed="${teacherGraduationFilter === name}">${name}<span>${count}</span></button>`).join('')}</nav>`,
     `<label class="teacher-graduation-class-filter"><span>按班级筛选</span><select data-graduation-class-filter aria-label="按班级筛选"><option value="全部">全部班级</option>${classOptions.map(name => `<option value="${tEsc(name)}" ${teacherGraduationClassFilter === name ? 'selected' : ''}>${tEsc(name)}</option>`).join('')}</select></label>`,
-    `<section class="teacher-graduation-list"><div class="teacher-graduation-list-head"><h2>${teacherGraduationFilter === '全部' ? '全部申请' : teacherGraduationFilter}</h2><span>${visible.length} 条记录</span></div>${visible.length ? visible.map(graduationRecordCard).join('') : '<div class="teacher-contract-empty">暂无符合条件的结业申请</div>'}</section>`
+    `<section class="teacher-graduation-list"><div class="teacher-graduation-list-head"><h2>${teacherGraduationFilter === '全部' ? '全部申请' : teacherGraduationFilter}</h2><span>${visible.length} 个申请批次</span></div>${visible.length ? visible.map(graduationBatchCard).join('') : '<div class="teacher-contract-empty">暂无符合条件的结业申请</div>'}</section>`
   ));
 }
 function classIdForName(name) { return mergeClassSeed(readDemoState().classes || []).find(item => item.name === name)?.id || ''; }
@@ -1931,10 +1956,23 @@ function graduationTimeline(record) {
 }
 function graduationResultBlock(record) {
   if (record.status === '已通过') return `<section class="teacher-graduation-section"><div class="teacher-graduation-section-head"><h2>复核结果</h2>${tPill(record.status, 'green')}</div><p class="teacher-graduation-result-copy">${tEsc(record.result || '数据复核通过，结业成果正在生成。')}</p></section>`;
-  if (record.status === '已取消结业') return `<section class="teacher-graduation-section"><div class="teacher-graduation-section-head"><h2>取消原因</h2>${tPill(record.status, 'gray')}</div><p class="teacher-graduation-result-copy">${tEsc(record.cancelReason)}</p></section>`;
   return `<section class="teacher-graduation-section"><div class="teacher-graduation-section-head"><h2>复核结果</h2>${tPill(record.status, 'brand')}</div><p class="teacher-graduation-result-copy">后台正在核对考勤、作业和教师评语。不达标学员的补课与退费由教务线下处理，处理完成后由后台置为已通过。</p></section>`;
 }
 function renderTeacherGraduationDetail() {
+  const batchId = new URLSearchParams(location.search).get('batch');
+  if (batchId !== null) {
+    const batch = teacherGraduationBatches().find(item => item.id === batchId);
+    if (!batch) {
+      tLayout(tStack(`<div class="teacher-contract-empty">未找到该申请批次</div><a class="mp-button secondary" href="${relativePath('/teacher/pages/graduation.html')}">返回申请记录</a>`));
+      return;
+    }
+    tLayout(tStack(
+      `<header class="teacher-graduation-batch-heading"><h2>${tEsc(batch.className)}</h2><p>${tEsc(batch.course)} · ${tEsc(batch.professional)}</p><p>${tEsc(batch.submittedAt)} 提交</p>${tPill(batch.status, batch.pending ? 'brand' : 'green')}</header>`,
+      `<dl class="teacher-graduation-detail-metrics"><div><dt>申请人数</dt><dd>${batch.total} 人</dd></div><div><dt>审核中</dt><dd>${batch.pending} 人</dd></div><div><dt>已通过</dt><dd>${batch.passed}/${batch.total} 人</dd></div></dl>`,
+      `<section class="teacher-graduation-batch-students"><div class="teacher-graduation-list-head"><h2>学员复核结果</h2><span>${batch.total} 人</span></div>${batch.records.map(record => `<article class="teacher-graduation-card teacher-graduation-batch-student"><div class="teacher-graduation-card-head"><h3>${tEsc(record.student)}</h3>${tPill(record.status, graduationStatusTone(record.status))}</div><dl class="teacher-graduation-metrics"><div><dt>出勤率</dt><dd>${tEsc(record.attendanceRate)}%</dd></div><div><dt>作业提交率</dt><dd>${tEsc(record.homeworkRate)}%</dd></div><div><dt>完成课次</dt><dd>${tEsc(record.lessons)}</dd></div></dl><div class="teacher-graduation-copy"><div><strong>教师综合评语</strong><p>${tEsc(record.comment || '—')}</p></div><div><strong>成长建议</strong><p>${tEsc(record.advice || '—')}</p></div></div><div class="teacher-graduation-card-foot"><span>${tEsc(graduationStatusCopy(record))}</span><a href="${relativePath(`/teacher/pages/graduation-detail.html?graduation=${encodeURIComponent(record.id)}`)}">查看审核记录</a></div></article>`).join('')}</section>`
+    ));
+    return;
+  }
   const record = currentGraduationRecord();
   tLayout(tStack(
     `<section class="teacher-graduation-detail-head"><div class="teacher-graduation-detail-person"><span aria-hidden="true">${tEsc(record.avatar)}</span><div><small>结业申请</small><h2>${tEsc(record.student)}</h2><p>${tEsc(record.submittedAt)} 提交</p></div></div>${tPill(record.status, graduationStatusTone(record.status))}</section>`,

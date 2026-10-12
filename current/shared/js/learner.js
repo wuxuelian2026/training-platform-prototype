@@ -1257,7 +1257,6 @@ function classResultActions(item, record) {
     : `<button class="mp-button secondary" type="button" disabled>${disabledText}</button>`;
   let statusNote = '结业材料已提交，等待后台审核。';
   if (completed) statusNote = '结业审核已通过，成果按生成状态开放查看。';
-  else if (completion === '已取消结业') statusNote = '本次结业流程已结束，如有疑问请联系教务。';
   const resultNote = `<p class="mp-class-result-actions-note">${statusNote}</p>`;
   return `<section class="mp-class-result-actions" aria-label="学习成果入口"><h3>学习成果</h3>${resultNote}<div class="mp-class-result-actions-grid">${action('查看学习报告', reportReady, '学习报告未生成')}${action('查看结业证书', certificateReady, '结业证书未生成')}</div></section>`;
 }
@@ -1974,8 +1973,7 @@ function renderOrderDetail() {
     refundable ? card(`<div class="mp-section-head"><h3>退款信息</h3>${pill(refundStatus || '退款处理中', learnerRefundTone(refundStatus))}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(credentials.refundNo || '—')}</dd></div><div><dt>退款金额</dt><dd>${money2(credentials.refundAmount)}</dd></div><div><dt>退款方式</dt><dd>${esc(credentials.refundMethod)}</dd></div><div><dt>退款状态</dt><dd>${esc(refundStatus || '退款处理中')}</dd></div><div><dt>${order.status === '已退款' ? '实际到账时间' : '预计到账时间'}</dt><dd>${esc(credentials.refundExpectedAt || '以渠道回执为准')}</dd></div><div class="wide"><dt>退款原因</dt><dd>${esc(credentials.refundReason)}</dd></div></dl>${order.status === '退款中' ? '<p class="mp-notice">退款结果由后台根据支付渠道回执更新，学员端仅展示进度。</p>' : ''}`) : '',
     rejectedRefund ? card(`<div class="mp-section-head"><h3>退款记录</h3>${pill('已拒绝', 'gray')}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(rejectedRefund.no || '—')}</dd></div><div><dt>申请金额</dt><dd>${money2(rejectedRefund.amount)}</dd></div><div class="wide"><dt>处理结果</dt><dd>${esc(rejectedRefund.rejectReason || rejectedRefund.remark || '退款申请未通过')}</dd></div></dl><p class="mp-notice">订单已恢复为可用状态，是否可以再次申请退款以当前退款规则为准。</p>`) : '',
     card(`<div class="mp-section-head"><h3>订单信息</h3><span class="mp-muted">交易记录</span></div><dl class="mp-order-detail-facts"><div><dt>订单号</dt><dd class="mp-order-no"><span>${esc(order.id)}</span><button class="mp-button secondary" type="button" data-action="copy-order-no" data-order-no="${esc(order.id)}">复制</button></dd></div><div><dt>下单时间</dt><dd>${esc(times.createdAt)}</dd></div>${isClass ? `<div><dt>报名学员</dt><dd>${esc(student.name)}</dd></div>` : `<div><dt>购买账号</dt><dd>${esc(purchaseAccount().name)}${purchaseAccount().phone ? `（${esc(purchaseAccount().phone)}）` : ''}</dd></div>`}<div><dt>订单类型</dt><dd>${isClass ? '面授课程' : '视频课程'}</dd></div>${!isClass && isPaid ? `<div class="wide"><dt>退款资格</dt><dd>${esc(videoRefund.reason)}${videoRefund.eligible ? ' 申请后将按实付金额全额退款。' : ''}</dd></div>` : ''}${order.paymentReason ? `<div class="wide"><dt>状态说明</dt><dd>${esc(order.paymentReason)}</dd></div>` : ''}</dl>`),
-    primaryAction || secondaryAction ? `<div class="mp-order-detail-actions">${primaryAction}${secondaryAction ? `<div class="mp-actions">${secondaryAction}</div>` : ''}</div>` : '',
-    `<a class="mp-button secondary full" href="/learner/pages/orders.html">返回我的订单</a>`
+    primaryAction || secondaryAction ? `<div class="mp-order-detail-actions">${primaryAction}${secondaryAction}</div>` : ''
   ));
 }
 
@@ -1997,7 +1995,7 @@ function learningRecords() {
     'class-mock-ended-teaching-01': { lessonStatus: '上课中', lessonNote: '今日 10:00-11:30', nextLesson: '正在上课', homeworkStatus: '待提交' },
     'class-mock-ended-teaching-02': { lessonStatus: '待上课', lessonNote: '09-16 09:00-10:30', nextLesson: '09-16 09:00' },
     'class-mock-ended-teaching-03': { lessonStatus: '已完成', lessonNote: '09-13 10:00-11:30', nextLesson: '09-15 14:00', homeworkStatus: '待教师点评' },
-    // 已结课班级的学员结业状态（学员端文案：已结业／审核中／已取消结业），用于「已获证书」指标与成果入口。
+    // 已结课班级的学员结业状态（审核中／已通过），用于「已获证书」指标与成果入口。
     'class-mock-ended-pending-01': { completionStatus: '已结业' },
     'class-mock-ended-finished-01': { completionStatus: '已结业' },
     'class-mock-ended-finished-02': { completionStatus: '审核中' },
