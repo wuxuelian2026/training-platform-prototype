@@ -56,6 +56,13 @@ jobs:
             --exclude='.gitignore' \
             current/ /tmp/pages-site/
 
+      - name: Publish bundled dashboard and its dependencies
+        shell: bash
+        run: |
+          cp -R current/dist/visualization/. /tmp/pages-site/visualization/
+          mkdir -p /tmp/pages-site/assets
+          cp -R current/dist/assets/. /tmp/pages-site/assets/
+
       - name: Build frozen iteration 1 preview
         shell: bash
         run: |

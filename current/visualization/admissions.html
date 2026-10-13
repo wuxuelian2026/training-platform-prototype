@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171a1d">
+  <title>招生分析 · 培训驾驶舱</title>
+  <link rel="stylesheet" href="../shared/css/visualization.css">
+</head>
+<body data-view="admissions">
+  <main class="dashboard-screen admissions-screen">
+    <header class="dashboard-header">
+      <div class="brand">
+        <h1>招生分析 <small>演示</small></h1>
+        <p>湖北艺术职业学院 · 继续教育学院</p>
+      </div>
+      <div class="header-controls">
+        <div class="period-label"><span id="academic-range"></span><span id="as-of"></span></div>
+        <label class="filter-field">学年<select id="academic-year-filter" aria-label="学年"></select></label>
+        <a class="view-link" id="analysis-link" href="./index.html"><i id="navigation-icon" aria-hidden="true"></i><span>返回总览</span></a>
+        <button type="button" class="icon-button" id="refresh" title="刷新数据" aria-label="刷新数据"></button>
+        <button type="button" class="icon-button" id="fullscreen" title="全屏查看" aria-label="全屏查看"></button>
+      </div>
+    </header>
+    <section class="dashboard-grid admissions-grid" aria-label="面授招生分析">
+      <article class="analysis-panel conversion-panel">
+        <div class="panel-heading"><h2>面授招生转化</h2></div>
+        <dl class="efficiency-stats">
+          <div class="efficiency-primary"><dt title="所选学年新增线索中已绑定面授已支付订单的线索数 ÷ 所选学年新增线索数；每条线索只计一次">线索转报名率</dt><dd class="efficiency-value" id="conversion-rate"></dd></div>
+          <div class="efficiency-row"><dt>新增线索数</dt><dd class="efficiency-value" id="conversion-leads"></dd></div>
+          <div class="efficiency-row"><dt>已转化线索数</dt><dd class="efficiency-value" id="conversion-converted"></dd></div>
+        </dl>
+        <div class="panel-footnote">所选学年新增线索 · 截至统计日</div>
+      </article>
+      <article class="analysis-panel sources-panel">
+        <div class="panel-heading"><h2>招生来源效果 <span class="top-label">Top5</span></h2></div>
+        <table class="data-table source-table"><caption class="sr-only">按已转化线索数排序的招生来源</caption>
+          <thead><tr><th scope="col">来源</th><th scope="col">新增线索</th><th scope="col">已转化</th><th scope="col">转化率</th></tr></thead>
+          <tbody id="source-ranking"></tbody>
+        </table>
+        <div class="panel-footnote">所选学年新增CRM线索 · 转化数降序</div>
+      </article>
+      <article class="analysis-panel enrollment-panel">
+        <div class="panel-heading"><h2>面授报名趋势</h2><span class="panel-period">人次</span></div>
+        <div class="enrollment-chart" id="enrollment-chart" role="group" aria-label="学年月度新增有效报名人次"></div>
+        <div class="panel-footnote">报名发生月份 · 已退班不计</div>
+      </article>
+    </section>
+    <footer class="dashboard-footer"><span id="scope"></span><span id="updated" aria-live="polite"></span></footer>
+  </main>
+  <script type="module" src="../shared/js/visualization.js"></script>
+</body>
+</html>

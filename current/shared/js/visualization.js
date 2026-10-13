@@ -1,192 +1,188 @@
-(function (global) {
-  const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
-  const __classicExports = {};
-  const __classicRequire = (id) => __classicModules[id];
-const dashboardData = {
-  year: {
-    date: '2026年度 · 截至09月09日',
-    enrollments: '12,864', enrollmentChange: '+14.8%', conversion: '25.8', conversionChange: '+3.2个百分点', revenue: '742.8', revenueChange: '+12.6%',
-    trendTitle: '年度经营趋势', trendSummary: '2026年实收营收 ¥742.8万，报名 12,864 人次', trendPeriod: '年度维度 · 近6年',
-    labels: ['2021', '2022', '2023', '2024', '2025', '2026'],
-    revenueAxis: ['800万', '600万', '400万', '200万', '0'], conversionAxis: ['32%', '24%', '16%', '8%', '0%'],
-    revenueSeries: [462, 498, 556, 613, 659, 743], enrollmentSeries: [7600, 8240, 9060, 10120, 11210, 12864], conversionSeries: [18.2, 19.6, 21.3, 20.8, 23.4, 25.8],
-    insight: {best: '春季批次', bestDetail: '报名 3,842 人 · 转化率 31.6%', watch: '寒假批次', watchDetail: '转化率 18.9% · 低于均值 6.4 个百分点', reason: '春季批次报名规模与缴费转化均领先，说明艺术类基础课程的招生承接更稳定。', action: '复用春季课程组合和顾问话术，提前为寒假批次配置试听场次。'}
-  },
-  batch: {
-    date: '2026年批次经营 · 截至09月09日',
-    enrollments: '12,864', enrollmentChange: '+14.8%', conversion: '25.8', conversionChange: '+3.2个百分点', revenue: '742.8', revenueChange: '+12.6%',
-    trendTitle: '四批次经营对比', trendSummary: '春季批次实收营收 ¥236.4万，报名 3,842 人次', trendPeriod: '批次维度 · 固定四批',
-    labels: ['春季', '暑假', '秋季', '寒假'], revenueAxis: ['280万', '210万', '140万', '70万', '0'], conversionAxis: ['36%', '27%', '18%', '9%', '0%'],
-    revenueSeries: [236, 184, 205, 117], enrollmentSeries: [3842, 2964, 3718, 2340], conversionSeries: [31.6, 26.8, 25.9, 18.9],
-    insight: {best: '春季批次', bestDetail: '报名 3,842 人 · 转化率 31.6%', watch: '寒假批次', watchDetail: '转化率 18.9% · 低于均值 6.4 个百分点', reason: '春季批次报名规模与缴费转化均领先，说明艺术类基础课程的招生承接更稳定。', action: '复用春季课程组合和顾问话术，提前为寒假批次配置试听场次。'}
-  }
-};
+import { createElement, RefreshCw, Maximize, Minimize, ArrowLeft } from 'lucide';
+import { TIME_ZONE, academicYearStart, createDemoFacts, compareAcademicYears } from './visualization-data.js';
+import { incomeChartModel } from './visualization-chart.js';
+import { mountDashboardHelp } from './visualization-help.js';
 
-const majorData = {
-  revenue: {label: '实收营收（万元）', unit: '万', values: [{name: '舞蹈表演', value: 218.4}, {name: '音乐表演', value: 187.6}, {name: '美术设计', value: 146.8}, {name: '戏剧影视', value: 109.3}, {name: '播音主持', value: 80.7}]},
-  enrollments: {label: '有效报名人次', unit: '人次', values: [{name: '舞蹈表演', value: 3628}, {name: '音乐表演', value: 3156}, {name: '美术设计', value: 2486}, {name: '戏剧影视', value: 1984}, {name: '播音主持', value: 1610}]},
-  conversion: {label: '缴费转化率', unit: '%', values: [{name: '舞蹈表演', value: 31.6}, {name: '音乐表演', value: 28.4}, {name: '戏剧影视', value: 25.1}, {name: '美术设计', value: 23.8}, {name: '播音主持', value: 20.6}]}
-};
+const byId = id => document.getElementById(id);
+const format = value => new Intl.NumberFormat('zh-CN').format(value);
+const money = cents => (cents / 1000000).toFixed(1);
+const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[char]);
+const yearFilter = byId('academic-year-filter');
+const factsCache = new Map();
+const admissionsView = document.body.dataset.view === 'admissions';
 
-const courseData = [
-  {name: '中国舞基础训练', type: '面授', enrollment: 642, tag: '爆款课程'},
-  {name: '少儿声乐启蒙', type: '面授', enrollment: 586, tag: ''},
-  {name: '硬笔书法入门', type: '视频', enrollment: 524, tag: ''},
-  {name: '舞台表演与形体', type: '面授', enrollment: 486, tag: ''},
-  {name: '钢琴即兴伴奏', type: '视频', enrollment: 432, tag: ''}
-];
-
-const teacherData = [
-  {name: '李晓芸', major: '舞蹈表演', hours: 486, tag: '明星教师'},
-  {name: '周启明', major: '音乐表演', hours: 452, tag: ''},
-  {name: '陈  晨', major: '美术设计', hours: 416, tag: ''},
-  {name: '王雅琴', major: '戏剧影视', hours: 388, tag: ''},
-  {name: '赵子昂', major: '播音主持', hours: 362, tag: ''}
-];
-
-const setText = (selector, value) => {
-  const element = document.querySelector(selector);
-  if (element) element.textContent = value;
-};
-
-const setMetric = (selector, value, unit) => {
-  const element = document.querySelector(selector);
-  if (element) element.innerHTML = value + '<small>' + unit + '</small>';
-};
-
-const formatNumber = (value) => new Intl.NumberFormat('zh-CN').format(value);
-
-function setPath(path, values, maxValue, minY, maxY) {
-  if (!path) return [];
-  const step = values.length > 1 ? 720 / (values.length - 1) : 720;
-  const points = values.map((value, index) => {
-    const x = Math.round(step * index);
-    const y = Math.round(maxY - (value / maxValue) * (maxY - minY));
-    return (index === 0 ? 'M' : 'L') + x + ' ' + y;
-  });
-  path.setAttribute('d', points.join(' '));
-  return values.map((value, index) => ({cx: Math.round(step * index), cy: Math.round(maxY - (value / maxValue) * (maxY - minY))}));
+function setMetric(id, value, unit) {
+  byId(id).innerHTML = '<span>' + value + '</span><small>' + unit + '</small>';
 }
 
-function renderBars(values, maxValue) {
-  const group = document.querySelector('[data-chart-bars]');
-  if (!group) return;
-  group.innerHTML = '';
-  const step = values.length > 1 ? 720 / (values.length - 1) : 720;
-  const barWidth = values.length > 5 ? 44 : 72;
-  values.forEach((value, index) => {
-    const height = (value / maxValue) * 188;
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect.setAttribute('x', String(Math.round(step * index - barWidth / 2)));
-    rect.setAttribute('y', String(Math.round(208 - height)));
-    rect.setAttribute('width', String(barWidth));
-    rect.setAttribute('height', String(Math.round(height)));
-    rect.setAttribute('rx', '2');
-    group.appendChild(rect);
-  });
-}
-
-function applyTrend(dimension) {
-  const data = dashboardData[dimension];
-  if (!data) return;
-  setText('#current-date', data.date);
-  setMetric('#metric-enrollments', data.enrollments, '人次');
-  setText('#metric-enrollments-change', data.enrollmentChange);
-  setMetric('#metric-conversion', data.conversion, '%');
-  setText('#metric-conversion-change', data.conversionChange);
-  setMetric('#metric-revenue', data.revenue, '万');
-  setText('#metric-revenue-change', data.revenueChange);
-  setText('#trend-title', data.trendTitle);
-  setText('#trend-summary', data.trendSummary);
-  setText('#trend-period', data.trendPeriod);
-  document.querySelectorAll('[data-axis-left]').forEach((axis, index) => { axis.textContent = data.revenueAxis[index]; });
-  document.querySelectorAll('[data-axis-right]').forEach((axis, index) => { axis.textContent = data.conversionAxis[index]; });
-  document.querySelectorAll('#trend-labels span').forEach((label, index) => { label.textContent = data.labels[index] || ''; });
-  renderBars(data.revenueSeries, Math.max(...data.revenueSeries) * 1.08);
-  const enrollmentCoords = setPath(document.querySelector('[data-chart-enrollment]'), data.enrollmentSeries, Math.max(...data.enrollmentSeries) * 1.12, 52, 208);
-  const conversionCoords = setPath(document.querySelector('[data-chart-conversion]'), data.conversionSeries, 36, 42, 208);
-  [...document.querySelectorAll('[data-chart-enrollment-points] circle')].forEach((point, index) => { const coord = enrollmentCoords[index]; if (coord) { point.setAttribute('cx', coord.cx); point.setAttribute('cy', coord.cy); } point.hidden = !coord; });
-  [...document.querySelectorAll('[data-chart-conversion-points] circle')].forEach((point, index) => { const coord = conversionCoords[index]; if (coord) { point.setAttribute('cx', coord.cx); point.setAttribute('cy', coord.cy); } point.hidden = !coord; });
-  setText('#best-batch', data.insight.best);
-  setText('#best-batch-detail', data.insight.bestDetail);
-  setText('#watch-batch', data.insight.watch);
-  setText('#watch-batch-detail', data.insight.watchDetail);
-  setText('#insight-reason-text', data.insight.reason);
-  setText('#insight-action-text', data.insight.action);
-}
-
-function renderMajor(metric) {
-  const data = majorData[metric];
-  const container = document.querySelector('#major-ranking');
-  if (!container || !data) return;
-  setText('#major-axis-label', data.label);
-  const max = Math.max(...data.values.map((item) => item.value));
-  container.innerHTML = data.values.map((item, index) => {
-    const rankClass = index < 3 ? 'rank-' + ['one', 'two', 'three'][index] : '';
-    const display = metric === 'conversion' ? item.value.toFixed(1) : formatNumber(item.value);
-    return '<div class=\"major-row\"><span class=\"major-rank ' + rankClass + '\">' + String(index + 1).padStart(2, '0') + '</span><span class=\"major-name\">' + item.name + '</span><span class=\"major-bar\"><i style=\"width:' + Math.round((item.value / max) * 100) + '%\"></i></span><b class=\"major-value\">' + display + '<small>' + data.unit + '</small></b></div>';
+function renderIncome(data) {
+  const model = incomeChartModel(data.monthly);
+  const axis = model.ticks.map((value, index) =>
+    '<span class="axis-tick" style="top:' + index * 25 + '%">' + value + '</span>').join('');
+  const lines = model.series.map((series, index) => '<polyline class="income-line ' + (index ? 'video' : 'offline') +
+    '" points="' + series.points.map(point => point.x + ',' + point.y).join(' ') + '"/>').join('');
+  const columns = data.monthly.map((row, index) => {
+    const label = row.year + '年' + row.label;
+    const description = row.future ? label + '，尚未发生' : label + '：面授净收 ' + money(row.offlineCents) + ' 万元，视频净收 ' + money(row.videoCents) + ' 万元';
+    const dots = model.series.map((series, seriesIndex) => {
+      const point = series.points.find(point => point.index === index);
+      return point ? '<i class="income-dot ' + (seriesIndex ? 'video' : 'offline') + '" style="top:' + point.y + '%"></i>' : '';
+    }).join('');
+    const tag = row.future ? 'div' : 'button';
+    return '<' + tag + (row.future ? '' : ' type="button"') + ' class="chart-column' + (row.future ? ' future' : '') +
+      '" aria-label="' + description + '">' + (row.future ? '<span class="future-value">—</span>' : dots) +
+      '<span class="month">' + row.label + '</span>' +
+      (row.future ? '' : '<span class="chart-tooltip">' + label + '<br>面授 ' + money(row.offlineCents) + ' 万<br>视频 ' + money(row.videoCents) + ' 万</span>') + '</' + tag + '>';
   }).join('');
+  byId('income-chart').innerHTML = '<div class="chart-axis"><div>' + axis + '</div></div>' +
+    '<div class="chart-plot" style="--zero:' + model.zero + '%"><div class="chart-columns">' +
+    '<div class="zero-line" aria-hidden="true"></div><svg class="income-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
+    lines + '</svg>' + columns + '</div></div>';
+  byId('income-chart').setAttribute('aria-label', data.period.label + '学年，截至' + data.period.cutoffDate + '，面授与视频月度净收金额，单位万元');
 }
 
-function renderTable(selector, rows, kind) {
-  const tbody = document.querySelector(selector);
-  if (!tbody) return;
-  tbody.innerHTML = rows.map((item, index) => {
-    const tag = item.tag ? '<span class=\"table-tag ' + (kind === 'teacher' ? 'star' : '') + '\">' + item.tag + '</span>' : '<span class=\"table-muted\">—</span>';
-    const value = kind === 'teacher' ? formatNumber(item.hours) + '<small>课时</small>' : formatNumber(item.enrollment) + '<small>人</small>';
-    return '<tr><td>' + String(index + 1).padStart(2, '0') + '</td><td title=\"' + item.name + '\">' + item.name + '</td><td>' + (kind === 'teacher' ? item.major : item.type) + '</td><td>' + value + '</td><td>' + tag + '</td></tr>';
+function renderYearComparison(comparison) {
+  byId('year-comparison').innerHTML = comparison.batchComparisons.map(row => {
+    const current = row.current?.enrolled;
+    const previous = row.previous?.enrolled;
+    const rate = previous > 0 ? (current - previous) / previous : null;
+    const value = amount => amount == null ? '—' : format(amount);
+    const growth = !row.current ? row.status : rate === null ? '—' : (rate > 0 ? '+' : '') + (rate * 100).toFixed(1) + '%';
+    return '<tr><th scope="row" title="' + row.status + '；本期截至' + row.cutoff + '；上期截至' + (row.previousCutoff || '—') + '">' + row.name + (row.status === '同期' ? '<small>同期</small>' : '') + '</th><td>' + value(current) +
+      '</td><td>' + value(previous) + '</td><td class="' + (rate > 0 ? 'growth-up' : rate < 0 ? 'growth-down' : '') + '" title="' + (rate === null ? '无可比基数' : '同批次同比') + '">' + growth + '</td></tr>';
   }).join('');
+  byId('comparison-range').textContent = '已结束比完整结果 · 进行中比同期';
+  byId('comparison-caption').textContent = comparison.current.period.label + '与' + comparison.previous.period.label + '同批次比较';
 }
 
-function refreshData() {
-  const indicator = document.querySelector('#refresh-indicator');
-  setText('#updated-time', new Date().toLocaleTimeString('zh-CN', {hour12: false}));
-  if (indicator) {
-    indicator.hidden = false;
-    window.setTimeout(() => { indicator.hidden = true; }, 2200);
+function renderRanking(id, rows, video = false) {
+  if (!rows.length) {
+    byId(id).innerHTML = '<tr><td colspan="3" class="empty-cell">暂无' + (video ? '有效付费订单' : '有效报名') + '</td></tr>';
+    return;
   }
+  const max = rows[0][video ? 'orders' : 'enrolled'];
+  const body = rows.map((row, index) => {
+    const value = row[video ? 'orders' : 'enrolled'];
+    return '<tr data-id="' + escapeHtml(row.id) + '"><td><div class="rank-name-line"><span class="rank-number">' + (index + 1) +
+      '</span><span class="rank-name" title="' + escapeHtml(row.name) + '">' + escapeHtml(row.name) + '</span></div>' +
+      '<div class="rank-meter" aria-hidden="true"><i style="width:' + (max ? value / max * 100 : 0) + '%"></i></div></td>' +
+      '<td class="rank-value">' + format(value) + '</td><td>' + (video ? money(row.netCents) : format(row.classes)) + '</td></tr>';
+  });
+  while (body.length < 5) body.push('<tr class="rank-placeholder" aria-hidden="true"><td>—</td><td>—</td><td>—</td></tr>');
+  byId(id).innerHTML = body.join('');
 }
 
-document.querySelectorAll('[data-dimension]').forEach((button) => {
-  button.addEventListener('click', () => {
-    document.querySelectorAll('[data-dimension]').forEach((item) => item.classList.toggle('active', item === button));
-    applyTrend(button.dataset.dimension);
-    refreshData();
-  });
+function renderAdmissionsEfficiency(data, previous) {
+  const stats = data.admissionsEfficiency;
+  const metric = (id, value, unit) => setMetric(id, value === null ? '—' : value, value === null ? '' : unit);
+  byId('efficiency-scope').textContent = '招生结束 ' + format(stats.eligibleClasses) + ' 班';
+  metric('efficiency-utilization', stats.utilization === null ? null : (stats.utilization * 100).toFixed(1), '%');
+  const ring = byId('efficiency-utilization');
+  ring.style.setProperty('--utilization', Math.max(0, Math.min(1, stats.utilization ?? 0)) * 100 + '%');
+  ring.classList.toggle('is-unavailable', stats.utilization === null);
+  ring.classList.toggle('is-over-capacity', stats.utilization > 1);
+  ring.setAttribute('aria-label', stats.utilization === null ? '招生名额使用率：暂无完整数据' :
+    '招生名额使用率 ' + (stats.utilization * 100).toFixed(1) + '%' + (stats.utilization > 1 ? '，超额招生' : ''));
+  if (stats.utilization > 1) ring.insertAdjacentHTML('beforeend', '<b class="utilization-overflow">超额</b>');
+  const prior = previous.admissionsEfficiency.utilization;
+  const change = stats.utilization === null || prior === null ? null : (stats.utilization - prior) * 100;
+  byId('quality-change').textContent = change === null ? '同比 —' : '同比 ' + (change > 0 ? '+' : '') + change.toFixed(1) + ' 个百分点';
+  const labels = ['不足50%', '50%–不足80%', '80%及以上'];
+  byId('quality-distribution').innerHTML = '<div class="quality-distribution-title">班级招生饱和度</div>' + (stats.saturation === null ? '<span>暂无完整饱和度数据</span>' :
+    '<div class="quality-bar" role="img" aria-label="' + labels.map((label, i) => label + '：' + stats.saturation[i] + '班').join('，') + '">' +
+    stats.saturation.map((count, i) => '<i class="quality-band band-' + i + '" style="width:' + count / stats.eligibleClasses * 100 + '%"></i>').join('') + '</div><div class="quality-legend">' +
+    labels.map((label, i) => '<span class="band-' + i + '"><i aria-hidden="true"></i>' + label + '<b>' + stats.saturation[i] + '班</b></span>').join('') + '</div>');
+  byId('efficiency-capacity').textContent = !stats.eligibleClasses ? '暂无招生结束班级' : stats.capacity === null
+    ? '招生名额数据不完整' : '有效报名 ' + format(stats.enrolled) + ' / 招生名额 ' + format(stats.capacity);
+}
+
+function renderOverview(comparison) {
+  const data = comparison.current;
+  const totals = data.totals;
+  setMetric('total-net', money(totals.netCents), '万元');
+  byId('total-net-meta').innerHTML = '<span class="offline-ink">面授 ' + money(totals.offlineNetCents) +
+    ' 万</span><span class="video-ink">视频 ' + money(totals.videoNetCents) + ' 万</span>';
+  setMetric('offline-classes', format(totals.openedClasses), '班');
+  const growthText = key => { const rate = comparison.metrics.find(row => row.key === key).growth; return rate === null ? '同比 —' : '同比 ' + (rate > 0 ? '+' : '') + (rate * 100).toFixed(1) + '%'; };
+  byId('offline-classes-meta').textContent = '覆盖 ' + data.batches.filter(row => row.classes > 0).length + ' 个批次 · ' + growthText('openedClasses');
+  setMetric('offline-enrolled', format(totals.enrolled), '人次');
+  byId('offline-enrolled-meta').textContent = '去重学员 ' + format(totals.students) + ' 人 · ' + growthText('enrolled');
+  setMetric('video-orders', format(totals.videoOrders), '笔');
+  byId('video-orders-meta').textContent = '全额退款 ' + format(totals.refundedVideoOrders) + ' 笔';
+  renderIncome(data);
+  renderYearComparison(comparison);
+  renderAdmissionsEfficiency(data, comparison.previous);
+  renderRanking('major-ranking', data.rankings.majors);
+  renderRanking('course-ranking', data.rankings.courses);
+  renderRanking('teacher-ranking', data.rankings.teachers);
+  renderRanking('video-ranking', data.rankings.videos, true);
+}
+
+function renderAdmissions(data) {
+  const conversion = data.admissionsConversion;
+  setMetric('conversion-rate', conversion.rate === null ? '—' : (conversion.rate * 100).toFixed(1), conversion.rate === null ? '' : '%');
+  setMetric('conversion-leads', format(conversion.leads), '条');
+  setMetric('conversion-converted', format(conversion.converted), '条');
+  byId('source-ranking').innerHTML = data.sourceRanking.length ? data.sourceRanking.map((row, index) =>
+    '<tr><td><span class="rank-number">' + (index + 1) + '</span> ' + escapeHtml(row.name) + '</td><td>' +
+    format(row.leads) + '</td><td>' + format(row.converted) + '</td><td>' +
+    (row.rate * 100).toFixed(1) + '%</td></tr>').join('') : '<tr><td colspan="4" class="empty-cell">暂无新增线索</td></tr>';
+  const enrollmentMax = Math.max(1, ...data.enrollmentMonthly.map(row => row.enrolled));
+  byId('enrollment-chart').innerHTML = data.enrollmentMonthly.map(row =>
+    '<div class="enrollment-month' + (row.future ? ' future' : '') + '" tabindex="0" title="' + row.year + '年' + row.label +
+    (row.future ? '：尚未发生' : '：新增有效报名 ' + format(row.enrolled) + ' 人次') + '">' +
+    '<div class="enrollment-bar">' + (row.future ? '' : '<i style="height:' + row.enrolled / enrollmentMax * 100 + '%"></i>') +
+    '<span>' + (row.future ? '—' : format(row.enrolled)) + '</span></div><span>' + row.label + '</span></div>').join('');
+}
+
+function renderDashboard() {
+  const now = new Date();
+  const year = Number(yearFilter.value);
+  if (!factsCache.has(year)) factsCache.set(year, createDemoFacts(year));
+  const comparison = compareAcademicYears(factsCache.get(year), year, now);
+  const data = comparison.current;
+  byId('academic-range').textContent = data.period.startDate.replaceAll('-', '.') + ' - ' + data.period.endDate.replaceAll('-', '.');
+  byId('as-of').textContent = '截至 ' + data.period.cutoffDate.replaceAll('-', '.');
+  byId('scope').textContent = '演示数据 · ' + data.period.label + '学年 · 全部校区';
+  byId('updated').textContent = '更新于 ' + new Intl.DateTimeFormat('zh-CN', { timeZone: TIME_ZONE, timeStyle: 'medium' }).format(now);
+  if (admissionsView) byId('analysis-link').href = './index.html?year=' + year;
+  const url = new URL(window.location.href);
+  url.searchParams.set('year', year);
+  window.history.replaceState(null, '', url);
+  if (admissionsView) renderAdmissions(data);
+  else renderOverview(comparison);
+}
+
+function setIcon(id, icon) {
+  byId(id).replaceChildren(createElement(icon, { 'stroke-width': 1.8, 'aria-hidden': 'true' }));
+}
+
+const currentYear = academicYearStart();
+const availableYears = [currentYear, currentYear - 1, currentYear - 2];
+yearFilter.innerHTML = availableYears.map(year =>
+  '<option value="' + year + '">' + (year === currentYear ? '本学年 · ' : '') + year + '-' + (year + 1) + (year === currentYear ? '' : '学年') + '</option>').join('');
+setIcon('refresh', RefreshCw);
+setIcon('fullscreen', Maximize);
+if (admissionsView) setIcon('navigation-icon', ArrowLeft);
+const requestedYear = Number(new URLSearchParams(window.location.search).get('year'));
+yearFilter.value = String(availableYears.includes(requestedYear) ? requestedYear : currentYear);
+yearFilter.addEventListener('change', renderDashboard);
+byId('refresh').addEventListener('click', renderDashboard);
+document.addEventListener('fullscreenchange', () => {
+  const active = Boolean(document.fullscreenElement);
+  setIcon('fullscreen', active ? Minimize : Maximize);
+  byId('fullscreen').title = active ? '退出全屏' : '全屏查看';
+  byId('fullscreen').setAttribute('aria-label', byId('fullscreen').title);
 });
-
-document.querySelectorAll('[data-major-metric]').forEach((button) => {
-  button.addEventListener('click', () => {
-    document.querySelectorAll('[data-major-metric]').forEach((item) => item.classList.toggle('active', item === button));
-    renderMajor(button.dataset.majorMetric);
-  });
+byId('fullscreen').addEventListener('click', async () => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  } catch {
+    byId('updated').textContent = '当前窗口暂不支持全屏';
+  }
 });
-
-document.querySelectorAll('[data-alert-tab]').forEach((button) => {
-  button.addEventListener('click', () => {
-    document.querySelectorAll('[data-alert-tab]').forEach((item) => item.classList.toggle('active', item === button));
-    document.querySelectorAll('[data-alert-list]').forEach((list) => { list.hidden = list.dataset.alertList !== button.dataset.alertTab; });
-  });
-});
-
-document.querySelector('[data-action=\"refresh\"]')?.addEventListener('click', refreshData);
-document.querySelector('[data-action=\"fullscreen\"]')?.addEventListener('click', async () => {
-  if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.();
-  else await document.exitFullscreen?.();
-});
-
-let remaining = 30;
-window.setInterval(() => {
-  remaining -= 1;
-  if (remaining <= 0) { remaining = 30; refreshData(); }
-  setText('#refresh-countdown', String(remaining));
-}, 1000);
-
-renderTable('#course-ranking', courseData, 'course');
-renderTable('#teacher-ranking', teacherData, 'teacher');
-renderMajor('revenue');
-applyTrend('year');
-
-
-  __classicModules["shared/js/visualization.js"] = __classicExports;
-})(globalThis);
+mountDashboardHelp();
+renderDashboard();

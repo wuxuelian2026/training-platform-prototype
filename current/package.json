@@ -20,9 +20,13 @@
     "check:course-hours": "node scripts/check-course-hours.mjs",
     "check:lesson-chain": "node scripts/check-lesson-chain.mjs",
     "check:refund": "node scripts/check-refund-flow.mjs",
-    "check:mobile-scripts": "node scripts/check-mobile-scripts.mjs"
+    "check:mobile-scripts": "node scripts/check-mobile-scripts.mjs",
+    "check:visualization": "node scripts/check-visualization.mjs"
   },
   "devDependencies": {
     "vite": "^6.1.0"
+  },
+  "dependencies": {
+    "lucide": "^1.56.0"
   }
 }
