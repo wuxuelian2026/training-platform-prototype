@@ -382,6 +382,7 @@ function libraryRow(item) {
     usage.locked
       ? button('复制新建', 'library-copy', `data-id="${item.id}"`)
       : button('编辑', 'library-edit', `data-id="${item.id}"`),
+    usage.locked && item.type === '面授课程' ? button('编辑', 'library-edit', `data-id="${item.id}"`) : '',
     button(disabled ? '启用' : '停用', 'library-toggle-enabled', `data-id="${item.id}"`, disabled ? '' : 'danger-link'),
     deletable ? button('删除', 'library-delete', `data-id="${item.id}"`, 'danger-link') : '',
     item.type === '视频课程' && item.status === '已完成' && !disabled ? button('发布商品', 'publish-product', `data-id="${item.id}"`) : '',
@@ -393,7 +394,7 @@ function libraryRow(item) {
   const editCell = usage.locked
     ? `<span class="tag ${usage.permanent ? 'red' : 'amber'}">已锁定</span><span class="sub-cell">${escapeHtml(usage.reasons.join('、'))}<br>${escapeHtml(usage.actionHint)}</span>`
     : '<span class="tag green">可编辑</span><span class="sub-cell">尚无订单、正式课表或上架商品</span>';
-  return `<tr><td><span class="primary-cell">${escapeHtml(key || '—')}</span></td><td><span class="primary-cell">${escapeHtml(item.name)}</span></td><td>${escapeHtml(item.source || '教师申报')}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${hoursText(item.hours)}</td><td>${statusCell}</td><td>${editCell}</td><td><div class="course-actions">${actions}</div></td></tr>`;
+  return `<tr><td><span class="primary-cell">${escapeHtml(key || '—')}</span></td><td>${item.type === '面授课程' && item.coverImage ? `<img class="course-archive-cover-thumb" src="${escapeHtml(item.coverImage)}" alt="课程封面" />` : ''}<span class="primary-cell">${escapeHtml(item.name)}</span></td><td>${escapeHtml(item.source || '教师申报')}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${hoursText(item.hours)}</td><td>${statusCell}</td><td>${editCell}</td><td><div class="course-actions">${actions}</div></td></tr>`;
 }
 
 // CR-2026-081：全部课程显示派生编辑状态，不再展示课程版本与历史版本。
@@ -453,7 +454,7 @@ function openLibraryView(id) {
   const dialog = modal('课程详情', `${key} · ${item.name}`, '<div data-course-detail-root></div>', { large: true });
   const holder = dialog.querySelector('[data-course-detail-root]');
   const tabs = () => `<div class="course-tabs"><button type="button" class="course-tab${activeTab === 'basic' ? ' active' : ''}" data-course-detail-tab="basic">基本信息</button><button type="button" class="course-tab${activeTab === 'outline' ? ' active' : ''}" data-course-detail-tab="outline">课程大纲</button></div>`;
-  const basic = () => `<section class="course-detail-section wide"><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(key)}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>总课时</dt><dd>${hoursText(item.hours)}</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(item.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(item) || '未填写')}</dd></div></dl></section>`;
+  const basic = () => `<section class="course-detail-section wide"><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(key)}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>总课时</dt><dd>${hoursText(item.hours)}</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(item.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(courseAgesText(item) || '未填写')}</dd></div></dl>${item.type === '面授课程' ? `<div><h3>课程封面</h3>${item.coverImage ? `<img class="course-archive-cover-preview" src="${escapeHtml(item.coverImage)}" alt="课程封面" />` : '<p class="course-hint">未设置封面</p>'}</div>` : ''}</section>`;
   const outline = () => courseOutlineView(chapters);
   const render = () => {
     const primaryAction = usage.locked
@@ -469,13 +470,60 @@ function openLibraryEdit(id) {
   const item = library.find(record => record.id === id);
   if (!item) return;
   const usage = courseEditLock(item);
-  if (usage.locked) {
+  if (usage.locked && item.type !== '面授课程') {
     showToast(`${courseEditLockLabel(usage)}；${usage.actionHint}`, 'error');
     return;
   }
   openCourseArchiveForm(id);
 }
 
+function courseCoverEditor(source) {
+  const draft = { coverImage: source?.coverImage || '', coverFile: source?.coverFile || '' };
+  let reading = false;
+  const previewMarkup = () => draft.coverImage ? `<img class="course-archive-cover-preview" src="${escapeHtml(draft.coverImage)}" alt="课程封面预览" /><small>${escapeHtml(draft.coverFile)}</small>` : '<p class="course-hint">未设置封面</p>';
+  const markup = () => `<div class="course-field wide" data-course-cover-field><label for="archive-cover-file">课程封面</label><input id="archive-cover-file" type="file" accept="image/jpeg,image/png,image/webp" /><small>JPG、PNG、WebP，≤2MB，建议横图 16:9</small><div data-cover-preview>${previewMarkup()}</div><button class="button" type="button" data-cover-remove>移除封面</button></div>`;
+  const bind = (dialog) => {
+    dialog.addEventListener('change', async event => {
+      const input = event.target.closest('#archive-cover-file');
+      if (!input || reading) return;
+      const file = input.files[0];
+      if (!file) return;
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) { input.value = ''; showToast('请选择不超过2MB的 JPG、PNG 或 WebP 图片', 'error'); return; }
+      reading = true;
+      try {
+        const bitmap = await createImageBitmap(file);
+        const ratio = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
+        canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
+        canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+        draft.coverImage = canvas.toDataURL('image/webp', 0.82);
+        draft.coverFile = file.name;
+        const preview = dialog.querySelector('[data-cover-preview]');
+        if (preview) preview.innerHTML = previewMarkup();
+      } catch { showToast('图片读取失败，请选择有效图片', 'error'); }
+      finally { reading = false; }
+    });
+    dialog.addEventListener('click', event => {
+      if (!event.target.closest('[data-cover-remove]') || reading) return;
+      draft.coverImage = ''; draft.coverFile = '';
+      dialog.querySelector('#archive-cover-file').value = '';
+      dialog.querySelector('[data-cover-preview]').innerHTML = previewMarkup();
+    });
+  };
+  const ready = () => { if (reading) showToast('图片正在读取，请稍后保存', 'error'); return !reading; };
+  return { draft, markup, bind, ready };
+}
+
+function saveCourseCover(course, cover) {
+  const current = courseArchiveFor(course) || library.find(row => courseArchiveKey(row) === toCanonicalCourseId(course.id));
+  if (!current) return;
+  const next = { ...current, ...cover };
+  persistLibrary(next);
+  const local = library.find(row => row.id === next.id);
+  if (local) Object.assign(local, next);
+}
 function copyLibraryCourse(id) {
   const item = library.find(record => record.id === id);
   if (!item) return;
@@ -498,6 +546,8 @@ function copyLibraryCourse(id) {
     plannedHours: Number(item.hours) || 0,
     difficulty: item.difficulty || '',
     ages: [...(item.ages || [])],
+    coverImage: item.coverImage || '',
+    coverFile: item.coverFile || '',
     status: '编排中',
     updatedAt: demoTime(),
     chapters: JSON.parse(JSON.stringify(sourceCourse?.chapters || item.chapters || []))
@@ -518,7 +568,9 @@ function openCourseArchiveForm(id) {
   const item = library.find(record => record.id === id);
   if (!item) return;
   const usage = courseEditLock(item);
-  if (usage.locked) { showToast(`${courseEditLockLabel(usage)}；${usage.actionHint}`, 'error'); return; }
+  if (usage.locked && item.type !== '面授课程') { showToast(`${courseEditLockLabel(usage)}；${usage.actionHint}`, 'error'); return; }
+  const coverOnly = usage.locked;
+  const coverEditor = courseCoverEditor(item);
   const key = courseArchiveKey(item);
   const course = contentCourses.find(record => record.id === key);
   const draft = { ...item, ages: [...(item.ages || [])], chapters: JSON.parse(JSON.stringify(course?.chapters || item.chapters || [])) };
@@ -527,7 +579,9 @@ function openCourseArchiveForm(id) {
   let activeChapter = 0;
   const dialog = modal('编辑课程', `${key} · ${item.name}`, '<div data-course-edit-root></div>', { large: true });
   const holder = dialog.querySelector('[data-course-edit-root]');
+  coverEditor.bind(dialog);
   const collectBasic = () => {
+    if (coverOnly) return true;
     const form = holder.querySelector('[data-course-edit-basic]');
     if (!form) return true;
     const data = new FormData(form);
@@ -538,9 +592,9 @@ function openCourseArchiveForm(id) {
     return true;
   };
   const tabs = () => `<div class="course-tabs"><button type="button" class="course-tab${activeTab === 'basic' ? ' active' : ''}" data-course-edit-tab="basic">基本信息</button><button type="button" class="course-tab${activeTab === 'outline' ? ' active' : ''}" data-course-edit-tab="outline">课程大纲</button></div>`;
-  const basic = () => `<form data-course-edit-basic><div class="course-detail-grid"><div class="course-field"><label>课程编号</label><input class="readonly-field" value="${escapeHtml(key)}" readonly /></div><div class="course-field"><label>课程来源</label><input class="readonly-field" value="${escapeHtml(item.source || '教师申报')}" readonly /></div><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required maxlength="30" value="${escapeHtml(draft.name)}" /></div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="${escapeHtml(draft.type)}" readonly /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major', draft.major)}</div><div class="course-field"><label>申报教师 <span class="sub-cell">必填</span></label><select name="teacher">${teacherNames.map(name => option(name, name === draft.teacher)).join('')}</select></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="${draft.hours}" /></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', courseDifficultyOptions(), draft.difficulty, '')}</div><div class="course-field wide"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" ${draft.ages.includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div></div></form>`;
+  const basic = () => `<form data-course-edit-basic><div class="course-detail-grid"><div class="course-field"><label>课程编号</label><input class="readonly-field" value="${escapeHtml(key)}" readonly /></div><div class="course-field"><label>课程来源</label><input class="readonly-field" value="${escapeHtml(item.source || '教师申报')}" readonly /></div><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required maxlength="30" value="${escapeHtml(draft.name)}" /></div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="${escapeHtml(draft.type)}" readonly /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major', draft.major)}</div><div class="course-field"><label>申报教师 <span class="sub-cell">必填</span></label><select name="teacher">${teacherNames.map(name => option(name, name === draft.teacher)).join('')}</select></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="${draft.hours}" /></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', courseDifficultyOptions(), draft.difficulty, '')}</div><div class="course-field wide"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" ${draft.ages.includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div></div>${item.type === '面授课程' ? coverEditor.markup() : ''}</form>`;
   const outline = () => { const chapter = draft.chapters[activeChapter]; return `<div class="course-workbench"><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>章节结构</h3><p>${draft.chapters.length} 个章节</p></div><button class="button" type="button" data-course-edit="add-chapter">添加章节</button></div><div class="chapter-list">${draft.chapters.map((entry, index) => `<div class="chapter-item${index === activeChapter ? ' active' : ''}" data-course-edit="select-chapter" data-index="${index}"><div><strong>${escapeHtml(entry.name)}</strong><small>${entry.lessons.length} 个课时 · ${escapeHtml(entry.desc || '暂无章节描述')}</small></div><div class="chapter-item-actions"><button type="button" data-course-edit="edit-chapter" data-index="${index}">编辑</button><button type="button" data-course-edit="delete-chapter" data-index="${index}">删</button></div></div>`).join('') || '<div class="course-empty"><strong>暂无章节</strong></div>'}</div></section><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>${chapter ? escapeHtml(chapter.name) : '课时数据'}</h3><p>${chapter ? escapeHtml(chapter.desc || '维护该章节的课时') : '请选择左侧章节'}</p></div>${chapter ? '<button class="button" type="button" data-course-edit="add-lesson">添加课时</button>' : ''}</div><div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target)}</p></div><div class="chapter-item-actions"><button type="button" data-course-edit="edit-lesson" data-index="${index}">编辑</button><button type="button" data-course-edit="delete-lesson" data-index="${index}">删</button></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${(lesson.resources || []).length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span><button class="button" type="button" data-course-edit="resource" data-index="${index}">引用资源</button></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section></div>`; };
-  const render = () => { holder.innerHTML = `${tabs()}${activeTab === 'basic' ? basic() : outline()}<p class="course-hint">保存后直接更新课程基本信息与课程大纲。课程一旦产生订单或正式课表，将永久锁定核心内容。</p><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="button" data-course-edit="save">保存</button></div>`; };
+  const render = () => { holder.innerHTML = `${tabs()}${activeTab === 'basic' ? basic() : coverOnly ? courseOutlineView(draft.chapters) : outline()}<p class="course-hint">${coverOnly ? '教学内容已锁定，仅允许修改课程封面。' : '保存后更新课程基本信息、封面与课程大纲。'}</p><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="button" data-course-edit="save">保存</button></div>`; if (coverOnly) holder.querySelectorAll('[data-course-edit-basic] input:not([type="file"]), [data-course-edit-basic] select').forEach(input => { input.disabled = true; }); };
   dialog.addEventListener('click', event => {
     const tab = event.target.closest('[data-course-edit-tab]')?.dataset.courseEditTab;
     if (tab) { if (activeTab === 'basic' && !collectBasic()) return; activeTab = tab; render(); return; }
@@ -569,12 +623,20 @@ function openCourseArchiveForm(id) {
     }
     if (action === 'resource') openResourcePicker(draft, activeChapter, Number(target.dataset.index), render);
     if (action !== 'save') return;
+    if (!coverEditor.ready()) return;
+    if (coverOnly) {
+      try { persistLibrary({ ...item, ...coverEditor.draft }); }
+      catch { showToast('封面保存失败，请换用较小图片', 'error'); return; }
+      Object.assign(item, coverEditor.draft);
+      closeModal(); renderLibrary(root()); showToast('课程封面已保存，教学内容未修改'); return;
+    }
     if (activeTab === 'basic' && !collectBasic()) return;
     if (!draft.chapters.length || draft.chapters.some(chapter => !chapter.lessons.length)) { showToast('请补齐章节与课时', 'error'); return; }
     const currentUsage = courseEditLock(item);
     if (currentUsage.locked) { showToast(`课程使用情况已变化，${courseEditLockLabel(currentUsage)}；${currentUsage.actionHint}`, 'error'); return; }
     applyArchiveChange(item, { name: draft.name, major: draft.major, teacher: draft.teacher, hours: draft.hours, difficulty: draft.difficulty, ages: [...draft.ages] }, draft.chapters);
     if (course) { Object.assign(course, { name: draft.name, major: draft.major, teacher: draft.teacher, hours: draft.hours, difficulty: draft.difficulty, ages: [...draft.ages], chapters: draft.chapters, updatedAt: demoTime() }); persistCourse(course); }
+    if (item.type === '面授课程') Object.assign(item, coverEditor.draft);
     persistLibrary(item);
     closeModal();
     renderLibrary(root());
@@ -728,6 +790,7 @@ function openWorkbench(id) {
   let activeChapter = 0;
   // CR-2026-014：教学属性来自申报，编排阶段可修改，保存后写入课程档案（course-display.js）。
   const archiveRecord = courseArchiveFor(item);
+  const coverEditor = courseCoverEditor(archiveRecord || item);
   const teaching = { difficulty: archiveRecord?.difficulty || item.difficulty || '', ages: [...(archiveRecord?.ages?.length ? archiveRecord.ages : item.ages || [])] };
   const readTeachingFromDom = () => {
     const difficulty = dialog.querySelector('#workbench-difficulty');
@@ -736,15 +799,22 @@ function openWorkbench(id) {
     teaching.ages = [...dialog.querySelectorAll('[name="workbench-age"]:checked')].map(input => input.value);
   };
   const saveTeaching = () => {
+    if (!coverEditor.ready()) return false;
     readTeachingFromDom();
     if (!teaching.difficulty || !teaching.ages.length) { showToast('请选择难度等级和适合年龄（教学属性必填）', 'error'); return false; }
     item.difficulty = teaching.difficulty;
     item.ages = [...teaching.ages];
     persistCourseTeaching(item, { difficulty: teaching.difficulty, ages: [...teaching.ages] });
+    if (item.type === '面授课程') {
+      try { saveCourseCover(item, coverEditor.draft); }
+      catch { showToast('封面保存失败，请换用较小图片', 'error'); return false; }
+      Object.assign(item, coverEditor.draft);
+    }
     return true;
   };
-  const teachingPanel = () => '<section class="course-workbench-teaching"><div class="course-pane-head"><div><h3>教学属性</h3><p>默认读取教师申报值，可在编排阶段调整；保存后写入课程档案</p></div></div><div class="course-teaching-grid"><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label><select id="workbench-difficulty" aria-label="难度等级"><option value="">请选择难度等级</option>' + courseDifficultyOptions().map(value => `<option ${teaching.difficulty === value ? 'selected' : ''}>${value}</option>`).join('') + '</select></div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">' + ['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="workbench-age" value="${value}" ${teaching.ages.includes(value) ? 'checked' : ''} />${value}</label>`).join('') + '</div></div></div></section>';
+  const teachingPanel = () => '<section class="course-workbench-teaching"><div class="course-pane-head"><div><h3>课程基本信息</h3><p>默认读取教师申报值，可在编排阶段调整；保存后写入课程档案</p></div></div><div class="course-teaching-grid"><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label><select id="workbench-difficulty" aria-label="难度等级"><option value="">请选择难度等级</option>' + courseDifficultyOptions().map(value => `<option ${teaching.difficulty === value ? 'selected' : ''}>${value}</option>`).join('') + '</select></div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">' + ['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="workbench-age" value="${value}" ${teaching.ages.includes(value) ? 'checked' : ''} />${value}</label>`).join('') + '</div></div></div>' + (item.type === '面授课程' ? coverEditor.markup() : '') + '</section>';
   const dialog = modal(`${item.status === '已完成' ? '查看课程编排' : item.status === '待编排' ? '开始课程编排' : '继续课程编排'}`, `${item.name} · ${item.type} · ${item.major}`, '<div id="workbench-content"></div>', { large: true });
+  coverEditor.bind(dialog);
   const renderWorkbench = () => {
     // 章节切换会整体重绘面板，先取回教学属性的当前输入，避免编辑丢失。
     readTeachingFromDom();

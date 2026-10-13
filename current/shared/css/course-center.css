@@ -239,3 +239,10 @@
 .catalog-reference-group li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; }
 .catalog-reference-group li small { color: var(--text-muted, #5b6478); font-size: 12px; }
 .catalog-reference-empty { margin: 8px 0 0; font-size: 13px; color: var(--text-muted, #5b6478); }
+.course-archive-cover-preview { display: block; width: min(100%, 360px); aspect-ratio: 16 / 9; object-fit: cover; margin: 12px 0; border-radius: 6px; }
+.course-archive-cover-thumb { display: inline-block; width: 72px; height: 45px; object-fit: cover; margin: 0 10px 4px 0; vertical-align: middle; border-radius: 4px; }
+[data-course-cover-field] > button { justify-self: start; width: auto; }
+.course-workbench-teaching { grid-template-columns: minmax(0, 1fr); }
+.course-teaching-grid .choice-group { flex-wrap: wrap; gap: 8px 16px; }
+.course-teaching-grid .choice { white-space: nowrap; }
+.course-teaching-grid .choice input { width: 16px; min-height: 16px; padding: 0; flex: none; }

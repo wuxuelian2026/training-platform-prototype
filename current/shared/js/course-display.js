@@ -7,6 +7,7 @@
 // 教学属性（难度等级、适合年龄）仍由课程档案承载，教师在申报时维护、后台编排可改、发布时只读带入；
 // 运营四字段（课程封面、图文详情、课程标签、C 端推荐语）改为各自维护在
 // 视频商品记录与面授班级记录上：同一门面授课程的多个班级互不影响，商品与班级互不影响。
+// 面授课程另存档案级 coverImage / coverFile，供课程浏览卡片与详情共用，不覆盖班级素材。
 //
 // 本模块是课程档案与售卖单元展示素材的统一读写入口，供 course-center.js（课程库）、
 // sales-crm.js（发布表单）与 learner.js（学员端展示）共用。
@@ -205,6 +206,8 @@ function courseArchiveDefaults(course = {}) {
     status: course.status || '已完成',
     difficulty: '',
     ages: [],
+    coverImage: course.coverImage || '',
+    coverFile: course.coverFile || '',
     detail: ''
   };
 }

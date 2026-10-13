@@ -157,7 +157,8 @@ function applyCourseDisplay(item) {
   return {
     ...item,
     cover: display.cover === COURSE_DISPLAY_UNSET ? '' : display.cover,
-    coverFile: display.coverFile,
+    coverFile: item.type === 'class' && item.objectType === 'course' ? courseArchiveFor(courseId || item.id)?.coverFile || '' : display.coverFile,
+    coverImage: item.type === 'class' && item.objectType === 'course' ? courseArchiveFor(courseId || item.id)?.coverImage || '' : item.coverImage || '',
     level: archive?.difficulty || item.level,
     age: agesText || item.age,
     detail: richDetail ? [] : (displayDetail.length ? displayDetail : item.detail),
@@ -184,7 +185,7 @@ function sharedLearnerCatalog(shared) {
   const courseRows = [...archiveCourses, ...storedCourses.filter(item => !representedIds.has(toCanonicalCourseId(item.id)))]
     .filter(item => item.status === '已完成' && !item.disabledAt && (!legacyInProgressCourseIds.has(toCanonicalCourseId(item.id)) || storedCourses.some(row => toCanonicalCourseId(row.id) === toCanonicalCourseId(item.id) && row.status === '已完成')))
     .map(item => ({
-      id: toCanonicalCourseId(item.id), type: item.type === '视频课程' ? 'video' : 'class', objectType: 'course', name: item.name, courseName: item.name, teacher: item.teacher, category: item.major, discipline: item.discipline || item.major, field: item.field || item.major, professional: item.professional || item.major, level: item.level || item.difficulty || '初级', age: item.age || (Array.isArray(item.ages) ? item.ages.join('、') : '') || '全年龄', hours: Number(item.hours) || 0, lessons: Number(item.hours) || 0, progress: 0, status: '待售', price: 0, intro: item.intro || '', updatedAt: item.updatedAt || '', chapters: item.chapters || [], outline: (item.chapters || []).map(chapter => ({ title: chapter.name, note: `${chapter.lessons?.length || 0}课时` }))
+      id: toCanonicalCourseId(item.id), type: item.type === '视频课程' ? 'video' : 'class', objectType: 'course', name: item.name, courseName: item.name, teacher: item.teacher, category: item.major, discipline: item.discipline || item.major, field: item.field || item.major, professional: item.professional || item.major, level: item.level || item.difficulty || '初级', age: item.age || (Array.isArray(item.ages) ? item.ages.join('、') : '') || '全年龄', hours: Number(item.hours) || 0, lessons: Number(item.hours) || 0, progress: 0, status: '待售', price: 0, intro: item.intro || '', detailHtml: item.detailHtml || '', updatedAt: item.updatedAt || '', chapters: item.chapters || [], outline: (item.chapters || []).map(chapter => ({ title: chapter.name, note: `${chapter.lessons?.length || 0}课时` }))
     }));
   const products = allProducts(shared).filter(item => item.status === '已上架');
   const videos = courseRows.filter(item => item.type === 'video' && products.some(product => toCanonicalCourseId(product.courseId) === item.id)).map(item => {
@@ -444,6 +445,9 @@ function stack(...content) { return `<div class="mp-stack">${content.join('')}</
 function toast(message) { const node = document.createElement('div'); node.className = 'mp-toast'; node.textContent = message; document.body.appendChild(node); setTimeout(() => node.remove(), 2200); }
 function courseMeta(item) { if (item.objectType === 'class') { const tail = item.category || item.professional || item.courseName || ''; return `面授班级 · ${item.teacher}老师${tail ? ` · ${tail}` : ''}`; } return `${item.type === 'video' ? '视频课程' : '面授课程'} · ${item.professional || item.category}`; }
 function courseLink(item) { return item.objectType === 'class' ? `/learner/pages/class-detail.html?courseId=${item.id}` : `/learner/pages/course-detail.html?courseId=${item.id}`; }
+function offlineCourseCoverImage(item) {
+  return item.coverImage ? `<img class="mp-archive-cover-image" src="${esc(item.coverImage)}" alt="${esc(item.name)}课程封面" />` : '';
+}
 function listItem(item, action = '') { return `<a class="mp-item" href="${courseLink(item)}"><div><strong>${esc(item.name)}</strong><small>${esc(courseMeta(item))}</small>${item.type === 'class' ? `<p>${esc(item.campus)} · ${esc(item.schedule)} · 剩余${esc(item.seats.split('/')[0])}名额</p>` : `<p>共${item.hours}课时 · 已学习${item.progress}%</p>`}</div><div>${action || `<span class="mp-link">查看</span>`}</div></a>`; }
 function courseCard(item) {
   const isClass = item.type === 'class';
@@ -457,7 +461,7 @@ function courseCard(item) {
     const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
     const statusTone = item.bookableClassCount > 0 ? 'green' : 'gray';
     const priceText = item.bookableClassCount > 0 ? `${money2(item.minimumPrice)}起` : '待开班';
-    return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}"><div class="mp-course-cover class-cover" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>面授课程</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">${priceText}</strong></div><div class="mp-course-tags">${pill(item.professional || item.category)}${pill(item.level || '初级', 'gray')}${pill(item.age || '全年龄', 'gray')}</div><div class="mp-course-teacher-row"><span class="mp-course-hours">共${esc(item.hours)}课时</span><span class="mp-course-status">${pill(item.status, statusTone)}</span></div></div></a>`;
+    return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}"><div class="mp-course-cover class-cover" data-cover-mark="${esc(coverMark)}" >${offlineCourseCoverImage(item)}<span>面授课程</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">${priceText}</strong></div><div class="mp-course-tags">${pill(item.professional || item.category)}${pill(item.level || '初级', 'gray')}${pill(item.age || '全年龄', 'gray')}</div><div class="mp-course-teacher-row"><span class="mp-course-hours">共${esc(item.hours)}课时</span><span class="mp-course-status">${pill(item.status, statusTone)}</span></div></div></a>`;
   }
   const teacher = state.teachers.find(row => row.name === item.teacher);
   const teacherName = teacher?.name || item.teacher;
@@ -521,7 +525,6 @@ function renderCourses() {
   const initialProfessional = params.get('professional') || (state.courses.some(item => item.professional === requestedCategory) ? requestedCategory : '');
   const levels = ['启蒙', '初级', '中级', '高级'];
   const ages = ['少儿', '青少年', '成人'];
-  const campuses = [...new Set((state.classOptions || []).filter(item => item.visible).map(item => item.campus).filter(Boolean))];
   const initialCourseTab = params.get('type') === 'video' ? 'video' : 'class';
   const optionList = (options, selected, emptyText) => `<option value="">${emptyText}</option>${options.map(option => `<option value="${esc(option)}" ${option === selected ? 'selected' : ''}>${esc(option)}</option>`).join('')}`;
   const initialMatch = state.courses.find(item => (initialProfessional && item.professional === initialProfessional) || (initialField && item.field === initialField));
@@ -537,7 +540,7 @@ function renderCourses() {
       children: [...new Set(state.courses.filter(item => item.discipline === discipline && item.field === field).map(item => item.professional).filter(Boolean))]
     }))
   }));
-  layout(stack(`<form id="course-search-form" class="mp-course-search" role="search"><input id="course-search" aria-label="搜索课程或专业" placeholder="搜索课程或专业" value="${esc(params.get('q') || '')}"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form>`, `<section class="mp-course-browser" aria-label="课程浏览"><div class="mp-tabs mp-course-type-tabs" role="tablist"><button class="mp-tab ${initialCourseTab === 'class' ? 'active' : ''}" type="button" data-course-tab="class" role="tab" aria-selected="${initialCourseTab === 'class'}">面授课程</button><button class="mp-tab ${initialCourseTab === 'video' ? 'active' : ''}" type="button" data-course-tab="video" role="tab" aria-selected="${initialCourseTab === 'video'}">视频课程</button></div><div class="mp-course-filter-row" aria-label="课程筛选条件"><button id="course-profession-trigger" class="mp-course-filter-chip" type="button" aria-haspopup="dialog" aria-controls="course-profession-dialog" aria-expanded="false"><span id="course-profession-value">专业</span><i aria-hidden="true">⌄</i></button><button id="course-level-trigger" class="mp-course-filter-chip" type="button"><span>难度</span><i aria-hidden="true">⌄</i></button><button id="course-age-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>适合年龄</span><i aria-hidden="true">⌄</i></button><button id="course-campus-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>校区</span><i aria-hidden="true">⌄</i></button><button id="course-open-only" class="mp-course-filter-chip" type="button" data-course-class-filter aria-pressed="false"><span>仅看可报名</span></button></div></section>`, `<section class="mp-course-list-section"><div class="mp-course-list-head"><div class="mp-list-summary"><h2>课程列表</h2><span id="course-result-count" class="mp-muted"></span></div><div class="mp-sort-switch" role="group" aria-label="课程排序"><button class="active" type="button" data-course-sort="latest" aria-pressed="true">最新</button><button type="button" data-course-sort="sales" aria-pressed="false">销量</button></div></div><div id="course-list" class="mp-list"></div></section>`, `<dialog id="course-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="course-cascade-title"><header class="mp-cascade-head"><div><h2 id="course-cascade-title">选择专业</h2><p id="course-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="course-cascade-path" class="mp-cascade-path"></div><div id="course-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="course-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="course-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`, `<dialog id="course-choice-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-choice-title"><header class="mp-cascade-head"><div><h2 id="course-choice-title">选择筛选条件</h2><p>点击选项后立即生效</p></div><button class="mp-cascade-close" type="button" data-choice-close aria-label="关闭筛选">×</button></header><div id="course-choice-options" class="mp-cascade-options" role="listbox"></div></section></dialog>`));
+  layout(stack(`<form id="course-search-form" class="mp-course-search" role="search"><input id="course-search" aria-label="搜索课程或专业" placeholder="搜索课程或专业" value="${esc(params.get('q') || '')}"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form>`, `<section class="mp-course-browser" aria-label="课程浏览"><div class="mp-tabs mp-course-type-tabs" role="tablist"><button class="mp-tab ${initialCourseTab === 'class' ? 'active' : ''}" type="button" data-course-tab="class" role="tab" aria-selected="${initialCourseTab === 'class'}">面授课程</button><button class="mp-tab ${initialCourseTab === 'video' ? 'active' : ''}" type="button" data-course-tab="video" role="tab" aria-selected="${initialCourseTab === 'video'}">视频课程</button></div><div class="mp-course-filter-row" aria-label="课程筛选条件"><button id="course-profession-trigger" class="mp-course-filter-chip" type="button" aria-haspopup="dialog" aria-controls="course-profession-dialog" aria-expanded="false"><span id="course-profession-value">专业</span><i aria-hidden="true">⌄</i></button><button id="course-level-trigger" class="mp-course-filter-chip" type="button"><span>难度</span><i aria-hidden="true">⌄</i></button><button id="course-age-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>适合年龄</span><i aria-hidden="true">⌄</i></button></div></section>`, `<section class="mp-course-list-section"><div class="mp-course-list-head"><div class="mp-list-summary"><h2>课程列表</h2><span id="course-result-count" class="mp-muted"></span></div><div class="mp-sort-switch" role="group" aria-label="课程排序"><button class="active" type="button" data-course-sort="latest" aria-pressed="true">最新</button><button type="button" data-course-sort="sales" aria-pressed="false">销量</button></div></div><div id="course-list" class="mp-list"></div></section>`, `<dialog id="course-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="course-cascade-title"><header class="mp-cascade-head"><div><h2 id="course-cascade-title">选择专业</h2><p id="course-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="course-cascade-path" class="mp-cascade-path"></div><div id="course-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="course-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="course-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`, `<dialog id="course-choice-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-choice-title"><header class="mp-cascade-head"><div><h2 id="course-choice-title">选择筛选条件</h2><p>点击选项后立即生效</p></div><button class="mp-cascade-close" type="button" data-choice-close aria-label="关闭筛选">×</button></header><div id="course-choice-options" class="mp-cascade-options" role="listbox"></div></section></dialog>`));
   const professionTrigger = document.querySelector('#course-profession-trigger');
   const professionValue = document.querySelector('#course-profession-value');
   const cascadeDialog = document.querySelector('#course-profession-dialog');
@@ -548,14 +551,10 @@ function renderCourses() {
   const choiceDialog = document.querySelector('#course-choice-dialog');
   const choiceTitle = document.querySelector('#course-choice-title');
   const choiceOptions = document.querySelector('#course-choice-options');
-  const openOnlyTrigger = document.querySelector('#course-open-only');
   const levelTrigger = document.querySelector('#course-level-trigger');
   const ageTrigger = document.querySelector('#course-age-trigger');
-  const campusTrigger = document.querySelector('#course-campus-trigger');
   let level = params.get('level') || '';
   let age = params.get('age') || '';
-  let campus = params.get('campus') || '';
-  let openOnly = false;
   let activeCourseTab = initialCourseTab;
   let activeSort = params.get('sort') === 'sales' ? 'sales' : 'latest';
   const cascadeSteps = [
@@ -573,13 +572,10 @@ function renderCourses() {
   const updateFilterControls = () => {
     const isClass = activeCourseTab === 'class';
     const classFilterVisible = isClass;
-    // 面授页签保留校区与适合年龄，视频页签隐藏只对面授有意义的筛选项。
+    // 适合年龄仅用于面授课程。
     document.querySelectorAll('[data-course-class-filter]').forEach(item => { item.hidden = !classFilterVisible; });
     levelTrigger.querySelector('span').textContent = level || '难度';
     ageTrigger.querySelector('span').textContent = age || '适合年龄';
-    campusTrigger.querySelector('span').textContent = campus || '校区';
-    openOnlyTrigger.classList.toggle('has-value', openOnly);
-    openOnlyTrigger.setAttribute('aria-pressed', String(openOnly));
     // 搜索范围随页签变化：面授只匹配课程名称与专业，视频才包含授课教师，占位文案同步切换。
     const searchInput = document.querySelector('#course-search');
     if (searchInput) {
@@ -629,8 +625,7 @@ function renderCourses() {
     const items = sortedLearnerItems(state.courses.filter(item => {
       const searchable = `${item.name}${item.type === 'video' ? item.teacher : ''}${item.category}${item.discipline || ''}${item.field || ''}${item.professional || ''}`.toLowerCase();
       const categoryMatch = !categoryFilter || [item.discipline, item.field, item.professional, item.category].filter(Boolean).some(value => value.includes(categoryFilter));
-      const campusMatch = !campus || (item.classOptions || []).some(option => option.campus === campus);
-      return item.type === activeCourseTab && categoryMatch && (!discipline || item.discipline === discipline) && (!field || item.field === field) && (!professional || item.professional === professional) && (!level || item.level === level) && (item.type !== 'class' || ((!age || String(item.age).includes(age)) && campusMatch)) && (!openOnly || item.type !== 'class' || item.bookable) && searchable.includes(keyword);
+      return item.type === activeCourseTab && categoryMatch && (!discipline || item.discipline === discipline) && (!field || item.field === field) && (!professional || item.professional === professional) && (!level || item.level === level) && (item.type !== 'class' || !age || String(item.age).includes(age)) && searchable.includes(keyword);
     }), activeSort);
     document.querySelector('#course-list').innerHTML = items.length ? items.map(item => courseCard(item)).join('') : `<div class="mp-empty">暂无符合条件的课程</div>`;
     document.querySelector('#course-result-count').textContent = `${items.length}门课程`;
@@ -681,10 +676,8 @@ function renderCourses() {
   cascadeDialog.addEventListener('close', () => professionTrigger.setAttribute('aria-expanded', 'false'));
   levelTrigger.addEventListener('click', () => openChoiceDialog('选择难度', levels, level, value => { level = value; }));
   ageTrigger.addEventListener('click', () => openChoiceDialog('选择适合年龄', ages, age, value => { age = value; }));
-  campusTrigger.addEventListener('click', () => openChoiceDialog('选择校区', campuses, campus, value => { campus = value; }));
   document.querySelector('[data-choice-close]').addEventListener('click', () => choiceDialog.close());
-  openOnlyTrigger.addEventListener('click', () => { openOnly = !openOnly; updateFilterControls(); draw(); });
-  document.querySelectorAll('[data-course-tab]').forEach(tab => tab.addEventListener('click', () => { activeCourseTab = tab.dataset.courseTab; if (activeCourseTab === 'video') { age = ''; campus = ''; openOnly = false; } const url = new URL(window.location.href); url.searchParams.set('type', activeCourseTab); window.history.replaceState({}, '', url); document.querySelectorAll('[data-course-tab]').forEach(item => { const active = item === tab; item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active)); }); updateFilterControls(); draw(); }));
+  document.querySelectorAll('[data-course-tab]').forEach(tab => tab.addEventListener('click', () => { activeCourseTab = tab.dataset.courseTab; if (activeCourseTab === 'video') age = ''; const url = new URL(window.location.href); url.searchParams.set('type', activeCourseTab); window.history.replaceState({}, '', url); document.querySelectorAll('[data-course-tab]').forEach(item => { const active = item === tab; item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active)); }); updateFilterControls(); draw(); }));
   document.querySelector('#course-search-form').addEventListener('submit', event => { event.preventDefault(); draw(); });
   document.querySelector('#course-search').addEventListener('input', draw);
   document.querySelectorAll('[data-course-sort]').forEach(control => control.addEventListener('click', () => {
@@ -761,16 +754,22 @@ function courseTeacherSection(item) {
 function courseCoverTags(item, typeLabel, status, statusTone) {
   return `${pill(typeLabel, 'light')}${pill(status, statusTone)}${(item.tags || []).slice(0, 2).map(tag => pill(tag, 'light')).join('')}`;
 }
+function courseDetailContent(item, detailTab, { playable = false, purchased = false } = {}) {
+  const chapters = Array.isArray(item.chapters) && item.chapters.length ? item.chapters : (item.outline || []);
+  const paragraphs = item.detailHtml ? richTextBody(item.detailHtml) : (item.detail || [item.intro]).filter(Boolean).map(text => `<p>${esc(text)}</p>`).join('') || '<p class="mp-muted">课程介绍暂未维护。</p>';
+  const content = detailTab === 'outline'
+    ? `<div class="mp-section-head"><h3>课程大纲</h3><span class="mp-muted">共${chapters.length}章</span></div>${courseOutlineMarkup(item, { playable, purchased })}`
+    : `<h3>课程介绍</h3><article class="mp-rich-content mp-course-detail-content">${paragraphs}</article>`;
+  return `<section class="mp-course-detail-tab-section"><div class="mp-tabs mp-course-detail-tabs" role="tablist" aria-label="课程内容切换">${[['intro', '课程介绍'], ['outline', '课程大纲']].map(([tab, label]) => `<button class="mp-tab ${detailTab === tab ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === tab}" data-course-detail-tab="${tab}">${label}</button>`).join('')}</div>${card(content, 'mp-course-detail-section')}</section>`;
+}
 function renderOfflineCourseDetail(item) {
+  const coverMark = (item.professional || item.discipline || item.name || '课').slice(0, 1);
   const detailTab = params.get('tab') === 'outline' ? 'outline' : 'intro';
-  const detailParagraphs = (item.detail || [item.intro]).filter(Boolean).map(text => `<p>${esc(text)}</p>`).join('') || '<p class="mp-muted">课程介绍暂未维护。</p>';
-  const outline = Array.isArray(item.outline) ? item.outline : [];
-  const outlineContent = courseOutlineMarkup(item);
   const recommendation = item.recommendation ? `<p class="mp-course-detail-subtitle">${esc(item.recommendation)}</p>` : '';
   layout(stack(
-    `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${courseCoverTags(item, '面授课程', item.status, item.bookable ? 'green' : 'gray')}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">课程档案</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2></div>${recommendation}<dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div><div><dt>适合年龄</dt><dd>${esc(item.age)}</dd></div><div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div><dt>可报班级</dt><dd>${esc(item.bookableClassCount)}个</dd></div></dl></div></section>`,
+    `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover class-cover" data-cover-mark="${esc(coverMark)}">${offlineCourseCoverImage(item)}<div class="mp-course-detail-cover-tags">${courseCoverTags(item, '面授课程', item.status, item.bookable ? 'green' : 'gray')}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">课程档案</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2></div>${recommendation}<dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div><div><dt>适合年龄</dt><dd>${esc(item.age)}</dd></div><div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div><div><dt>可报班级</dt><dd>${esc(item.bookableClassCount)}个</dd></div></dl></div></section>`,
     courseTeacherSection(item),
-    `<section class="mp-course-detail-tab-section"><div class="mp-tabs mp-course-detail-tabs" role="tablist"><button class="mp-tab ${detailTab === 'intro' ? 'active' : ''}" type="button" data-course-detail-tab="intro">课程介绍</button><button class="mp-tab ${detailTab === 'outline' ? 'active' : ''}" type="button" data-course-detail-tab="outline">课程大纲</button></div>${detailTab === 'outline' ? card(outlineContent, 'mp-course-detail-section') : card(`<h3>课程介绍</h3><article class="mp-rich-content mp-course-detail-content">${detailParagraphs}</article>`, 'mp-course-detail-section')}</section>`,
+    courseDetailContent(item, detailTab),
     `<div class="mp-bottom-actions mp-course-detail-actions">
       <button class="mp-button secondary mp-icon-action" type="button" data-action="consult"><span class="mp-linear-icon mp-linear-icon-consult" aria-hidden="true"></span><span>咨询</span></button>
       <button class="mp-button secondary mp-icon-action" type="button" data-action="share"><span class="mp-linear-icon mp-linear-icon-share" aria-hidden="true"></span><span>分享</span></button>
@@ -788,16 +787,13 @@ function renderCourseDetail(item) {
   const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
   const detailTab = params.get('tab') === 'outline' ? 'outline' : 'intro';
   const ageFact = `<div><dt>适合年龄</dt><dd>${esc(item.age || '不限')}</dd></div>`;
-  const detailParagraphs = item.detailHtml ? richTextBody(item.detailHtml) : (item.detail || [item.intro]).filter(Boolean).map(text => `<p>${esc(text)}</p>`).join('');
-  const hasOutline = Array.isArray(item.outline) && item.outline.length > 0;
   const purchased = hasPurchasedVideo(item);
-  const outlineContent = hasOutline ? courseOutlineMarkup(item, { playable: !isClass, purchased }) : '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
   const recommendation = item.recommendation ? `<p class="mp-course-detail-subtitle">${esc(item.recommendation)}</p>` : '';
 
   layout(stack(
     `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${courseCoverTags(item, isClass ? '面授课程' : '精品视频', status, statusTone)}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">${isClass ? '面授课程' : '精品课程'}</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2><strong>${money2(item.price)}</strong></div>${recommendation}<dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div>${ageFact}<div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div></dl></div></section>`,
     courseTeacherSection(item),
-    `<section class="mp-course-detail-tab-section"><div class="mp-tabs mp-course-detail-tabs" role="tablist"><button class="mp-tab ${detailTab === 'intro' ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === 'intro'}" data-course-detail-tab="intro">课程介绍</button>${hasOutline ? `<button class="mp-tab ${detailTab === 'outline' ? 'active' : ''}" type="button" role="tab" aria-selected="${detailTab === 'outline'}" data-course-detail-tab="outline">课程大纲</button>` : ''}</div>${detailTab === 'outline' ? card(`<div class="mp-section-head"><h3>课程大纲</h3><span class="mp-muted">共${item.outline.length}章</span></div>${outlineContent}`, 'mp-course-detail-section') : card(`<h3>课程介绍</h3><article class="mp-rich-content mp-course-detail-content">${detailParagraphs}<figure class="mp-rich-figure"><div class="mp-rich-image" role="img" aria-label="${esc(item.name)}课程内容图片占位"><span>课程图文</span><strong>${esc(item.professional || item.category)}课堂内容</strong></div><figcaption>课程内容展示，以实际发布内容为准</figcaption></figure></article>`, 'mp-course-detail-section')}</section>`,
+    courseDetailContent(item, detailTab, { playable: !isClass, purchased }),
     detailActions(item)
   ));
   document.querySelectorAll('[data-course-detail-tab]').forEach(tab => tab.addEventListener('click', () => go(`/learner/pages/course-detail.html?courseId=${encodeURIComponent(item.id)}&tab=${tab.dataset.courseDetailTab}`)));
@@ -815,7 +811,7 @@ function fastRegistrationCard(item) {
 function renderFastRegistration() {
   const courseIdFilter = params.get('courseId') || '';
   const filteredCourse = courseIdFilter ? state.courses.find(item => item.id === courseIdFilter) : null;
-  const classItems = (state.classOptions || []).filter(item => (!courseIdFilter || item.courseId === courseIdFilter) && item.visible && !['CLASS_STARTED', 'CLASS_CANCELLED'].includes(item.unavailableReasonCode));
+  const classItems = (state.classOptions || []).filter(item => (!courseIdFilter || item.courseId === courseIdFilter) && item.visible && item.learnerStatus !== '报名结束' && !['CLASS_STARTED', 'CLASS_CANCELLED'].includes(item.unavailableReasonCode));
   const campusOptions = [...new Set(classItems.map(item => item.campus).filter(Boolean))];
   const disciplineOptions = [...new Set(state.courses.map(item => item.discipline).filter(Boolean))];
   const professionalTree = disciplineOptions.map(discipline => ({
@@ -826,7 +822,7 @@ function renderFastRegistration() {
     }))
   }));
   const filterOptions = (items, emptyText) => `<option value="">${emptyText}</option>${items.map(item => `<option value="${esc(item)}">${esc(item)}</option>`).join('')}`;
-  layout(stack(card(`<div class="mp-section-head"><h2 id="fast-batch-title">2026年秋季</h2><span id="fast-result-count" class="mp-muted"></span></div><div class="mp-tabs"><button class="mp-tab" data-season="春季">春季</button><button class="mp-tab" data-season="暑假">暑假</button><button class="mp-tab active" data-season="秋季">秋季</button><button class="mp-tab" data-season="寒假">寒假</button></div><div class="mp-fast-filter-chips" aria-label="报名筛选条件"><button id="fast-profession-trigger" class="mp-fast-filter-chip" type="button" aria-haspopup="dialog" aria-controls="fast-profession-dialog" aria-expanded="false"><span>专业</span><b id="fast-profession-value">全部专业</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="campus"><span>校区</span><b id="fast-campus-value">全部校区</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="weekday"><span>上课时间</span><b id="fast-weekday-value">全部时间</b><i aria-hidden="true">›</i></button><button id="fast-open-only" class="mp-fast-filter-chip" type="button" aria-pressed="false"><span>只看可报名</span></button></div><div class="mp-fast-filter-actions"><button id="fast-filter-reset" class="mp-button ghost" type="button">重置筛选</button></div><div class="mp-fast-sort-row"><span>排序</span><div class="mp-sort-switch" role="group" aria-label="快速报名排序"><button class="active" type="button" data-fast-sort="latest" aria-pressed="true">最新</button><button type="button" data-fast-sort="sales" aria-pressed="false">销量</button></div></div>`), `<div id="class-list" class="mp-registration-list"></div>`, `<dialog id="fast-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="fast-cascade-title"><header class="mp-cascade-head"><div><h2 id="fast-cascade-title">选择专业</h2><p id="fast-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="fast-cascade-path" class="mp-cascade-path"></div><div id="fast-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="fast-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="fast-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`));
+  layout(stack(`<section class="mp-fast-toolbar" aria-label="报名筛选"><form id="fast-course-search-form" class="mp-course-search" role="search"><input id="fast-course-search" type="search" aria-label="搜索课程名称" placeholder="搜索课程名称"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form><div class="mp-tabs"><button class="mp-tab" data-season="春季">春季</button><button class="mp-tab" data-season="暑假">暑假</button><button class="mp-tab active" data-season="秋季">秋季</button><button class="mp-tab" data-season="寒假">寒假</button></div><div class="mp-fast-filter-chips" aria-label="报名筛选条件"><button id="fast-profession-trigger" class="mp-fast-filter-chip" type="button" aria-haspopup="dialog" aria-controls="fast-profession-dialog" aria-expanded="false"><span>专业</span><b id="fast-profession-value">全部专业</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="campus"><span>校区</span><b id="fast-campus-value">全部校区</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="weekday"><span>上课时间</span><b id="fast-weekday-value">全部时间</b><i aria-hidden="true">›</i></button><button id="fast-filter-reset" class="mp-fast-reset" type="button" aria-label="重置筛选" title="重置筛选" hidden><span aria-hidden="true">↺</span></button></div></section>`, `<section class="mp-fast-results"><div class="mp-fast-list-head"><div class="mp-fast-summary"><span id="fast-course-scope"></span><span id="fast-result-count" class="mp-muted" aria-live="polite"></span></div><div class="mp-sort-switch" role="group" aria-label="快速报名排序"><button class="active" type="button" data-fast-sort="latest" aria-pressed="true">最新</button><button type="button" data-fast-sort="sales" aria-pressed="false">销量</button></div></div><div id="class-list" class="mp-registration-list"></div></section>`, `<dialog id="fast-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="fast-cascade-title"><header class="mp-cascade-head"><div><h2 id="fast-cascade-title">选择专业</h2><p id="fast-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="fast-cascade-path" class="mp-cascade-path"></div><div id="fast-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="fast-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="fast-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`));
   const selectedMajor = { discipline: '', field: '', professional: '' };
   const professionTrigger = document.querySelector('#fast-profession-trigger');
   const professionValue = document.querySelector('#fast-profession-value');
@@ -840,7 +836,6 @@ function renderFastRegistration() {
   const cascadeConfirm = document.querySelector('#fast-cascade-confirm');
   let selectedCampus = '';
   let selectedWeekday = '';
-  let openOnly = false;
   let activeSort = params.get('sort') === 'sales' ? 'sales' : 'latest';
   const cascadeSteps = [{ key: 'discipline', label: '专业门类' }, { key: 'field', label: '专业分类' }, { key: 'professional', label: '专业' }];
   let draftMajor = { ...selectedMajor };
@@ -862,10 +857,6 @@ function renderFastRegistration() {
     weekdayTrigger.classList.toggle('has-value', Boolean(selectedWeekday));
     campusTrigger.setAttribute('aria-label', `校区：${campusValue}`);
     weekdayTrigger.setAttribute('aria-label', `上课时间：${weekdayValue}`);
-    const openOnlyTrigger = document.querySelector('#fast-open-only');
-    openOnlyTrigger.classList.toggle('has-value', openOnly);
-    openOnlyTrigger.setAttribute('aria-pressed', String(openOnly));
-    openOnlyTrigger.setAttribute('aria-label', `只看可报名：${openOnly ? '已开启' : '未开启'}`);
   };
   const cascadeValues = () => {
     if (activeCascadeStep === 'discipline') return professionalTree.map(item => item.value);
@@ -897,10 +888,12 @@ function renderFastRegistration() {
   };
   const draw = () => {
     const activeSeason = document.querySelector('[data-season].active')?.dataset.season || '秋季';
-    const items = sortedLearnerItems(classItems.filter(item => (item.season || '秋季') === activeSeason && (!selectedMajor.discipline || item.discipline === selectedMajor.discipline) && (!selectedMajor.field || item.field === selectedMajor.field) && (!selectedMajor.professional || item.professional === selectedMajor.professional) && (!selectedCampus || item.campus === selectedCampus) && scheduleMatches(item.schedule, selectedWeekday) && (!openOnly || item.bookable)), activeSort);
-    document.querySelector('#fast-batch-title').textContent = filteredCourse ? `${filteredCourse.name} · ${activeSeason}` : `2026年${activeSeason}`;
+    const keyword = document.querySelector('#fast-course-search').value.trim().toLowerCase();
+    const items = sortedLearnerItems(classItems.filter(item => (item.season || '秋季') === activeSeason && (!selectedMajor.discipline || item.discipline === selectedMajor.discipline) && (!selectedMajor.field || item.field === selectedMajor.field) && (!selectedMajor.professional || item.professional === selectedMajor.professional) && (!selectedCampus || item.campus === selectedCampus) && scheduleMatches(item.schedule, selectedWeekday) && String(item.courseName || item.name || '').toLowerCase().includes(keyword)), activeSort);
+    document.querySelector('#fast-course-scope').textContent = filteredCourse ? filteredCourse.name : '';
+    document.querySelector('#fast-filter-reset').hidden = !(keyword || selectedMajor.discipline || selectedMajor.field || selectedMajor.professional || selectedCampus || selectedWeekday);
     document.querySelector('#fast-result-count').textContent = `${items.length}个班级`;
-    document.querySelector('#class-list').innerHTML = items.length ? items.map(fastRegistrationCard).join('') : '<div class="mp-empty">当前条件下暂无可报名班级</div>';
+    document.querySelector('#class-list').innerHTML = items.length ? items.map(fastRegistrationCard).join('') : '<div class="mp-empty">暂无符合条件的班级</div>';
   };
   document.querySelectorAll('[data-season]').forEach(tab => tab.addEventListener('click', () => {
     document.querySelectorAll('[data-season]').forEach(item => item.classList.remove('active'));
@@ -967,8 +960,9 @@ function renderFastRegistration() {
     dialog.addEventListener('close', () => dialog.remove(), { once: true });
   };
   document.querySelectorAll('[data-fast-choice]').forEach(chip => chip.addEventListener('click', () => openFastChoice(chip.dataset.fastChoice)));
-  document.querySelector('#fast-open-only').addEventListener('click', () => { openOnly = !openOnly; updateFastFilterChips(); draw(); });
-  document.querySelector('#fast-filter-reset').addEventListener('click', () => { Object.assign(selectedMajor, { discipline: '', field: '', professional: '' }); selectedCampus = ''; selectedWeekday = ''; openOnly = false; updateProfessionValue(); updateFastFilterChips(); draw(); });
+  document.querySelector('#fast-course-search').addEventListener('input', draw);
+  document.querySelector('#fast-course-search-form').addEventListener('submit', event => { event.preventDefault(); draw(); });
+  document.querySelector('#fast-filter-reset').addEventListener('click', () => { Object.assign(selectedMajor, { discipline: '', field: '', professional: '' }); selectedCampus = ''; selectedWeekday = ''; document.querySelector('#fast-course-search').value = ''; updateProfessionValue(); updateFastFilterChips(); draw(); });
   document.querySelectorAll('[data-fast-sort]').forEach(control => control.addEventListener('click', () => {
     activeSort = control.dataset.fastSort;
     document.querySelectorAll('[data-fast-sort]').forEach(item => { const active = item === control; item.classList.toggle('active', active); item.setAttribute('aria-pressed', String(active)); });

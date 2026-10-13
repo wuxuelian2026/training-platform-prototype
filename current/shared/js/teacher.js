@@ -877,7 +877,7 @@ function classRosterOf(classItem) {
   });
 }
 function classGraduationState(classItem) {
-  const records = demoLocalize(teacherState.graduationRecords).filter((item) => item.className === classItem.name);
+  const records = demoLocalize(teacherState.graduationRecords).filter((item) => item.classId ? item.classId === classItem.id : item.className === classItem.name);
   const submittedNames = new Set(records.map((item) => item.student));
   const roster = classRosterOf(classItem);
   const pending = roster.filter((student) => !submittedNames.has(student.name));
@@ -885,9 +885,10 @@ function classGraduationState(classItem) {
   return { records, pending, allLessonsDone };
 }
 function teacherClassGraduationPanel(classItem) {
-  const { records, pending, allLessonsDone } = classGraduationState(classItem);
-  const list = records.length
-    ? records.map((item) => `<article class="teacher-class-graduation-row"><div><strong>${tEsc(item.student)}</strong><small>${tEsc(item.completedAt || '')} 结课</small><p class="teacher-class-graduation-facts">出勤率 ${tEsc(item.attendanceRate ?? '—')}% · 作业提交率 ${tEsc(item.homeworkRate ?? '—')}% · 完成课次 ${tEsc(item.lessons || '—')}</p></div>${tPill(item.status, item.status === '已完成' || item.status === '已通过' ? 'green' : item.status === '需补课' || item.status === '补课中' ? 'amber' : '')}</article>`).join('')
+  const { pending, allLessonsDone } = classGraduationState(classItem);
+  const batches = teacherGraduationBatches().filter(batch => batch.records.some(record => record.classId ? record.classId === classItem.id : record.className === classItem.name));
+  const list = batches.length
+    ? batches.map(graduationBatchCard).join('')
     : '<div class="teacher-class-empty"><strong>暂无结业申请</strong><p>本班全部课次完成后，可在这里发起结业申请。</p></div>';
   const applyEntry = allLessonsDone && pending.length
     ? `<div class="teacher-class-graduation-apply"><p>本班课次已全部完成，${pending.length} 名学员可提交结业申请；提交后由教务按学员复核。</p>${tButton('发起结业申请', 'data-class-graduation-apply')}</div>`
@@ -895,8 +896,8 @@ function teacherClassGraduationPanel(classItem) {
       ? '<p class="teacher-class-graduation-note">本班学员均已提交结业申请，等待教务复核结果。</p>'
       : '<p class="teacher-class-graduation-note">全部课次完成后可发起结业申请。</p>';
   // CR138-08：班级「已结束」只表示课次完成，与学员结业相互独立；本条说明避免把两者混为一个状态。
-  const scopeNote = '<p class="teacher-class-graduation-note">班级「已结束」只表示全部课次完成，不代表每位学员已结业；学员结业按人复核，状态可为审核中／需补课／已通过／已取消。</p>';
-  return `<section class="teacher-class-graduation-panel" id="teacher-class-section-graduation" data-class-section="graduation"><div class="teacher-class-detail-section-head"><h3>本班结业申请</h3><span>${records.length} 条</span></div>${scopeNote}${list}${applyEntry}</section>`;
+  const scopeNote = '<p class="teacher-class-graduation-note">班级「已结束」只表示全部课次完成，不代表每位学员已结业；学员结业按人复核，状态为审核中／已通过。</p>';
+  return `<section class="teacher-class-graduation-panel" id="teacher-class-section-graduation" data-class-section="graduation"><div class="teacher-class-detail-section-head"><h3>本班结业申请</h3><span>${batches.length} 条班级申请</span></div>${scopeNote}${list}${applyEntry}</section>`;
 }
 function graduationApplyDraftKey(classId) { return `hbyx-teacher-graduation-draft-${classId}`; }
 function readGraduationApplyDraft(classId) {
@@ -958,11 +959,10 @@ function renderClassGraduationApply() {
     if (incomplete) { error.hidden = false; error.textContent = `请完善${incomplete.name}的综合评语和成长建议`; return; }
     const lastSession = [...(classItem.sessions || [])].reverse()[0] || {};
     const submittedAt = demoTime();
-    const batchId = demoId('graduation-batch');
     const created = details.map(({ name, comment, advice }) => {
       const student = classRosterOf(classItem).find((item) => item.name === name) || {};
       return {
-        id: demoId('graduation'), batchId, classId: classItem.id, student: name, avatar: name.slice(0, 1), className: classItem.name, course: classItem.course,
+        id: demoId('graduation'), classId: classItem.id, student: name, avatar: name.slice(0, 1), className: classItem.name, course: classItem.course,
         professional: classItem.professional || '', completedAt: lastSession.date || DEMO_TODAY, submittedAt,
         status: '审核中', attendanceRate: student.attendance ?? '—', homeworkRate: student.homework ?? '—',
         lessons: `${classItem.total}/${classItem.total}`, comment, advice,
@@ -1911,11 +1911,12 @@ function teacherGraduationBatches() {
   const batches = new Map();
   for (const record of demoLocalize(teacherState.graduationRecords).map(enrichGraduationRecord)) {
     const classKey = record.classId || classIdForName(record.className) || record.className;
-    // 历史记录无批次号时按同班同次提交归组；缺少提交时间时不猜测批次。
-    const legacyBatch = record.submittedAt !== '—' ? record.submittedAt : record.id;
-    const id = JSON.stringify([classKey, record.batchId || legacyBatch]);
+    // 一个班级只有一条申请，旧批次仅保留在学员原始记录中，不再拆分申请。
+    const id = classKey;
     if (!batches.has(id)) batches.set(id, { id, className: record.className, course: record.course, professional: record.professional, submittedAt: record.submittedAt, records: [] });
     batches.get(id).records.push(record);
+    const application = batches.get(id);
+    if (record.submittedAt !== '—' && (application.submittedAt === '—' || record.submittedAt < application.submittedAt)) application.submittedAt = record.submittedAt;
   }
   return [...batches.values()].map(batch => {
     const total = batch.records.length;
@@ -1924,7 +1925,7 @@ function teacherGraduationBatches() {
   }).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
 }
 function graduationBatchCard(batch) {
-  const href = relativePath(`/teacher/pages/graduation-detail.html?batch=${encodeURIComponent(batch.id)}`);
+  const href = relativePath(`/teacher/pages/graduation-detail.html?class=${encodeURIComponent(batch.id)}`);
   return `<a class="teacher-graduation-card teacher-graduation-batch" href="${tEsc(href)}"><div class="teacher-graduation-card-head"><div class="teacher-graduation-batch-title"><h3>${tEsc(batch.className)}</h3><p>${tEsc(batch.course)} · ${tEsc(batch.professional)}</p></div>${tPill(batch.status, batch.pending ? 'brand' : 'green')}</div><dl class="teacher-graduation-metrics"><div><dt>申请人数</dt><dd>${batch.total} 人</dd></div><div><dt>审核中</dt><dd>${batch.pending} 人</dd></div><div><dt>已通过</dt><dd>${batch.passed}/${batch.total} 人</dd></div></dl><div class="teacher-graduation-card-foot"><span>${tEsc(batch.submittedAt)} 提交</span><strong>查看申请<i aria-hidden="true">›</i></strong></div></a>`;
 }
 function renderTeacherGraduations() {
@@ -1939,7 +1940,7 @@ function renderTeacherGraduations() {
   tLayout(tStack(
     `<nav class="teacher-graduation-filters" aria-label="结业申请筛选">${filters.map(([name, count]) => `<button type="button" class="${teacherGraduationFilter === name ? 'active' : ''}" data-graduation-filter="${name}" aria-pressed="${teacherGraduationFilter === name}">${name}<span>${count}</span></button>`).join('')}</nav>`,
     `<label class="teacher-graduation-class-filter"><span>按班级筛选</span><select data-graduation-class-filter aria-label="按班级筛选"><option value="全部">全部班级</option>${classOptions.map(name => `<option value="${tEsc(name)}" ${teacherGraduationClassFilter === name ? 'selected' : ''}>${tEsc(name)}</option>`).join('')}</select></label>`,
-    `<section class="teacher-graduation-list"><div class="teacher-graduation-list-head"><h2>${teacherGraduationFilter === '全部' ? '全部申请' : teacherGraduationFilter}</h2><span>${visible.length} 个申请批次</span></div>${visible.length ? visible.map(graduationBatchCard).join('') : '<div class="teacher-contract-empty">暂无符合条件的结业申请</div>'}</section>`
+    `<section class="teacher-graduation-list"><div class="teacher-graduation-list-head"><h2>${teacherGraduationFilter === '全部' ? '全部申请' : teacherGraduationFilter}</h2><span>${visible.length} 条班级申请</span></div>${visible.length ? visible.map(graduationBatchCard).join('') : '<div class="teacher-contract-empty">暂无符合条件的结业申请</div>'}</section>`
   ));
 }
 function classIdForName(name) { return mergeClassSeed(readDemoState().classes || []).find(item => item.name === name)?.id || ''; }
@@ -1959,11 +1960,17 @@ function graduationResultBlock(record) {
   return `<section class="teacher-graduation-section"><div class="teacher-graduation-section-head"><h2>复核结果</h2>${tPill(record.status, 'brand')}</div><p class="teacher-graduation-result-copy">后台正在核对考勤、作业和教师评语。不达标学员的补课与退费由教务线下处理，处理完成后由后台置为已通过。</p></section>`;
 }
 function renderTeacherGraduationDetail() {
-  const batchId = new URLSearchParams(location.search).get('batch');
-  if (batchId !== null) {
-    const batch = teacherGraduationBatches().find(item => item.id === batchId);
+  const params = new URLSearchParams(location.search);
+  let classId = params.get('class');
+  const legacyBatch = params.get('batch');
+  if (classId === null && legacyBatch !== null) {
+    try { const key = JSON.parse(legacyBatch); classId = Array.isArray(key) ? key[0] : legacyBatch; }
+    catch { classId = legacyBatch; }
+  }
+  if (classId !== null) {
+    const batch = teacherGraduationBatches().find(item => item.id === classId);
     if (!batch) {
-      tLayout(tStack(`<div class="teacher-contract-empty">未找到该申请批次</div><a class="mp-button secondary" href="${relativePath('/teacher/pages/graduation.html')}">返回申请记录</a>`));
+      tLayout(tStack(`<div class="teacher-contract-empty">未找到该班级申请</div><a class="mp-button secondary" href="${relativePath('/teacher/pages/graduation.html')}">返回申请记录</a>`));
       return;
     }
     tLayout(tStack(
