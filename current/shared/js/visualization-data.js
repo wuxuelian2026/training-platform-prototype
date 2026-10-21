@@ -51,6 +51,19 @@ export function academicPeriod(startYear, now = new Date()) {
   return { startYear, startDate, endDate, cutoffDate, label: startYear + '-' + (startYear + 1), months };
 }
 
+function calendarPeriod(year, now = new Date()) {
+  const today = shanghaiDate(now);
+  const startDate = year + '-01-01';
+  const endDate = year + '-12-31';
+  const cutoffDate = today < endDate ? today : endDate;
+  const months = Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
+    const key = year + '-' + String(month).padStart(2, '0');
+    return { key, year, month, label: month + '月', future: key > cutoffDate.slice(0, 7) };
+  });
+  return { year, startDate, endDate, cutoffDate, months };
+}
+
 // 展示样例独立于三端业务存储；同时保留支付、退款、学籍和班级事实，避免用静态总数拼榜单。
 export function createDemoFacts(startYear) {
   const facts = { courses: [...OFFLINE_COURSES, ...VIDEO_COURSES], teachers: TEACHERS,
@@ -167,6 +180,7 @@ export function compareAcademicYears(facts, startYear, now = new Date()) {
 
 export function aggregateDashboard(facts, startYear, now = new Date()) {
   const period = academicPeriod(startYear, now);
+  const incomePeriod = calendarPeriod(startYear, now);
   const inPeriod = value => {
     const date = datePart(value);
     return date >= period.startDate && date <= period.cutoffDate;
@@ -243,6 +257,23 @@ export function aggregateDashboard(facts, startYear, now = new Date()) {
     if (order) receipts.push({ date: datePart(row.completedOn), kind: order.kind, courseId: order.courseId,
       grossCents: 0, refundCents: row.amountCents });
   });
+  const inIncomePeriod = value => {
+    const date = datePart(value);
+    return date >= incomePeriod.startDate && date <= incomePeriod.cutoffDate;
+  };
+  const incomeReceipts = orders.filter(row => inIncomePeriod(row.paidOn)).map(row => ({
+    date: datePart(row.paidOn), kind: row.kind, grossCents: row.amountCents, refundCents: 0
+  }));
+  refunds.filter(row => inIncomePeriod(row.completedOn)).forEach(row => {
+    const order = orderById.get(row.orderId);
+    if (order) incomeReceipts.push({ date: datePart(row.completedOn), kind: order.kind, grossCents: 0, refundCents: row.amountCents });
+  });
+  const incomeMonthly = incomePeriod.months.map(month => ({ ...month, offlineCents: 0, videoCents: 0 }));
+  const incomeMonthByKey = new Map(incomeMonthly.map(row => [row.key, row]));
+  incomeReceipts.forEach(row => {
+    const month = incomeMonthByKey.get(row.date.slice(0, 7));
+    if (month && (row.kind === 'offline' || row.kind === 'video')) month[row.kind + 'Cents'] += row.grossCents - row.refundCents;
+  });
   const monthly = period.months.map(month => ({ ...month, offlineCents: 0, videoCents: 0 }));
   const monthByKey = new Map(monthly.map(row => [row.key, row]));
   const courseNet = new Map();
@@ -280,7 +311,7 @@ export function aggregateDashboard(facts, startYear, now = new Date()) {
   })).sort((a, b) => b.orders - a.orders || b.netCents - a.netCents || a.id.localeCompare(b.id)).slice(0, 10);
   const offlineNetCents = sum(monthly, 'offlineCents');
   const videoNetCents = sum(monthly, 'videoCents');
-  return { period, monthly, batches, admissionsEfficiency, admissionsConversion, sourceRanking, enrollmentMonthly,
+  return { period, monthly, incomePeriod, incomeMonthly, batches, admissionsEfficiency, admissionsConversion, sourceRanking, enrollmentMonthly,
     totals: { netCents: offlineNetCents + videoNetCents, offlineNetCents, videoNetCents,
       grossCents: sum(receipts, 'grossCents'), refundCents: sum(receipts, 'refundCents'),
       openedClasses: opened.length, enrolled: enrollments.length,

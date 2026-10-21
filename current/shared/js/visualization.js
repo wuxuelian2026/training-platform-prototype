@@ -18,12 +18,12 @@ function setMetric(id, value, unit) {
 }
 
 function renderIncome(data) {
-  const model = incomeChartModel(data.monthly);
+  const model = incomeChartModel(data.incomeMonthly);
   const axis = model.ticks.map((value, index) =>
     '<span class="axis-tick" style="top:' + index * 25 + '%">' + value + '</span>').join('');
   const lines = model.series.map((series, index) => '<polyline class="income-line ' + (index ? 'video' : 'offline') +
     '" points="' + series.points.map(point => point.x + ',' + point.y).join(' ') + '"/>').join('');
-  const columns = data.monthly.map((row, index) => {
+  const columns = data.incomeMonthly.map((row, index) => {
     const label = row.year + '年' + row.label;
     const description = row.future ? label + '，尚未发生' : label + '：面授净收 ' + money(row.offlineCents) + ' 万元，视频净收 ' + money(row.videoCents) + ' 万元';
     const dots = model.series.map((series, seriesIndex) => {
@@ -40,7 +40,7 @@ function renderIncome(data) {
     '<div class="chart-plot" style="--zero:' + model.zero + '%"><div class="chart-columns">' +
     '<div class="zero-line" aria-hidden="true"></div><svg class="income-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
     lines + '</svg>' + columns + '</div></div>';
-  byId('income-chart').setAttribute('aria-label', data.period.label + '学年，截至' + data.period.cutoffDate + '，面授与视频月度净收金额，单位万元');
+  byId('income-chart').setAttribute('aria-label', data.incomePeriod.year + '年，截至' + data.incomePeriod.cutoffDate + '，面授与视频月度净收金额，单位万元');
 }
 
 function renderYearComparison(comparison) {
@@ -72,6 +72,44 @@ function renderRanking(id, rows, video = false) {
   });
   while (body.length < 10) body.push('<tr class="rank-placeholder" aria-hidden="true"><td>—</td><td>—</td><td>—</td></tr>');
   byId(id).innerHTML = body.join('');
+}
+
+function mountRankingAutoScroll() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('.ranking-scroll').forEach(container => {
+    if (container.dataset.autoScrollMounted) return;
+    container.dataset.autoScrollMounted = 'true';
+    let paused = false;
+    let resumeTimer;
+    let resetAt = 0;
+    let last = performance.now();
+    const pause = () => {
+      paused = true;
+      clearTimeout(resumeTimer);
+    };
+    const resume = () => {
+      clearTimeout(resumeTimer);
+      resumeTimer = setTimeout(() => { paused = false; }, 500);
+    };
+    ['mouseenter', 'focusin', 'touchstart'].forEach(event => container.addEventListener(event, pause, { passive: true }));
+    container.addEventListener('wheel', () => { pause(); resume(); }, { passive: true });
+    ['mouseleave', 'focusout', 'touchend'].forEach(event => container.addEventListener(event, resume, { passive: true }));
+    const tick = now => {
+      const elapsed = Math.min(now - last, 100);
+      last = now;
+      if (!paused && container.scrollHeight > container.clientHeight) {
+        if (resetAt && now >= resetAt) resetAt = 0;
+        if (!resetAt) {
+          container.scrollTop += elapsed * 0.06;
+          if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
+            resetAt = now + 900;
+          }
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
 }
 
 function renderAdmissionsEfficiency(data, previous) {
@@ -118,6 +156,7 @@ function renderOverview(comparison) {
   renderRanking('course-ranking', data.rankings.courses);
   renderRanking('teacher-ranking', data.rankings.teachers);
   renderRanking('video-ranking', data.rankings.videos, true);
+  mountRankingAutoScroll();
 }
 
 function renderAdmissions(data) {

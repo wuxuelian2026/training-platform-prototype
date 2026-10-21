@@ -168,6 +168,9 @@ button.chart-column { cursor: pointer; }
 .ranking-scroll::-webkit-scrollbar-thumb { background: #566267; border-radius: 3px; }
 .ranking-scroll::-webkit-scrollbar-track { background: transparent; }
 .ranking-scroll .ranking-table thead { position: sticky; top: 0; z-index: 1; background: #171a1d; }
+@media (prefers-reduced-motion: reduce) {
+  .ranking-scroll { scroll-behavior: auto; }
+}
 .ranking-table td { height: 30px; padding: 5px 0; font-size: 13px; }
 .ranking-table td:last-child { color: var(--muted); }
 .rank-name-line { display: flex; align-items: baseline; min-width: 0; gap: 7px; line-height: 1.5; }
