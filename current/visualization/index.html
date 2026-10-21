@@ -16,7 +16,7 @@
       </div>
       <div class="header-controls">
         <div class="period-label"><span id="academic-range"></span><span id="as-of"></span></div>
-        <label class="filter-field">学年<select id="academic-year-filter" aria-label="学年"></select></label>
+        <label class="filter-field">年份<select id="academic-year-filter" aria-label="年份"></select></label>
         <button type="button" class="icon-button" id="refresh" title="刷新数据" aria-label="刷新数据"></button>
         <button type="button" class="icon-button" id="fullscreen" title="全屏查看" aria-label="全屏查看"></button>
         <button type="button" class="dashboard-help-button" id="dashboard-help">页面说明</button>
@@ -71,39 +71,39 @@
       </article>
 
       <article class="analysis-panel ranking-panel major-ranking-panel">
-        <div class="panel-heading"><h2>面授专业 <span class="top-label">Top5</span></h2></div>
-        <table class="data-table ranking-table">
+        <div class="panel-heading"><h2>面授专业 <span class="top-label">Top10</span></h2></div>
+        <div class="ranking-scroll"><table class="data-table ranking-table">
           <caption class="sr-only">按面授专业报名人次排名</caption>
           <thead><tr><th scope="col">专业</th><th scope="col">报名人次</th><th scope="col">开班数</th></tr></thead>
           <tbody id="major-ranking"></tbody>
-        </table>
+        </table></div>
         <div class="panel-footnote">有效报名人次降序</div>
       </article>
       <article class="analysis-panel ranking-panel">
-        <div class="panel-heading"><h2>面授热卖课程 <span class="top-label">Top5</span></h2></div>
-        <table class="data-table ranking-table">
+        <div class="panel-heading"><h2>面授热卖课程 <span class="top-label">Top10</span></h2></div>
+        <div class="ranking-scroll"><table class="data-table ranking-table">
           <caption class="sr-only">按面授课程报名人次排名</caption>
           <thead><tr><th scope="col">课程</th><th scope="col">报名人次</th><th scope="col">开班数</th></tr></thead>
           <tbody id="course-ranking"></tbody>
-        </table>
+        </table></div>
         <div class="panel-footnote">同一课程跨班级汇总</div>
       </article>
       <article class="analysis-panel ranking-panel">
-        <div class="panel-heading"><h2>教师班级报名人次 <span class="top-label">Top5</span></h2></div>
-        <table class="data-table ranking-table">
+        <div class="panel-heading"><h2>教师班级报名人次 <span class="top-label">Top10</span></h2></div>
+        <div class="ranking-scroll"><table class="data-table ranking-table">
           <caption class="sr-only">按教师负责班级的报名人次排名</caption>
           <thead><tr><th scope="col">教师</th><th scope="col">报名人次</th><th scope="col">开班数</th></tr></thead>
           <tbody id="teacher-ranking"></tbody>
-        </table>
+        </table></div>
         <div class="panel-footnote">按班级主授教师归属</div>
       </article>
       <article class="analysis-panel ranking-panel video-ranking-panel">
-        <div class="panel-heading"><h2>热卖视频课程 <span class="top-label">Top5</span></h2></div>
-        <table class="data-table ranking-table">
+        <div class="panel-heading"><h2>热卖视频课程 <span class="top-label">Top10</span></h2></div>
+        <div class="ranking-scroll"><table class="data-table ranking-table">
           <caption class="sr-only">按视频课程有效付费订单数排名</caption>
           <thead><tr><th scope="col">课程</th><th scope="col">订单数</th><th scope="col">净收 / 万元</th></tr></thead>
           <tbody id="video-ranking"></tbody>
-        </table>
+        </table></div>
         <div class="panel-footnote">有效付费订单数降序</div>
       </article>
     </section>

@@ -163,6 +163,11 @@ button.chart-column { cursor: pointer; }
 .comparison-range { display: grid; gap: 2px; }
 .ranking-table th:first-child { width: 55%; }
 .ranking-table th:nth-child(2) { width: 27%; }
+.ranking-scroll { min-height: 0; max-height: 238px; flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #566267 transparent; }
+.ranking-scroll::-webkit-scrollbar { width: 6px; }
+.ranking-scroll::-webkit-scrollbar-thumb { background: #566267; border-radius: 3px; }
+.ranking-scroll::-webkit-scrollbar-track { background: transparent; }
+.ranking-scroll .ranking-table thead { position: sticky; top: 0; z-index: 1; background: #171a1d; }
 .ranking-table td { height: 30px; padding: 5px 0; font-size: 13px; }
 .ranking-table td:last-child { color: var(--muted); }
 .rank-name-line { display: flex; align-items: baseline; min-width: 0; gap: 7px; line-height: 1.5; }

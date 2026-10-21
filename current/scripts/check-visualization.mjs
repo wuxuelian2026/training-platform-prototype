@@ -109,13 +109,13 @@ check('截止日取上海日期，10月14日前的支付不会在10月13日出�
   assert.equal(previous.totals.grossCents, 40000);
   assert.equal(next.totals.grossCents, 45000);
 });
-check('历年演示榜单均为Top5且正确降序，未来月份金额为0', () => {
+check('历年演示榜单均为Top10且正确降序，未来月份金额为0', () => {
   for (const year of [2026, 2025, 2024]) {
     const demo = aggregateDashboard(createDemoFacts(year), year, now);
     for (const key of ['majors', 'courses', 'teachers', 'videos']) {
       const metric = key === 'videos' ? 'orders' : 'enrolled';
       const rows = demo.rankings[key];
-      assert.equal(rows.length, 5);
+      assert.ok(rows.length > 0 && rows.length <= 10);
       assert.equal(rows.every((row, index) => !index || rows[index - 1][metric] >= row[metric]), true);
     }
     assert.equal(demo.monthly.filter(row => row.future).every(row => row.offlineCents === 0 && row.videoCents === 0), true);

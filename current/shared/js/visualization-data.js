@@ -272,12 +272,12 @@ export function aggregateDashboard(facts, startYear, now = new Date()) {
       if (group) group.enrolled++;
     });
     return [...groups.values()].filter(row => row.enrolled > 0)
-      .sort((a, b) => b.enrolled - a.enrolled || b.classes - a.classes || String(a.id).localeCompare(String(b.id), 'zh-CN')).slice(0, 5);
+      .sort((a, b) => b.enrolled - a.enrolled || b.classes - a.classes || String(a.id).localeCompare(String(b.id), 'zh-CN')).slice(0, 10);
   };
   const videoRanking = [...new Set(validVideo.map(row => row.courseId))].map(id => ({
     id, name: courses.get(id)?.name || '未关联课程', orders: validVideo.filter(row => row.courseId === id).length,
     netCents: courseNet.get(id) || 0
-  })).sort((a, b) => b.orders - a.orders || b.netCents - a.netCents || a.id.localeCompare(b.id)).slice(0, 5);
+  })).sort((a, b) => b.orders - a.orders || b.netCents - a.netCents || a.id.localeCompare(b.id)).slice(0, 10);
   const offlineNetCents = sum(monthly, 'offlineCents');
   const videoNetCents = sum(monthly, 'videoCents');
   return { period, monthly, batches, admissionsEfficiency, admissionsConversion, sourceRanking, enrollmentMonthly,

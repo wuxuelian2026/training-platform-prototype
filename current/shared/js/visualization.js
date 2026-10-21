@@ -70,7 +70,7 @@ function renderRanking(id, rows, video = false) {
       '<div class="rank-meter" aria-hidden="true"><i style="width:' + (max ? value / max * 100 : 0) + '%"></i></div></td>' +
       '<td class="rank-value">' + format(value) + '</td><td>' + (video ? money(row.netCents) : format(row.classes)) + '</td></tr>';
   });
-  while (body.length < 5) body.push('<tr class="rank-placeholder" aria-hidden="true"><td>—</td><td>—</td><td>—</td></tr>');
+  while (body.length < 10) body.push('<tr class="rank-placeholder" aria-hidden="true"><td>—</td><td>—</td><td>—</td></tr>');
   byId(id).innerHTML = body.join('');
 }
 
@@ -162,7 +162,7 @@ function setIcon(id, icon) {
 const currentYear = academicYearStart();
 const availableYears = [currentYear, currentYear - 1, currentYear - 2];
 yearFilter.innerHTML = availableYears.map(year =>
-  '<option value="' + year + '">' + (year === currentYear ? '本学年 · ' : '') + year + '-' + (year + 1) + (year === currentYear ? '' : '学年') + '</option>').join('');
+  '<option value="' + year + '">' + year + '</option>').join('');
 setIcon('refresh', RefreshCw);
 setIcon('fullscreen', Maximize);
 if (admissionsView) setIcon('navigation-icon', ArrowLeft);
