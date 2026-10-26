@@ -33,7 +33,7 @@ const TEACHER_FACTS = [
       { id: 'cert-005', name: '中国舞等级考试考官证', type: '艺术等级证', status: '已通过', expiresAt: '2026-10-15', majors: ['中国舞'] }
     ],
     contracts: [
-      { number: 'CT2026090021', status: '待教师签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['舞蹈基本功'], majors: ['中国舞'] },
+      { number: 'CT2026090021', status: '已签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['舞蹈基本功'], majors: ['中国舞'] },
       { number: 'CT2026010008', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['舞蹈基本功'], majors: ['中国舞'] },
       { number: 'CT2026090031', status: '已签署', startAt: '2026-09-01', endAt: '2027-08-31', courses: ['中国舞进阶训练'], majors: ['中国舞'] }
     ]
@@ -58,7 +58,7 @@ const TEACHER_FACTS = [
       { id: 'cert-chen', name: '教师资格证', type: '教师资格证', status: '待审核', expiresAt: '2034-06-30', majors: ['声乐演唱'] }
     ],
     contracts: [
-      { number: 'CT2026090016', status: '待学校签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['声乐演唱技巧', '艺术歌曲示范课'], majors: ['声乐演唱'] }
+      { number: 'CT2026090016', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', courses: ['声乐演唱技巧', '艺术歌曲示范课'], majors: ['声乐演唱'] }
     ]
   },
   {
@@ -135,7 +135,7 @@ const TEACHER_FACTS = [
       { id: 'cert-sunning', name: '古筝教师资格证', type: '艺术等级证', status: '待审核', expiresAt: '2029-12-31', majors: ['古筝'] }
     ],
     contracts: [
-      { number: 'CT2026090023', status: '待教师签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['古筝启蒙'], majors: ['古筝'] }
+      { number: 'CT2026090023', status: '已签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['古筝启蒙'], majors: ['古筝'] }
     ]
   },
   {
@@ -200,7 +200,7 @@ const TEACHER_FACTS = [
       { id: 'cert-tangwen', name: '美术教师资格证', type: '教师资格证', status: '已撤销', expiresAt: '2030-06-30', majors: ['少儿绘画'] }
     ],
     contracts: [
-      { number: 'CT2026090028', status: '待学校签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['少儿创意绘画'], majors: ['少儿绘画'] },
+      { number: 'CT2026090028', status: '已签署', startAt: '2026-10-01', endAt: '2027-09-30', courses: ['少儿创意绘画'], majors: ['少儿绘画'] },
       { number: 'CT2026090033', status: '已签署', startAt: '2026-09-01', endAt: '2027-08-31', courses: ['少儿绘画进阶训练'], majors: ['少儿绘画'] }
     ]
   },

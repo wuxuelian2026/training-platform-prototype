@@ -1700,7 +1700,7 @@ function renderMessages() {
     ['工资发布', '工资单已发布｜{salary_month}', '{salary_month}工资单已发布，实际核发金额：{actual_payment}。实际转账由财务线下完成。', '教师', '后台发布工资单成功', '对应工资单教师本人'],
     ['课程申报结果', '课程申报{review_result}｜{course_name}', '课程“{course_name}”申报结果：{review_result}。{review_reason}', '教师', '后台完成课程申报审核', '提交申报的教师本人'],
     ['证书审核结果', '证书审核{review_result}｜{certificate_name}', '证书“{certificate_name}”审核结果：{review_result}。{review_reason}', '教师', '后台完成教师证书审核', '证书所属教师本人'],
-    ['合同待签署', '合同待签署｜{contract_no}', '合同{contract_no}已生成，请于{sign_deadline}前下载、线下签署并上传签署件。', '教师', '后台推送合同待教师签署', '合同所属教师本人'],
+    ['合同归档', '合同已归档｜{contract_no}', '合同{contract_no}的已签字盖章最终版 PDF 已归档，可在教师端查看和下载。', '教师', '后台发起合同时上传已签章最终版 PDF', '合同所属教师本人'],
   ];
   if (activeTab === 'templates') {
     pageFrame('消息中心', '', '', `${tabs}<div class="ops-note">系统消息使用固定模板生成；模板变量、触发条件和接收人范围由产品规则统一维护。</div>${table('<thead><tr><th>消息类型</th><th>标题模板</th><th>内容模板</th><th>发送对象类型</th><th>触发条件</th><th>接收人范围</th></tr></thead>')}`);

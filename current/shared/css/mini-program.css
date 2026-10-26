@@ -1386,6 +1386,8 @@ body { background: #f7f7f5; }
 .teacher-contract-info-head { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #eee9e5; }
 .teacher-contract-info-head h3 { margin: 0; font-size: 14px; }
 .teacher-contract-info-head span { color: var(--muted); font-size: 9px; }
+.teacher-contract-actions { display: grid; gap: 8px; padding: 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
+.teacher-contract-actions .mp-button { min-height: 44px; padding: 0 10px; font-size: 10px; }
 .teacher-contract-file { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 13px; padding: 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
 .teacher-contract-file-page { display: grid; min-height: 148px; align-content: center; justify-items: center; padding: 10px 7px; border: 1px solid #d9cec6; background: #fffdfb; color: #62564f; text-align: center; }
 .teacher-contract-file-page span { width: 100%; color: #978b83; font-size: 7px; overflow-wrap: anywhere; }

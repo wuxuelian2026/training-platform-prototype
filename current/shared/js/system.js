@@ -3,7 +3,7 @@
   const __classicExports = {};
   const __classicRequire = (id) => __classicModules[id];
 const { DATA_SCOPES, PERMISSION_POINTS, permissionById, permissionPointsByModule, permissionsOfRole } = __classicRequire("shared/js/permissions.js");
-const { CERTIFICATE_EXPIRY_WINDOW_OPTIONS, certificateExpirySettings, classRefundSettings, contractSettings, dataDictionary, fileSpecSettings, homeworkDeadlineSettings, messageRetrySettings, paymentTimeoutSettings, readDemoState, refundSettings, writeDemoState, writeDictionary } = __classicRequire("shared/js/demo-store.js");
+const { CERTIFICATE_EXPIRY_WINDOW_OPTIONS, certificateExpirySettings, classRefundSettings, dataDictionary, fileSpecSettings, homeworkDeadlineSettings, messageRetrySettings, paymentTimeoutSettings, readDemoState, refundSettings, writeDemoState, writeDictionary } = __classicRequire("shared/js/demo-store.js");
 
 const systemRoot = document.querySelector('[data-system-page]');
 const systemPage = systemRoot?.dataset.systemPage;
@@ -44,8 +44,6 @@ const sharedClassRefund = classRefundSettings();
 const sharedFileSpec = fileSpecSettings();
 const sharedRetry = messageRetrySettings();
 const settings = { platform: '湖北艺术职业学院继续教育', timezone: 'Asia/Shanghai（UTC+8）', defaultLessonMinutes: 90, homeworkDeadlineHours: homeworkDeadlineSettings().deadlineHours, attendanceThreshold: 80, homeworkThreshold: 80, refundWindowDays: sharedRefund.windowDays, selfMaxCompletedPercent: sharedRefund.selfMaxCompletedPercent };
-// CR-2026-083：合同签署截止期限默认 7 天，由「参数配置」维护，合同列表与教师端同源读取。
-settings.contractSignDeadlineDays = contractSettings().signDeadlineDays;
 // CR-2026-112：证书到期提醒窗口默认 30 天，由「参数配置」维护，后台证书列表与教师端同源读取。
 settings.certificateExpiryDays = certificateExpirySettings().expiryReminderDays;
 // CR-2026-104：待支付支付时限、视频退款申请窗口、文件上传规格与消息重试策略均由「参数配置」维护。
@@ -116,23 +114,6 @@ function renderRoles() {
   const row = (item) => `<td><strong>${item.name}</strong>${item.preset ? '<br><span class="muted">系统预置</span>' : ''}</td><td>${item.key}</td><td>${item.description}</td><td>${item.users}</td><td>${item.modules}</td><td>${item.updated}</td><td>${tag(item.status)}</td><td class="action-cell"><button class="text-button" data-system-action="role-edit">编辑</button><button class="text-button" data-system-action="role-permission">权限分配</button><button class="text-button" data-system-action="role-toggle">${item.status === '启用' ? '禁用' : '启用'}</button><button class="text-button danger-link" data-system-action="role-delete">删除</button></td>`;
   renderRows(systemData, row);
   bindFilter('role-filter', systemData, (form) => { const keyword = form.keyword.value.trim(); return (item) => !keyword || `${item.name}${item.key}`.includes(keyword); }, row);
-}
-// CR-2026-083：合同参数卡片在参数配置页渲染后挂载，与既有卡片共用同一保存表单。
-function mountContractSettingsCard() {
-  const form = document.querySelector('#settings-form');
-  const layout = form?.querySelector('.settings-layout');
-  if (!form || !layout || layout.querySelector('[data-contract-settings]')) return;
-  const card = document.createElement('section');
-  card.className = 'card settings-card';
-  card.dataset.contractSettings = 'true';
-  card.innerHTML = `<h2>合同参数</h2><div class="form-grid">${field('签署截止期限（天）', 'contractSignDeadlineDays', 'number', '1-30', false, settings.contractSignDeadlineDays)}</div><p class="ops-form-help">合同推送后按该期限生成签署截止日期，后台合同列表与教师端同源展示；修改后对新推送的合同生效，历史合同不改写。</p>`;
-  layout.append(card);
-  form.addEventListener('submit', () => {
-    const value = Number(new FormData(form).get('contractSignDeadlineDays'));
-    if (!Number.isFinite(value) || value < 1 || value > 30) { showToast('合同签署截止期限需为 1–30 天。'); return; }
-    settings.contractSignDeadlineDays = Math.round(value);
-    writeDemoState((next) => ({ ...next, contractSettings: { signDeadlineDays: settings.contractSignDeadlineDays } }));
-  });
 }
 // CR-2026-112：证书到期提醒窗口卡片。只允许 7／15／30／60 四选一（默认 30），
 // 后台证书列表与教师端「我的证书」读取同一份配置；非法注入值在读取与保存两侧都会被拦回 30。
@@ -411,7 +392,7 @@ function mountTimetableSettingsCard() {
     writeDemoState((next) => ({ ...next, timetableSettings: { transferGapMinutes: Math.round(gap), crossCampusExtraMinutes: Math.round(extra) } }));
   });
 }
-if (systemPage === 'settings') { renderSettings(); mountContractSettingsCard(); mountCertificateSettingsCard(); mountTimetableSettingsCard(); mountConfigurableLimitCards(); }
+if (systemPage === 'settings') { renderSettings(); mountCertificateSettingsCard(); mountTimetableSettingsCard(); mountConfigurableLimitCards(); }
 if (systemPage === 'dictionaries') renderDictionaries();
 
 

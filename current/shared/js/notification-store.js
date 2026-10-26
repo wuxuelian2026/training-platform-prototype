@@ -9,7 +9,7 @@ const NOTIFICATION_STATUS = { PENDING: '待发送', SENT: '已发送', FAILED: '
 const DELIVERY_STATUS = { PENDING: '待发送', DELIVERED: '已送达', FAILED: '发送失败' };
 const NOTIFICATION_SOURCE = { MANUAL: '人工通知', SYSTEM: '系统通知' };
 // 通知由业务事件自动产生；后台只查看结果、处理失败投递，不直接新增业务通知。
-const NOTIFICATION_TYPES = ['课次调整', '上课提醒', '作业发布', '作业截止提醒', '作业撤回', '作业提交提醒', '退款状态变更', '结业审核结果', '工资发布', '课程申报结果', '证书审核结果', '合同待签署'];
+const NOTIFICATION_TYPES = ['课次调整', '上课提醒', '作业发布', '作业截止提醒', '作业撤回', '作业提交提醒', '退款状态变更', '结业审核结果', '工资发布', '课程申报结果', '证书审核结果', '合同归档'];
 const NOTIFICATION_RULES = {
   lesson_rescheduled: { type: '调课通知', trigger: '调课保存并发布后立即', frequency: '同一课次版本一次', schedule: 'immediate' },
   lesson_reminder: { type: '上课提醒', trigger: '课次开始前 24 小时', frequency: '每课次一次', schedule: 'before_lesson_24h' },
@@ -80,7 +80,7 @@ const DEMO_TEMPLATE_TYPES = [
   ['工资发布', '工资单已发布｜2026年9月', '2026年9月工资单已发布，实际核发金额：4800元。', '教师'],
   ['课程申报结果', '课程申报通过｜芭蕾舞进阶', '课程“芭蕾舞进阶”申报结果：通过。', '教师'],
   ['证书审核结果', '证书审核通过｜教师资格证', '证书“教师资格证”审核结果：通过。', '教师'],
-  ['合同待签署', '合同待签署｜HT-2026-009', '合同HT-2026-009已生成，请于2026-10-15前下载、线下签署并上传签署件。', '教师']
+  ['合同归档', '合同已归档｜HT-2026-009', '合同HT-2026-009的已签字盖章最终版 PDF 已归档，可在教师端查看和下载。', '教师']
 ];
 
 const buildTemplateDemo = ([type, title, content, audience], index) => ({

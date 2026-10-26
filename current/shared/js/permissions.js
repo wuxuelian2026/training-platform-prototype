@@ -27,7 +27,7 @@ const PERMISSION_POINTS = [
   { id: 'PERM-TEACHER-003', module: '师资中心', object: '教师导入', action: '教师导入', scopes: MANAGE, note: '批量导入、校验与确认导入' },
   { id: 'PERM-TEACHER-004', module: '师资中心', object: '教师证书', action: '证书录入', scopes: MANAGE, note: '新增录入教师证书；录入后状态为已通过（与证书审核独立授权）' },
   { id: 'PERM-TEACHER-005', module: '师资中心', object: '教师证书', action: '证书审核', scopes: MANAGE, note: '审核教师上传的证书；驳回需填原因' },
-  { id: 'PERM-TEACHER-006', module: '师资中心', object: '教师合同', action: '合同管理', scopes: MANAGE, note: '创建并推送合同、学校签署、续签、终止' },
+  { id: 'PERM-TEACHER-006', module: '师资中心', object: '教师合同', action: '合同管理', scopes: MANAGE, note: '创建合同、上传已签章最终版 PDF、续签、终止' },
   { id: 'PERM-TEACHER-007', module: '师资中心', object: '名师推荐', action: '名师推荐', scopes: MANAGE, note: '切换学员端名师推荐位' },
   { id: 'PERM-COURSE-001', module: '课程中心', object: '课程申报', action: '查看', scopes: TEACHING, note: '查看课程申报列表与详情' },
   { id: 'PERM-COURSE-002', module: '课程中心', object: '课程申报', action: '申报审核', scopes: TEACHING, note: '审批课程申报；驳回需填原因' },

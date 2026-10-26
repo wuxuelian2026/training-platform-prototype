@@ -23,7 +23,7 @@ const { teacherFactsById } = __classicRequire("shared/js/teacher-facts.js");
 const { isMiniLoggedIn, isMiniRole, redirectMiniLogin } = __classicRequire("shared/js/mobile-guard.js");
 const { certificateSourceLabel, findDuplicateCertificate } = __classicRequire("shared/js/certificate-source.js");
 const { contractDocumentHtml } = __classicRequire("shared/js/contract-document.js");
-const { contractSignDeadline } = __classicRequire("shared/js/contract-terms.js");
+const { finalContractFileName } = __classicRequire("shared/js/contract-terms.js");
 const { teachingResourcesForClass } = __classicRequire("shared/js/teaching-resources.js");
 const { applyFieldConstraints } = __classicRequire("shared/js/field-constraints.js");
 const { TEACHER_PROFILE_EDITABLE_FIELDS: teacherProfileEditableFields, TEACHER_PROFILE_GROUPS: teacherProfileGroups, TEACHER_PROFILE_GROUP_NOTE: teacherProfileGroupNote, teacherProfileMask } = __classicRequire("shared/js/teacher-profile-fields.js");
@@ -182,26 +182,25 @@ function contractRowsFromFacts() {
     const template = teacherContractDefaults.find((row) => row.number === contract.number) || {};
     const startYear = String(contract.startAt || '').slice(0, 4);
     const endYear = String(contract.endAt || '').slice(0, 4);
-    const signed = contract.status === '已签署';
+    const status = ['已签署', '已终止'].includes(contract.status) ? contract.status : '已签署';
+    const finalFile = template.file || `${contract.number}-已签章合同.pdf`;
     return {
       id: `contract-${contract.number}`,
       number: contract.number,
       name: template.name || `${startYear}-${endYear}年度教师合作协议`,
       type: '合作协议',
-      status: contract.status,
+      status,
       startAt: contract.startAt,
       endAt: contract.endAt,
       course: (contract.courses || []).join('、'),
       majors: contract.majors || [],
       campus: template.campus || campus,
       rate: template.rate || 180,
-      note: contract.status === '待教师签署' ? '请下载、线下签署并上传本人签署件。' : contract.status === '已签署' ? '双方签署完成，按合同条款执行。' : template.note || '',
-      pushedAt: template.pushedAt || `${contract.startAt} 09:00`,
-      teacherSignedAt: signed ? (template.teacherSignedAt || contract.startAt) : '',
-      schoolSignedAt: signed ? (template.schoolSignedAt || contract.startAt) : '',
-      file: template.file || `${contract.number}-合同.pdf`,
-      teacherFile: signed ? `${contract.number}-教师签署件.pdf` : '',
-      schoolFile: signed ? `${contract.number}-学校签署件.pdf` : '',
+      partyB: facts.name,
+      note: status === '已签署' ? '已签章最终版合同已归档，按合同条款执行。' : template.note || '',
+      uploadedAt: template.uploadedAt || template.schoolSignedAt || template.teacherSignedAt || contract.startAt,
+      file: finalFile,
+      contractFile: finalFile,
       renewedFrom: template.renewedFrom || '',
       terminatedAt: template.terminatedAt || '',
       terminateReason: template.terminateReason || ''
@@ -219,10 +218,10 @@ const teacherCertificateDefaults = [
   { id: 'cert-005', name: '中国舞等级考试考官证', number: 'KG-2022-1056', type: '艺术等级证', issuer: '中国舞蹈家协会', issuedAt: '2022-10-01', expiresAt: '2026-10-15', status: '已通过', validity: '即将过期', source: '教师端上传', majors: ['中国舞'], file: '中国舞等级考试考官证.pdf', reviewedAt: '2022-10-06', reviewNote: '证书信息已核验，请在有效期结束前办理续期。' }
 ];
 const teacherContractDefaults = [
-  { id: 'contract-2027', name: '2026-2027年度教师合作协议', number: 'CT2026090021', type: '合作协议', status: '待教师签署', startAt: '2026-10-01', endAt: '2027-09-30', signedAt: '', version: 'v1', rate: 180, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2026090021-待签署合同.pdf', teacherFile: '', schoolFile: '', pushedAt: '2026-09-13', renewedFrom: 'CT2026010008', note: '请下载待签署合同，线下手写签署后上传 PDF。' },
-  { id: 'contract-2026', name: '2026年度教师合作协议', number: 'CT2026010008', type: '合作协议', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', signedAt: '2026-01-03', teacherSignedAt: '2026-01-02', schoolSignedAt: '2026-01-03', teacherFile: 'CT2026010008-教师签署件.pdf', schoolFile: 'CT2026010008-学校签署件.pdf', version: 'v1', rate: 180, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2026010008-学校签署件.pdf', pushedAt: '2026-01-02', note: '教师签署件与学校盖章件均已归档，按有效课次计薪。' },
-  { id: 'contract-2025', name: '2025年度教师合作协议', number: 'CT2025010006', type: '合作协议', status: '已签署', startAt: '2025-01-01', endAt: '2025-12-31', signedAt: '2025-01-02', teacherSignedAt: '2024-12-30', schoolSignedAt: '2025-01-02', teacherFile: 'CT2025010006-教师签署件.pdf', schoolFile: 'CT2025010006-学校签署件.pdf', version: 'v1', rate: 165, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2025010006-学校签署件.pdf', pushedAt: '2024-12-28', note: '合同已到期，仅供历史查询。' },
-  { id: 'contract-2024', name: '2024年度教师合作协议', number: 'CT2024010004', type: '合作协议', status: '已终止', startAt: '2024-01-01', endAt: '2024-12-31', signedAt: '2024-01-03', teacherSignedAt: '2024-01-02', schoolSignedAt: '2024-01-03', teacherFile: 'CT2024010004-教师签署件.pdf', schoolFile: 'CT2024010004-学校签署件.pdf', version: 'v2', rate: 150, campus: '南湖校区', course: '舞蹈基本功', file: 'CT2024010004-学校签署件.pdf', pushedAt: '2023-12-25', terminatedAt: '2024-10-31', terminateReason: '因授课安排调整，双方协商终止本合同。', note: '因授课安排调整，双方协商终止本合同。' }
+  { id: 'contract-2027', name: '2026-2027年度教师合作协议', number: 'CT2026090021', type: '合作协议', status: '已签署', startAt: '2026-10-01', endAt: '2027-09-30', version: 'v1', rate: 180, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2026090021-已签章合同.pdf', contractFile: 'CT2026090021-已签章合同.pdf', uploadedAt: '2026-09-13', renewedFrom: 'CT2026010008', note: '续签合同已签字盖章并归档。' },
+  { id: 'contract-2026', name: '2026年度教师合作协议', number: 'CT2026010008', type: '合作协议', status: '已签署', startAt: '2026-01-01', endAt: '2026-12-31', version: 'v1', rate: 180, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2026010008-已签章合同.pdf', contractFile: 'CT2026010008-已签章合同.pdf', uploadedAt: '2026-01-03', note: '已签章最终版合同已归档，按有效课次计薪。' },
+  { id: 'contract-2025', name: '2025年度教师合作协议', number: 'CT2025010006', type: '合作协议', status: '已签署', startAt: '2025-01-01', endAt: '2025-12-31', version: 'v1', rate: 165, campus: '龙泉校区', course: '舞蹈基本功', file: 'CT2025010006-已签章合同.pdf', contractFile: 'CT2025010006-已签章合同.pdf', uploadedAt: '2025-01-02', note: '合同已到期，仅供历史查询。' },
+  { id: 'contract-2024', name: '2024年度教师合作协议', number: 'CT2024010004', type: '合作协议', status: '已终止', startAt: '2024-01-01', endAt: '2024-12-31', version: 'v2', rate: 150, campus: '南湖校区', course: '舞蹈基本功', file: 'CT2024010004-已签章合同.pdf', contractFile: 'CT2024010004-已签章合同.pdf', uploadedAt: '2024-01-03', terminatedAt: '2024-10-31', terminateReason: '因授课安排调整，双方协商终止本合同。', note: '因授课安排调整，双方协商终止本合同。' }
 ];
 const teacherGraduationDefaults = [
   // CR-2026-150：教师端与后台结业审核共用同一组学员指标、评语和成长建议；仅按端展示不同状态文案。
@@ -241,7 +240,7 @@ const teacherLessonDefaults = {
 const teacherMessageDefaults = [
   { id: 'TMSG20260910001', type: '新增排课通知', title: '今日课程将在09:00开始', summary: '少儿舞蹈基础班第8次课将在龙泉校区综合楼302上课。', body: '教务已为您安排一节舞蹈基本功课程，请提前到达龙泉校区综合楼302并完成上课准备。', createdAt: '2026-09-12 07:30', read: false, target: '/teacher/pages/class-detail.html?class=class-001&lesson=8', actionLabel: '进入课次详情' },
   { id: 'TMSG20260909001', type: '课次调整通知', title: '第12次课时间已调整', summary: '少儿舞蹈提高班第12次课因场地检修改到9月19日同一时段、改在艺术楼201上课。', body: '因龙泉校区综合楼302场地检修，原定9月12日的少儿舞蹈提高班第12次课已调整为9月19日同一时段，上课地点改为艺术楼201。请按调整后的时间地点上课。', createdAt: '2026-09-11 17:25', read: false, target: '/teacher/pages/class-detail.html?class=class-002&lesson=12', actionLabel: '查看课次详情' },
-  { id: 'TMSG20260909002', type: '合同签署通知', title: '您有一份合同待教师签署', summary: '2026-2027年度教师合作协议请于9月20日前完成签署。', body: '新的教师合作协议已推送，请核对授课范围、课时单价和有效期，并在2026年9月20日前完成签署。', createdAt: '2026-09-09 16:10', read: false, target: '/teacher/pages/contract-detail.html?contract=contract-2027', actionLabel: '查看合同' },
+  { id: 'TMSG20260909002', type: '合同归档', title: '您有一份合同已完成归档', summary: '2026-2027年度教师合作协议已签字盖章，可在小程序查看和下载。', body: '新的教师合作协议已由学校完成签字盖章并归档，请核对授课范围、课时单价和有效期。合同文件仅支持查看和下载。', createdAt: '2026-09-09 16:10', read: false, target: '/teacher/pages/contract-detail.html?contract=contract-2027', actionLabel: '查看合同' },
   { id: 'TMSG20260908003', type: '工资单已发布', title: '2026年7月工资单已发布', summary: '本期实际核发5483.20元，已发放至尾号2866账户。', body: '2026年7月工资已完成发放，实际核发5483.20元，已于2026年8月5日发放至中国建设银行尾号2866账户。', createdAt: '2026-09-08 10:20', read: true, target: '/teacher/pages/salary-detail.html?month=2026-07', actionLabel: '查看工资明细' },
   { id: 'TMSG20260908004', type: '工资单已发布', title: '2026年6月工资单已发布', summary: '本期实际核发5024.40元，可查看工资明细。', body: '2026年6月工资单已发布，本期共计28课时，实际核发5024.40元。实际转账由财务在线下流程完成，本平台不登记线下结果。', createdAt: '2026-09-08 09:40', read: true, target: '/teacher/pages/salary-detail.html?month=2026-06', actionLabel: '查看工资明细' },
   { id: 'TMSG20260907003', type: '作业提交提醒', title: '有学员提交了作业', summary: '林知夏已提交“节奏练习视频”，请及时批改并填写文字评语。', body: '学员林知夏已完成“节奏练习视频”作业提交，请进入班级课次详情查看作业内容并完成文本评语。', createdAt: '2026-09-07 18:30', read: false, target: '/teacher/pages/class-detail.html?class=class-001&lesson=8', actionLabel: '查看作业' },
@@ -297,15 +296,15 @@ teacherState.contracts = (Array.isArray(teacherState.contracts)
   ? teacherState.contracts
   : (factsContractRows || demoLocalize(teacherContractDefaults)).map(item => ({ ...item }))).map(item => {
   const next = { ...item };
-  // CR-2026-082：兼容旧演示会话，但必须重新以双方 PDF 文件是否存在为准。
-  if (next.status === '待教师签署') { next.teacherFile = ''; next.schoolFile = ''; next.teacherSignedAt = ''; next.schoolSignedAt = ''; }
-  if (next.status === '待学校签署' && !next.teacherFile) { next.teacherFile = `${next.number}-教师签署件.pdf`; next.teacherSignedAt = next.signedAt || '2026-09-10'; }
-  if (next.status === '已签署' && (!next.teacherFile || !next.schoolFile)) {
-    next.teacherFile = next.teacherFile || `${next.number}-教师签署件.pdf`;
-    next.schoolFile = next.schoolFile || `${next.number}-学校签署件.pdf`;
-    next.teacherSignedAt = next.teacherSignedAt || next.signedAt || '2026-09-09';
-    next.schoolSignedAt = next.schoolSignedAt || next.signedAt || '2026-09-10';
-  }
+  // 兼容旧演示会话：取消双签流程后，所有未终止合同统一视为已签章归档。
+  if (!['已签署', '已终止'].includes(next.status)) next.status = '已签署';
+  next.contractFile = finalContractFileName(next);
+  next.file = next.contractFile;
+  next.uploadedAt = next.uploadedAt || next.schoolSignedAt || next.teacherSignedAt || next.signedAt || next.startAt;
+  delete next.teacherFile;
+  delete next.schoolFile;
+  delete next.teacherSignedAt;
+  delete next.schoolSignedAt;
   return next;
 });
 // CR-2026-028 §3.2：教师端只展示文件来源文案（学校录入／本人上传／系统生成），
@@ -1461,7 +1460,7 @@ function renderProfile() {
       teacherProfileRow({ mark: '档', title: '个人档案', description: '查看并维护本人基础资料', href: loginFor('/teacher/pages/profile-detail.html'), value: '登录后查看', tone: 'amber' }),
       teacherProfileRow({ mark: '信', title: '消息通知', description: '查看排课、审核与工资通知', href: loginFor('/teacher/pages/messages.html'), value: '登录后查看', tone: 'amber' }),
       teacherProfileRow({ mark: '证', title: '我的证书', description: '资格证书与审核记录', href: loginFor('/teacher/pages/certificates.html'), value: '登录后查看', tone: 'amber' }),
-      teacherProfileRow({ mark: '合', title: '我的合同', description: '查看协议、有效期与签署状态', href: loginFor('/teacher/pages/contracts.html'), value: '登录后查看', tone: 'amber' }),
+      teacherProfileRow({ mark: '合', title: '我的合同', description: '查看已签章合同与有效期', href: loginFor('/teacher/pages/contracts.html'), value: '登录后查看', tone: 'amber' }),
       teacherProfileRow({ mark: '结', title: '结业申请记录', description: '查看复核结果', href: loginFor('/teacher/pages/graduation.html'), value: '登录后查看', tone: 'amber' }),
       teacherProfileRow({ mark: '设', title: '设置', description: '账号设置、协议与关于我们', href: loginFor('/teacher/pages/settings.html') })
     ].join('');
@@ -1477,7 +1476,7 @@ function renderProfile() {
   const affairs = [
     { mark: '信', title: '消息通知', description: '查看排课、审核与工资通知', href: '/teacher/pages/messages.html', value: unreadMessages ? `${unreadMessages}条未读` : '已读', tone: unreadMessages ? 'amber' : 'green' },
     { mark: '证', title: '我的证书', description: '资格证书与审核记录', href: '/teacher/pages/certificates.html', value: '1项待审核', tone: 'amber' },
-    { mark: '合', title: '我的合同', description: '查看协议、有效期与签署状态', href: '/teacher/pages/contracts.html', value: `${contracts.filter(item => item.status === '待教师签署').length}份待教师签署`, tone: 'amber' },
+    { mark: '合', title: '我的合同', description: '查看已签章合同与有效期', href: '/teacher/pages/contracts.html', value: `${contracts.filter(item => item.status === '已签署').length}份合同`, tone: 'green' },
     { mark: '结', title: '结业申请记录', description: '查看复核结果', href: '/teacher/pages/graduation.html', value: `${graduationPending}项处理中`, tone: graduationPending ? 'amber' : 'green' }
   ].map(teacherProfileRow).join('');
   const settings = teacherProfileRow({ mark: '设', title: '设置', description: '账号设置、协议与关于我们', href: '/teacher/pages/settings.html' });
@@ -1771,12 +1770,10 @@ function bindTeacherCertificateEvents() {
   document.querySelectorAll('[data-certificate-view]').forEach(button => button.addEventListener('click', () => { const item = teacherState.certificates.find(record => record.id === button.dataset.certificateView); if (item) openTeacherCertificateDetail(item); }));
   document.querySelectorAll('[data-certificate-reupload]').forEach(button => button.addEventListener('click', () => { const item = teacherState.certificates.find(record => record.id === button.dataset.certificateReupload); if (item) openTeacherCertificateForm(item); }));
 }
-let teacherContractFilter = '全部';
 function contractStatusTone(status) {
   if (status === '已签署') return 'green';
   if (status === '有效') return 'green';
-  if (status === '待教师签署' || status === '即将到期') return 'amber';
-  if (status === '待学校签署') return 'brand';
+  if (status === '即将到期') return 'amber';
   if (status === '已到期') return 'red';
   return 'gray';
 
@@ -1790,7 +1787,7 @@ function contractTermStatusOf(contract, today = DEMO_TODAY) {
 
 }
 function teacherContractCard(contract) {
-  const action = contract.status === '待教师签署' ? '下载并上传签署件' : '查看详情';
+  const action = '查看详情';
   // I1-DEF-012：签署态与期限态分列，期限状态不替换签署状态。
   // CR-2026-083：期限状态仅在「即将到期／已到期」时以辅助标签出现，「有效」不单独出标签，也不并入签署状态文案。
   const signingStatus = contract.status;
@@ -1801,23 +1798,13 @@ function teacherContractCard(contract) {
   const terminateFacts = terminated
     ? `<div><dt>终止生效日期</dt><dd>${tEsc(contract.terminatedAt || '—')}</dd></div><div><dt>终止原因</dt><dd>${tEsc(contract.terminateReason || contract.note || '—')}</dd></div>`
     : '';
-  // CR-2026-083：续签件标注原合同编号；待签署卡展示签署截止日期。
   const renewalNote = contract.renewedFrom ? `<p class="teacher-contract-card-note">续签件 · 原合同 ${tEsc(contract.renewedFrom)}</p>` : '';
-  const signDeadline = contract.status === '待教师签署' ? contractSignDeadline(contract) : '';
-  const pendingNote = contract.status === '待教师签署'
-    ? `<p class="teacher-contract-card-note">${tEsc(contract.note)}${signDeadline ? `请于 ${tEsc(signDeadline)} 前完成签署。` : ''}</p>`
-    : '';
-  return `<a class="teacher-contract-card ${contract.status === '待教师签署' ? 'pending' : ''}" href="${relativePath(`/teacher/pages/contract-detail.html?contract=${contract.id}`)}"><div class="teacher-contract-card-head"><div><span>${tEsc(contract.type)}</span><h3>${tEsc(contract.name)}</h3></div>${tPill(signingStatus, contractStatusTone(signingStatus))}${termPill}</div><dl class="teacher-contract-card-facts"><div><dt>合同编号</dt><dd>${tEsc(contract.number)}</dd></div><div><dt>合同期限</dt><dd>${tEsc(contract.startAt)} 至 ${tEsc(contract.endAt)}</dd></div><div><dt>工作校区</dt><dd>${tEsc(contract.campus)}</dd></div><div><dt>每课次含税单价</dt><dd>¥${Number(contract.rate).toFixed(2)} / 每次课（含税）</dd></div>${terminateFacts}</dl>${renewalNote}${pendingNote}${contract.status === '待学校签署' ? '<p class="teacher-contract-card-note">本人签署件已上传，等待学校上传盖章件。</p>' : ''}<div class="teacher-contract-card-foot"><span>${contract.schoolSignedAt || contract.teacherSignedAt || contract.pushedAt || '—'}</span><strong>${action}<i aria-hidden="true">›</i></strong></div></a>`;
+  return `<a class="teacher-contract-card" href="${relativePath(`/teacher/pages/contract-detail.html?contract=${contract.id}`)}"><div class="teacher-contract-card-head"><div><span>${tEsc(contract.type)}</span><h3>${tEsc(contract.name)}</h3></div>${tPill(signingStatus, contractStatusTone(signingStatus))}${termPill}</div><dl class="teacher-contract-card-facts"><div><dt>合同编号</dt><dd>${tEsc(contract.number)}</dd></div><div><dt>合同期限</dt><dd>${tEsc(contract.startAt)} 至 ${tEsc(contract.endAt)}</dd></div><div><dt>工作校区</dt><dd>${tEsc(contract.campus)}</dd></div><div><dt>每课次含税单价</dt><dd>¥${Number(contract.rate).toFixed(2)} / 每次课（含税）</dd></div>${terminateFacts}</dl>${renewalNote}<div class="teacher-contract-card-foot"><span>${tEsc(contract.uploadedAt || '—')}</span><strong>${action}<i aria-hidden="true">›</i></strong></div></a>`;
 }
 function renderTeacherContracts() {
   const contracts = [...teacherState.contracts].sort((a, b) => b.startAt.localeCompare(a.startAt));
-  const pendingCount = contracts.filter(item => item.status === '待教师签署').length;
-  // P1：筛选维度与后台对齐——按签署状态四分桶；期限状态不参与筛选，仅在即将到期／已到期时以辅助标签展示。
-  const CONTRACT_STATUS_TABS = ['全部', '待教师签署', '待学校签署', '已签署', '已终止'];
-  if (!CONTRACT_STATUS_TABS.includes(teacherContractFilter)) teacherContractFilter = '全部';
-  const visible = contracts.filter(item => teacherContractFilter === '全部' || item.status === teacherContractFilter);
-  const filters = CONTRACT_STATUS_TABS.map(label => [label, label === '全部' ? contracts.length : contracts.filter(item => item.status === label).length]).filter(([label, count]) => label === '全部' || count > 0);
-  tLayout(tStack(`<section class="teacher-contract-overview"><div><strong>${pendingCount}</strong><span>份合同待教师签署</span></div><p>${pendingCount ? '请在截止日期前下载、线下签署并上传 PDF' : '当前没有待教师签署合同'}</p></section>`, `<nav class="teacher-contract-filters" role="tablist" aria-label="合同状态筛选">${filters.map(([label, count]) => `<button type="button" role="tab" aria-selected="${teacherContractFilter === label}" class="${teacherContractFilter === label ? 'active' : ''}" data-contract-filter="${label}">${label}<span>${count}</span></button>`).join('')}</nav>`, `<section class="teacher-contract-list" aria-live="polite"><div class="teacher-contract-list-head"><h2>${tEsc(teacherContractFilter)}</h2><span>${visible.length} 份</span></div>${visible.length ? visible.map(teacherContractCard).join('') : `<div class="teacher-contract-empty">暂无${tEsc(teacherContractFilter)}合同</div>`}</section>`));
+  const list = contracts.length ? contracts.map(teacherContractCard).join('') : '<div class="teacher-contract-empty">暂无合同</div>';
+  tLayout(tStack(`<section class="teacher-contract-overview"><div><strong>${contracts.length}</strong><span>份已归档合同</span></div><p>合同由后台上传已签字盖章的最终版 PDF，此处仅支持查看和下载</p></section>`, `<section class="teacher-contract-list" aria-live="polite"><div class="teacher-contract-list-head"><h2>合同列表</h2><span>${contracts.length} 份</span></div>${list}</section>`));
 }
 // CR-2026-083：条文模板由 shared/js/contract-document.js 提供，后台详情与教师端阅读器同源。
 function contractDocument(contract) {
@@ -1825,30 +1812,22 @@ function contractDocument(contract) {
 }
 function currentTeacherContract() {
   const id = new URLSearchParams(location.search).get('contract');
-  return teacherState.contracts.find(item => item.id === id) || teacherState.contracts.find(item => item.status === '待教师签署') || teacherState.contracts[0];
+  return teacherState.contracts.find(item => item.id === id) || teacherState.contracts.find(item => item.status === '已签署') || teacherState.contracts[0];
 }
 function renderTeacherContractDetail() {
   const contract = currentTeacherContract();
-  const pendingTeacher = contract.status === '待教师签署';
-  const statusNote = pendingTeacher ? contract.note : contract.status === '已终止' ? `终止日期 ${contract.terminatedAt} · ${contract.note}` : contract.status === '待学校签署' ? '教师签署件已上传，等待学校上传盖章件。' : contract.note;
-  // CR-2026-082：教师端不再进行在线签名，只处理本人签署 PDF 的上传。
-  // CR-2026-083：信息区补充行按「签署截止日期 → 续签来源 → 终止证据」顺序拼装。
-  const signDeadline = pendingTeacher ? contractSignDeadline(contract) : '';
+  const statusNote = contract.status === '已终止' ? `终止日期 ${contract.terminatedAt} · ${contract.note}` : '合同已完成签字盖章并归档，教师端仅支持查看和下载。';
   const contractExtraRows = [
-    ...(signDeadline ? [['签署截止日期', signDeadline]] : []),
     ...(contract.renewedFrom ? [['续签来源', `原合同 ${contract.renewedFrom}`, 'wide']] : []),
     ...(contract.status === '已终止' ? [['终止生效日期', contract.terminatedAt || '—'], ['终止原因', contract.terminateReason || contract.note || '—', 'wide']] : [])
   ];
-  const fileName = contract.schoolFile || contract.teacherFile || contract.file;
-  const uploadArea = pendingTeacher
-    ? `<div class="teacher-contract-upload"><label class="mp-field"><span>上传本人签署件 PDF</span><input type="file" accept="application/pdf,.pdf" data-contract-upload></label><small>请先下载待签署合同，线下手写签名后上传；仅支持 PDF，单文件不超过 ${fileSpecSettings().documentMb}MB。</small></div>`
-    : `<p class="teacher-contract-file-note">${contract.status === '待学校签署' ? '本人签署件已归档，等待学校处理。' : '当前合同文件仅支持查看和下载，不能直接覆盖。'}</p>`;
-  tLayout(tStack(`<section class="teacher-contract-detail-head"><div><span>${tEsc(contract.type)}</span><h2>${tEsc(contract.name)}</h2><p>${tEsc(contract.number)}</p></div>${tPill(contract.status, contractStatusTone(contract.status))}${tPill(contractTermStatusOf(contract), contractStatusTone(contractTermStatusOf(contract)))}</section>`, `<section class="teacher-contract-info"><div class="teacher-contract-info-head"><h3>合同信息</h3><span>${pendingTeacher ? '待上传签署件' : '只读'}</span></div>${teacherArchiveRows([['合同期限', `${contract.startAt} 至 ${contract.endAt}`, 'wide'], ['授课课程', contract.course, 'wide'], ['工作校区', contract.campus], ['每课次含税单价', `¥${Number(contract.rate).toFixed(2)} / 每次课（含税）`], ['教师签署时间', contract.teacherSignedAt || '待上传'], ['学校签署时间', contract.schoolSignedAt || '待上传'], ['待签署合同 PDF', `${contract.number}-待签署合同.pdf`, 'wide'], ['本人签署件', contract.teacherFile || '尚未上传'], ['学校签署件', contract.schoolFile || '尚未上传'], ['当前有效合同文件', contract.schoolFile || contract.teacherFile || `${contract.number}-待签署合同.pdf`, 'wide'], ...contractExtraRows])}</section>`, `<section class="teacher-contract-file"><div class="teacher-contract-file-page"><span>PDF · ${tEsc(fileName)}</span><strong>教师${tEsc(contract.type)}</strong><p>${tEsc(contract.number)}</p><small>线下签署 PDF 归档</small></div><div><h3>合同全文</h3><p>查看合同期限、授课安排、每课次含税单价及双方权责。</p><div class="teacher-contract-file-actions"><button type="button" class="mp-button secondary full" data-contract-download>下载${pendingTeacher ? '待签署合同' : '当前合同 PDF'}</button><button type="button" class="mp-button secondary full" data-contract-read>查看合同全文</button></div>${uploadArea}</div></section>`, `<p class="teacher-contract-status-note ${pendingTeacher ? 'pending' : ''}">${tEsc(statusNote)}</p>`));
+  const fileName = finalContractFileName(contract);
+  tLayout(tStack(`<section class="teacher-contract-detail-head"><div><span>${tEsc(contract.type)}</span><h2>${tEsc(contract.name)}</h2><p>${tEsc(contract.number)}</p></div>${tPill(contract.status, contractStatusTone(contract.status))}${tPill(contractTermStatusOf(contract), contractStatusTone(contractTermStatusOf(contract)))}</section>`, `<section class="teacher-contract-info"><div class="teacher-contract-info-head"><h3>合同信息</h3><span>只读</span></div>${teacherArchiveRows([['合同期限', `${contract.startAt} 至 ${contract.endAt}`, 'wide'], ['授课课程', contract.course, 'wide'], ['工作校区', contract.campus], ['每课次含税单价', `¥${Number(contract.rate).toFixed(2)} / 每次课（含税）`], ['合同归档日期', contract.uploadedAt || '—'], ['已签章最终版 PDF', fileName, 'wide'], ...contractExtraRows])}</section>`, `<section class="teacher-contract-actions"><button type="button" class="mp-button secondary full" data-contract-download>下载已签章 PDF</button><button type="button" class="mp-button secondary full" data-contract-read>查看合同全文</button></section>`, `<p class="teacher-contract-status-note">${tEsc(statusNote)}</p>`));
 }
 function openTeacherContractReader(contract) {
   const dialog = document.createElement('dialog');
   dialog.className = 'teacher-contract-reader-dialog';
-  dialog.innerHTML = `<div class="teacher-contract-reader"><header><div><span>${contract.status === '待教师签署' ? '待签署合同预览' : '合同全文'}</span><strong>${tEsc(contract.number)}</strong></div><button type="button" data-contract-close aria-label="关闭合同全文">×</button></header><div class="teacher-contract-reader-body" data-contract-reader-body>${contractDocument(contract)}</div><footer><span>线下签署 PDF 归档</span><button type="button" class="mp-button" data-contract-close>关闭全文</button></footer></div>`;
+  dialog.innerHTML = `<div class="teacher-contract-reader"><header><div><span>合同全文</span><strong>${tEsc(contract.number)}</strong></div><button type="button" data-contract-close aria-label="关闭合同全文">×</button></header><div class="teacher-contract-reader-body" data-contract-reader-body>${contractDocument(contract)}</div><footer><span>已签字盖章最终版 PDF</span><button type="button" class="mp-button" data-contract-close>关闭全文</button></footer></div>`;
   document.body.appendChild(dialog);
   const close = () => dialog.close();
   dialog.addEventListener('close', () => dialog.remove());
@@ -1856,24 +1835,11 @@ function openTeacherContractReader(contract) {
   dialog.showModal();
 }
 function downloadTeacherContract(contract) {
-  tToast(`已准备下载合同 PDF：${contract.file || `${contract.number}-待签署合同.pdf`}`);
+  tToast(`已准备下载合同 PDF：${finalContractFileName(contract)}`);
 }
 function bindTeacherContractEvents() {
-  document.querySelectorAll('[data-contract-filter]').forEach(button => button.addEventListener('click', () => { teacherContractFilter = button.dataset.contractFilter; renderTeacherContracts(); bindTeacherContractEvents(); }));
   document.querySelector('[data-contract-read]')?.addEventListener('click', () => openTeacherContractReader(currentTeacherContract()));
   document.querySelector('[data-contract-download]')?.addEventListener('click', () => downloadTeacherContract(currentTeacherContract()));
-  document.querySelector('[data-contract-upload]')?.addEventListener('change', (event) => {
-    const file = event.currentTarget.files?.[0];
-    const contract = currentTeacherContract();
-    if (!file) return;
-    if (file.type !== 'application/pdf' && !String(file.name).toLowerCase().endsWith('.pdf')) { tToast('仅支持上传 PDF 文件。'); event.currentTarget.value = ''; return; }
-    if (file.size > fileSpecSettings().documentMb * 1024 * 1024) { tToast(`PDF 文件不能超过 ${fileSpecSettings().documentMb}MB。`); event.currentTarget.value = ''; return; }
-    teacherState.contracts = teacherState.contracts.map(item => item.id === contract.id ? { ...item, status: '待学校签署', teacherFile: file.name, teacherSignedAt: DEMO_TODAY, signedAt: '', note: '本人签署件已上传，等待学校上传盖章件。' } : item);
-    saveTeacher();
-    renderTeacherContractDetail();
-    bindTeacherContractEvents();
-    tToast('本人签署件已上传，等待学校处理。');
-  });
 }
 let teacherGraduationFilter = '全部';
 let teacherGraduationClassFilter = '全部';

@@ -183,17 +183,16 @@ const TEACHER_FIELD_SPEC = {
           { id: 'FD-TEACHER-039', label: '身份证号', type: '文本（只读）', length: '18 位', required: '系统带入', note: '按所选教师自动读取', constraints: { readOnly: true, sourceField: 'FD-TEACHER-006' } },
           { id: 'FD-TEACHER-047', label: '课程', type: '多选', length: '至少 1 门', required: '是', note: '取自课程库中与教师授课专业匹配的课程；新入职教师先签合同后申报课程，候选集不依赖教师本人的申报记录', constraints: { dictionary: '课程库', minItems: 1, multi: true, matchMajor: true } },
           { id: 'FD-TEACHER-048', label: '合同编号', type: '只读', length: 'CT+年月日+序号', required: '系统生成', note: '按规则自动生成且全局唯一；取消或关闭弹窗不生成编号；续签生成新编号，原编号保留', constraints: { system: true, readOnly: true, unique: true, numberRule: 'CT+YYYYMMDD+序号' } },
-          { id: 'FD-TEACHER-040', label: '合同模板', type: '下拉', length: '预置模板', required: '是', note: '决定合同条款与签署方式', constraints: { dictionary: '合同模板' } },
+          { id: 'FD-TEACHER-040', label: '合同类型', type: '下拉', length: '预置类型', required: '是', note: '合作协议／劳动合同／合同补充；合同正文以实际上传的已签章 PDF 为准', constraints: { dictionary: '合同类型' } },
           { id: 'FD-TEACHER-041', label: '工作校区', type: '下拉', length: '预置校区', required: '是', note: '合同约定的服务校区', constraints: { dictionary: '校区' } },
           { id: 'FD-TEACHER-042', label: '合同起始日期', type: '日期', length: 'YYYY-MM-DD', required: '是', note: '合同生效日期', constraints: { format: 'YYYY-MM-DD' } },
           { id: 'FD-TEACHER-043', label: '合同截止日期', type: '日期', length: 'YYYY-MM-DD', required: '是', note: '需晚于起始日期', constraints: { format: 'YYYY-MM-DD', afterField: 'FD-TEACHER-042' } },
           { id: 'FD-TEACHER-044', label: '课时费标准', type: '金额', length: '大于 0', required: '是', note: '每课次含税单价，用于工资核算', constraints: { exclusiveMin: 0, decimals: 2 } },
           { id: 'FD-TEACHER-045', label: '无固定期限', type: '开关', length: '是 / 否', required: '否', note: '开启后合同截止日期不作为必填', constraints: { boolean: true, whenOn: 'FD-TEACHER-043' } },
-          { id: 'FD-TEACHER-049', label: '签署状态', type: '只读', length: '4 个状态值', required: '系统计算', note: '推送成功后为待教师签署；教师上传本人签署 PDF 后进入待学校签署；后台上传学校签署 PDF 后为已签署；终止后为已终止（终态）', constraints: { system: true, readOnly: true, options: ['待教师签署 pending_teacher', '待学校签署 pending_school', '已签署 signed', '已终止 terminated'] } },
+          { id: 'FD-TEACHER-049', label: '合同状态', type: '只读', length: '2 个状态值', required: '系统计算', note: '发起合同时上传已签字盖章的最终版 PDF 后直接为已签署；终止后为已终止（终态）', constraints: { system: true, readOnly: true, options: ['已签署 signed', '已终止 terminated'] } },
           { id: 'FD-TEACHER-065', label: '期限状态', type: '只读', length: '3 个派生值', required: '系统计算', note: '按合同起止日期派生：有效 active／即将到期 expiring／已到期 expired；不设「未生效」，未到起始日期按有效计算', constraints: { system: true, readOnly: true, derived: true, options: ['有效 active', '即将到期 expiring', '已到期 expired'] } },
-          { id: 'FD-TEACHER-078', label: '签署截止日期', type: '只读', length: 'YYYY-MM-DD', required: '系统计算', note: '按推送日期加后台「参数配置」的签署截止期限派生，默认推送后 7 天；仅待教师签署阶段展示，不作为签署状态取值', constraints: { system: true, readOnly: true, derived: true } },
           { id: 'FD-TEACHER-079', label: '续签来源', type: '只读', length: '原合同编号', required: '续签件展示', note: '续签生成的新合同保留原合同编号引用，用于与历史合同区分；后台合同列表与教师端我的合同同源展示', constraints: { system: true, readOnly: true } },
-          { id: 'FD-TEACHER-050', label: '合同文件', type: '文件组', length: 'PDF，单文件≤10MB', required: '系统生成／按角色上传', note: '系统生成待签署 PDF；教师上传本人线下签署 PDF；后台上传学校签署或盖章 PDF；双方文件均保留，当前有效合同文件取学校签署件，不能直接覆盖', constraints: { pdfOnly: true, maxSizeMb: 10, files: ['pending_pdf', 'teacher_signed_pdf', 'school_signed_pdf'], uploaderByFile: { pending_pdf: 'system', teacher_signed_pdf: 'teacher', school_signed_pdf: 'admin' }, immutableAfterUpload: true } },
+          { id: 'FD-TEACHER-050', label: '已签章最终版合同 PDF', type: '文件', length: 'PDF，单文件≤50MB', required: '是', note: '后台发起合同时直接上传双方已签字盖章的最终版 PDF；该文件为合同唯一正文，创建后不可直接覆盖；教师端仅查看和下载', constraints: { pdfOnly: true, maxSizeMb: 50, source: 'admin_upload', requiredOnCreate: true, teacherReadOnly: true, immutableAfterCreate: true } },
           { id: 'FD-TEACHER-046', label: '备注', type: '多行文本', length: '≤ 200 字', required: '否', note: '补充约定或内部说明', constraints: { maxLength: 200 } }
         ] }
       ],
@@ -203,6 +202,8 @@ const TEACHER_FIELD_SPEC = {
         '教师工资按课次数乘以合同约定的每课次含税单价计算。',
         '续签基于原合同带入信息，生成新合同编号，原合同不被覆盖。',
         '终止须记录原因及生效日期，两端同步，已完成课次和历史计薪保留。',
+        '合同文件由后台发起合同时直接上传已签字盖章的最终版 PDF，不再经过教师签署、学校签署或签署截止日期流程。',
+        '教师端仅可查看和下载合同，不得上传、替换或执行签署操作。',
         '合同与证书、离职日期、账号状态独立维护，不相互级联。'
       ]
     },

@@ -275,8 +275,6 @@ const defaultState = () => ({
   fileSpecSettings: { imageMb: 10, documentMb: 50, videoMb: 500, resourceGb: 100 },
   // CR-2026-104：消息失败重试策略由「参数配置」维护（次数 + 间隔分钟序列）。
   messageRetrySettings: { maxAttempts: 3, intervalsMinutes: [5, 30, 120] },
-  // CR-2026-083：合同签署截止期限由后台参数配置，默认推送后 7 天，两端读取同一份配置。
-  contractSettings: { signDeadlineDays: 7 },
   // CR-2026-112：证书到期提醒窗口由后台参数配置，只允许 7／15／30／60，默认 30 天；
   // 后台证书列表与教师端证书提醒读取同一份配置，避免两端分叉。
   certificateSettings: { expiryReminderDays: 30 },
@@ -413,13 +411,6 @@ function messageRetrySettings() {
     maxAttempts: clampInt(settings.maxAttempts ?? 3, 1, 5, 3),
     intervalsMinutes: intervals.length ? intervals : [5, 30, 120]
   };
-}
-
-// CR-2026-083：合同签署截止期限由后台「参数配置」维护，默认 7 天，取值范围 1–30 天。
-function contractSettings() {
-  const settings = readStored().contractSettings || {};
-  const days = Math.round(Number(settings.signDeadlineDays ?? 7));
-  return { signDeadlineDays: Number.isFinite(days) ? Math.min(30, Math.max(1, days)) : 7 };
 }
 
 // CR-2026-112：证书到期提醒窗口由后台「参数配置」维护，只允许 7／15／30／60 四个取值，默认 30 天。
@@ -636,7 +627,6 @@ __classicExports["paymentTimeoutSettings"] = paymentTimeoutSettings;
 __classicExports["homeworkDeadlineSettings"] = homeworkDeadlineSettings;
 __classicExports["fileSpecSettings"] = fileSpecSettings;
 __classicExports["messageRetrySettings"] = messageRetrySettings;
-__classicExports["contractSettings"] = contractSettings;
 __classicExports["certificateExpirySettings"] = certificateExpirySettings;
 __classicExports["timetableSettings"] = timetableSettings;
 __classicExports["dataDictionary"] = dataDictionary;

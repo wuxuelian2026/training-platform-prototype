@@ -155,16 +155,6 @@ const STATE_MACHINES = [
     ],
     "states": [
       [
-        "pending_teacher",
-        "待教师签署",
-        false
-      ],
-      [
-        "pending_school",
-        "待学校签署",
-        false
-      ],
-      [
         "signed",
         "已签署",
         false
@@ -177,19 +167,7 @@ const STATE_MACHINES = [
     ],
     "transitions": [
       [
-        "待教师签署",
-        "上传教师签署件 PDF",
-        "待学校签署",
-        "教师本人"
-      ],
-      [
-        "待学校签署",
-        "上传学校签署件 PDF",
         "已签署",
-        "超级管理员/教务主管"
-      ],
-      [
-        "待教师签署/待学校签署/已签署",
         "终止合同（填原因）",
         "已终止",
         "超级管理员/教务主管"
