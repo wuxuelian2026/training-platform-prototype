@@ -91,7 +91,7 @@ function syncSharedRefunds() {
 const refundCounted = (item) => item.status === '已退款';
 const orderReceiptTotal = (orderNo) => payments.filter((item) => item.orderNo === orderNo).reduce((sum, item) => sum + Number(item.amount || 0), 0);
 const orderRefundedTotal = (orderNo) => refunds.filter((item) => item.orderNo === orderNo && refundCounted(item)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-// MVP 一单一次全额终结退款：订单存在任意有效退款记录后不再作为线下登记候选。
+// 线下登记只处理「整单退完」的补登记，固定全额；订单存在任意退款记录后不再作为线下登记候选（部分退款走统一订单管理）。
 const orderPendingRefund = (orderNo) => refunds.some((item) => item.orderNo === orderNo && item.status !== '已拒绝') ? 0 : orderReceiptTotal(orderNo);
 function refundOrderStatus(orderNo) {
   const received = orderReceiptTotal(orderNo);
@@ -143,12 +143,12 @@ function openOfflineRefundForm() {
   const hint = dialog.querySelector('[data-refund-hint]');
   const refreshHint = () => {
     const orderNo = orderSelect.value;
-    if (!orderNo) { amountInput.value = ''; hint.textContent = '仅可登记一次全额退款；实收金额取该订单收款记录合计。'; return; }
+    if (!orderNo) { amountInput.value = ''; hint.textContent = '线下登记仅可整单全额退款；实收金额取该订单收款记录合计。'; return; }
     const pending = orderPendingRefund(orderNo);
     amountInput.min = pending;
     amountInput.max = pending;
     amountInput.value = pending;
-    hint.textContent = `该订单实收 ${money(pending)}，本次必须全额登记。`;
+    hint.textContent = `该订单实收 ${money(pending)}，线下登记须全额；只退部分金额请走统一订单管理。`;
   };
   orderSelect.addEventListener('change', refreshHint);
   refreshHint();
@@ -160,7 +160,7 @@ function openOfflineRefundForm() {
     const pending = orderPendingRefund(orderNo);
     const amount = Number(data.get('amount'));
     if (!amount || amount <= 0) { error.textContent = '退款金额必须大于 0。'; error.hidden = false; return; }
-    if (amount !== pending) { error.textContent = `MVP 仅支持全额退款，金额必须等于 ${money(pending)}。`; error.hidden = false; return; }
+    if (amount !== pending) { error.textContent = `线下登记仅支持整单全额退款，金额必须等于 ${money(pending)}。`; error.hidden = false; return; }
     const candidate = offlineRefundCandidates().find((item) => item.orderNo === orderNo) || {};
     if (candidate.status === '已取消') { error.textContent = '已取消订单不得登记退款。'; error.hidden = false; return; }
     if (candidate.orderType === '视频课程' && candidate.refundRule && !candidate.refundRule.eligible) { error.textContent = `视频课程不满足退款条件：${candidate.refundRule.reason}。`; error.hidden = false; return; }

@@ -160,7 +160,7 @@ function createRefundExceptionTodo(refund, reason, now) {
 
 /**
  * 面授退款资格判定：申请窗口和已消课比例只决定是否可退。
- * 通过资格校验后固定退订单实收全额，不计算部分退款。
+ * 通过资格校验后建议金额取订单实收全额（后台发起时允许改小为部分退款，不在此处计算）。
  */
 function classRefundSuggestion({ order, classRecord, requestedAt = demoTime(), selfService = true } = {}) {
   const policy = classRefundSettings();
@@ -185,8 +185,8 @@ function classRefundSuggestion({ order, classRecord, requestedAt = demoTime(), s
     paid, total, completed, remaining, completedPercent, elapsedDays,
     refundAmount, eligible: !ineligibleReason, ineligibleReason, policy,
     rule: total > 0
-      ? `资格校验通过（已消课 ${completed}/${total}），退订单实收全额`
-      : '未排课，退订单实收全额'
+      ? `资格校验通过（已消课 ${completed}/${total}），默认退订单实收全额，可改为部分金额`
+      : '未排课，默认退订单实收全额，可改为部分金额'
   };
 }
 
@@ -241,7 +241,7 @@ function createRefundRequest(input = {}) {
     paidAmount: numberOr(order.amount),
     completedLessons: suggestion?.completed ?? null,
     totalLessons: suggestion?.total ?? null,
-    rule: suggestion?.rule || '视频课程全额退款规则',
+    rule: suggestion?.rule || '视频课程退款规则（默认全额，可改为部分金额）',
     policySnapshot: suggestion?.policy ? { ...suggestion.policy } : null,
     reason: requestReason,
     channel: input.channel || order.payMethod || '原路退回',
@@ -271,7 +271,7 @@ function createRefundRequest(input = {}) {
     refundExpectedAt: record.expectedAt,
     refundReason: record.reason,
     refundAt: order.refundAt || now,
-    refundType: isClass ? '面授全额终结退款' : '视频全额终结退款',
+    refundType: `${isClass ? '面授' : '视频'}${amount < numberOr(order.amount) ? '部分' : '全额'}终结退款`,
     refundBusinessKey: businessKey
   };
   upsertDemoRecord('orders', nextOrder);

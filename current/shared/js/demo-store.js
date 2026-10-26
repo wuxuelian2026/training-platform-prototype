@@ -373,7 +373,7 @@ function refundSettings() {
   };
 }
 
-// 面授退款参数只决定资格；MVP 退款金额固定为订单实收全额。
+// 面授退款参数只决定资格；退款金额默认订单实收全额，后台发起时可改为部分金额。
 function classRefundSettings() {
   const settings = readStored().classRefundSettings || {};
   const unified = refundSettings();

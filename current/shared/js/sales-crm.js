@@ -1429,7 +1429,7 @@ function openEnrollmentChangeForm(row, enrollment) {
     .filter(item => item.id !== row.id)
     .filter(item => !(shared.enrollments || []).some(entry => entry.classId === item.id && entry.studentId === enrollment.studentId && isEnrollmentActive(entry.status)));
   const targetOptions = targets.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('');
-  // 退班／退学可同步发起全额终结退款，最终以财务审批为准。
+  // 退班／退学可同步发起全额终结退款（该入口固定全额，无审批环节）。
   const paidOrders = enrollmentRefundCandidates(row, enrollment.studentId);
   const refundTotal = paidOrders.reduce((sum, item) => sum + item.refundAmount, 0);
   const refundFields = paidOrders.length

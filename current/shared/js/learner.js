@@ -1585,7 +1585,7 @@ function syncVideoEntitlementForRefund(order, item, nextStatus, reason) {
 }
 // 学员端自助申请退款（2026-09-24 定案：面授与视频都允许学员自助发起）：
 // 列表与详情共用同一入口，统一生成共享退款单进入后台交易中心审批；
-// 面授消课只用于资格判定，视频沿用观看资格；两类订单均为一单一次全额终结退款。
+// 面授消课只用于资格判定，视频沿用观看资格；两类订单均为一单一次终结退款（金额默认全额，可改为部分金额）。
 function openRefundReasonDialog(orderId, onSubmit) {
   const dialog = document.createElement('dialog');
   dialog.className = 'mp-dialog';
