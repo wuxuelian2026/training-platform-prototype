@@ -1605,6 +1605,8 @@ function openRefundReasonDialog(orderId, onSubmit) {
   dialog.showModal();
 }
 
+// CR-2026-155 C8：学员端已无自助退款入口，本组函数（videoRefundEligibility/openRefundReasonDialog/
+// applyRefundApplication/syncVideoEntitlementForRefund）调用点均已注释，运行期不可达，仅作回归留档。
 function applyRefundApplication(orderId, reason = '') {
   const order = state.orders.find(row => row.id === orderId);
   const item = order ? orderCourse(order) : null;
