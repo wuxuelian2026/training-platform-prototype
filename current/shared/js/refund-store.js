@@ -213,8 +213,11 @@ function createRefundRequest(input = {}) {
   const isSelfService = (input.origin || REFUND_ORIGIN.SYSTEM) === REFUND_ORIGIN.LEARNER;
   const suggestion = isClass ? classRefundSuggestion({ order, classRecord, requestedAt: now, selfService: isSelfService }) : null;
   if (suggestion && !suggestion.eligible && !input.skipApproval) return { ok: false, reason: suggestion.ineligibleReason, suggestion };
-  // MVP 支持全额或部份终结退款；后台登记/订单列表退款可手改金额。面授退款资格仍沿用消课规则校验，但仅约束学员自助申请（后台手动退款绕过）。
-  const amount = numberOr(input.amount) || numberOr(order.amount);
+  // MVP：一单只支持一次退款，金额默认订单实收全额、允许改小（部分退款）；退款完成后订单终结，不再支持二次发起。
+  // 面授退款资格仍沿用消课规则校验，但仅约束学员自助申请（后台手动退款绕过）。
+  // 金额取值只认显式传入值，未传才回落全额——避免传 0 被静默当成全额退款。
+  const hasAmount = input.amount !== undefined && input.amount !== null && String(input.amount).trim() !== '';
+  const amount = hasAmount ? numberOr(input.amount) : numberOr(order.amount);
   if (!(amount > 0) || amount > numberOr(order.amount)) return { ok: false, reason: 'REFUND_AMOUNT_INVALID', suggestion };
 
   const student = sharedRows('students').find((row) => row.id === order.studentId) || null;
@@ -377,10 +380,11 @@ function settleRefund(refundId, decision, operator = {}) {
       if (order.classId) enrollment = updateEnrollmentRefundRelation(next, REFUND_STATUS.PROCESSING, { refundRetriedAt: now });
     } else {
       const isClass = Boolean(order.classId);
+      const isPartial = numberOr(next.amount) < numberOr(order.amount);
       nextOrder = {
         ...order,
         status: REFUND_STATUS.DONE,
-        refundStatus: '已完成',
+        refundStatus: isPartial ? '已完成（部分退款）' : '已完成',
         refundAt: now,
         refundAmount: numberOr(next.amount),
         refundMethod: next.channel,
@@ -405,6 +409,7 @@ function settleRefund(refundId, decision, operator = {}) {
 
 /**
  * 登记已在线下完成的终结退款。MVP 一单只允许一次退款，完成后订单终结。
+ * 该入口用于「线下已整单退完」的补登记，固定按订单实收全额；需要部分退款的走「统一订单管理」订单列表退款入口。
  * 即时完成仍通过 createRefundRequest() 和 settleRefund() 推进，页面不直接改订单、学籍或授权。
  */
 function registerCompletedOfflineRefund(input = {}) {

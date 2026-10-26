@@ -853,13 +853,25 @@ function renderOrders() {
   businessData = dataSets.orders;
   // CR-2026-032 §2：指标卡可点击筛选；支付、履约、退款三类状态分列展示。
   const metricCard = ([label, value, note, progress, metric]) => `<button type="button" class="card metric-card" data-order-metric="${metric}"><span class="metric-label">${label}</span><span class="metric-value">${value}</span><span class="metric-note">${note}</span>${progress ? `<span class="metric-progress"><span style="width:${progress}%"></span></span>` : ''}</button>`;
-  pageFrame('统一订单管理', '', '<button class="button" data-business-action="order-export">导出订单</button><button class="button" data-business-action="order-batch-refund">批量退款</button>', `<div class="sales-workspace-tabs order-type-tabs" role="tablist"><button type="button" role="tab" data-order-type="" aria-selected="true" class="active">全部订单</button><button type="button" role="tab" data-order-type="面授课程" aria-selected="false">面授课程</button><button type="button" role="tab" data-order-type="视频课程" aria-selected="false">视频课程</button></div><div class="card-grid compact-metrics" data-order-metrics></div>` + filterPanel('order-filter', selectField('订单类型', 'type', ['视频课程', '面授课程']) + selectField('支付状态', 'status', ['待支付', '已支付', '已取消']) + selectField('退款状态', 'refundStatus', ['无退款', '退款中', '退款异常', '已退款', '已拒绝']) + `<label class="form-field"><span>下单时间起</span><input name="from" type="date"></label><label class="form-field"><span>下单时间止</span><input name="to" type="date"></label>` + inputField('购买账号', 'account', '账号名称 / 手机号 / 账号编号') + inputField('学员', 'student', '学员姓名') + inputField('班级名称', 'className', '关联班级名称') + inputField('关键词', 'keyword', '订单号 / 课程名称', true)) + table('<thead><tr><th>订单号</th><th>课程名称</th><th>课程类型</th><th>购买账号 / 学员</th><th>订单金额</th><th>支付状态</th><th>退款状态</th><th>关联班级</th><th>下单时间</th><th>操作</th></tr></thead>'));
+  pageFrame('统一订单管理', '', '<button class="button" data-business-action="order-export">导出订单</button><button class="button" data-business-action="order-batch-refund">批量退款</button>', `<div class="sales-workspace-tabs order-type-tabs" role="tablist"><button type="button" role="tab" data-order-type="" aria-selected="true" class="active">全部订单</button><button type="button" role="tab" data-order-type="面授课程" aria-selected="false">面授课程</button><button type="button" role="tab" data-order-type="视频课程" aria-selected="false">视频课程</button></div><div class="card-grid compact-metrics" data-order-metrics></div>` + filterPanel('order-filter', selectField('订单类型', 'type', ['视频课程', '面授课程']) + selectField('支付状态', 'status', ['待支付', '已支付', '已取消']) + selectField('退款状态', 'refundStatus', ['无退款', '退款中', '退款异常', '已退款']) + `<label class="form-field"><span>下单时间起</span><input name="from" type="date"></label><label class="form-field"><span>下单时间止</span><input name="to" type="date"></label>` + inputField('购买账号', 'account', '账号名称 / 手机号 / 账号编号') + inputField('学员', 'student', '学员姓名') + inputField('班级名称', 'className', '关联班级名称') + inputField('关键词', 'keyword', '订单号 / 课程名称', true)) + table('<thead><tr><th>订单号</th><th>课程名称</th><th>课程类型</th><th>购买账号 / 学员</th><th>订单金额</th><th>支付状态</th><th>退款状态</th><th>关联班级</th><th>下单时间</th><th>操作</th></tr></thead>'));
   const params = new URLSearchParams(window.location.search);
   document.querySelector('#order-filter [name="type"]')?.closest('.form-field')?.remove();
   // RM-F-07: video orders name the purchasing account; offline orders keep account + student.
   const paymentStatusOf = (row) => ['退款中', '已退款'].includes(row.status) ? '已支付' : row.status;
-  const refundStatusOf = (row) => { const linked = (readDemoState().refunds || []).find(item => item.orderNo === row.number) || row.refund; return linked?.status || (['退款中', '已退款'].includes(row.status) ? row.status : '无退款'); };
-  const rows = (row) => { const collection = (readDemoState().paymentRecords || []).find(item => item.orderNo === row.number && ['待确认', '已到账'].includes(item.status)); return `<td>${row.number}</td><td>${row.name}</td><td>${row.type}</td><td>${row.type === '视频课程' ? `${row.account || row.student}${row.account ? `<span class="sub-cell">${row.accountPhone || ''}</span>` : ''}` : `${row.account || '—'}<span class="sub-cell">学员：${row.student || '—'}</span>`}</td><td class="amount-cell">¥${row.amount}</td><td>${tag(paymentStatusOf(row))}${collection ? `<span class="sub-cell">收款：${collection.status}</span>` : ''}</td><td>${tag(refundStatusOf(row))}</td><td>${row.type === '面授课程' ? (row.linked || '—') : '—'}</td><td>${row.time}</td><td><button class="text-button" data-business-action="order-view">查看详情</button>${row.status === '待支付' && !collection ? '<button class="text-button" data-business-action="order-payment-create">登记收款</button>' : ''}${paymentStatusOf(row) === '已支付' && refundStatusOf(row) === '无退款' ? '<button class="text-button" data-business-action="order-refund">退款</button>' : ''}</td>`; };
+  const refundRecordOf = (row) => (readDemoState().refunds || []).find(item => item.orderNo === row.number) || row.refund || null;
+  const refundStatusOf = (row) => { const linked = refundRecordOf(row); return linked?.status || (['退款中', '已退款'].includes(row.status) ? row.status : '无退款'); };
+  // CR-2026-155 C9：单笔退款默认全额、允许改小（部分退款），退款完成后订单终结、不再支持二次发起。
+  // 部分退款时「已退款」需与金额并列展示，避免财务把「只退了一部分」误读为全额退。
+  const money = (value) => Number(String(value ?? '').replace(/[^0-9.-]/g, '')) || 0;
+  const refundAmountNote = (row) => {
+    const record = refundRecordOf(row);
+    if (!record || record.status !== '已退款') return '';
+    const refunded = money(record.amount);
+    const paid = money(row.amount);
+    if (!(refunded > 0) || !(paid > 0) || refunded >= paid) return '';
+    return `<span class="sub-cell">部分退款 ¥${refunded.toFixed(2)} / ¥${paid.toFixed(2)}</span>`;
+  };
+  const rows = (row) => { const collection = (readDemoState().paymentRecords || []).find(item => item.orderNo === row.number && ['待确认', '已到账'].includes(item.status)); return `<td>${row.number}</td><td>${row.name}</td><td>${row.type}</td><td>${row.type === '视频课程' ? `${row.account || row.student}${row.account ? `<span class="sub-cell">${row.accountPhone || ''}</span>` : ''}` : `${row.account || '—'}<span class="sub-cell">学员：${row.student || '—'}</span>`}</td><td class="amount-cell">¥${row.amount}</td><td>${tag(paymentStatusOf(row))}${collection ? `<span class="sub-cell">收款：${collection.status}</span>` : ''}</td><td>${tag(refundStatusOf(row))}${refundAmountNote(row)}</td><td>${row.type === '面授课程' ? (row.linked || '—') : '—'}</td><td>${row.time}</td><td><button class="text-button" data-business-action="order-view">查看详情</button>${row.status === '待支付' && !collection ? '<button class="text-button" data-business-action="order-payment-create">登记收款</button>' : ''}${paymentStatusOf(row) === '已支付' && refundStatusOf(row) === '无退款' ? '<button class="text-button" data-business-action="order-refund">退款</button>' : ''}</td>`; };
   // 指标卡与筛选条件叠加：指标卡再次点击取消；下单时间范围含起止当天。
   let metricFilter = '';
   const inRange = (row, form) => {
@@ -1120,7 +1132,7 @@ function openOrderPaymentForm(row) {
 }
 
 // CR-2026-155 C9（订单列表退款入口）：将退款发起入口从「退款管理」页签迁移至「统一订单管理」订单列表。
-// 后台发起的退款登记后直接进入「退款中」，不经过审批；默认退全部金额，允许手动改退款金额（支持部分退款）；
+// 后台发起的退款登记后直接进入「退款中」，不经过审批；金额默认全额、允许改小（部分退款），一单只支持一次退款；
 // 去掉原「退款时间」字段，退款申请时间（requestedAt）与完成时间（completedAt）由系统自动记录。
 function refundResultText(code) {
   const map = {
@@ -1137,9 +1149,11 @@ function openOrderRefundForm(row) {
   if (!row) return;
   const paidAmount = Number(row.amount || 0);
   if (!(paidAmount > 0)) return showToast('该订单无有效支付金额，无法发起退款。', 'warning');
+  if (row.status === '已退款') return showToast('该订单已完成退款并终结，不能再次发起。', 'warning');
   if (openRefundForOrder(row.number)) return showToast('该订单已存在未结退款单，请勿重复发起。', 'warning');
   const body = `<form id="order-refund-form" class="crm-form-grid">
     <p class="form-help wide">退款将直接进入「退款中」状态，由财务执行，不经过审批流程。退款时间由系统自动记录（申请时间 / 完成时间），无需手工填写。</p>
+    <p class="form-help wide">退款金额默认等于支付金额（全额退款）；如只退其中一部分，请改小金额。一单只支持一次退款，部分退款完成后订单即终结，不支持再次发起。</p>
     <label class="form-field"><span>订单号</span><input value="${escapeHtml(row.number)}" disabled></label>
     <label class="form-field"><span>课程名称</span><input value="${escapeHtml(row.name)}" disabled></label>
     <label class="form-field"><span>支付金额（元）</span><input value="${paidAmount.toFixed(2)}" disabled></label>
@@ -1159,7 +1173,9 @@ function openOrderRefundForm(row) {
     closeBusinessDialog();
     syncSharedBusinessData();
     renderOrders();
-    showToast(`退款单 ${result.refund.no} 已登记，已进入退款中。`);
+    showToast(amount < paidAmount
+      ? `退款单 ${result.refund.no} 已登记，已进入退款中（部分退款 ¥${amount.toFixed(2)} / ¥${paidAmount.toFixed(2)}）。`
+      : `退款单 ${result.refund.no} 已登记，已进入退款中。`);
   });
 }
 
@@ -1225,7 +1241,7 @@ function openOrderDetail(row) {
     ...linkedRefunds.map((item) => ({ number: item.no, source: item.source || '线上', method: item.channel, amount: item.amount, status: item.status, at: item.time, reason: item.reason }))
   ];
   const refundRows = refundRecords.length
-    ? `<div class="table-wrap"><table><thead><tr><th>退款单号</th><th>退款方式</th><th>退款渠道</th><th>退款金额</th><th>退款状态</th><th>到账时间</th><th>申请时间</th><th>退款原因</th></tr></thead><tbody>${refundRecords.map((item) => { const completed = item.status === '已退款'; const arrival = completed ? (item.completedAt || item.at || '—') : (item.expectedAt || '以渠道回执为准'); return `<tr><td>${escapeHtml(item.number)}</td><td>${escapeHtml(item.source || '线上')}</td><td>${escapeHtml(item.method || '—')}</td><td>¥${escapeHtml(Number(item.amount ?? 0).toFixed(2))}</td><td>${escapeHtml(item.status || '—')}</td><td>${escapeHtml(arrival)}</td><td>${escapeHtml(item.at || '—')}</td><td>${escapeHtml(item.reason || '—')}</td></tr>`; }).join('')}</tbody></table></div>`
+    ? `<div class="table-wrap"><table><thead><tr><th>退款单号</th><th>退款方式</th><th>退款渠道</th><th>退款金额</th><th>退款状态</th><th>到账时间</th><th>申请时间</th><th>退款原因</th></tr></thead><tbody>${refundRecords.map((item) => { const completed = item.status === '已退款'; const arrival = completed ? (item.completedAt || item.at || '—') : (item.expectedAt || '以渠道回执为准'); const refunded = Number(item.amount ?? 0); const partial = refunded > 0 && refunded < Number(row.amount || 0); return `<tr><td>${escapeHtml(item.number)}</td><td>${escapeHtml(item.source || '线上')}</td><td>${escapeHtml(item.method || '—')}</td><td>¥${escapeHtml(refunded.toFixed(2))}${partial ? `<span class="sub-cell">部分退款 · 订单实收 ¥${escapeHtml(Number(row.amount || 0).toFixed(2))}</span>` : ''}</td><td>${escapeHtml(item.status || '—')}</td><td>${escapeHtml(arrival)}</td><td>${escapeHtml(item.at || '—')}</td><td>${escapeHtml(item.reason || '—')}</td></tr>`; }).join('')}</tbody></table></div>`
     : '';
   const logRows = (row.logs || []).map((log) => `<tr><td>${escapeHtml(log.at)}</td><td>${escapeHtml(log.role)}</td><td>${escapeHtml(`${log.from} → ${log.to}`)}</td><td>${escapeHtml(log.reason || '—')}</td></tr>`).join('');
   const section = (title, content) => (content ? `<section class="course-detail-section wide"><h3>${title}</h3>${content}</section>` : '');

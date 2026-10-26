@@ -56,7 +56,7 @@ const MALL_FIELD_SPEC = {
         { heading: '列表筛选字段', fields: [
           { id: 'FD-MALL-041', label: '订单类型', type: '下拉', length: '视频课程 / 面授课程', required: '否', note: '区分视频订单与面授订单', constraints: { options: ['视频课程', '面授课程'] } },
           { id: 'FD-MALL-042', label: '支付状态', type: '下拉', length: '待支付 / 已支付 / 已取消', required: '否', note: '只表示支付事实；退款中与已退款不改变已支付状态', constraints: { options: ['待支付', '已支付', '已取消'] } },
-          { id: 'FD-MALL-051', label: '退款状态', type: '下拉', length: '无退款 / 退款中 / 退款异常 / 已退款', required: '否', note: '独立于支付状态；无退款表示订单没有有效退款单；退款由后台发起后直接进入退款中，不设待审批状态（CR-2026-155 C9）', constraints: { options: ['无退款', '退款中', '退款异常', '已退款'] } },
+          { id: 'FD-MALL-051', label: '退款状态', type: '下拉', length: '无退款 / 退款中 / 退款异常 / 已退款', required: '否', note: '独立于支付状态；无退款表示订单没有有效退款单；退款由后台发起后直接进入退款中，不设待审批状态（CR-2026-155 C9）；「已退款」含全额与部分退款两种结果，部分退款须在列表与详情并列展示「已退金额 / 订单金额」', constraints: { options: ['无退款', '退款中', '退款异常', '已退款'] } },
           { id: 'FD-MALL-043', label: '下单时间起', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '按下单时间范围筛选，含当天' },
           { id: 'FD-MALL-044', label: '下单时间止', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '含当天；与起始日期共同构成闭区间' },
           { id: 'FD-MALL-045', label: '指标卡筛选', type: '按钮', length: '—', required: '否', note: '今日订单／待支付／退款中／已支付可点击筛选；退款中按退款状态筛选，其余按支付状态筛选，再次点击取消', constraints: { action: true } }
@@ -64,7 +64,7 @@ const MALL_FIELD_SPEC = {
         { heading: '订单详情分区字段', fields: [
           { id: 'FD-MALL-046', label: '订单基础信息', type: '只读', length: '—', required: '系统展示', note: '订单号、类型、课程、购买账号或报名学员、下单时间、金额，以及相互独立的支付状态、履约状态与退款状态', constraints: { readOnly: true, system: true } },
           { id: 'FD-MALL-047', label: '支付记录', type: '只读', length: '—', required: '有支付记录时展示', note: '支付渠道、金额、状态与时间；未支付订单不渲染该分区', constraints: { readOnly: true, system: true } },
-          { id: 'FD-MALL-048', label: '退款记录', type: '只读', length: '—', required: '退款中或已退款时展示', note: '退款单号、渠道、金额、状态、到账时间与原因；视频订单满足退款规则时同样渲染该分区', constraints: { readOnly: true, system: true } },
+          { id: 'FD-MALL-048', label: '退款记录', type: '只读', length: '—', required: '退款中或已退款时展示', note: '退款单号、渠道、金额、状态、到账时间与原因；部分退款并列展示退款金额与订单金额对比；视频订单满足退款规则时同样渲染该分区', constraints: { readOnly: true, system: true } },
           { id: 'FD-MALL-049', label: '履约结果', type: '只读', length: '—', required: '系统展示', note: '视频订单展示学习权限与有效期；面授订单展示班级、校区、分班与名额占用结果', constraints: { readOnly: true, system: true } },
           { id: 'FD-MALL-050', label: '操作日志', type: '只读', length: '—', required: '有状态变更时展示', note: '状态变更时间、操作人角色、变更前后状态与原因', constraints: { readOnly: true, system: true } }
         ] }
