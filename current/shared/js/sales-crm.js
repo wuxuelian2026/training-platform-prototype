@@ -17,6 +17,9 @@ const { defaultLessonDuration, TIMELINE_END, TIMELINE_START, isWithinTimeline, l
 const { openSchedulePlanner, openSessionAdjustment } = __classicRequire("shared/js/academic.js");
 const { isEnrollmentActive } = __classicRequire("shared/js/class-roster.js");
 const { REFUND_ORIGIN, classRefundSuggestion, createRefundRequest, openRefundForOrder } = __classicRequire("shared/js/refund-store.js");
+// CR-2026-155 C10：班级详情「学员与记录」的考勤率／作业提交率按已上课次聚合，取数口径与教师端、
+// 课次详情同源（lesson-records 单一口径）；该模块仅班级管理页加载，未加载时按「—」兜底，不报错。
+const lessonRecordsModule = () => __classicRequire("shared/js/lesson-records.js");
 
 const businessRoot = document.querySelector('[data-business-page]');
 const businessPage = businessRoot?.dataset.businessPage;
@@ -850,13 +853,13 @@ function renderOrders() {
   businessData = dataSets.orders;
   // CR-2026-032 §2：指标卡可点击筛选；支付、履约、退款三类状态分列展示。
   const metricCard = ([label, value, note, progress, metric]) => `<button type="button" class="card metric-card" data-order-metric="${metric}"><span class="metric-label">${label}</span><span class="metric-value">${value}</span><span class="metric-note">${note}</span>${progress ? `<span class="metric-progress"><span style="width:${progress}%"></span></span>` : ''}</button>`;
-  pageFrame('统一订单管理', '', '<button class="button" data-business-action="order-export">导出订单</button>', `<div class="sales-workspace-tabs order-type-tabs" role="tablist"><button type="button" role="tab" data-order-type="" aria-selected="true" class="active">全部订单</button><button type="button" role="tab" data-order-type="面授课程" aria-selected="false">面授课程</button><button type="button" role="tab" data-order-type="视频课程" aria-selected="false">视频课程</button></div><div class="card-grid compact-metrics" data-order-metrics></div>` + filterPanel('order-filter', selectField('订单类型', 'type', ['视频课程', '面授课程']) + selectField('支付状态', 'status', ['待支付', '已支付', '已取消']) + selectField('退款状态', 'refundStatus', ['无退款', '待审批', '退款中', '退款异常', '已退款', '已拒绝']) + `<label class="form-field"><span>下单时间起</span><input name="from" type="date"></label><label class="form-field"><span>下单时间止</span><input name="to" type="date"></label>` + inputField('购买账号', 'account', '账号名称 / 手机号 / 账号编号') + inputField('学员', 'student', '学员姓名') + inputField('班级名称', 'className', '关联班级名称') + inputField('关键词', 'keyword', '订单号 / 课程名称', true)) + table('<thead><tr><th>订单号</th><th>课程名称</th><th>课程类型</th><th>购买账号 / 学员</th><th>订单金额</th><th>支付状态</th><th>退款状态</th><th>关联班级</th><th>下单时间</th><th>操作</th></tr></thead>'));
+  pageFrame('统一订单管理', '', '<button class="button" data-business-action="order-export">导出订单</button><button class="button" data-business-action="order-batch-refund">批量退款</button>', `<div class="sales-workspace-tabs order-type-tabs" role="tablist"><button type="button" role="tab" data-order-type="" aria-selected="true" class="active">全部订单</button><button type="button" role="tab" data-order-type="面授课程" aria-selected="false">面授课程</button><button type="button" role="tab" data-order-type="视频课程" aria-selected="false">视频课程</button></div><div class="card-grid compact-metrics" data-order-metrics></div>` + filterPanel('order-filter', selectField('订单类型', 'type', ['视频课程', '面授课程']) + selectField('支付状态', 'status', ['待支付', '已支付', '已取消']) + selectField('退款状态', 'refundStatus', ['无退款', '退款中', '退款异常', '已退款', '已拒绝']) + `<label class="form-field"><span>下单时间起</span><input name="from" type="date"></label><label class="form-field"><span>下单时间止</span><input name="to" type="date"></label>` + inputField('购买账号', 'account', '账号名称 / 手机号 / 账号编号') + inputField('学员', 'student', '学员姓名') + inputField('班级名称', 'className', '关联班级名称') + inputField('关键词', 'keyword', '订单号 / 课程名称', true)) + table('<thead><tr><th>订单号</th><th>课程名称</th><th>课程类型</th><th>购买账号 / 学员</th><th>订单金额</th><th>支付状态</th><th>退款状态</th><th>关联班级</th><th>下单时间</th><th>操作</th></tr></thead>'));
   const params = new URLSearchParams(window.location.search);
   document.querySelector('#order-filter [name="type"]')?.closest('.form-field')?.remove();
   // RM-F-07: video orders name the purchasing account; offline orders keep account + student.
   const paymentStatusOf = (row) => ['退款中', '已退款'].includes(row.status) ? '已支付' : row.status;
   const refundStatusOf = (row) => { const linked = (readDemoState().refunds || []).find(item => item.orderNo === row.number) || row.refund; return linked?.status || (['退款中', '已退款'].includes(row.status) ? row.status : '无退款'); };
-  const rows = (row) => { const collection = (readDemoState().paymentRecords || []).find(item => item.orderNo === row.number && ['待确认', '已到账'].includes(item.status)); return `<td>${row.number}</td><td>${row.name}</td><td>${row.type}</td><td>${row.type === '视频课程' ? `${row.account || row.student}${row.account ? `<span class="sub-cell">${row.accountPhone || ''}</span>` : ''}` : `${row.account || '—'}<span class="sub-cell">学员：${row.student || '—'}</span>`}</td><td class="amount-cell">¥${row.amount}</td><td>${tag(paymentStatusOf(row))}${collection ? `<span class="sub-cell">收款：${collection.status}</span>` : ''}</td><td>${tag(refundStatusOf(row))}</td><td>${row.type === '面授课程' ? (row.linked || '—') : '—'}</td><td>${row.time}</td><td><button class="text-button" data-business-action="order-view">查看详情</button>${row.status === '待支付' && !collection ? '<button class="text-button" data-business-action="order-payment-create">登记收款</button>' : ''}</td>`; };
+  const rows = (row) => { const collection = (readDemoState().paymentRecords || []).find(item => item.orderNo === row.number && ['待确认', '已到账'].includes(item.status)); return `<td>${row.number}</td><td>${row.name}</td><td>${row.type}</td><td>${row.type === '视频课程' ? `${row.account || row.student}${row.account ? `<span class="sub-cell">${row.accountPhone || ''}</span>` : ''}` : `${row.account || '—'}<span class="sub-cell">学员：${row.student || '—'}</span>`}</td><td class="amount-cell">¥${row.amount}</td><td>${tag(paymentStatusOf(row))}${collection ? `<span class="sub-cell">收款：${collection.status}</span>` : ''}</td><td>${tag(refundStatusOf(row))}</td><td>${row.type === '面授课程' ? (row.linked || '—') : '—'}</td><td>${row.time}</td><td><button class="text-button" data-business-action="order-view">查看详情</button>${row.status === '待支付' && !collection ? '<button class="text-button" data-business-action="order-payment-create">登记收款</button>' : ''}${paymentStatusOf(row) === '已支付' && refundStatusOf(row) === '无退款' ? '<button class="text-button" data-business-action="order-refund">退款</button>' : ''}</td>`; };
   // 指标卡与筛选条件叠加：指标卡再次点击取消；下单时间范围含起止当天。
   let metricFilter = '';
   const inRange = (row, form) => {
@@ -1116,6 +1119,86 @@ function openOrderPaymentForm(row) {
   });
 }
 
+// CR-2026-155 C9（订单列表退款入口）：将退款发起入口从「退款管理」页签迁移至「统一订单管理」订单列表。
+// 后台发起的退款登记后直接进入「退款中」，不经过审批；默认退全部金额，允许手动改退款金额（支持部分退款）；
+// 去掉原「退款时间」字段，退款申请时间（requestedAt）与完成时间（completedAt）由系统自动记录。
+function refundResultText(code) {
+  const map = {
+    REFUND_REASON_REQUIRED: '退款原因必填',
+    ORDER_NOT_FOUND: '订单不存在',
+    ORDER_ALREADY_REFUNDED: '订单已退款',
+    REFUND_ALREADY_OPEN: '该订单已有未结退款单',
+    REFUND_AMOUNT_INVALID: '退款金额不合法（需大于 0 且不超过实付金额）',
+    REFUND_INELIGIBLE: '不符合退款资格'
+  };
+  return map[code] || code || '未知错误';
+}
+function openOrderRefundForm(row) {
+  if (!row) return;
+  const paidAmount = Number(row.amount || 0);
+  if (!(paidAmount > 0)) return showToast('该订单无有效支付金额，无法发起退款。', 'warning');
+  if (openRefundForOrder(row.number)) return showToast('该订单已存在未结退款单，请勿重复发起。', 'warning');
+  const body = `<form id="order-refund-form" class="crm-form-grid">
+    <p class="form-help wide">退款将直接进入「退款中」状态，由财务执行，不经过审批流程。退款时间由系统自动记录（申请时间 / 完成时间），无需手工填写。</p>
+    <label class="form-field"><span>订单号</span><input value="${escapeHtml(row.number)}" disabled></label>
+    <label class="form-field"><span>课程名称</span><input value="${escapeHtml(row.name)}" disabled></label>
+    <label class="form-field"><span>支付金额（元）</span><input value="${paidAmount.toFixed(2)}" disabled></label>
+    <label class="form-field"><span>退款金额（元） <b class="required-mark">*</b></span><input name="amount" type="number" min="0.01" max="${paidAmount.toFixed(2)}" step="0.01" value="${paidAmount.toFixed(2)}" required></label>
+    <label class="form-field wide"><span>退款原因 <b class="required-mark">*</b></span><textarea name="reason" rows="3" required placeholder="请填写退款原因（如学员申请、课程调整、重复支付等）"></textarea></label>
+  </form>`;
+  const dialog = openBusinessDialog('订单退款', '从统一订单管理发起退款，登记后直接进入退款中。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="order-refund-form" class="button primary">确认退款</button>');
+  dialog.querySelector('#order-refund-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const amount = Number(data.get('amount'));
+    const reason = String(data.get('reason') || '').trim();
+    if (!reason) return showToast('请填写退款原因。', 'warning');
+    if (!(amount > 0) || amount > paidAmount) return showToast(`退款金额需在 0.01 ~ ${paidAmount.toFixed(2)} 元之间。`, 'warning');
+    const result = createRefundRequest({ orderId: row.number, reason, amount, skipApproval: true, origin: REFUND_ORIGIN.OFFLINE, source: '后台', requestedBy: '后台' });
+    if (!result.ok) return showToast(`退款发起失败：${refundResultText(result.reason)}`, 'error');
+    closeBusinessDialog();
+    syncSharedBusinessData();
+    renderOrders();
+    showToast(`退款单 ${result.refund.no} 已登记，已进入退款中。`);
+  });
+}
+
+// CR-2026-155 C9：批量退款仅支持全额退款，不可退部分金额；勾选后所有选中订单直接进入「退款中」，由财务执行，不经过审批。
+function openBatchRefundDialog() {
+  const isPaidStatus = (r) => ['退款中', '已退款'].includes(r.status) ? '已支付' : r.status;
+  const refundStateOf = (r) => { const linked = (readDemoState().refunds || []).find((item) => item.orderNo === r.number); return linked?.status || (['退款中', '已退款'].includes(r.status) ? r.status : '无退款'); };
+  const candidates = businessData.filter((r) => isPaidStatus(r) === '已支付' && refundStateOf(r) === '无退款' && !openRefundForOrder(r.number));
+  if (!candidates.length) return showToast('当前没有可批量退款的已支付订单。', 'warning');
+  const optionRows = candidates.map((r) => `<tr><td><input type="checkbox" name="order" value="${escapeHtml(r.id)}" checked></td><td>${escapeHtml(r.number)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.type)}</td><td class="amount-cell">¥${Number(r.amount || 0).toFixed(2)}</td></tr>`).join('');
+  const body = `<form id="batch-refund-form" class="crm-form-grid">
+    <p class="form-help wide">批量退款仅支持全额退款，不可退部分金额；勾选后所有选中订单将直接进入「退款中」，由财务执行，不经过审批。退款时间由系统自动记录。</p>
+    <label class="form-field wide"><span>退款原因 <b class="required-mark">*</b></span><textarea name="reason" rows="3" required placeholder="请填写批量退款原因"></textarea></label>
+    <div class="table-wrap"><table><thead><tr><th>选择</th><th>订单号</th><th>课程名称</th><th>类型</th><th>金额</th></tr></thead><tbody>${optionRows}</tbody></table></div>
+  </form>`;
+  const dialog = openBusinessDialog('批量退款', '勾选需要全额退款的已支付订单。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="batch-refund-form" class="button primary">确认批量退款</button>');
+  dialog.querySelector('#batch-refund-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const reason = String(data.get('reason') || '').trim();
+    const ids = data.getAll('order');
+    if (!reason) return showToast('请填写退款原因。', 'warning');
+    if (!ids.length) return showToast('请至少勾选一笔订单。', 'warning');
+    let success = 0; const failures = [];
+    ids.forEach((id) => {
+      const selected = candidates.find((item) => item.id === id);
+      if (!selected) return;
+      const paidAmount = Number(selected.amount || 0);
+      const result = createRefundRequest({ orderId: selected.number, reason: `${reason}（批量）`, amount: paidAmount, skipApproval: true, origin: REFUND_ORIGIN.OFFLINE, source: '后台', requestedBy: '后台' });
+      if (result.ok) success += 1; else failures.push(`${selected.number}: ${refundResultText(result.reason)}`);
+    });
+    closeBusinessDialog();
+    syncSharedBusinessData();
+    renderOrders();
+    if (failures.length) showToast(`批量退款完成：成功 ${success} 笔，失败 ${failures.length} 笔（${failures.join('；')}）。`, 'warning');
+    else showToast(`批量退款完成：成功 ${success} 笔，已进入退款中。`);
+  });
+}
+
 // CR-2026-032 §3：订单详情由通用弹窗改为订单专用分区详情（五分区，无数据的分区不渲染，不展示渠道侧标识与回调结果）。
 function openOrderDetail(row) {
   const isVideo = row.type === '视频课程';
@@ -1296,17 +1379,26 @@ function mountClassEnrollmentPanel(dialog, row, shared) {
     const transfer = item.transferToClassId ? `<span class="sub-cell">转入 ${escapeHtml(classNames.get(item.transferToClassId) || item.transferToClassId)}</span>` : '';
     const changeAt = !active && item.changeAt ? `<span class="sub-cell">${escapeHtml(item.changeAt)}</span>` : '';
     const refundRelation = item.refundRelationStatus ? `<span class="sub-cell">退款：${escapeHtml(item.refundRelationStatus)}</span>` : '';
-    return `<tr><td>${escapeHtml(student?.name || item.studentId)}</td><td>${escapeHtml(item.enrolledAt || '—')}</td><td>${tag(item.status)}${refundRelation}${transfer}${changeAt}</td><td>${active ? `<button class="text-button" data-enrollment-change="${escapeHtml(item.id)}">学籍异动</button>` : '—'}</td></tr>`;
-  }).join('') : '<tr><td colspan="4">暂无学员报名</td></tr>';
+    // CR-2026-155 C10：考勤率／作业提交率按本班已上课次聚合；点击跳转对应监控列表并预填班级+学员筛选。
+    const records = lessonRecordsModule();
+    const studentName = student?.name || item.studentId;
+    const rateCell = (rate, page) => (rate === null || rate === undefined)
+      ? '<span class="sub-cell">—</span>'
+      : `<a class="sales-rate-link" href="/admin/pages/academic/${page}.html?classId=${encodeURIComponent(row.id)}&className=${encodeURIComponent(row.name || '')}&studentId=${encodeURIComponent(student?.id || item.studentId)}&studentName=${encodeURIComponent(studentName)}">${rate}%</a>`;
+    const attendanceRate = records?.studentAttendanceRate && student ? records.studentAttendanceRate(row, student) : null;
+    const homeworkRate = records?.studentHomeworkRate && student ? records.studentHomeworkRate(row, student) : null;
+    return `<tr><td>${escapeHtml(student?.name || item.studentId)}</td><td>${escapeHtml(item.enrolledAt || '—')}</td><td>${tag(item.status)}${refundRelation}${transfer}${changeAt}</td><td>${rateCell(attendanceRate, 'attendance')}</td><td>${rateCell(homeworkRate, 'homework')}</td><td>${active ? `<button class="text-button" data-enrollment-change="${escapeHtml(item.id)}">学籍异动</button>` : '—'}</td></tr>`;
+  }).join('') : '<tr><td colspan="6">暂无学员报名</td></tr>';
   const changes = (shared.enrollmentChanges || []).filter(item => item.classId === row.id)
     .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
-  const changeRows = changes.length ? changes.map(item => `<tr><td>${escapeHtml(item.at || '—')}</td><td>${escapeHtml(item.studentName || item.studentId)}</td><td>${escapeHtml(item.type || '—')}</td><td>${escapeHtml(item.reason || '—')}</td><td>${escapeHtml(item.targetClassName || '—')}</td><td>${item.refundNo ? `${escapeHtml(item.refundNo)}<br><span class="sub-cell">${escapeHtml(item.refundStatus || '待审批')}</span>` : '—'}</td><td>${escapeHtml(item.operator || '—')}</td></tr>`).join('')
+  const changeRows = changes.length ? changes.map(item => `<tr><td>${escapeHtml(item.at || '—')}</td><td>${escapeHtml(item.studentName || item.studentId)}</td><td>${escapeHtml(item.type || '—')}</td><td>${escapeHtml(item.reason || '—')}</td><td>${escapeHtml(item.targetClassName || '—')}</td><td>${item.refundNo ? `${escapeHtml(item.refundNo)}<br><span class="sub-cell">${escapeHtml(item.refundStatus || '退款中')}</span>` : '—'}</td><td>${escapeHtml(item.operator || '—')}</td></tr>`).join('')
     : '<tr><td colspan="7">暂无学籍异动记录</td></tr>';
   const refundTodos = (shared.academicTodos || []).filter(item => item.classId === row.id && item.status === '待处理');
   const todoPanel = refundTodos.length ? `<div class="sales-roster-meta"><strong>教务待办 ${refundTodos.length} 项</strong>${refundTodos.map(item => `<div>${escapeHtml(item.title)}：${escapeHtml(item.detail)}</div>`).join('')}</div>` : '';
   panel.innerHTML = `<div class="sales-dialog-summary"><div><span>在读学员</span><strong>${activeCount}</strong></div><div><span>已退出</span><strong>${exitedCount}</strong></div><div><span>招生容量</span><strong>${Number(row.capacity || 0)}</strong></div><div><span>剩余名额</span><strong>${Math.max(0, Number(row.capacity || 0) - activeCount)}</strong></div></div>
     <p class="sales-roster-meta">学籍异动只改变本班名册：已发布作业保留应交记录，退出学员不再计入作业提交率分母；转班学员在新班级重新起算。登记后班级名册、教师端与后台作业统计立即同源更新。</p>
-    <div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>学籍状态</th><th>操作</th></tr></thead><tbody>${roster}</tbody></table></div>
+    <p class="sales-roster-meta">考勤率、作业提交率按本班已上课次聚合，与教师端班级概览、课次详情同口径；点击比率跳转考勤监控／作业批阅监管列表，并按当前班级与学员预填筛选。</p>
+    <div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>学籍状态</th><th>考勤率</th><th>作业提交率</th><th>操作</th></tr></thead><tbody>${roster}</tbody></table></div>
     ${todoPanel}<div class="sales-table-wrap" style="margin-top:12px"><table><thead><tr><th>异动时间</th><th>学员</th><th>异动类型</th><th>原因</th><th>转入班级</th><th>退款单 / 状态</th><th>操作人</th></tr></thead><tbody>${changeRows}</tbody></table></div>`;
   panel.querySelectorAll('[data-enrollment-change]').forEach(button => button.addEventListener('click', () => {
     const enrollment = enrollments.find(item => item.id === button.dataset.enrollmentChange);
@@ -1325,7 +1417,7 @@ function openEnrollmentChangeForm(row, enrollment) {
   const paidOrders = enrollmentRefundCandidates(row, enrollment.studentId);
   const refundTotal = paidOrders.reduce((sum, item) => sum + item.refundAmount, 0);
   const refundFields = paidOrders.length
-    ? `<label class="form-field wide"><span>同步发起退费</span><span class="sales-inline-check"><input type="checkbox" name="withRefund" value="是" checked>本班已支付订单 ${paidOrders.length} 笔，全额退款合计 ${refundTotal} 元（${paidOrders[0].rule}）</span><small class="sub-cell">取消勾选则本次异动不发起退费，可由学员在「我的订单」自助申请，或由财务线下登记。</small></label>`
+    ? `<label class="form-field wide"><span>同步发起退费</span><span class="sales-inline-check"><input type="checkbox" name="withRefund" value="是" checked>本班已支付订单 ${paidOrders.length} 笔，全额退款合计 ${refundTotal} 元（${paidOrders[0].rule}）</span><small class="sub-cell">取消勾选则本次异动不发起退费，可由财务在统一订单管理登记退款。</small></label>`
     : '<p class="sales-roster-meta">本班暂无可退费的已支付订单，本次异动只变更学籍。</p>';
   const fields = `<label class="form-field"><span>异动类型 <b class="required-mark">*</b></span><select name="type" required><option value="">请选择</option><option>退班</option><option>转班</option><option>退学</option></select></label>
     <label class="form-field"><span>转入班级</span><select name="targetClassId"><option value="">转班时必填</option>${targetOptions}</select></label>
@@ -1345,7 +1437,7 @@ function openEnrollmentChangeForm(row, enrollment) {
     const outcome = applyEnrollmentChange(row, enrollment, { type, reason, targetClassId: type === '转班' ? targetClassId : '', withRefund, refundOrders: withRefund ? paidOrders : [] });
     closeBusinessDialog();
     renderClasses();
-    if (outcome?.refunds?.length) showToast(`${type}已登记：${student?.name || enrollment.studentId}；已同步发起 ${outcome.refunds.length} 张退款单（待审批）。`);
+    if (outcome?.refunds?.length) showToast(`${type}已登记：${student?.name || enrollment.studentId}；已同步发起 ${outcome.refunds.length} 张退款单（退款中）。`);
     else if (withRefund && !paidOrders.length) showToast(`${type}已登记：${student?.name || enrollment.studentId}；本班无可退订单，未发起退费。`, 'warning');
     showToast(`已登记${type}：${student?.name || enrollment.studentId}；班级名册与作业统计口径已同步。`);
   });
@@ -1405,7 +1497,9 @@ function applyEnrollmentChange(row, enrollment, { type, reason, targetClassId, w
         reason: `${type}退费：${reason}`,
         channel: item.order.payMethod || '原路退回',
         classChangeId: changeId,
-        remark: `学籍异动发起：${item.rule}`
+        remark: `学籍异动发起：${item.rule}`,
+        // CR-2026-155 C9：退款审批环节已取消，后台发起的退费登记后直接进入「退款中」，由财务在退款记录页执行。
+        skipApproval: true
       });
       if (result.ok) refunds.push(result.refund);
     });
@@ -1421,7 +1515,7 @@ function applyEnrollmentChange(row, enrollment, { type, reason, targetClassId, w
     targetClassId: targetClassId || '',
     targetClassName: targetClassId ? (classPool.find(item => item.id === targetClassId)?.name || targetClassId) : '',
     refundNo: refunds.map(item => item.no).join('、'),
-    refundStatus: refunds.length ? '待审批' : '',
+    refundStatus: refunds.length ? '退款中' : '',
     operator: '当前账号',
     at: now
   });
@@ -1477,6 +1571,9 @@ function handleBusinessAction(action, row) {
   if (action === 'product-publish' || action === 'product-unpublish') { row.status = action === 'product-publish' ? '已上架' : '已下架'; row.updated = action === 'product-publish' ? demoTime() : row.updated; persistProduct(row); renderProducts(); showToast(action === 'product-publish' ? '商品已上架，学员端可购买。' : '商品已下架，历史订单不受影响。'); return; }
   if (action === 'order-view') return openOrderDetail(row);
   if (action === 'order-payment-create') return openOrderPaymentForm(row);
+  // CR-2026-155 C9：统一订单管理订单列表新增退款入口（单笔 / 批量），后台发起、登记后直接进入退款中，不经过审批。
+  if (action === 'order-refund') return openOrderRefundForm(row);
+  if (action === 'order-batch-refund') return openBatchRefundDialog();
   if (action === 'class-view') return openClassDetail(row);
   if (action === 'schedule-history') return openScheduleHistory(row);
   if (action === 'class-create' || action === 'class-edit') return openClassForm(row);

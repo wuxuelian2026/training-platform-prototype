@@ -74,11 +74,11 @@ const TEACHER_FIELD_SPEC = {
         { heading: '联系与财务', fields: [
           { id: 'FD-TEACHER-014', label: '手机号', type: '文本', length: '11 位数字', required: '是', note: '需唯一；作为教师账号登录身份', constraints: { pattern: '^1[3-9]\\d{9}$', maxLength: 11, unique: true } },
           { id: 'FD-TEACHER-015', label: '邮箱', type: '文本', length: '≤ 64 字符', required: '否', note: '选填，需符合邮箱格式', constraints: { format: 'email', maxLength: 64 } },
-          { id: 'FD-TEACHER-016', label: '紧急联系人姓名', type: '文本', length: '2–30 字', required: '否', note: '选填', constraints: { minLength: 2, maxLength: 30 } },
-          { id: 'FD-TEACHER-017', label: '紧急联系人电话', type: '文本', length: '11 位数字', required: '否', note: '选填，填写时需符合手机号格式', constraints: { pattern: '^1[3-9]\\d{9}$', maxLength: 11 } },
-          { id: 'FD-TEACHER-018', label: '收款户名', type: '文本', length: '≤ 50 字', required: '否', note: '用于工资结算收款', constraints: { maxLength: 50 } },
-          { id: 'FD-TEACHER-019', label: '银行卡号', type: '文本', length: '16–19 位数字', required: '否', note: '选填', constraints: { pattern: '^\\d{16,19}$', maxLength: 19 } },
-          { id: 'FD-TEACHER-020', label: '开户行', type: '下拉', length: '4 个预置选项', required: '否', note: '选填', constraints: { options: ['中国工商银行', '中国建设银行', '中国银行', '中国农业银行'] } }
+          { id: 'FD-TEACHER-016', label: '紧急联系人姓名', type: '文本', length: '2–30 字', required: '是', note: '安全留痕项，紧急联络使用', constraints: { minLength: 2, maxLength: 30 } },
+          { id: 'FD-TEACHER-017', label: '紧急联系人电话', type: '文本', length: '11 位数字', required: '是', note: '填写时需符合手机号格式', constraints: { pattern: '^1[3-9]\\d{9}$', maxLength: 11 } },
+          { id: 'FD-TEACHER-018', label: '收款户名', type: '文本', length: '≤ 50 字', required: '是', note: '须与本人姓名一致，用于工资结算收款', constraints: { maxLength: 50 } },
+          { id: 'FD-TEACHER-019', label: '银行卡号', type: '文本', length: '16–19 位数字', required: '是', note: '工资结算收款账户', constraints: { pattern: '^\\d{16,19}$', maxLength: 19 } },
+          { id: 'FD-TEACHER-020', label: '开户行', type: '下拉', length: '4 个预置选项', required: '是', note: '工资结算收款账户开户行', constraints: { options: ['中国工商银行', '中国建设银行', '中国银行', '中国农业银行'] } }
         ] },
         { heading: '经历与展示', fields: [
           { id: 'FD-TEACHER-021', label: '学习经历', type: '多行文本', length: '≤ 500 字', required: '否', note: '填写毕业院校、专业和学习时间', constraints: { maxLength: 500 } },
@@ -101,7 +101,7 @@ const TEACHER_FIELD_SPEC = {
       ],
       notes: [
         '保存草稿：资料状态为“待完善”，不创建账号。',
-        '完成建档：校验姓名、人员类型、身份证号、手机号和至少一个授课专业。',
+        '完成建档：校验姓名、人员类型、身份证号、手机号和至少一个授课专业，以及紧急联系人姓名／电话、收款户名（须与本人姓名一致）、银行卡号、开户行。',
         '校验通过后资料状态为“已建档”，离职日期为空（即在职），账号状态直接为“正常”。',
         '建档成功后账号状态即“正常”，不设未激活与邀请激活流程，后台不设置初始密码。',
         '冻结与解冻只变更账号状态；离职只写入离职日期，历史授课、考勤与结算记录均保留。',

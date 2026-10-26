@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// 校验班级课时口径（2026-09-23 客户裁定）：
-//   班级总课时 = 课程库该课程的总课时；已排课时「课次数 = 总课时」（一个课时一个课次）。
-// 拦截项：班级课时与课程库不一致、课次数与总课时不一致、课时表与课程库不一致。
+// 校验班级课时口径（2026-09-23 客户裁定；2026-10-23 CR-2026-155 C2/C3 修订）：
+//   班级总课时（学时）= 课程库该课程的总课时；单节课固定 45 分钟；
+//   课次与课时为倍数关系：课次数 = 总课时（学时）÷ 每次连上节数，单次实际上课时长 = 45 分钟 × 连上节数。
+// 拦截项：班级总课时与课程库不一致、课次数与「总课时 ÷ 连上节数」不一致、课时表与课程库不一致。
 // 提示项（不拦截）：课程库课程档案自身「总课时」与「大纲课时合计」不一致——属后台大纲待补录，需产品/教研定夺。
 import { loadClassicModule } from './load-classic-modules.mjs';
 
@@ -24,8 +25,12 @@ for (const item of classes) {
     problems.push(`${item.id}：课时表登记 ${expected}，课程库课程档案为 ${courseHours}（课程 ${item.courseId}）`);
   }
   const sessions = item.sessions || [];
-  if (sessions.length && sessions.length !== Number(item.lessons)) {
-    problems.push(`${item.id}：课次数 ${sessions.length} 与总课时 ${item.lessons} 不一致`);
+  const consecutive = Number(item.consecutiveLessons) > 0 ? Number(item.consecutiveLessons) : 1;
+  if (sessions.length) {
+    const expectedSessions = Math.round(Number(item.lessons) / consecutive);
+    if (sessions.length !== expectedSessions) {
+      problems.push(`${item.id}：课次数 ${sessions.length} 与「总课时 ${item.lessons} ÷ 连上节数 ${consecutive}」预期课次 ${expectedSessions} 不一致`);
+    }
   }
   const outlineLessons = (archive.chapters || []).reduce((sum, chapter) => sum + (chapter.lessons || []).length, 0);
   if (outlineLessons && courseHours && outlineLessons !== courseHours && !seenOutline.has(item.courseId)) {
@@ -43,4 +48,4 @@ if (problems.length) {
   problems.forEach((line) => console.error(`  - ${line}`));
   process.exit(1);
 }
-console.log(`检查通过：${classes.length} 个班级的「总课时 = 课次数 = 课程库课时」一致。`);
+console.log(`检查通过：${classes.length} 个班级的「总课时 = 课程库课时」，且按连上节数校验「课次数 × 连上节数 ≈ 总课时」一致。`);

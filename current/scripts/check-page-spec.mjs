@@ -269,7 +269,10 @@ for (const page of pages) {
   for (const match of html.matchAll(/<script[^>]+src="([^"]+)"/g)) {
     const target = path.resolve(path.dirname(page.file), match[1]);
     if (!existsSync(target)) continue;
+    // 跳过共享基建与 spec 事实源自身：规格文案本来就住在 spec/ 里，拼进「页面源码」会把每个
+    // 已迁移页面都误判成重复文案（42 处误报即此因）。本检查只比对页面 HTML 与页面自己的模块。
     if (target.endsWith('admin-shell.js') || target.endsWith('page-help-fields.js')) continue;
+    if (target.includes(`${path.sep}spec${path.sep}`)) continue;
     parts.push(stripUiAttributes(readFileSync(target, 'utf8')));
   }
   pageSource.set(page.key, parts.join('\n'));

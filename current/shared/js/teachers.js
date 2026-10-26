@@ -694,8 +694,8 @@ function teacherRecordFromForm(form, id) {
       gender: checked('gender'), birthMonth: value('birthday'), idCard: value('idCard'),
       politicalStatus: value('political'), ethnicity: value('ethnicity'), highestEducation: value('education'),
       carPlate: value('plateNumber'), mobile: value('phone'), email: value('email'),
-      emergencyName: value('emergencyName'), emergencyMobile: value('emergencyPhone'),
-      payeeName: value('payee'), bankCard: value('bankCard'), bankName: value('bank'),
+      emergencyName: value('emergencyName'), emergencyMobile: value('emergencyMobile'),
+      payeeName: value('payeeName'), bankCard: value('bankCard'), bankName: value('bankName'),
       education: value('studyExperience'), employment: value('workExperience'), awards: value('awards'),
       remark: value('remark')
     },
@@ -1033,6 +1033,16 @@ function initTeacherCreate() {
     event.preventDefault();
     // CR-2026-045 §3.1.2：跨页签全量校验，失败切到第一个含错误的页签并高亮该字段。
     if (!validateTeacherForm(form, teacherTabs)) return;
+    // CR-2026-155 C1：收款户名须与本人姓名一致（工资发放、结算、对账强相关）。
+    const payeeNameValue = form.querySelector('[name="payeeName"]')?.value?.trim() || '';
+    const legalNameValue = form.querySelector('[name="name"]')?.value?.trim() || '';
+    if (payeeNameValue && legalNameValue && payeeNameValue !== legalNameValue) {
+      toast('收款户名须与本人姓名一致。', 'error');
+      teacherTabs.setTab('contact');
+      const payeeField = form.querySelector('[name="payeeName"]');
+      if (payeeField) { markTeacherFieldError(payeeField); payeeField.scrollIntoView({ block: 'center' }); payeeField.focus({ preventScroll: true }); }
+      return;
+    }
     if (selected.length === 0) { toast('请至少添加一个授课专业。', 'error'); return; }
     const phone = form.querySelector('[name="phone"]')?.value || '';
     const idCard = form.querySelector('[name="idCard"]')?.value || '';

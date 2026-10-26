@@ -212,10 +212,10 @@ function createRefundRequest(input = {}) {
   const now = demoTime();
   const isSelfService = (input.origin || REFUND_ORIGIN.SYSTEM) === REFUND_ORIGIN.LEARNER;
   const suggestion = isClass ? classRefundSuggestion({ order, classRecord, requestedAt: now, selfService: isSelfService }) : null;
-  if (suggestion && !suggestion.eligible) return { ok: false, reason: suggestion.ineligibleReason, suggestion };
-  // MVP 只支持全额终结退款；面授退款资格仍沿用消课规则校验，但不拆分退款金额。
-  const amount = numberOr(order.amount);
-  if (!(amount > 0) || amount !== numberOr(order.amount)) return { ok: false, reason: 'REFUND_MUST_BE_FULL', suggestion };
+  if (suggestion && !suggestion.eligible && !input.skipApproval) return { ok: false, reason: suggestion.ineligibleReason, suggestion };
+  // MVP 支持全额或部份终结退款；后台登记/订单列表退款可手改金额。面授退款资格仍沿用消课规则校验，但仅约束学员自助申请（后台手动退款绕过）。
+  const amount = numberOr(input.amount) || numberOr(order.amount);
+  if (!(amount > 0) || amount > numberOr(order.amount)) return { ok: false, reason: 'REFUND_AMOUNT_INVALID', suggestion };
 
   const student = sharedRows('students').find((row) => row.id === order.studentId) || null;
   const businessKey = `refund:${order.id}`;
@@ -245,26 +245,26 @@ function createRefundRequest(input = {}) {
     time: now,
     requestedAt: now,
     requestedBy: input.requestedBy || REFUND_ORIGIN.SYSTEM,
-    status: REFUND_STATUS.PENDING,
-    source: '线上',
+    status: input.skipApproval ? REFUND_STATUS.PROCESSING : REFUND_STATUS.PENDING,
+    source: input.source || '线上',
     origin: input.origin || REFUND_ORIGIN.SYSTEM,
     businessKey,
     classChangeId: input.classChangeId || '',
-    expectedAt: '审批通过后预计 3 个工作日内原路退回',
+    expectedAt: input.skipApproval ? '退款登记后由财务执行' : '审批通过后预计 3 个工作日内原路退回',
     operator: input.requestedBy || '系统',
     remark: input.remark || '',
     voucher: ''
   };
   upsertDemoRecord('refunds', record);
-  recordRefundAudit(record, '申请退款', '—', REFUND_STATUS.PENDING, { name: record.requestedBy, role: record.origin }, record.reason);
-  notifyRefundAccount(record, '退款申请已受理', '退款申请已受理', `退款单 ${record.no} 已提交，正在等待审批。`);
+  recordRefundAudit(record, input.skipApproval ? '登记退款' : '申请退款', '—', record.status, { name: record.requestedBy, role: record.origin }, record.reason);
+  notifyRefundAccount(record, input.skipApproval ? '退款已登记' : '退款申请已受理', input.skipApproval ? '退款已登记' : '退款申请已受理', input.skipApproval ? `退款单 ${record.no} 已登记，正在处理中。` : `退款单 ${record.no} 已提交，正在等待审批。`);
   const nextOrder = {
     ...order,
     status: REFUND_STATUS.PROCESSING,
     refundNo: record.no,
     refundAmount: amount,
     refundMethod: record.channel,
-    refundStatus: '待审核',
+    refundStatus: input.skipApproval ? '退款处理中' : '待审核',
     refundExpectedAt: record.expectedAt,
     refundReason: record.reason,
     refundAt: order.refundAt || now,
@@ -272,7 +272,7 @@ function createRefundRequest(input = {}) {
     refundBusinessKey: businessKey
   };
   upsertDemoRecord('orders', nextOrder);
-  if (isClass) updateEnrollmentRefundRelation(record, REFUND_STATUS.PENDING, { refundRequestedAt: now });
+  if (isClass) updateEnrollmentRefundRelation(record, record.status, { refundRequestedAt: now });
   // 视频订单在进入审核流程时冻结学习授权，退款完成后置为已失效。
   if (!isClass) transitionVideoEntitlement(nextOrder.accountId, nextOrder.courseId, '冻结', { reason: '视频退款审核期间学习授权冻结', orderId: nextOrder.id, refundKey: businessKey });
   return { ok: true, refund: record, order: nextOrder, suggestion };
@@ -412,37 +412,28 @@ function registerCompletedOfflineRefund(input = {}) {
   if (!order) return { ok: false, reason: 'ORDER_NOT_FOUND' };
   const paidAmount = numberOr(order.amount);
   const amount = numberOr(input.amount, paidAmount);
+  // 线下退款登记仅支持全额退款（不支持部分退款，与门禁用例一致）；部分退款请走「统一订单管理」订单列表退款入口。
   if (!(paidAmount > 0) || amount !== paidAmount) return { ok: false, reason: 'REFUND_AMOUNT_INVALID' };
+  // CR-2026-155（C9）：后台登记线下退款直接生成「退款中」退款单，不再经过待审批、不再自动终结；由财务在退款执行页标记完成。
   const created = createRefundRequest({
     ...input,
     amount,
     origin: REFUND_ORIGIN.OFFLINE,
     requestedBy: input.operator?.name || input.requestedBy || '财务',
-    channel: input.channel || '线下退款'
+    channel: input.channel || '线下退款',
+    skipApproval: true
   });
   if (!created.ok) return created;
-  const approved = settleRefund(created.refund.id, '通过', {
-    ...(input.operator || {}),
-    channel: input.channel || '线下退款',
-    remark: '线下退款凭证已核验，登记即视为审批通过。'
-  });
-  if (!approved.ok) return approved;
-  const completed = settleRefund(created.refund.id, '完成', {
-    ...(input.operator || {}),
-    channelResult: '线下凭证已核验',
-    remark: input.remark || '线下退款已完成。'
-  });
-  if (!completed.ok) return completed;
   const finalRefund = {
-    ...completed.refund,
+    ...created.refund,
     source: '线下',
     origin: REFUND_ORIGIN.OFFLINE,
-    time: input.time || completed.refund.time,
+    time: input.time || created.refund.time,
     voucher: input.voucher || '',
-    expectedAt: '登记即时完成（线下）'
+    expectedAt: '线下退款已登记，待财务执行'
   };
   upsertDemoRecord('refunds', finalRefund);
-  return { ...completed, refund: finalRefund };
+  return { ...created, refund: finalRefund };
 }
 
 /** 把共享退款单并回已有的展示数组（后台退款记录页使用）。 */

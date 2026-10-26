@@ -124,8 +124,11 @@ check(store.readDemoState().videoEntitlements.find((row) => row.courseId === vid
 const offlineCase = seedClassCase('offline', { amount: 120 });
 check(refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 40 }).reason === 'REFUND_AMOUNT_INVALID', '线下登记拦截部分退款');
 const offline = refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 120, reason: '协商终结退款', channel: '银行转账', voucher: 'refund.pdf', operator: { name: '周财务', role: '财务' } });
-check(offline.ok && offline.refund.status === '已退款' && offline.refund.source === '线下', '线下退款经统一服务直接终结');
-check(offline.order.status === '已退款' && enrollmentOf(offlineCase).status === '已退班', '线下退款联动订单与学籍');
+check(offline.ok && offline.refund.status === '退款中' && offline.refund.source === '线下', '线下退款登记后直接进入退款中（不经审批，由财务在退款执行页标记完成）');
+check(offline.order.status === '退款中' && enrollmentOf(offlineCase).status === '已分班', '线下退款登记后订单进入退款中、学籍暂不联动');
+// CR-2026-155（C9）：线下退款登记仅到「退款中」，财务标记完成后才终结并联动订单与学籍。
+const offlineDone = refunds.settleRefund(offline.refund.id, '完成', { name: '财务' });
+check(offlineDone.ok && offlineDone.refund.status === '已退款' && offlineDone.order.status === '已退款' && enrollmentOf(offlineCase).status === '已退班', '财务标记完成后线下退款终结并联动订单与学籍');
 check(refunds.registerCompletedOfflineRefund({ orderId: offlineCase.orderId, amount: 120, reason: '重复登记' }).reason === 'ORDER_ALREADY_REFUNDED', '线下退款完成后拦截第二次退款');
 
 console.log(`退款闭环回归通过：${passed.length} 项`);

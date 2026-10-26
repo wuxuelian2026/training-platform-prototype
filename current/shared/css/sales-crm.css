@@ -104,6 +104,9 @@
 .sales-class-roster { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .sales-class-roster h3 { margin: 0 0 12px; font-size: 15px; }
 .sales-roster-meta { margin: 0 0 10px; font-size: 12px; }
+/* CR-2026-155 C10：班级详情「学员与记录」的考勤率／作业提交率跳转入口。 */
+.sales-rate-link { color: var(--brand); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.sales-rate-link:hover { color: #6d0101; }
 .sales-class-roster table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .sales-class-roster th, .sales-class-roster td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
 .sales-class-roster th { color: var(--muted); font-weight: 500; }

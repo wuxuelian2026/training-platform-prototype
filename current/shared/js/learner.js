@@ -1559,6 +1559,7 @@ function videoWatchedLessonCount(order, item) {
   const total = Array.isArray(item.outline) && item.outline.length ? item.outline.length : Number(item.lessons || item.hours || 0);
   return [...ids].filter(id => /^chapter-\d+$/.test(id) && (!total || Number(id.slice(8)) <= total)).length;
 }
+/* CR-2026-155 C8（扩展至视频课程）：小程序学员端不再提供任何自助申请退款入口，退款统一由后台发起与执行；以下视频退款资格判定、授权冻结与申请弹窗/提交链路整体停用，保留实现便于回溯。
 function videoRefundEligibility(order, item) {
   const config = refundSettings();
   if (!order || order.status !== '已支付' || !item || item.type !== 'video') return { eligible: false, watchedLessons: 0, config, reason: '仅已支付视频订单可申请退款。' };
@@ -1646,6 +1647,8 @@ function applyRefundApplication(orderId, reason = '') {
   saveState();
   return true;
 }
+*/
+
 function isPaymentResumable(order) { return !order || ['待支付', '已取消'].includes(order.status); }
 function studentEnrolledCount(shared, classId) {
   return (shared.enrollments || []).filter(item => item.accountId === state.accountId && item.studentId === state.currentStudentId && item.classId === classId && item.status === '已分班').length;
@@ -1836,14 +1839,10 @@ function orderCard(order) {
   // I1-DEC-25 / RM-U-01: video orders are keyed by the purchasing account, class orders by account + student.
   const subjectFact = isClass ? `<div><span>当前学员</span><strong>${esc(student.name)}</strong></div>` : `<div><span>购买账号</span><strong>${esc(purchaseAccount().name)}</strong></div>`;
   const detailLink = `/learner/pages/order-detail.html?orderId=${encodeURIComponent(order.id)}`;
-  const videoRefund = !isClass ? videoRefundEligibility(order, item) : { eligible: false };
   const primary = order.status === '待支付'
     ? `<button class="mp-button mp-order-action" type="button" data-order-action="pay" data-course-id="${item.id}" data-order-id="${order.id}">${order.status === '待支付' ? '去支付' : '继续支付'}</button>`
-    : order.status === '已支付' && isClass
-      ? `<button class="mp-button secondary mp-order-action" type="button" data-order-action="refund" data-order-id="${order.id}">申请退款</button>`
-      : videoRefund.eligible
-        ? `<button class="mp-button secondary mp-order-action" type="button" data-order-action="refund" data-order-id="${order.id}">申请全额退款</button>`
-      : '';
+    // CR-2026-155 C8：小程序学员端「我的订单」不再提供申请退款入口，退款统一由后台发起与执行；此处仅保留退款进度只读展示（订单卡片底部的「查看详情 / 查看退款进度」链接不变）。
+    : '';
   // 学籍异动或退款完成后，订单卡片同步说明该班学籍状态，避免「已退班但订单显示正常」的误读。
   const enrollment = isClass ? (readDemoState().enrollments || []).find(row => row.classId === order.classId && row.studentId === order.studentId) : null;
   const exitHint = enrollment && !isEnrollmentActive(enrollment.status) ? `学籍状态：${enrollment.status}${enrollment.changeReason ? ` · ${enrollment.changeReason}` : ''}` : '';
@@ -1888,14 +1887,15 @@ function renderOrders() {
       }).join('');
     }
     list.querySelectorAll('[data-order-action="pay"]').forEach(node => node.addEventListener('click', () => { const order = state.orders.find(row => row.id === node.dataset.orderId); go(`/learner/pages/payment.html?${order?.classId ? `classId=${encodeURIComponent(order.classId)}` : `courseId=${encodeURIComponent(node.dataset.courseId)}`}&orderId=${encodeURIComponent(node.dataset.orderId)}`); }));
-    list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => {
-      openRefundReasonDialog(node.dataset.orderId, (reason) => {
-        if (!applyRefundApplication(node.dataset.orderId, reason)) return;
-        const refund = refundsForOrder(node.dataset.orderId).find(row => row.status === '待审批');
-        draw();
-        toast(refund ? `退款申请已提交，申请金额 ¥${refund.amount}，等待后台审核` : '退款申请已提交，等待后台审核');
-      });
-    }));
+    // CR-2026-155 C8：学员端「我的订单」已移除申请退款入口，下方退款申请绑定一并停用（退款由后台发起与执行，学员端仅只读展示进度）。
+    // list.querySelectorAll('[data-order-action="refund"]').forEach(node => node.addEventListener('click', () => {
+    //   openRefundReasonDialog(node.dataset.orderId, (reason) => {
+    //     if (!applyRefundApplication(node.dataset.orderId, reason)) return;
+    //     const refund = refundsForOrder(node.dataset.orderId).find(row => row.status === '待审批');
+    //     draw();
+    //     toast(refund ? `退款申请已提交，申请金额 ¥${refund.amount}，等待后台审核` : '退款申请已提交，等待后台审核');
+    //   });
+    // }));
   };
   document.querySelectorAll('[data-order-tab]').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('[data-order-tab]').forEach(item => item.classList.remove('active')); tab.classList.add('active'); draw(); }));
   draw();
@@ -1944,9 +1944,7 @@ function renderOrderDetail() {
   const isClass = item.type === 'class';
   if (isClass && order.cancelType === 'seat-allocation-failed') { renderSeatFailureOrder(order, item, student); return; }
   const isPaid = order.status === '已支付';
-  const videoRefund = !isClass ? videoRefundEligibility(order, item) : { eligible: false };
-  const canRefund = isClass && isPaid;
-  const canVideoRefund = !isClass && videoRefund.eligible;
+  // CR-2026-155 C8：学员端不再提供申请退款入口，canRefund / canVideoRefund 不再用于渲染申请按钮（退款统一由后台发起）。
   const displayStatus = learnerPaymentStatus(order);
   const refundStatus = learnerRefundStatus(order);
   const association = orderAssociation(order, item, isClass);
@@ -1958,7 +1956,8 @@ function renderOrderDetail() {
       : isPaid
         ? `<button class="mp-button full" type="button" data-action="learning">进入学习</button>`
         : '';
-  const secondaryAction = canRefund ? button('申请退款', `data-action="refund" data-order-id="${order.id}"`, 'secondary') : canVideoRefund ? button('申请全额退款', `data-action="refund" data-order-id="${order.id}"`, 'secondary') : '';
+  // CR-2026-155 C8：学员端申请退款入口已移除，secondaryAction 不再渲染申请退款按钮；仅保留后台发起的退款进度只读展示（退款信息 / 退款记录卡片仍按 order.status 展示）。
+  const secondaryAction = '';
   const rejectedRefund = refundsForOrder(order.id).find(row => row.status === '已拒绝');
   layout(stack(
     card(`<div class="mp-order-detail-status"><div class="mp-pills" aria-label="订单状态">${pill(displayStatus, learnerPaymentTone(order))}${refundStatus ? pill(refundStatus, learnerRefundTone(refundStatus)) : ''}</div><span class="mp-muted">${isClass ? '面授课程订单' : '视频课程订单'}</span></div><div class="mp-order-status-copy">${esc(orderStatusGuidance(order, isClass))}</div>`),
@@ -1966,7 +1965,7 @@ function renderOrderDetail() {
     card(`<div class="mp-section-head"><h3>金额与支付</h3><span class="mp-muted">交易凭证</span></div><dl class="mp-order-detail-facts"><div><dt>实付金额</dt><dd><strong class="mp-price">${money2(order.amount || item.price)}</strong></dd></div><div><dt>支付方式</dt><dd>${esc(credentials.payMethod)}</dd></div><div><dt>支付流水号</dt><dd>${esc(credentials.paymentNo || '未产生支付流水')}</dd></div><div><dt>支付时间</dt><dd>${esc(credentials.paidAt || '未完成支付')}</dd></div></dl>`),
     refundable ? card(`<div class="mp-section-head"><h3>退款信息</h3>${pill(refundStatus || '退款处理中', learnerRefundTone(refundStatus))}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(credentials.refundNo || '—')}</dd></div><div><dt>退款金额</dt><dd>${money2(credentials.refundAmount)}</dd></div><div><dt>退款方式</dt><dd>${esc(credentials.refundMethod)}</dd></div><div><dt>退款状态</dt><dd>${esc(refundStatus || '退款处理中')}</dd></div><div><dt>${order.status === '已退款' ? '实际到账时间' : '预计到账时间'}</dt><dd>${esc(credentials.refundExpectedAt || '以渠道回执为准')}</dd></div><div class="wide"><dt>退款原因</dt><dd>${esc(credentials.refundReason)}</dd></div></dl>${order.status === '退款中' ? '<p class="mp-notice">退款结果由后台根据支付渠道回执更新，学员端仅展示进度。</p>' : ''}`) : '',
     rejectedRefund ? card(`<div class="mp-section-head"><h3>退款记录</h3>${pill('已拒绝', 'gray')}</div><dl class="mp-order-detail-facts"><div><dt>退款单号</dt><dd>${esc(rejectedRefund.no || '—')}</dd></div><div><dt>申请金额</dt><dd>${money2(rejectedRefund.amount)}</dd></div><div class="wide"><dt>处理结果</dt><dd>${esc(rejectedRefund.rejectReason || rejectedRefund.remark || '退款申请未通过')}</dd></div></dl><p class="mp-notice">订单已恢复为可用状态，是否可以再次申请退款以当前退款规则为准。</p>`) : '',
-    card(`<div class="mp-section-head"><h3>订单信息</h3><span class="mp-muted">交易记录</span></div><dl class="mp-order-detail-facts"><div><dt>订单号</dt><dd class="mp-order-no"><span>${esc(order.id)}</span><button class="mp-button secondary" type="button" data-action="copy-order-no" data-order-no="${esc(order.id)}">复制</button></dd></div><div><dt>下单时间</dt><dd>${esc(times.createdAt)}</dd></div>${isClass ? `<div><dt>报名学员</dt><dd>${esc(student.name)}</dd></div>` : `<div><dt>购买账号</dt><dd>${esc(purchaseAccount().name)}${purchaseAccount().phone ? `（${esc(purchaseAccount().phone)}）` : ''}</dd></div>`}<div><dt>订单类型</dt><dd>${isClass ? '面授课程' : '视频课程'}</dd></div>${!isClass && isPaid ? `<div class="wide"><dt>退款资格</dt><dd>${esc(videoRefund.reason)}${videoRefund.eligible ? ' 申请后将按实付金额全额退款。' : ''}</dd></div>` : ''}${order.paymentReason ? `<div class="wide"><dt>状态说明</dt><dd>${esc(order.paymentReason)}</dd></div>` : ''}</dl>`),
+    card(`<div class="mp-section-head"><h3>订单信息</h3><span class="mp-muted">交易记录</span></div><dl class="mp-order-detail-facts"><div><dt>订单号</dt><dd class="mp-order-no"><span>${esc(order.id)}</span><button class="mp-button secondary" type="button" data-action="copy-order-no" data-order-no="${esc(order.id)}">复制</button></dd></div><div><dt>下单时间</dt><dd>${esc(times.createdAt)}</dd></div>${isClass ? `<div><dt>报名学员</dt><dd>${esc(student.name)}</dd></div>` : `<div><dt>购买账号</dt><dd>${esc(purchaseAccount().name)}${purchaseAccount().phone ? `（${esc(purchaseAccount().phone)}）` : ''}</dd></div>`}<div><dt>订单类型</dt><dd>${isClass ? '面授课程' : '视频课程'}</dd></div>${order.paymentReason ? `<div class="wide"><dt>状态说明</dt><dd>${esc(order.paymentReason)}</dd></div>` : ''}</dl>`),
     primaryAction || secondaryAction ? `<div class="mp-order-detail-actions">${primaryAction}${secondaryAction}</div>` : ''
   ));
 }
@@ -2253,7 +2252,8 @@ function renderStudentManagement() {
   if (!isLoggedIn()) { layout(stack(`<section class="mp-locked"><strong>登录后管理关联学员</strong><p>登录后可切换、添加和维护学员资料。</p><a class="mp-button" href="/login.html?redirect=${encodeURIComponent('/learner/pages/student-management.html')}">去登录</a></section>`)); return; }
   const studentRow = student => {
     const isCurrent = student.id === state.currentStudentId;
-    return `<article class="mp-student-row ${isCurrent ? 'is-current' : ''}"><span class="mp-student-avatar" aria-hidden="true">${esc(student.name.slice(0, 1))}</span><div class="mp-student-copy"><strong>${esc(student.name)}</strong><small>${esc(student.relation)} · ${esc(student.gender || '性别待补充')}</small></div><div class="mp-student-management-actions">${isCurrent ? pill('当前学员', 'green') : `<button class="mp-button secondary mp-student-switch" type="button" data-student-manage-switch="${esc(student.id)}">切换</button>`}<a class="mp-student-action" href="/learner/pages/student-edit.html?studentId=${encodeURIComponent(student.id)}">编辑</a></div></article>`;
+    const avatar = student.photo ? `<img class="mp-student-avatar-img" src="${esc(student.photo)}" alt="${esc(student.name)}的照片">` : esc(student.name.slice(0, 1));
+    return `<article class="mp-student-row ${isCurrent ? 'is-current' : ''}"><span class="mp-student-avatar" aria-hidden="true">${avatar}</span><div class="mp-student-copy"><strong>${esc(student.name)}</strong><small>${esc(student.relation)} · ${esc(student.gender || '性别待补充')}</small></div><div class="mp-student-management-actions">${isCurrent ? pill('当前学员', 'green') : `<button class="mp-button secondary mp-student-switch" type="button" data-student-manage-switch="${esc(student.id)}">切换</button>`}<a class="mp-student-action" href="/learner/pages/student-edit.html?studentId=${encodeURIComponent(student.id)}">编辑</a></div></article>`;
   };
   layout(stack(card(`<div class="mp-section-head"><h2>关联学员</h2><span class="mp-muted">${state.students.length}人</span></div><div class="mp-student-list mp-student-management-list">${state.students.map(studentRow).join('')}</div><a class="mp-button secondary mp-student-management-add" href="/learner/pages/student-edit.html">添加学员</a>`)));
   document.querySelectorAll('[data-student-manage-switch]').forEach(buttonNode => buttonNode.addEventListener('click', () => { state.currentStudentId = buttonNode.dataset.studentManageSwitch; saveState(); renderStudentManagement(); toast(`已切换当前学员：${currentStudent().name}`); }));
@@ -2278,6 +2278,30 @@ function showDeleteStudentDialog(studentId) {
   });
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
 }
+// CR-2026-155 C6：学员照片必填。选图后压缩为 dataURL（最长边 240px、JPEG 0.72）随学员档案写入
+// 共享 demo-store；学员管理列表与后台结业证书预览读取同一份照片，无照片时展示首字母占位。
+const STUDENT_PHOTO_MAX_EDGE = 240;
+function readStudentPhoto(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type || !file.type.startsWith('image/')) { reject(new Error('请选择图片文件（JPG/PNG）。')); return; }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('照片读取失败，请重新选择。'));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error('照片解析失败，请重新选择。'));
+      image.onload = () => {
+        const scale = Math.min(1, STUDENT_PHOTO_MAX_EDGE / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 function renderStudentEdit() {
   if (!isLoggedIn()) { layout(stack(`<section class="mp-locked"><strong>登录后维护学员资料</strong><p>登录后可添加、编辑或删除关联学员。</p><a class="mp-button" href="/login.html?redirect=${encodeURIComponent('/learner/pages/student-edit.html')}">去登录</a></section>`)); return; }
   const student = params.get('studentId') ? state.students.find(item => item.id === params.get('studentId')) : null;
@@ -2286,7 +2310,26 @@ function renderStudentEdit() {
   const isEditing = Boolean(student);
   const gender = student?.gender || (student?.relation === '女儿' ? '女' : student?.relation === '儿子' ? '男' : '');
   const relationOptions = ['女儿', '儿子', '本人', '其他'];
-  layout(stack(card(`<form id="student-edit-form" class="mp-form"><div class="mp-field"><label for="profile-student-name">学员姓名</label><input id="profile-student-name" required maxlength="20" placeholder="请输入学员姓名" value="${esc(student?.name || '')}"><small id="profile-student-error" class="mp-form-error" hidden></small></div><fieldset class="mp-student-gender"><legend>性别</legend><div class="mp-student-gender-options"><label><input type="radio" name="profile-student-gender" value="女" required ${gender === '女' ? 'checked' : ''}><span>女</span></label><label><input type="radio" name="profile-student-gender" value="男" ${gender === '男' ? 'checked' : ''}><span>男</span></label></div></fieldset><div class="mp-field"><label for="profile-student-birth-month">出生年月</label><input id="profile-student-birth-month" type="month" max="${maxBirthMonth}" required value="${esc(student?.birthMonth || '')}"></div><div class="mp-field"><label for="profile-student-relation">与账号关系</label><select id="profile-student-relation">${relationOptions.map(option => `<option ${option === student?.relation ? 'selected' : ''}>${option}</option>`).join('')}</select></div><div class="mp-actions"><a class="mp-button secondary" href="/learner/pages/student-management.html">取消</a><button class="mp-button" type="submit">${isEditing ? '保存修改' : '添加并切换'}</button></div></form>`), isEditing ? `<button id="student-edit-delete" class="mp-student-danger-action" type="button">删除学员</button>` : ''));
+  layout(stack(card(`<form id="student-edit-form" class="mp-form"><div class="mp-field"><label for="profile-student-name">学员姓名</label><input id="profile-student-name" required maxlength="20" placeholder="请输入学员姓名" value="${esc(student?.name || '')}"><small id="profile-student-error" class="mp-form-error" hidden></small></div><fieldset class="mp-student-gender"><legend>性别</legend><div class="mp-student-gender-options"><label><input type="radio" name="profile-student-gender" value="女" required ${gender === '女' ? 'checked' : ''}><span>女</span></label><label><input type="radio" name="profile-student-gender" value="男" ${gender === '男' ? 'checked' : ''}><span>男</span></label></div></fieldset><div class="mp-field"><label for="profile-student-birth-month">出生年月</label><input id="profile-student-birth-month" type="month" max="${maxBirthMonth}" required value="${esc(student?.birthMonth || '')}"></div><div class="mp-field"><label for="profile-student-relation">与账号关系</label><select id="profile-student-relation">${relationOptions.map(option => `<option ${option === student?.relation ? 'selected' : ''}>${option}</option>`).join('')}</select></div><div class="mp-field"><label for="profile-student-photo">学员照片（必填）</label><div class="mp-photo-uploader"><span class="mp-photo-preview" id="profile-student-photo-preview" aria-hidden="true">${student?.photo ? `<img src="${esc(student.photo)}" alt="">` : esc((student?.name || '学员').slice(0, 1))}</span><div class="mp-photo-actions"><input id="profile-student-photo" type="file" accept="image/*"><small>上传学员本人清晰照片（JPG/PNG），用于结业证书等场景；未选择照片无法保存。</small><small id="profile-student-photo-error" class="mp-form-error" hidden></small></div></div></div><div class="mp-actions"><a class="mp-button secondary" href="/learner/pages/student-management.html">取消</a><button class="mp-button" type="submit">${isEditing ? '保存修改' : '添加并切换'}</button></div></form>`), isEditing ? `<button id="student-edit-delete" class="mp-student-danger-action" type="button">删除学员</button>` : ''));
+  // CR-2026-155 C6：照片必填校验与即时预览（压缩后随档案持久化）。
+  let photoData = student?.photo || '';
+  const photoInput = document.querySelector('#profile-student-photo');
+  const photoError = document.querySelector('#profile-student-photo-error');
+  const paintPhotoPreview = () => { const preview = document.querySelector('#profile-student-photo-preview'); if (preview) preview.innerHTML = photoData ? `<img src="${esc(photoData)}" alt="">` : esc((student?.name || '学员').slice(0, 1)); };
+  photoInput?.addEventListener('change', async () => {
+    const file = photoInput.files && photoInput.files[0];
+    if (!file) return;
+    try {
+      photoData = await readStudentPhoto(file);
+      if (photoError) { photoError.hidden = true; photoError.textContent = ''; }
+      paintPhotoPreview();
+    }
+    catch (error) {
+      photoData = student?.photo || '';
+      photoInput.value = '';
+      if (photoError) { photoError.hidden = false; photoError.textContent = error.message; }
+    }
+  });
   document.querySelector('#student-edit-form').addEventListener('submit', event => {
     event.preventDefault();
     const name = document.querySelector('#profile-student-name').value.trim();
@@ -2294,8 +2337,10 @@ function renderStudentEdit() {
     const birthMonth = document.querySelector('#profile-student-birth-month').value;
     if (!name || !selectedGender || !birthMonth) return;
     const error = document.querySelector('#profile-student-error');
+    // CR-2026-155 C6：学员照片必填，未上传（含历史档案补编辑）时阻止保存并就地提示。
+    if (!photoData) { if (photoError) { photoError.hidden = false; photoError.textContent = '学员照片为必填项，请上传照片后再保存。'; } return; }
     if (state.students.some(item => item.id !== student?.id && item.name === name)) { error.hidden = false; error.textContent = '该学员已存在，请直接切换当前学员。'; return; }
-    const values = { name, gender: selectedGender, birthMonth, relation: document.querySelector('#profile-student-relation').value };
+    const values = { name, gender: selectedGender, birthMonth, relation: document.querySelector('#profile-student-relation').value, photo: photoData };
     if (student) {
       Object.assign(student, values);
       upsertDemoRecord('students', { ...student, accountId: state.accountId });
@@ -2374,14 +2419,15 @@ document.addEventListener('click', event => {
   if (action === 'homework') go(homeworkDeepLinkFor(event.target.closest('[data-course-id]').dataset.courseId));
   if (action === 'switch-student') switchStudent();
   if (action === 'copy-order-no') { const orderNo = event.target.closest('[data-order-no]')?.dataset.orderNo || ''; if (orderNo) copyOrderNo(orderNo); }
-  if (action === 'refund') {
-    const orderId = event.target.closest('[data-order-id]')?.dataset.orderId;
-    openRefundReasonDialog(orderId, (reason) => {
-      if (!applyRefundApplication(orderId, reason)) return;
-      renderOrderDetail();
-      toast('退款申请已提交，等待后台审核');
-    });
-  }
+  // CR-2026-155 C8：学员端申请退款入口已移除，data-action="refund" 派发分支停用（退款由后台发起与执行，学员端仅只读展示进度）。
+  // if (action === 'refund') {
+  //   const orderId = event.target.closest('[data-order-id]')?.dataset.orderId;
+  //   openRefundReasonDialog(orderId, (reason) => {
+  //     if (!applyRefundApplication(orderId, reason)) return;
+  //     renderOrderDetail();
+  //     toast('退款申请已提交，等待后台审核');
+  //   });
+  // }
 });
 
 subscribeDemoState(() => {

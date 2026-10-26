@@ -35,14 +35,16 @@ const LEARNER_APP_FIELD_SPEC = {
           { id: 'FD-LAPP-008', label: '学员姓名', type: '文本', length: '≤ 20 字', required: '是', note: '学员本人姓名，用于报名、分班、考勤与结业展示', constraints: { maxLength: 20 } },
           { id: 'FD-LAPP-009', label: '性别', type: '单选', length: '男 / 女', required: '是', note: '用于班级与课程适配', constraints: { options: ['男', '女'] } },
           { id: 'FD-LAPP-010', label: '出生年月', type: '日期', length: 'YYYY-MM', required: '是', note: '不得晚于当前月份，用于适龄校验', constraints: { format: 'YYYY-MM' } },
-          { id: 'FD-LAPP-011', label: '与账号关系', type: '下拉', length: '预置关系选项', required: '是', note: '说明该学员与当前登录账号的关系' }
+          { id: 'FD-LAPP-011', label: '与账号关系', type: '下拉', length: '预置关系选项', required: '是', note: '说明该学员与当前登录账号的关系' },
+          { id: 'FD-LAPP-035', label: '学员照片', type: '图片', length: 'JPG/PNG，上传后压缩展示', required: '是', note: 'CR-2026-155 C6：新增与编辑学员资料时必填；未上传照片无法保存。照片随学员档案保存，用于后台结业证书预览展示；历史档案编辑时需补传' }
         ] }
       ],
       notes: [
         '学员档案归属登录账号，一个家长或监护人账号可维护多名学员。',
         '学员资料的增删改不改变账号下的视频学习权限与学习进度，视频权限按账号共享。',
         '面授订单必须关联具体学员，报名、考勤、作业与结业数据按学员隔离。',
-        '出生年月用于适龄校验，修改后不影响已发生的报名与订单记录。'
+        '出生年月用于适龄校验，修改后不影响已发生的报名与订单记录。',
+        '学员照片为必填项（CR-2026-155 C6）：新增与编辑均需上传，保存后用于后台结业证书预览等场景。'
       ]
     },
     'learner/fast-registration-detail': {
