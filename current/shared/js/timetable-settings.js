@@ -3,23 +3,23 @@
   const __classicExports = {};
   const __classicRequire = (id) => __classicModules[id];
 // I1-DEC-29 (OD-S11 / OD-S12 / OD-S13): the timetable axis is fixed — 08:00-21:00, one 15-minute
-// tick (52 ticks). Lesson duration is a dictionary value (45/60/90/120/150, default 45) and one
-// 课时 equals exactly one 课次, so a session's end time is start + lesson duration.
-const { lessonDurationSettings } = __classicRequire("shared/js/demo-store.js");
+// tick (52 ticks). CR-2026-155 C2: 单节课时长固定 45 分钟（课时时长字典已冻结），
+// 课次时长 = 连上节数 × 45；一次课次可包含多节课时，不再是一课时对一课次。
+const FIXED_LESSON_DURATION = 45;
 const TIMELINE_START = '08:00';
 const TIMELINE_END = '21:00';
 const TIMELINE_STEP_MINUTES = 15;
 const TIMELINE_TICK_COUNT = (toMinutes(TIMELINE_END) - toMinutes(TIMELINE_START)) / TIMELINE_STEP_MINUTES; // 52
 const HALF_DAY_BOUNDARIES = ['08:00', '12:00', '18:00', '21:00'];
 const HALF_DAY_LABELS = ['上午', '下午', '晚上'];
-/** 课时时长字典：由「系统管理 → 数据字典」维护，页面不得写死选项（CR-2026-103）。 */
+/** 课时时长：已按 CR-2026-155 C2 冻结为 45 分钟，字典仅保留一项。 */
 function lessonDurationValues() {
-  return lessonDurationSettings().options;
+  return [FIXED_LESSON_DURATION];
 }
 
-/** 字典默认课时时长，未配置时回落到字典首项。 */
+/** 默认课时时长：固定 45 分钟（字典冻结后仅此项）。 */
 function defaultLessonDuration() {
-  return lessonDurationSettings().defaultMinutes;
+  return FIXED_LESSON_DURATION;
 }
 function toMinutes(value) {
   const [hour, minute] = String(value || '00:00').split(':').map(Number);
@@ -79,6 +79,7 @@ function lessonDurationOptions(selected = defaultLessonDuration()) {
 
 __classicExports["lessonDurationValues"] = lessonDurationValues;
 __classicExports["defaultLessonDuration"] = defaultLessonDuration;
+__classicExports["FIXED_LESSON_DURATION"] = FIXED_LESSON_DURATION;
 __classicExports["toMinutes"] = toMinutes;
 __classicExports["toTime"] = toTime;
 __classicExports["snapToStep"] = snapToStep;

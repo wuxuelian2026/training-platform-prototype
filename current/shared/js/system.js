@@ -43,7 +43,7 @@ const sharedRefund = refundSettings();
 const sharedClassRefund = classRefundSettings();
 const sharedFileSpec = fileSpecSettings();
 const sharedRetry = messageRetrySettings();
-const settings = { platform: '湖北艺术职业学院继续教育', timezone: 'Asia/Shanghai（UTC+8）', defaultLessonMinutes: 90, homeworkDeadlineHours: homeworkDeadlineSettings().deadlineHours, attendanceThreshold: 80, homeworkThreshold: 80, refundWindowDays: sharedRefund.windowDays, selfMaxCompletedPercent: sharedRefund.selfMaxCompletedPercent };
+const settings = { platform: '湖北艺术职业学院继续教育', timezone: 'Asia/Shanghai（UTC+8）', homeworkDeadlineHours: homeworkDeadlineSettings().deadlineHours, attendanceThreshold: 80, homeworkThreshold: 80, refundWindowDays: sharedRefund.windowDays, selfMaxCompletedPercent: sharedRefund.selfMaxCompletedPercent };
 // CR-2026-112：证书到期提醒窗口默认 30 天，由「参数配置」维护，后台证书列表与教师端同源读取。
 settings.certificateExpiryDays = certificateExpirySettings().expiryReminderDays;
 // CR-2026-104：待支付支付时限、视频退款申请窗口、文件上传规格与消息重试策略均由「参数配置」维护。
@@ -155,7 +155,9 @@ function mountConfigurableLimitCards() {
 }
 // CR-2026-103：数据字典维护页。业务枚举（难度等级、适合年龄、课时类型、课时时长）
 // 统一在这里维护；字典类型由产品口径固定，新增类型需走变更单。
+// CR-2026-155 C2：课时时长字典冻结（单节课固定 45 分钟），本页只读展示、不提供增删改。
 const DICTIONARY_TYPE_ORDER = ['course_difficulty', 'suitable_age', 'lesson_kind', 'lesson_duration'];
+const FROZEN_DICTIONARY_TYPES = ['lesson_duration'];
 function renderDictionaries() {
   const all = dataDictionary();
   const types = [...new Set([...DICTIONARY_TYPE_ORDER, ...Object.keys(all)])].filter((type) => all[type]);
@@ -163,17 +165,18 @@ function renderDictionaries() {
   const activeType = all[requested] ? requested : types[0];
   const current = all[activeType];
   const isNumber = current.kind === 'number';
+  const isFrozen = FROZEN_DICTIONARY_TYPES.includes(activeType);
   const itemLabel = isNumber ? `${current.label}（${current.unit || '数值'}）` : current.label;
   const tabs = types.map((type) => `<button type="button" class="dictionary-tab${type === activeType ? ' active' : ''}" data-dict-type="${type}">${escapeHtml(all[type].label)} <small>(${all[type].items.length})</small></button>`).join('');
-  const row = (value, index) => `<div class="dictionary-row" data-dict-row><span class="dictionary-order">${index + 1}</span><input ${isNumber ? 'type="number" min="1" step="1"' : ''} value="${escapeHtml(value)}" aria-label="${escapeHtml(itemLabel)}字典项" data-dict-item /><button type="button" class="button" data-dict-remove>删除</button></div>`;
-  const defaultValueSelect = isNumber ? `<label class="form-field"><span>默认${escapeHtml(current.label)}（${escapeHtml(current.unit || '')}）</span><select data-dict-default>${current.items.map((value) => `<option value="${value}" ${value === current.defaultItem ? 'selected' : ''}>${value} ${escapeHtml(current.unit || '')}</option>`).join('')}</select></label>` : '';
+  const row = (value, index) => `<div class="dictionary-row" data-dict-row><span class="dictionary-order">${index + 1}</span><input ${isNumber ? 'type="number" min="1" step="1"' : ''} value="${escapeHtml(value)}" aria-label="${escapeHtml(itemLabel)}字典项" data-dict-item${isFrozen ? ' readonly' : ''} /><button type="button" class="button" data-dict-remove${isFrozen ? ' hidden' : ''}>删除</button></div>`;
+  const defaultValueSelect = isNumber ? `<label class="form-field"><span>默认${escapeHtml(current.label)}（${escapeHtml(current.unit || '')}）</span><select data-dict-default${isFrozen ? ' disabled' : ''}>${current.items.map((value) => `<option value="${value}" ${value === current.defaultItem ? 'selected' : ''}>${value} ${escapeHtml(current.unit || '')}</option>`).join('')}</select></label>` : '';
   const consumers = {
     course_difficulty: '课程申报、课程库编排与后台新增面授课程读取同一份字典；发布商品与班级时只读带入。',
     suitable_age: '课程申报、课程库编排、后台新增面授课程与学员端筛选读取同一份字典。',
     lesson_kind: '课程库编排的课时类型读取同一份字典。',
-    lesson_duration: '排班表单、班级默认课时时长与课程库编排读取同一份字典；已排课次保留原时长，仅新建或编辑时按新字典取值。'
+    lesson_duration: '课时时长字典已冻结：单节课固定 45 分钟，排班、班级默认课时与课程库编排统一按 45 分钟取值，不再支持新增或调整其他时长。'
   };
-  const content = `<section class="card dictionary-card"><div class="dictionary-head"><div><h2>${escapeHtml(current.label)}</h2><p class="ops-form-help">${escapeHtml(consumers[activeType] || '本字典由页面与接口统一读取。')}</p></div><button type="button" class="button primary" data-dict-save>保存字典</button></div><div class="dictionary-list" data-dict-list>${current.items.map(row).join('')}</div><div class="toolbar-actions"><button type="button" class="button" data-dict-add>新增字典项</button></div>${defaultValueSelect}<p class="ops-form-help">${isNumber ? '字典项为大于 0 的整数，保存时按数值去重升序；默认值必须属于字典项，删除默认项时默认值回落到首项。' : '字典项保存时去重并保持维护顺序；留空的字典项不会保存。'}</p></section>`;
+  const content = `<section class="card dictionary-card"><div class="dictionary-head"><div><h2>${escapeHtml(current.label)}${isFrozen ? '<small class="sub-cell">已冻结</small>' : ''}</h2><p class="ops-form-help">${escapeHtml(consumers[activeType] || '本字典由页面与接口统一读取。')}</p></div>${isFrozen ? '' : '<button type="button" class="button primary" data-dict-save>保存字典</button>'}</div><div class="dictionary-list" data-dict-list>${current.items.map(row).join('')}</div>${isFrozen ? '' : `<div class="toolbar-actions"><button type="button" class="button" data-dict-add>新增字典项</button></div>`}${defaultValueSelect}<p class="ops-form-help">${isFrozen ? '该字典项由业务裁定冻结（CR-2026-155 C2），如需调整须先走变更单。' : (isNumber ? '字典项为大于 0 的整数，保存时按数值去重升序；默认值必须属于字典项，删除默认项时默认值回落到首项。' : '字典项保存时去重并保持维护顺序；留空的字典项不会保存。')}</p></section>`;
   pageFrame('数据字典', '业务枚举统一在这里维护：字典项增删后即时生效，页面与接口读取同一份字典，不得写死选项。', '', `<div class="dictionary-tabs">${tabs}</div>${content}`);
   const list = systemRoot.querySelector('[data-dict-list]');
   const defaultSelect = systemRoot.querySelector('[data-dict-default]');
@@ -218,7 +221,7 @@ function renderDictionaries() {
 }
 
 function renderSettings() {
-  pageFrame('参数配置', '', '<button class="button primary" data-system-action="settings-save">保存修改</button>', `<form id="settings-form"><div class="settings-layout"><section class="card settings-card"><h2>平台基础参数</h2><div class="form-grid">${field('平台名称', 'platform', 'text', '', false, settings.platform)}<label class="form-field"><span>默认时区</span><select name="timezone"><option>${settings.timezone}</option></select></label>${field('作业默认截止时间（小时）', 'homeworkDeadlineHours', 'number', '24-720', false, settings.homeworkDeadlineHours)}${field('最低出勤率（%）', 'attendanceThreshold', 'number', '0-100', false, settings.attendanceThreshold)}${field('最低作业提交率（%）', 'homeworkThreshold', 'number', '0-100', false, settings.homeworkThreshold)}</div><p class="ops-form-help">结业判定使用最低出勤率和最低作业提交率，待补录考勤不参与计算。</p></section><section class="card settings-card"><h2>退款参数</h2><p class="ops-form-help">视频课程和面授课程统一按申请窗口与已消课比例判定自助退款资格；通过后固定退订单实收全额。</p><div class="form-grid">${field('退款申请窗口（自然日，0=不限）', 'refundWindowDays', 'number', '0-365', false, settings.refundWindowDays)}${field('自助退款最大已消课比例（%）', 'selfMaxCompletedPercent', 'number', '0-100', false, settings.selfMaxCompletedPercent)}</div><p class="ops-form-help">修改后仅对新提交的退款申请生效，历史订单不改写。</p></section></div><div class="form-actions"><button type="submit" class="button primary">保存修改</button></div></form>`);
+  pageFrame('参数配置', '', '<button class="button primary" data-system-action="settings-save">保存修改</button>', `<form id="settings-form"><div class="settings-layout"><section class="card settings-card"><h2>平台基础参数</h2><div class="form-grid">${field('平台名称', 'platform', 'text', '', false, settings.platform)}<label class="form-field"><span>默认时区</span><select name="timezone"><option>${settings.timezone}</option></select></label>${field('作业默认截止时间（小时）', 'homeworkDeadlineHours', 'number', '24-720', false, settings.homeworkDeadlineHours)}${field('最低出勤率（%）', 'attendanceThreshold', 'number', '0-100', false, settings.attendanceThreshold)}${field('最低作业提交率（%）', 'homeworkThreshold', 'number', '0-100', false, settings.homeworkThreshold)}</div><p class="ops-form-help">结业判定使用最低出勤率和最低作业提交率，待补录考勤不参与计算。</p></section><section class="card settings-card"><h2>退款参数<span class="sub-cell">学员自助申请已停用</span></h2><p class="ops-form-help">CR-2026-155 C8／C9：学员端不再提供自助退款入口，退款统一由后台发起并直接进入退款中，不受申请窗口与已消课比例限制。本组参数仅对存量自助申请单据保留参考。</p><div class="form-grid">${field('退款申请窗口（自然日，0=不限）', 'refundWindowDays', 'number', '0-365', false, settings.refundWindowDays)}${field('自助退款最大已消课比例（%）', 'selfMaxCompletedPercent', 'number', '0-100', false, settings.selfMaxCompletedPercent)}</div><p class="ops-form-help">修改后仅影响存量自助申请单据的判定，历史订单不改写。</p></section></div><div class="form-actions"><button type="submit" class="button primary">保存修改</button></div></form>`);
   document.querySelector('#settings-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);

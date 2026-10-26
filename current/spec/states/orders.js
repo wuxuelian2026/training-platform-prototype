@@ -58,13 +58,7 @@ const STATE_MACHINES = [
       ],
       [
         "已支付",
-        "视频退款审批通过",
-        "退款中",
-        "购买账号"
-      ],
-      [
-        "已支付",
-        "面授退款审批通过",
+        "面授退款发起",
         "退款中",
         "教务主管/财务"
       ],
@@ -136,18 +130,13 @@ const STATE_MACHINES = [
   },
   {
     "id": "SM-REFUND-OFFLINE",
-    "object": "退款申请",
+    "object": "退款单",
     "diagram": true,
     "pages": [
       "finance/refunds",
       "learner/order-detail"
     ],
     "states": [
-      [
-        "pending",
-        "待审批",
-        false
-      ],
       [
         "processing",
         "退款中",
@@ -162,26 +151,9 @@ const STATE_MACHINES = [
         "completed",
         "已退款",
         true
-      ],
-      [
-        "rejected",
-        "已拒绝",
-        true
       ]
     ],
     "transitions": [
-      [
-        "待审批",
-        "审批通过",
-        "退款中",
-        "教务主管"
-      ],
-      [
-        "待审批",
-        "审批拒绝（填原因）",
-        "已拒绝",
-        "教务主管"
-      ],
       [
         "退款中",
         "渠道退款完成",

@@ -283,11 +283,12 @@ const defaultState = () => ({
   // CR-2026-103：业务枚举统一由「系统管理 → 数据字典」按字典类型维护；
   // 难度等级、适合年龄、课时类型、课时时长都在这里定义，页面与接口不得写死选项。
   // kind=number 的字典项为数值（去重升序），并用 defaultItem 指定默认值。
+  // CR-2026-155 C2：单节课时长固定 45 分钟，课时时长字典冻结（仅保留 45，不可增删改）。
   dataDictionary: {
     course_difficulty: { label: '难度等级', kind: 'text', items: ['启蒙', '初级', '中级', '高级', '考级冲刺'] },
     suitable_age: { label: '适合年龄', kind: 'text', items: ['全年龄段', '少儿', '青少年', '成人'] },
     lesson_kind: { label: '课时类型', kind: 'text', items: ['理论', '示范', '练习', '综合'] },
-    lesson_duration: { label: '课时时长', kind: 'number', unit: '分钟', items: [45, 60, 90, 120, 150], defaultItem: 45 }
+    lesson_duration: { label: '课时时长', kind: 'number', unit: '分钟', items: [45], defaultItem: 45 }
   }
 });
 
@@ -296,8 +297,12 @@ const DICTIONARY_FALLBACK = {
   course_difficulty: { label: '难度等级', kind: 'text', items: ['启蒙', '初级', '中级', '高级', '考级冲刺'] },
   suitable_age: { label: '适合年龄', kind: 'text', items: ['全年龄段', '少儿', '青少年', '成人'] },
   lesson_kind: { label: '课时类型', kind: 'text', items: ['理论', '示范', '练习', '综合'] },
-  lesson_duration: { label: '课时时长', kind: 'number', unit: '分钟', items: [45, 60, 90, 120, 150], defaultItem: 45 }
+  lesson_duration: { label: '课时时长', kind: 'number', unit: '分钟', items: [45], defaultItem: 45 }
 };
+
+// CR-2026-155 C2：课时时长字典冻结——单节课固定 45 分钟，字典项不再随配置调整，
+// 旧版本存在本地的 60/90/120/150 等冗余值在读取时统一归一到 45。
+const FROZEN_DICTIONARY_ITEMS = { lesson_duration: [45] };
 
 function readStored() {
   try {
@@ -437,6 +442,7 @@ function timetableSettings() {
 }
 // CR-2026-103：数据字典读取与归一化。数值型字典（课时时长）按正整数去重升序，
 // 文本型字典保持维护顺序并去重；默认项缺失或越界时回落到首项。
+// CR-2026-155 C2：frozen 字典（课时时长）忽略存储值，强制归一到冻结项。
 function normalizeDictionaryEntry(type, entry) {
   const fallback = DICTIONARY_FALLBACK[type] || { label: type, kind: 'text', items: [] };
   const kind = entry?.kind || fallback.kind;
@@ -446,13 +452,15 @@ function normalizeDictionaryEntry(type, entry) {
     : [...new Set(raw.map((value) => String(value).trim()).filter(Boolean))];
   const resolved = items.length ? items : fallback.items;
   const preferred = kind === 'number' ? Math.round(Number(entry?.defaultItem)) : entry?.defaultItem;
+  const frozen = FROZEN_DICTIONARY_ITEMS[type];
+  const finalItems = frozen || resolved;
   return {
     type,
     label: entry?.label || fallback.label,
     kind,
     unit: entry?.unit ?? fallback.unit ?? '',
-    items: resolved,
-    defaultItem: resolved.includes(preferred) ? preferred : resolved[0]
+    items: finalItems,
+    defaultItem: frozen ? frozen[0] : (resolved.includes(preferred) ? preferred : resolved[0])
   };
 }
 
@@ -495,8 +503,8 @@ function writeDictionary(type, { items, defaultItem } = {}) {
   });
 }
 
-// CR-2026-100 / CR-2026-103：课时时长读取数据字典 lesson_duration，
-// 排班、班级默认值与课程编排共用同一份字典。
+// CR-2026-100 / CR-2026-103：课时时长读取数据字典 lesson_duration。
+// CR-2026-155 C2：该字典已冻结（仅 45 分钟），排班、班级默认值与课程编排共用同一份固定值。
 function lessonDurationSettings() {
   return { options: dictionaryItems('lesson_duration'), defaultMinutes: dictionaryDefault('lesson_duration') };
 }
