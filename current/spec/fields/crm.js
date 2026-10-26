@@ -52,7 +52,7 @@ const CRM_FIELD_SPEC = {
         { heading: '排课工作台 · 第 3 步 排课配置', fields: [
           { id: 'FD-ACADEMIC-020', label: '每周上课日', type: '复选框组', length: '至少 1 天', required: '是', note: '决定课次重复规则；多选后每个上课日生成独立时间组' },
           { id: 'FD-ACADEMIC-022', label: '上课开始时间', type: '按上课日重复的时间', length: 'HH:mm', required: '每个已选上课日必填', note: '每个上课日独立维护；按 15 分钟刻度吸附，范围 08:00–21:00', constraints: { format: 'HH:mm' } },
-          { id: 'FD-ACADEMIC-023', label: '单次课时长', type: '下拉', length: '45 / 60 / 90 / 120 / 150 分钟', required: '是', note: '所有上课日公用；默认 45 分钟；一个课时对应一个课次' },
+          { id: 'FD-ACADEMIC-023', label: '单次课时长', type: '只读', length: '固定 45 分钟', required: '是', note: '所有上课日公用；单节课固定 45 分钟（CR-2026-155 C2），由系统写入不可编辑；一个课时对应一个课次', constraints: { readOnly: true } },
           { id: 'FD-ACADEMIC-024', label: '上课结束时间', type: '按上课日重复的时间（自动计算）', length: 'HH:mm', required: '系统计算', note: '每个上课日均由该日开始时间加公用单次课时长计算，只读', constraints: { format: 'HH:mm', system: true, readOnly: true } },
           { id: 'FD-ACADEMIC-021', label: '首次上课日期', type: '日期', length: 'YYYY-MM-DD', required: '是', note: '决定首次课次日期', constraints: { format: 'YYYY-MM-DD' } },
           { id: 'FD-ACADEMIC-036', label: '末次上课日期', type: '只读', length: 'YYYY-MM-DD', required: '系统计算', note: '取全部课次中最晚的日期（CR-2026-138 无停课与取消状态）；课次调整、增删课次后自动重算，不是发布时锁定的快照；结业后不再变化', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD' } }

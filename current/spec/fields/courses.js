@@ -151,7 +151,7 @@ const COURSE_FIELD_SPEC = {
           { id: 'FD-COURSE-037', label: '课时名称', type: '文本', length: '≤ 50 字', required: '是', note: '如“站姿与脚位”', constraints: { maxLength: 50 } },
           { id: 'FD-COURSE-038', label: '课时序号', type: '数字', length: '≥ 1 的整数', required: '是', note: '决定课时在章节内的先后顺序，可拖拽调整', constraints: { min: 1, integer: true } },
           { id: 'FD-COURSE-039', label: '课时目标', type: '文本', length: '≤ 100 字', required: '是', note: '本课时可达成、可验收的教学目标', constraints: { maxLength: 100 } },
-          { id: 'FD-COURSE-040', label: '课时时长（分钟）', type: '数字', length: '45 / 60 / 90 / 120 / 150', required: '是', note: '一个课时对应一个课次；默认 45 分钟', constraints: { options: [45, 60, 90, 120, 150] } },
+          { id: 'FD-COURSE-040', label: '课时时长（分钟）', type: '数字（只读）', length: '固定 45', required: '是', note: '单节课固定 45 分钟（CR-2026-155 C2）；一个课时对应一个课次，不提供其他时长选项', constraints: { options: [45], readOnly: true } },
           { id: 'FD-COURSE-041', label: '课时类型', type: '下拉', length: '理论 / 示范 / 练习 / 综合', required: '是', note: '决定课时的教学形式', constraints: { options: ['理论', '示范', '练习', '综合'] } },
           { id: 'FD-COURSE-042', label: '内容描述', type: '多行文本', length: '≤ 500 字', required: '否', note: '填写教学内容和执行提示', constraints: { maxLength: 500 } },
           { id: 'FD-COURSE-043', label: '引用资源', type: '资源选择器', length: '至少 1 个资源', required: '视频课程必填', note: '视频课程所有课时必须关联至少一个视频资源才能完成编排；面授课程可选', constraints: { minItems: 1, requiredWhen: 'courseType=video' } }
