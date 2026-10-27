@@ -66,7 +66,7 @@ const FINANCE_FIELD_SPEC = {
           { id: 'FD-FINANCE-045', label: '学员', type: '文本', length: '≤ 30 字', required: '否', note: '与订单号独立筛选，支持姓名模糊匹配', constraints: { maxLength: 30 } }
         ] },
         { heading: '退款执行字段', fields: [
-          { id: 'FD-FINANCE-012', label: '财务备注', type: '文本', length: '≤ 200 字', required: '否', note: '退款执行与异常重试的经办说明，选填', constraints: { maxLength: 200 } }
+          { id: 'FD-FINANCE-012', label: '财务备注', type: '文本', length: '≤ 200 字', required: '否', note: '确认退款与取消退款的经办说明，选填', constraints: { maxLength: 200 } }
         ] },
         // CR-2026-036：线下退款登记（登记的是已发生的线下退款事实，不是发起退款申请）。
         { heading: '线下退款登记字段', fields: [
@@ -76,11 +76,12 @@ const FINANCE_FIELD_SPEC = {
           { id: 'FD-FINANCE-038', label: '退款原因', type: '文本', length: '≤ 200 字', required: '是', note: '填写线下退款原因', constraints: { maxLength: 200 } },
           { id: 'FD-FINANCE-039', label: '退款时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '否', note: '默认登记时间；用于与银行流水核对', constraints: { format: 'YYYY-MM-DD HH:mm' } },
           { id: 'FD-FINANCE-040', label: '备注', type: '文本', length: '≤ 200 字', required: '否', note: '凭证号、经办说明等', constraints: { maxLength: 200 } },
-          { id: 'FD-FINANCE-041', label: '退款方式 / 渠道', type: '只读', length: '线上 / 线下 + 渠道', required: '系统记录', note: '退款记录列表与订单详情按该列区分线上退款单与线下退款登记，筛选与指标卡计数一致', constraints: { readOnly: true, system: true } }
+          { id: 'FD-FINANCE-041', label: '退款方式 / 渠道', type: '只读', length: '线上 / 线下 + 渠道', required: '系统记录', note: '退款记录列表与订单详情按该列区分线上退款单与线下退款登记，筛选与指标卡计数一致', constraints: { readOnly: true, system: true } },
+          { id: 'FD-FINANCE-046', label: '完成时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '财务确认退款（或渠道回调成功）时由系统自动写入；退款中／已取消单据为空，展示「—」；与发起时间并列展示，用于对账与时效统计', constraints: { readOnly: true, system: true } }
         ] }
       ],
       notes: [
-        'CR-2026-155 C9：退款统一由后台发起，发起后直接进入「退款中」，不设学员申请与教务审批环节；退款执行与异常处理由财务负责。',
+        'CR-2026-155 C9：退款统一由后台发起，发起后直接进入「退款中」，不设学员申请与教务审批环节；确认退款与取消退款由财务负责。',
         '面授课程与视频课程的线上退款均不再经过审批；发起、渠道处理与完成状态独立记录，保证流程可追溯。',
         'CR-2026-036：线下退款登记用于补齐视频课程与面授课程的退款出口，登记的是已经发生的线下退款事实。',
         'CR-2026-036：线下退款没有渠道回调，登记成功即视为退款完成，订单状态直接转为「已退款」，不经过「退款中」；登记失败不产生任何记录。',
