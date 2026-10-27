@@ -18,7 +18,7 @@ let salaryActiveTab = 'calculation';
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const statusClass = (value) => ({
-  草稿: 'gray', 核算中: 'amber', 待发布: 'brand', 已发布: 'green', 待发放: 'amber', 发放中: 'brand', 已发放: 'green', 发放失败: 'red', 部分失败: 'red', 已到账: 'green', 待确认: 'amber', 异常: 'red', 退款中: 'brand', 已退款: 'green', 已拒绝: 'gray',
+  草稿: 'gray', 核算中: 'amber', 待发布: 'brand', 已发布: 'green', 待发放: 'amber', 发放中: 'brand', 已发放: 'green', 发放失败: 'red', 部分失败: 'red', 已到账: 'green', 待确认: 'amber', 异常: 'red', 退款中: 'brand', 已退款: 'green', 已取消: 'gray',
   正常: 'green', 库存不足: 'amber', 启用: 'green', 停用: 'gray', 待处理: 'amber', 已处理: 'green', 通过: 'green', 拒绝: 'red', '部分成功': 'amber', '全部失败': 'red'
 }[value] || 'gray');
 const tag = (value) => `<span class="tag ${statusClass(value)}">${esc(value)}</span>`;

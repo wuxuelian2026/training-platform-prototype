@@ -1249,7 +1249,7 @@ function openOrderDetail(row) {
   const body = [
     section('订单信息', `<dl class="course-detail-list">${baseRows}</dl>`),
     section('支付记录', paymentRows ? `<dl class="course-detail-list">${paymentRows}</dl>` : ''),
-    section('退款记录', `${refundRows}<p class="sales-dialog-summary"><a class="link" href="/admin/pages/finance/refunds.html?orderNo=${encodeURIComponent(row.number)}">进入退款记录处理</a><span class="sub-cell">审批、异常登记、渠道重试和完成确认统一在退款记录页操作</span></p>`),
+    section('退款记录', `${refundRows}<p class="sales-dialog-summary"><a class="link" href="/admin/pages/finance/refunds.html?orderNo=${encodeURIComponent(row.number)}">进入退款记录处理</a><span class="sub-cell">确认退款与取消退款统一在退款记录页处理（CR-2026-157）页操作</span></p>`),
     section('履约结果', `<dl class="course-detail-list">${fulfillmentRows || '<div class="wide"><dt>结果</dt><dd>—</dd></div>'}${seatFailed ? '<div class="wide"><dt>退款结果</dt><dd>报名未成功，已发起全额原路退款</dd></div>' : ''}</dl>`),
     section('操作日志', logRows ? `<div class="table-wrap"><table><thead><tr><th>时间</th><th>操作人角色</th><th>状态变更</th><th>变更原因</th></tr></thead><tbody>${logRows}</tbody></table></div>` : '')
   ].join('');

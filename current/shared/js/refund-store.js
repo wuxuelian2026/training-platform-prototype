@@ -396,7 +396,7 @@ function registerCompletedOfflineRefund(input = {}) {
   const amount = numberOr(input.amount, paidAmount);
   // 线下退款登记仅支持全额退款（不支持部分退款，与门禁用例一致）；部分退款请走「统一订单管理」订单列表退款入口。
   if (!(paidAmount > 0) || amount !== paidAmount) return { ok: false, reason: 'REFUND_AMOUNT_INVALID' };
-  // CR-2026-155（C9）：后台登记线下退款直接生成「退款中」退款单，不再经过待审批、不再自动终结；由财务在退款执行页标记完成。
+  // CR-2026-155（C9）：后台登记线下退款直接生成「退款中」退款单，不再经过待审批、不再自动终结；由财务在退款记录页确认退款或取消退款（CR-2026-157）。
   const created = createRefundRequest({
     ...input,
     amount,
