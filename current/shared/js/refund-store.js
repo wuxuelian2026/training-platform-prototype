@@ -8,15 +8,17 @@
 // - 订单是交易事实、退款单是唯一审批对象、报名分班记录是名册事实，三者由 settleRefund() 统一推进；
 // - 学员端「我的订单」自助申请、后台「学籍异动」同步发起、后台「线下登记」都只负责创建退款单；
 // - 同一订单同时只能存在一张未结退款单（待审批／退款中），重复发起复用既有单，避免重复退款；
-// - 退款完成才改学籍与名额，并回写订单；拒绝只回滚订单，不自动恢复学籍（由教务确认）。
+// - 退款完成才改学籍与名额，并回写订单；拒绝只回滚订单，不自动恢复学籍（由教务确认）；
+// - 取消退款（CR-2026-157）：退款中可由财务取消，订单回「已支付」、退款状态「已取消」，学籍/授权保持，
+//   取消不消耗「一单一次」配额，订单可重新发起退款。
 const { classRefundSettings, demoId, demoTime, readDemoState, transitionVideoEntitlement, upsertDemoRecord, writeDemoState } = __classicRequire("shared/js/demo-store.js");
 const { classLessonProgress } = __classicRequire("shared/js/class-lifecycle.js");
 const { isEnrollmentActive } = __classicRequire("shared/js/class-roster.js");
 const { mergeClassSeed } = __classicRequire("shared/js/class-seed.js");
 const { emitNotificationEvent } = __classicRequire("shared/js/notification-store.js");
-const REFUND_STATUS = { PENDING: '待审批', PROCESSING: '退款中', EXCEPTION: '退款异常', DONE: '已退款', REJECTED: '已拒绝' };
+const REFUND_STATUS = { PENDING: '待审批', PROCESSING: '退款中', CANCELLED: '已取消', DONE: '已退款', REJECTED: '已拒绝' };
 const REFUND_ORIGIN = { LEARNER: '学员申请', ENROLLMENT: '学籍异动', OFFLINE: '线下登记', SYSTEM: '系统' };
-const OPEN_STATUSES = [REFUND_STATUS.PENDING, REFUND_STATUS.PROCESSING, REFUND_STATUS.EXCEPTION];
+const OPEN_STATUSES = [REFUND_STATUS.PENDING, REFUND_STATUS.PROCESSING];
 const numberOr = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 
 function sharedRows(collection) {
@@ -30,7 +32,7 @@ function refundsForOrder(orderId) {
   return listRefunds().filter((row) => row.orderId === orderId || row.orderNo === orderId);
 }
 
-/** 该订单当前未结的退款单（待审批／退款中）。 */
+/** 该订单当前未结的退款单（待审批／退款中）；已取消不算未结，可重新发起。 */
 function openRefundForOrder(orderId) {
   return refundsForOrder(orderId).find((row) => OPEN_STATUSES.includes(row.status)) || null;
 }
@@ -139,24 +141,6 @@ function createAcademicRefundTodo(refund, enrollment, reason, now) {
   return todo;
 }
 
-function createRefundExceptionTodo(refund, reason, now) {
-  const todo = {
-    id: `refund-exception:${refund.id}`,
-    type: '退款异常处理',
-    status: '待处理',
-    priority: '高',
-    classId: refund.classId || '',
-    studentId: refund.studentId || '',
-    refundId: refund.id,
-    refundNo: refund.no,
-    title: `${refund.studentName || refund.student || '学员'}退款失败或超时`,
-    detail: `退款单 ${refund.no} 处理异常：${reason}。请核对渠道结果后重试或人工处理。`,
-    createdAt: now,
-    updatedAt: now
-  };
-  upsertDemoRecord('academicTodos', todo);
-  return todo;
-}
 
 /**
  * 面授退款资格判定：申请窗口和已消课比例只决定是否可退。
@@ -308,7 +292,7 @@ function settleClassEnrollment(refund, now) {
 
 /**
  * 退款单唯一状态出口。
- * decision：通过／拒绝用于待审批；完成／异常用于退款中；重试用于退款异常。
+ * decision：通过／拒绝用于历史待审批单；完成／取消用于退款中（CR-2026-157：取消替代异常，无重试链路）。
  * @returns {{ok: boolean, reason?: string, refund?: object, order?: object, enrollment?: object}}
  */
 function settleRefund(refundId, decision, operator = {}) {
@@ -317,12 +301,11 @@ function settleRefund(refundId, decision, operator = {}) {
   if (refund.status === REFUND_STATUS.DONE) return { ok: false, reason: 'REFUND_ALREADY_SETTLED', refund };
   const now = demoTime();
   const order = orderById(refund.orderId || refund.orderNo);
-  const failReason = String(operator.rejectReason || operator.exceptionReason || '').trim();
+  const failReason = String(operator.rejectReason || operator.exceptionReason || operator.cancelReason || '').trim();
   if (['通过', '拒绝'].includes(decision) && refund.status !== REFUND_STATUS.PENDING) return { ok: false, reason: 'REFUND_STATUS_INVALID', refund };
-  if (['完成', '异常'].includes(decision) && refund.status !== REFUND_STATUS.PROCESSING) return { ok: false, reason: 'REFUND_STATUS_INVALID', refund };
-  if (decision === '重试' && refund.status !== REFUND_STATUS.EXCEPTION) return { ok: false, reason: 'REFUND_STATUS_INVALID', refund };
+  if (['完成', '取消'].includes(decision) && refund.status !== REFUND_STATUS.PROCESSING) return { ok: false, reason: 'REFUND_STATUS_INVALID', refund };
   if (decision === '拒绝' && !failReason) return { ok: false, reason: 'REFUND_REJECT_REASON_REQUIRED' };
-  if (decision === '异常' && !failReason) return { ok: false, reason: 'REFUND_EXCEPTION_REASON_REQUIRED' };
+  if (decision === '取消' && !failReason) return { ok: false, reason: 'REFUND_CANCEL_REASON_REQUIRED' };
   if (decision === '通过' && !String(operator.channel || refund.channel || '').trim()) return { ok: false, reason: 'REFUND_CHANNEL_REQUIRED' };
 
   const next = { ...refund, reviewedAt: now, reviewedBy: operator.name || operator.id || '当前账号' };
@@ -334,16 +317,11 @@ function settleRefund(refundId, decision, operator = {}) {
     next.status = REFUND_STATUS.REJECTED;
     next.rejectReason = failReason;
     next.remark = failReason;
-  } else if (decision === '异常') {
-    next.status = REFUND_STATUS.EXCEPTION;
-    next.exceptionReason = failReason;
-    next.exceptionAt = now;
+  } else if (decision === '取消') {
+    next.status = REFUND_STATUS.CANCELLED;
+    next.cancelReason = failReason;
+    next.cancelledAt = now;
     next.remark = failReason;
-  } else if (decision === '重试') {
-    next.status = REFUND_STATUS.PROCESSING;
-    next.retryCount = numberOr(refund.retryCount) + 1;
-    next.lastRetryAt = now;
-    next.remark = operator.remark || '已按原退款单重新提交渠道处理。';
   } else if (decision === '完成') {
     next.status = REFUND_STATUS.DONE;
     next.completedAt = now;
@@ -356,6 +334,7 @@ function settleRefund(refundId, decision, operator = {}) {
   if (decision === '通过') notifyRefundAccount(next, '退款审批通过', '退款审批已通过', `退款单 ${next.no} 已进入渠道退款处理。`);
   if (decision === '拒绝') notifyRefundAccount(next, '退款审批拒绝', '退款申请未通过', `退款单 ${next.no} 未通过：${failReason}`);
   if (decision === '完成') notifyRefundAccount(next, '退款已完成', '退款已完成', `退款单 ${next.no} 已完成，请留意退款账户入账情况。`);
+  if (decision === '取消') notifyRefundAccount(next, '退款已取消', '退款已取消', `退款单 ${next.no} 已取消（原因：${failReason}），如需退款请由后台重新发起。`);
 
   let nextOrder = order;
   let enrollment = null;
@@ -371,13 +350,11 @@ function settleRefund(refundId, decision, operator = {}) {
         enrollment = updateEnrollmentRefundRelation(next, REFUND_STATUS.REJECTED, { refundRejectedAt: now, refundRejectReason: failReason });
         academicTodo = createAcademicRefundTodo(next, enrollment, failReason, now);
       } else transitionVideoEntitlement(order.accountId, order.courseId, '生效', { reason: '视频退款申请被拒，学习授权恢复生效', operator: operator.name || '系统', orderId: order.id });
-    } else if (decision === '异常') {
-      nextOrder = { ...order, status: REFUND_STATUS.PROCESSING, refundStatus: REFUND_STATUS.EXCEPTION, refundExceptionReason: failReason };
-      if (order.classId) enrollment = updateEnrollmentRefundRelation(next, REFUND_STATUS.EXCEPTION, { refundExceptionAt: now, refundExceptionReason: failReason });
-      academicTodo = createRefundExceptionTodo(next, failReason, now);
-    } else if (decision === '重试') {
-      nextOrder = { ...order, status: REFUND_STATUS.PROCESSING, refundStatus: '渠道重试中', refundRetryCount: next.retryCount };
-      if (order.classId) enrollment = updateEnrollmentRefundRelation(next, REFUND_STATUS.PROCESSING, { refundRetriedAt: now });
+    } else if (decision === '取消') {
+      // CR-2026-157：取消退款后订单回「已支付」，面授学籍保持在读、视频授权恢复生效；可重新发起退款。
+      nextOrder = { ...order, status: '已支付', refundStatus: REFUND_STATUS.CANCELLED, refundCancelledAt: now, refundCancelReason: failReason };
+      if (order.classId) enrollment = updateEnrollmentRefundRelation(next, REFUND_STATUS.CANCELLED, { refundCancelledAt: now, refundCancelReason: failReason });
+      else transitionVideoEntitlement(order.accountId, order.courseId, '生效', { reason: '退款已取消，学习授权恢复生效', operator: operator.name || '系统', orderId: order.id });
     } else {
       const isClass = Boolean(order.classId);
       const isPartial = numberOr(next.amount) < numberOr(order.amount);

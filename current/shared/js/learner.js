@@ -1545,7 +1545,8 @@ function learnerRefundStatus(order) {
   const source = String(record?.status || order.refundStatus || '');
   if (order.status === '已退款' || source === '已退款' || source.includes('已完成')) return '已退款';
   if (source === '已拒绝' || source.includes('拒绝') || source.includes('未通过')) return '退款申请未通过';
-  if (source === '退款异常' || source.includes('异常') || source.includes('失败')) return '退款处理异常';
+  if (source === '已取消' || source.includes('取消')) return '退款已取消';
+  if (source.includes('异常') || source.includes('失败')) return '退款处理异常';
   if (source === '待审批' || source.includes('待审核') || source.includes('待审批')) return '退款申请处理中';
   if (order.status === '退款中' || source === '退款中' || source.includes('退款处理中') || source.includes('处理中')) return '退款处理中';
   return '';

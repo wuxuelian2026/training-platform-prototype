@@ -90,13 +90,17 @@ const exitedReject = refunds.settleRefund(exitedRejectRequest.refund.id, '拒绝
 check(exitedReject.academicTodo?.status === '待处理', '已退出学籍退款被拒生成教务待办');
 check(enrollmentOf(exitedRejectCase).status === '已退学', '退款被拒不自动恢复已退出学籍');
 
-const exceptionCase = seedClassCase('exception');
-const exceptionRequest = refunds.createRefundRequest({ orderId: exceptionCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER, reason: '时间安排冲突' });
-refunds.settleRefund(exceptionRequest.refund.id, '通过', { name: '教务主管', channel: '原路退回' });
-const exception = refunds.settleRefund(exceptionRequest.refund.id, '异常', { name: '财务', exceptionReason: '渠道超时' });
-check(exception.ok && exception.refund.status === '退款异常' && exception.academicTodo?.status === '待处理', '渠道超时进入退款异常并生成待办');
-const retry = refunds.settleRefund(exceptionRequest.refund.id, '重试', { name: '财务' });
-check(retry.ok && retry.refund.status === '退款中' && retry.refund.retryCount === 1, '退款异常复用原退款单重试');
+const cancelCase = seedClassCase('cancel');
+const cancelRequest = refunds.createRefundRequest({ orderId: cancelCase.orderId, origin: refunds.REFUND_ORIGIN.LEARNER, reason: '时间安排冲突' });
+refunds.settleRefund(cancelRequest.refund.id, '通过', { name: '教务主管', channel: '原路退回' });
+// CR-2026-157：退款中可取消，订单回已支付、学籍保持，已取消后可重新发起；异常重试链路已删除。
+check(refunds.settleRefund(cancelRequest.refund.id, '取消', { name: '财务' }).ok === false, '取消退款必须填写取消原因');
+const cancelled = refunds.settleRefund(cancelRequest.refund.id, '取消', { name: '财务', cancelReason: '渠道超时，先取消再重新发起' });
+check(cancelled.ok && cancelled.refund.status === '已取消', '退款中取消退款后退款单为已取消');
+check(cancelled.order.status === '已支付' && cancelled.order.refundStatus === '已取消', '取消退款后订单回已支付');
+const reRequest = refunds.createRefundRequest({ orderId: cancelCase.orderId, origin: refunds.REFUND_ORIGIN.OFFLINE, requestedBy: '财务', reason: '重新发起退款', skipApproval: true });
+check(reRequest.ok && reRequest.refund.status === '退款中' && reRequest.refund.no !== cancelRequest.refund.no, '已取消后可重新发起新退款单');
+check(refunds.settleRefund(cancelRequest.refund.id, '重试', { name: '财务' }).ok === false, '重试决策已废止');
 
 function seedVideoCase(suffix) {
   const orderId = `video-order-${suffix}`;

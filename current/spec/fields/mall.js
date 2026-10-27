@@ -56,7 +56,7 @@ const MALL_FIELD_SPEC = {
         { heading: '列表筛选字段', fields: [
           { id: 'FD-MALL-041', label: '订单类型', type: '下拉', length: '视频课程 / 面授课程', required: '否', note: '区分视频订单与面授订单', constraints: { options: ['视频课程', '面授课程'] } },
           { id: 'FD-MALL-042', label: '支付状态', type: '下拉', length: '待支付 / 已支付 / 已取消', required: '否', note: '只表示支付事实；退款中与已退款不改变已支付状态', constraints: { options: ['待支付', '已支付', '已取消'] } },
-          { id: 'FD-MALL-051', label: '退款状态', type: '下拉', length: '无退款 / 退款中 / 退款异常 / 已退款', required: '否', note: '独立于支付状态；无退款表示订单没有有效退款单；退款由后台发起后直接进入退款中，不设待审批状态（CR-2026-155 C9）；「已退款」含全额与部分退款两种结果，部分退款须在列表与详情并列展示「已退金额 / 订单金额」', constraints: { options: ['无退款', '退款中', '退款异常', '已退款'] } },
+          { id: 'FD-MALL-051', label: '退款状态', type: '下拉', length: '无退款 / 退款中 / 已取消 / 已退款', required: '否', note: '独立于支付状态；无退款表示订单没有有效退款单；退款由后台发起后直接进入退款中，不设待审批状态（CR-2026-155 C9）；退款中可被取消为「已取消」，此时订单回「已支付」且可重新发起退款（CR-2026-157）；「已退款」含全额与部分退款两种结果，部分退款须在列表与详情并列展示「已退金额 / 订单金额」', constraints: { options: ['无退款', '退款中', '已取消', '已退款'] } },
           { id: 'FD-MALL-043', label: '下单时间起', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '按下单时间范围筛选，含当天' },
           { id: 'FD-MALL-044', label: '下单时间止', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '含当天；与起始日期共同构成闭区间' },
           { id: 'FD-MALL-045', label: '指标卡筛选', type: '按钮', length: '—', required: '否', note: '今日订单／待支付／退款中／已支付可点击筛选；退款中按退款状态筛选，其余按支付状态筛选，再次点击取消', constraints: { action: true } }

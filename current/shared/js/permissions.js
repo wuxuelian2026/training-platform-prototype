@@ -62,7 +62,7 @@ const PERMISSION_POINTS = [
   { id: 'PERM-TRADE-001', module: '交易中心', object: '订单', action: '订单查看', scopes: VIEW, note: '查看统一订单列表与订单详情' },
   { id: 'PERM-TRADE-002', module: '交易中心', object: '退款', action: '退款查看', scopes: VIEW, note: '查看退款单与执行结果' },
   { id: 'PERM-TRADE-003', module: '交易中心', object: '退款', action: '退款发起', scopes: TEACHING, note: '由后台发起退款，发起后直达退款中，不设审批环节' },
-  { id: 'PERM-TRADE-004', module: '交易中心', object: '退款', action: '退款执行', scopes: TEACHING, note: '确认退款完成、登记异常与重试' },
+  { id: 'PERM-TRADE-004', module: '交易中心', object: '退款', action: '退款执行', scopes: TEACHING, note: '确认退款与取消退款（CR-2026-157）' },
   { id: 'PERM-TRADE-005', module: '交易中心', object: '退款', action: '线下退款登记', scopes: TEACHING, note: '登记已完成的线下终结退款及凭证' },
   { id: 'PERM-FINANCE-001', module: '财务中心', object: '教师工资', action: '工资管理', scopes: TEACHING, note: '生成与发布教师工资单' },
   { id: 'PERM-FINANCE-002', module: '财务中心', object: '收款', action: '收款记录', scopes: TEACHING, note: '查看收款流水与到账状态' },
