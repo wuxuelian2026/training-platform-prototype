@@ -22,7 +22,7 @@ const SYSTEM_FIELD_SPEC = {
           { id: 'FD-SYSTEM-048', label: '退款申请窗口（自然日）', type: '数字', length: '0–365', required: '否', note: '视频与面授共用，支付后计算；0 表示不限', constraints: { min: 0, max: 365 } },
           { id: 'FD-SYSTEM-049', label: '图片上传上限（MB）', type: '数字', length: '1–1024', required: '否', note: '封面、证书与成果等图片类上传的统一上限，默认 10MB', constraints: { min: 1, max: 1024 } },
           { id: 'FD-SYSTEM-050', label: '文档上传上限（MB）', type: '数字', length: '1–1024', required: '否', note: 'PDF、Word、PPT 等文档类上传的统一上限，默认 50MB；合同签署件按本项校验', constraints: { min: 1, max: 1024 } },
-          { id: 'FD-SYSTEM-051', label: '视频上传上限（MB）', type: '数字', length: '1–10240', required: '否', note: '视频课程与教学视频上传的统一上限，默认 500MB', constraints: { min: 1, max: 10240 } },
+          { id: 'FD-SYSTEM-051', label: '视频上传上限（GB）', type: '数字', length: '0.1–10', required: '否', note: '视频课程与教学视频上传的统一上限，默认及最大 10GB；作业提交页展示时按 MB／GB 自适应换算', constraints: { min: 0.1, max: 10, unit: 'GB' } },
           { id: 'FD-SYSTEM-052', label: '教学资源库单文件上限（GB）', type: '数字', length: '1–10240', required: '否', note: '教学资源库单文件上限，默认 100GB；与其他上传项独立校验', constraints: { min: 1, max: 10240 } },
           { id: 'FD-SYSTEM-053', label: '消息失败最大重试次数', type: '数字', length: '1–5', required: '否', note: '通知发送失败后的最大重试次数，默认 3 次；超过次数进入补发队列', constraints: { min: 1, max: 5 } },
           { id: 'FD-SYSTEM-054', label: '消息重试间隔（分钟）', type: '数字组', length: '每项 1–1440，至少一项', required: '否', note: '按顺序生效的重试间隔，默认 5／30／120 分钟；保存时去重升序，仅在启用消息失败自动重试时生效', constraints: { min: 1, max: 1440, multi: true } },

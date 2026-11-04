@@ -15,7 +15,7 @@ const { graduationSeed } = __classicRequire("shared/js/graduation-seed.js");
 const { isEnrollmentActive } = __classicRequire("shared/js/class-roster.js");
 const { venueSeed } = __classicRequire("shared/js/venue-seed.js");
 const { lessonAttendanceStatus } = __classicRequire("shared/js/lesson-records.js");
-const { getHomework, listHomework, getStudentSubmission, homeworkFileLimitMb, homeworkLifecycleStatus, listSubmissions, saveDraftSubmission, submitHomework: submitHomeworkRecord, syncHomeworkNotificationReads } = __classicRequire("shared/js/homework-store.js");
+const { getHomework, listHomework, getStudentSubmission, homeworkFileAccept, homeworkFileFormat, homeworkFileLimitLabel, homeworkFileLimitMb, homeworkFormatAllowed, homeworkFormatRequirements, homeworkLifecycleStatus, homeworkTextMaxLength, listSubmissions, normalizeHomeworkFormats, saveDraftSubmission, submitHomework: submitHomeworkRecord, syncHomeworkNotificationReads } = __classicRequire("shared/js/homework-store.js");
 const { resolveHomeBanners } = __classicRequire("shared/js/banner-seed.js");
 const { isLearnerPublicPage, isMiniLoggedIn, isMiniRole, miniPageName, redirectMiniLogin } = __classicRequire("shared/js/mobile-guard.js");
 const { toCanonicalCourseId } = __classicRequire("shared/js/course-seed.js");
@@ -1384,9 +1384,8 @@ function homeworkDeepLinkFor(classId) {
     : `/learner/pages/class-detail.html?courseId=${encodeURIComponent(classId)}&tab=lessons`;
 }
 // MVP 口径 3、7（2026-09-24 冻结）：截止后只读，不支持迟交；附件类型必须符合发布时选择的格式。
-const HOMEWORK_ACCEPT = { 视频: 'video/*', 图片: 'image/*', 音频: 'audio/*', 文档: '.pdf,.doc,.docx', PDF: '.pdf' };
 function homeworkAcceptAttr(homework) {
-  return (homework?.formats || []).map((item) => HOMEWORK_ACCEPT[item]).filter(Boolean).join(',');
+  return homeworkFileAccept(homework?.formats || []);
 }
 function homeworkOverdue(homework) {
   const due = demoDateTime(homework?.deadline);
@@ -1394,20 +1393,10 @@ function homeworkOverdue(homework) {
   return demoDateTime(DEMO_NOW).getTime() > due.getTime();
 }
 function homeworkFileAllowed(homework, file) {
-  const accept = homeworkAcceptAttr(homework);
-  if (!accept) return false;
-  const name = String(file?.name || '').toLowerCase();
-  const type = String(file?.type || '').toLowerCase();
-  return accept.split(',').some((rule) => (rule === 'video/*'
-    ? type.startsWith('video/') || /\.(mp4|mov|avi|m4v|webm)$/i.test(name)
-    : rule === 'image/*'
-      ? type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(name)
-      : rule === 'audio/*'
-        ? type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg)$/i.test(name)
-    : name.endsWith(rule.toLowerCase())));
+  return homeworkFormatAllowed(homework, file);
 }
 function homeworkTextAllowed(homework) {
-  return (homework?.formats || []).includes('文字');
+  return normalizeHomeworkFormats(homework?.formats || []).includes('文本');
 }
 // 学员作业详情页：只按「homeworkId + classId + 当前学员 ID」加载本人这一条记录。
 // 不渲染班级作业列表，也不再兜底成该班第一条作业——定位不到就回到能定位的页面（班级详情课次段）。
@@ -1442,18 +1431,45 @@ function renderHomeworkPage() {
   // 截止后只读（MVP 口径 3）；已点评后禁止重新提交（MVP 口径 4，补交需教师开启「允许补交」）。
   const locked = overdue || status === '已提交' || status === '已点评';
   const lockNote = overdue ? `已过截止时间（${esc(homework.deadline)}），本次作业只读，不支持迟交。` : status === '已提交' ? '作业已提交，当前为只读查看状态，等待教师点评。' : '教师已点评，本次作业为只读查看状态。';
-  const fileSpec = fileSpecSettings();
-  const fileLimitText = `图片${fileSpec.imageMb}MB、视频${fileSpec.videoMb}MB、文档${fileSpec.documentMb}MB`;
   const allowsText = homeworkTextAllowed(homework);
   const allowsAttachment = Boolean(acceptAttr);
-  const textField = allowsText ? `<div class="mp-field"><label for="homework-text">文字说明</label><textarea id="homework-text" placeholder="请输入本次作业说明">${esc(submission?.content || submission?.text || '')}</textarea></div>` : '';
-  const attachmentField = allowsAttachment ? `<div class="mp-field"><label for="homework-file">附件</label><input id="homework-file" type="file" accept="${acceptAttr}"><small class="mp-muted">允许格式：${esc((homework.formats || []).filter((format) => format !== '文字').join('、'))}；${fileLimitText}；演示原型只记录文件名，不上传真实文件。</small><span id="homework-file-name" class="mp-muted">${attachmentName ? `已选择：${esc(attachmentName)}` : '尚未选择附件'}</span></div>` : '';
+  const textMaxLength = homeworkTextMaxLength();
+  const textValue = submission?.content || submission?.text || '';
+  const requirements = homeworkFormatRequirements(homework.formats || []);
+  const selectedFormats = normalizeHomeworkFormats(homework.formats || []);
+  const selectedFileFormats = selectedFormats.filter((format) => format !== '文本');
+  const requirementsPanel = requirements.length
+    ? `<div class="mp-homework-format-requirements"><strong>提交要求</strong><ul>${requirements.map((item) => `<li>${esc(item.text)}</li>`).join('')}</ul></div>`
+    : '';
+  const textField = allowsText ? `<div class="mp-field"><label for="homework-text">文本内容</label><textarea id="homework-text" maxlength="${textMaxLength}" placeholder="请输入本次作业内容">${esc(textValue)}</textarea><small class="mp-muted"><span id="homework-text-count">${textValue.length}</span>／${textMaxLength} 字</small></div>` : '';
+  const attachmentField = allowsAttachment ? `<div class="mp-field"><label for="homework-file">${esc(selectedFileFormats.join('／'))}</label><input id="homework-file" type="file" accept="${acceptAttr}"><small class="mp-muted">单次提交 1 个文件；演示原型只记录文件名，不上传真实文件。</small><span id="homework-file-name" class="mp-muted">${attachmentName ? `已选择：${esc(attachmentName)}` : '尚未选择文件'}</span></div>` : '';
   const history = Array.isArray(submission?.history) && submission.history.length ? card(`<div class="mp-section-head"><h3>提交记录</h3><span>${submission.history.length + 1} 次</span></div><div class="mp-list">${[...submission.history, submission].map((row, index) => `<div class="mp-item"><div><strong>第${row.version || index + 1}次提交</strong><small>${esc(row.submittedAt || row.updatedAt || '草稿')} · ${esc(row.status)}</small></div>${row.review?.comment ? `<span class="mp-muted">已点评</span>` : ''}</div>`).join('')}</div>`) : '';
   const submissionPanel = locked && (status === '已提交' || status === '已点评')
-    ? card(`<section class="mp-homework-readonly"><div class="mp-section-head"><h3>提交详情</h3><span>${esc(submission?.submittedAt || '已提交')}</span></div><p class="mp-notice">${lockNote}</p><dl class="mp-homework-readonly-facts"><div><dt>提交状态</dt><dd>${pill(status, statusTone)}</dd></div><div><dt>提交时间</dt><dd>${esc(submission?.submittedAt || '—')}</dd></div><div><dt>更新时间</dt><dd>${esc(submission?.updatedAt || '—')}</dd></div></dl><div class="mp-homework-readonly-block"><strong>文字说明</strong><p>${esc(submission?.content || submission?.text || '未填写文字说明')}</p></div><div class="mp-homework-readonly-block"><strong>附件</strong><p>${attachmentName ? esc(attachmentName) : '未提交附件'}</p></div></section>`)
-    : card(`<form id="homework-form" class="mp-form"><div class="mp-section-head"><h3>提交作业</h3><span>尚未提交</span></div>${draftNotice}${textField}${attachmentField}<p id="homework-error" class="mp-notice" hidden></p><div class="mp-actions"><button type="button" class="mp-button secondary" data-homework-action="save">保存草稿</button><button type="submit" class="mp-button">提交作业</button></div></form>`);
+    ? card(`<section class="mp-homework-readonly"><div class="mp-section-head"><h3>提交详情</h3><span>${esc(submission?.submittedAt || '已提交')}</span></div><p class="mp-notice">${lockNote}</p><dl class="mp-homework-readonly-facts"><div><dt>提交状态</dt><dd>${pill(status, statusTone)}</dd></div><div><dt>提交时间</dt><dd>${esc(submission?.submittedAt || '—')}</dd></div><div><dt>更新时间</dt><dd>${esc(submission?.updatedAt || '—')}</dd></div></dl><div class="mp-homework-readonly-block"><strong>文本内容</strong><p>${esc(submission?.content || submission?.text || '未填写文本内容')}</p></div><div class="mp-homework-readonly-block"><strong>图片／视频</strong><p>${attachmentName ? esc(attachmentName) : '未提交文件'}</p></div></section>`)
+    : card(`<form id="homework-form" class="mp-form"><div class="mp-section-head"><h3>提交作业</h3><span>尚未提交</span></div>${draftNotice}${requirementsPanel}${textField}${attachmentField}<p id="homework-error" class="mp-notice" hidden></p><div class="mp-actions"><button type="button" class="mp-button secondary" data-homework-action="save">保存草稿</button><button type="submit" class="mp-button">提交作业</button></div></form>`);
   layout(stack(card(`<div class="mp-pills">${pill(status, statusTone)}${pill(homework.required ? '必交' : '选交', 'gray')}</div><h2 style="margin-top:12px">${esc(homework.title)}</h2><p>${esc(homework.description)}</p><dl class="mp-homework-facts"><div><dt>所属班级</dt><dd>${esc(course(homework.classId)?.name || homework.classId)}</dd></div><div><dt>第几次课</dt><dd>第${esc(homework.lessonIndex)}次课</dd></div><div><dt>截止时间</dt><dd>${esc(homework.deadline)}</dd></div><div><dt>提交格式</dt><dd>${esc((homework.formats || []).join('、'))}</dd></div></dl></div>`), submissionPanel, status === '已提交' || status === '已点评' ? card(`<div class="mp-section-head"><h3>教师点评</h3>${pill(status === '已点评' ? '已点评' : '待点评', status === '已点评' ? 'green' : 'amber')}</div><p>${esc(submission?.review?.comment || '教师尚未完成批改。')}</p>`) : '', history));
-  const fileInput = document.querySelector('#homework-file'); fileInput?.addEventListener('change', event => { const file = event.target.files[0]; if (file) document.querySelector('#homework-file-name').textContent = `已选择：${file.name}`; });
+  const fileInput = document.querySelector('#homework-file');
+  fileInput?.addEventListener('change', event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const validationMessage = homeworkFileValidationMessage(homework, file);
+    const error = document.querySelector('#homework-error');
+    const fileName = document.querySelector('#homework-file-name');
+    if (validationMessage) {
+      event.target.value = '';
+      error.hidden = false;
+      error.textContent = validationMessage;
+      fileName.textContent = '请重新选择文件';
+      return;
+    }
+    error.hidden = true;
+    error.textContent = '';
+    fileName.textContent = `已选择：${file.name}（上限 ${homeworkFileLimitLabel(homeworkFileLimitMb(file))}）`;
+  });
+  document.querySelector('#homework-text')?.addEventListener('input', event => {
+    const count = document.querySelector('#homework-text-count');
+    if (count) count.textContent = String(event.target.value.length);
+  });
   document.querySelector('#homework-form')?.addEventListener('submit', event => submitLearnerHomework(event, false, homework, submission));
   document.querySelector('[data-homework-action="save"]')?.addEventListener('click', () => submitLearnerHomework(null, true, homework, submission));
 }
@@ -1467,11 +1483,15 @@ function submitLearnerHomework(event, draft, homework, existing) {
   const file = document.querySelector('#homework-file')?.files[0];
   const attachmentName = file?.name || existing?.attachments?.[0]?.name || existing?.fileName || '';
   if (file) {
-    if (!homeworkFileAllowed(homework, file)) { showError(`附件格式不符合要求，本次作业仅允许：${(homework.formats || []).join('、')}。`); return; }
-    if (file.size > homeworkFileLimitMb(file) * 1024 * 1024) { showError(`附件大小超过当前文件类型的系统参数上限，请压缩后重新上传。`); return; }
+    const validationMessage = homeworkFileValidationMessage(homework, file);
+    if (validationMessage) { showError(validationMessage); return; }
   }
-  if (!draft && !text && !attachmentName) { showError('请填写文字说明或选择附件后再提交'); return; }
-  if (!draft && text && !attachmentName && !homeworkTextAllowed(homework)) { showError(`本次作业要求提交${(homework.formats || []).join('或')}，仅填写文字说明不符合要求。`); return; }
+  const selectedFormats = normalizeHomeworkFormats(homework.formats || []);
+  const emptySubmissionMessage = selectedFormats.includes('文本') && selectedFormats.some((format) => format !== '文本')
+    ? '请填写文本内容或选择文件后再提交'
+    : selectedFormats.includes('文本') ? '请填写文本内容后再提交' : '请选择本次要求的图片或视频后再提交';
+  if (!draft && !text && !attachmentName) { showError(emptySubmissionMessage); return; }
+  if (!draft && text && !attachmentName && !homeworkTextAllowed(homework)) { showError(`本次作业要求提交${(homework.formats || []).join('或')}，仅填写文本不符合要求。`); return; }
   const input = { homeworkId: homework.id, classId: homework.classId, lessonIndex: homework.lessonIndex, studentId: state.currentStudentId, studentName: currentStudent()?.name || '', content: text, attachments: file ? [{ name: attachmentName, type: file.type || '', size: file.size || 0 }] : (existing?.attachments || []) };
   try {
     if (draft) saveDraftSubmission(input); else submitHomeworkRecord(input);
@@ -1481,17 +1501,30 @@ function submitLearnerHomework(event, draft, homework, existing) {
       HOMEWORK_WITHDRAWN: '作业已撤回，当前不可查看或提交。',
       HOMEWORK_ALREADY_REVIEWED: '教师已点评，不能重新提交；如需补交请联系授课教师开启「允许补交」。',
       HOMEWORK_FILE_FORMAT_INVALID: `附件格式不符合要求，本次作业仅允许：${(homework.formats || []).join('、')}。`,
-      HOMEWORK_FILE_TOO_LARGE: '附件大小超过当前文件类型的系统参数上限，请压缩后重新上传。',
-      HOMEWORK_TEXT_NOT_ALLOWED: `本次作业要求提交${(homework.formats || []).join('或')}，不接受文字说明。`,
+      HOMEWORK_FILE_TOO_LARGE: `附件大小超过当前文件类型的上限（${homeworkFileLimitLabel(homeworkFileLimitMb(file || existing?.attachments?.[0] || {}))}），请压缩后重新上传。`,
+      HOMEWORK_TEXT_NOT_ALLOWED: `本次作业要求提交${(homework.formats || []).join('或')}，不接受文本内容。`,
+      HOMEWORK_TEXT_TOO_LONG: `文本内容不能超过 ${homeworkTextMaxLength()} 字。`,
       HOMEWORK_STUDENT_NOT_ALLOWED: '该作业不属于当前学员，无法提交。',
       HOMEWORK_STUDENT_EXITED: '你已退班／转班，不能再提交该班级的作业；如需继续学习请联系教务。',
-      HOMEWORK_EMPTY_SUBMISSION: '请填写文字说明或选择附件后再提交。'
+      HOMEWORK_EMPTY_SUBMISSION: emptySubmissionMessage
     };
     showError(messages[error?.message] || '作业提交失败，请稍后重试。');
     return;
   }
   toast(draft ? '作业草稿已保存' : '作业已提交');
   setTimeout(renderHomeworkPage, 180);
+}
+function homeworkFileValidationMessage(homework, file) {
+  if (!homeworkFileAllowed(homework, file)) {
+    const requirements = homeworkFormatRequirements(homework?.formats || []).filter((item) => item.format !== '文本');
+    return `文件格式不符合要求。${requirements.length ? requirements.map((item) => item.text).join('；') : '本次作业不接受文件。'}`;
+  }
+  const fileFormat = homeworkFileFormat(file);
+  const limitMb = homeworkFileLimitMb(file);
+  if (Number(file.size || 0) > limitMb * 1024 * 1024) {
+    return `${fileFormat}文件不能超过 ${homeworkFileLimitLabel(limitMb)}，请压缩后重新上传。`;
+  }
+  return '';
 }
 // 学员端文案映射：状态机「已通过」在学员端展示为「已结业」，其余取值原样展示（见 05-状态字典 §7.5）。
 function learnerGraduationLabel(status) { return status === '已通过' ? '已结业' : status; }

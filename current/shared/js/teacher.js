@@ -15,11 +15,12 @@ const { venueSeed } = __classicRequire("shared/js/venue-seed.js");
 const { classRosterFor } = __classicRequire("shared/js/class-roster.js");
 const { lessonStatusOf, sessionsInScheduleOrder } = __classicRequire("shared/js/class-lifecycle.js");
 const { classAttendanceSummary, classHomeworkSummary, countedSessionsOf, lessonAttendance, lessonHomework, studentAttendanceHistory, studentAttendanceRate, studentHomeworkHistory, studentHomeworkRate } = __classicRequire("shared/js/lesson-records.js");
-const { getHomework, homeworkForLesson, homeworkLifecycleStatus, homeworkRosterDrift, listHomework, listSubmissions, publishHomework, reviewSubmission, submissionSummary, syncHomeworkNotificationReads, updateHomeworkDeadline, withdrawHomework } = __classicRequire("shared/js/homework-store.js");
+const { getHomework, homeworkForLesson, homeworkFormatOptions, homeworkLifecycleStatus, homeworkRosterDrift, listHomework, listSubmissions, publishHomework, reviewSubmission, submissionSummary, syncHomeworkNotificationReads, updateHomeworkDeadline, withdrawHomework } = __classicRequire("shared/js/homework-store.js");
 const { applicationSeed, courseIdForApplication, defaultTeacherId, teacherAccounts } = __classicRequire("shared/js/course-seed.js");
 const { syncNotificationReads } = __classicRequire("shared/js/notification-store.js");
 const { courseAgesText } = __classicRequire("shared/js/course-display.js");
 const { teacherFactsById } = __classicRequire("shared/js/teacher-facts.js");
+const { explainTeacherCapacity } = __classicRequire("shared/js/teacher-capacity.js");
 const { isMiniLoggedIn, isMiniRole, redirectMiniLogin } = __classicRequire("shared/js/mobile-guard.js");
 const { certificateSourceLabel, findDuplicateCertificate } = __classicRequire("shared/js/certificate-source.js");
 const { contractDocumentHtml } = __classicRequire("shared/js/contract-document.js");
@@ -32,6 +33,16 @@ const { TEACHER_PROFILE_EDITABLE_FIELDS: teacherProfileEditableFields, TEACHER_P
 function certificateFileSpecText() {
   const spec = fileSpecSettings();
   return `图片不超过${spec.imageMb}MB，文档不超过${spec.documentMb}MB`;
+}
+function applicationAttachmentSpecText() {
+  return `仅支持 JPG、JPEG、PNG、WebP，单张不超过${fileSpecSettings().imageMb}MB`;
+}
+function validateApplicationAttachment(file) {
+  const imageType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
+  const imageExtension = /\.(jpe?g|png|webp)$/i.test(file.name);
+  if (!imageType && !imageExtension) return '附加材料仅支持 JPG、JPEG、PNG、WebP 图片';
+  if (file.size > fileSpecSettings().imageMb * 1024 * 1024) return `附加材料不能超过${fileSpecSettings().imageMb}MB`;
+  return '';
 }
 const teacherMain = document.querySelector('.mobile-main');
 const teacherPath = location.pathname;
@@ -881,19 +892,54 @@ function classGraduationState(classItem) {
   const roster = classRosterOf(classItem);
   const pending = roster.filter((student) => !submittedNames.has(student.name));
   const allLessonsDone = Number(classItem.total || 0) > 0 && Number(classItem.completed || 0) >= Number(classItem.total || 0);
-  return { records, pending, allLessonsDone };
+  const executions = readDemoState().lessonExecutions || [];
+  const executionFor = (session) => executions.find((item) =>
+    item.id === teacherLessonKeyOf(classItem, session)
+    || (item.classId === classItem.id && Number(item.sessionIndex) === Number(session.index))
+  ) || teacherState.lessonExecutions?.[teacherLessonKeyOf(classItem, session)] || null;
+  const missingAttendanceSessions = (classItem.sessions || []).filter((session) => {
+    const execution = executionFor(session);
+    const attendance = execution?.attendance || {};
+    const submitted = execution && (execution.attendanceSaved || execution.attendanceSynced);
+    return !submitted || !roster.length || roster.some((student) => !attendance[student.name]);
+  });
+  const missingTeachingRecordSessions = (classItem.sessions || []).filter((session) => {
+    const execution = executionFor(session);
+    return !(execution && (execution.teachingRecordSaved || String(execution.teachingRecord || '').trim()));
+  });
+  const currentTime = demoDateTime(DEMO_NOW).getTime();
+  const pendingHomework = listHomework({ classId: classItem.id })
+    .filter((item) => {
+      if (item.status !== '已发布') return false;
+      const deadline = demoDateTime(item.deadline).getTime();
+      return !Number.isFinite(deadline) || deadline > currentTime;
+    });
+  return {
+    records, pending, allLessonsDone, missingAttendanceSessions, missingTeachingRecordSessions, pendingHomework,
+    recordsReady: missingAttendanceSessions.length === 0 && missingTeachingRecordSessions.length === 0,
+    homeworkReady: pendingHomework.length === 0
+  };
 }
 function teacherClassGraduationPanel(classItem) {
-  const { pending, allLessonsDone } = classGraduationState(classItem);
+  const { pending, allLessonsDone, missingAttendanceSessions, missingTeachingRecordSessions, pendingHomework, recordsReady, homeworkReady } = classGraduationState(classItem);
   const batches = teacherGraduationBatches().filter(batch => batch.records.some(record => record.classId ? record.classId === classItem.id : record.className === classItem.name));
   const list = batches.length
     ? batches.map(graduationBatchCard).join('')
     : '<div class="teacher-class-empty"><strong>暂无结业申请</strong><p>本班全部课次完成后，可在这里发起结业申请。</p></div>';
-  const applyEntry = allLessonsDone && pending.length
-    ? `<div class="teacher-class-graduation-apply"><p>本班课次已全部完成，${pending.length} 名学员可提交结业申请；提交后由教务按学员复核。</p>${tButton('发起结业申请', 'data-class-graduation-apply')}</div>`
-    : allLessonsDone && !pending.length
-      ? '<p class="teacher-class-graduation-note">本班学员均已提交结业申请，等待教务复核结果。</p>'
-      : '<p class="teacher-class-graduation-note">全部课次完成后可发起结业申请。</p>';
+  const canApply = allLessonsDone && recordsReady && homeworkReady && pending.length > 0;
+  const reasonId = `teacher-graduation-entry-reason-${classItem.id}`;
+  const entryCopy = canApply
+    ? `本班课次已全部完成，${pending.length} 名学员可提交结业申请；提交后由教务按学员复核。`
+    : !allLessonsDone
+      ? `全部课次完成后可发起结业申请（当前 ${Number(classItem.completed || 0)}/${Number(classItem.total || 0)} 次）。`
+      : missingAttendanceSessions.length
+        ? `还有 ${missingAttendanceSessions.length} 个课次未提交完整教师考勤，请先补全。`
+        : missingTeachingRecordSessions.length
+          ? `还有 ${missingTeachingRecordSessions.length} 个课次未提交教学记录，请先补全。`
+          : pendingHomework.length
+            ? `还有 ${pendingHomework.length} 份已发布作业未到提交截止时间，请等待截止后再发起。`
+      : '本班学员均已提交结业申请，等待教务复核结果。';
+  const applyEntry = `<div class="teacher-class-graduation-apply"><p id="${reasonId}">${tEsc(entryCopy)}</p>${tButton('发起结业申请', `data-class-graduation-apply aria-describedby="${reasonId}"${canApply ? '' : ' disabled'}`, canApply ? '' : 'secondary')}</div>`;
   // CR138-08：班级「已结束」只表示课次完成，与学员结业相互独立；本条说明避免把两者混为一个状态。
   const scopeNote = '<p class="teacher-class-graduation-note">班级「已结束」只表示全部课次完成，不代表每位学员已结业；学员结业按人复核，状态为审核中／已通过。</p>';
   return `<section class="teacher-class-graduation-panel" id="teacher-class-section-graduation" data-class-section="graduation"><div class="teacher-class-detail-section-head"><h3>本班结业申请</h3><span>${batches.length} 条班级申请</span></div>${scopeNote}${list}${applyEntry}</section>`;
@@ -917,7 +963,20 @@ function renderClassGraduationApply() {
     tLayout(tStack(tCard('<h2>结业申请不可用</h2><p>请从本人已结束班级的结业段进入。</p><a class="mp-button secondary" href="' + relativePath('/teacher/pages/classes.html') + '">返回我的班级</a>')));
     return;
   }
-  const { pending } = classGraduationState(classItem);
+  const { pending, allLessonsDone, missingAttendanceSessions, missingTeachingRecordSessions, pendingHomework, recordsReady, homeworkReady } = classGraduationState(classItem);
+  const blockedReason = !allLessonsDone
+    ? `本班课次尚未全部完成，当前完成 ${Number(classItem.completed || 0)}/${Number(classItem.total || 0)} 次。`
+    : missingAttendanceSessions.length
+      ? `还有 ${missingAttendanceSessions.length} 个课次未提交完整教师考勤。`
+      : missingTeachingRecordSessions.length
+        ? `还有 ${missingTeachingRecordSessions.length} 个课次未提交教学记录。`
+        : pendingHomework.length
+          ? `还有 ${pendingHomework.length} 份已发布作业未到提交截止时间。`
+          : !pending.length ? '本班学员均已提交结业申请。' : '';
+  if (!allLessonsDone || !recordsReady || !homeworkReady) {
+    tLayout(tStack(tCard(`<h2>结业申请暂不可发起</h2><p>${tEsc(blockedReason)}</p><a class="mp-button secondary" href="${relativePath(`/teacher/pages/class-overview.html?class=${encodeURIComponent(classItem.id)}&tab=graduation`)}">返回班级详情</a>`)));
+    return;
+  }
   if (!pending.length) {
     tLayout(tStack(tCard(`<h2>暂无待提交学员</h2><p>本班学员均已提交结业申请。</p><a class="mp-button secondary" href="${relativePath(`/teacher/pages/class-overview.html?class=${encodeURIComponent(classItem.id)}&tab=graduation`)}">返回班级详情</a>`)));
     return;
@@ -1243,9 +1302,13 @@ function renderApplications() {
 function renderApplicationCreate() {
   const requestedId = new URLSearchParams(location.search).get('application');
   const teacherProfile = currentTeacher();
-  const source = requestedId ? currentApplication() : { id: '', name: '', professional: teacherProfile.professional, type: '面授课程', hours: 16, intro: '', file: '' };
+  const teacherFacts = teacherFactsById(currentTeacherIdForDemo());
+  const allowedMajors = [...new Set((teacherFacts?.majors?.length ? teacherFacts.majors : [teacherProfile.professional]).filter(Boolean))];
+  const defaultMajor = allowedMajors.includes(teacherProfile.professional) ? teacherProfile.professional : allowedMajors[0];
+  const source = requestedId ? currentApplication() : { id: '', name: '', professional: defaultMajor, type: '面授课程', hours: 16, intro: '', file: '' };
+  const selectedMajor = allowedMajors.includes(source.professional) ? source.professional : defaultMajor;
   const editing = Boolean(requestedId);
-  tLayout(tStack(`<section class="teacher-application-detail-head"><div>${tPill(editing ? '编辑中' : '新申报')}<h2>${editing ? '编辑课程申报' : '发起课程申报'}</h2><p>教师资料由系统自动带入，课程信息请完整填写。</p></div></section>`, `<section class="teacher-application-form"><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>系统带入</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(teacherProfile.name)}</strong></div><div><span>教师工号</span><strong>${tEsc(teacherProfile.no)}</strong></div><div><span>教学单位</span><strong>${tEsc(teacherProfile.unit)}</strong></div><div><span>专业方向</span><strong>${tEsc(teacherProfile.professional)}</strong></div><div><span>职称</span><strong>${tEsc(teacherProfile.title)}</strong></div></div></div><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>申报内容</h3><span>带 * 为必填</span></div><div class="mp-form"><div class="mp-field"><label for="application-name">课程名称 <b>*</b></label><input id="application-name" value="${tEsc(source.name)}" maxlength="100" placeholder="请输入课程名称"></div><div class="mp-field"><label>所属专业 <b>*</b><small>按门类、分类、专业逐级选择</small></label><div class="teacher-professional-cascade"><select id="application-discipline" aria-label="专业门类"><option>艺术学</option><option>教育学</option></select><select id="application-category" aria-label="专业分类"><option>舞蹈类</option><option>音乐类</option></select><select id="application-professional" aria-label="专业">${[...new Set([teacherProfile.professional, '舞蹈表演', '音乐表演', '音乐学'])].map(name => `<option ${source.professional === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div></div><div class="mp-field"><label>课程类型 <b>*</b></label><div class="teacher-radio-row"><label><input type="radio" name="application-type" value="面授课程" ${source.type === '面授课程' ? 'checked' : ''}>面授课程</label><label><input type="radio" name="application-type" value="视频课程" ${source.type === '视频课程' ? 'checked' : ''}>视频课程</label></div></div><div class="mp-field" id="application-hours-field"><label for="application-hours">总课时 <b>*</b><small>面授课程用于生成课次和工资统计</small></label><input id="application-hours" type="number" min="1" value="${tEsc(source.hours || 16)}" placeholder="请输入总课时"></div><div class="mp-field"><label for="application-difficulty">难度等级 <b>*</b><small>学员端卡片与筛选按此展示</small></label><select id="application-difficulty"><option value="">请选择难度等级</option>${dictionaryItems('course_difficulty').map(value => `<option ${source.difficulty === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div><div class="mp-field"><label>适合年龄 <b>*</b><small>可多选</small></label><div class="teacher-radio-row">${dictionaryItems('suitable_age').map(value => `<label><input type="checkbox" name="application-age" value="${value}" ${(source.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div><div class="mp-field"><label for="application-intro">课程简介</label><textarea id="application-intro" placeholder="补充课程目标、教学内容和适合人群">${tEsc(source.intro)}</textarea></div><div class="mp-field"><label for="application-file">附加材料</label><input type="file" id="application-file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.png"><small class="mp-muted" id="application-file-name">${source.file ? `已选择：${tEsc(source.file)}` : '尚未选择文件'}</small></div></div></div><div class="teacher-application-form-actions"><a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">取消</a>${tButton('提交审核', 'data-application-form-action="submit"')}</div></section>`));
+  tLayout(tStack(`<section class="teacher-application-detail-head"><div>${tPill(editing ? '编辑中' : '新申报')}<h2>${editing ? '编辑课程申报' : '发起课程申报'}</h2><p>教师资料由系统自动带入，课程信息请完整填写。</p></div></section>`, `<section class="teacher-application-form"><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>教师信息</h3><span>系统带入</span></div><div class="teacher-readonly-grid"><div><span>教师姓名</span><strong>${tEsc(teacherProfile.name)}</strong></div><div><span>教师工号</span><strong>${tEsc(teacherProfile.no)}</strong></div><div><span>教学单位</span><strong>${tEsc(teacherProfile.unit)}</strong></div><div><span>专业方向</span><strong>${tEsc(teacherProfile.professional)}</strong></div><div><span>职称</span><strong>${tEsc(teacherProfile.title)}</strong></div></div></div><div class="teacher-form-section"><div class="teacher-form-section-head"><h3>申报内容</h3><span>带 * 为必填</span></div><div class="mp-form"><div class="mp-field"><label for="application-name">课程名称 <b>*</b></label><input id="application-name" value="${tEsc(source.name)}" maxlength="100" placeholder="请输入课程名称"></div><div class="mp-field"><label>所属专业 <b>*</b><small>仅可选择本人授课专业</small></label><div class="teacher-professional-cascade"><select id="application-discipline" aria-label="专业门类"><option>艺术学</option><option>教育学</option></select><select id="application-category" aria-label="专业分类"><option>舞蹈类</option><option>音乐类</option></select><select id="application-professional" aria-label="专业">${allowedMajors.map(name => `<option ${selectedMajor === name ? 'selected' : ''}>${tEsc(name)}</option>`).join('')}</select></div></div><div class="mp-field"><label>课程类型 <b>*</b></label><div class="teacher-radio-row"><label><input type="radio" name="application-type" value="面授课程" ${source.type === '面授课程' ? 'checked' : ''}>面授课程</label><label><input type="radio" name="application-type" value="视频课程" ${source.type === '视频课程' ? 'checked' : ''}>视频课程</label></div></div><div class="mp-field" id="application-hours-field"><label for="application-hours">总课时 <b>*</b><small>面授课程用于生成课次和工资统计</small></label><input id="application-hours" type="number" min="1" value="${tEsc(source.hours || 16)}" placeholder="请输入总课时"></div><div class="mp-field"><label for="application-difficulty">难度等级 <b>*</b><small>学员端卡片与筛选按此展示</small></label><select id="application-difficulty"><option value="">请选择难度等级</option>${dictionaryItems('course_difficulty').map(value => `<option ${source.difficulty === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div><div class="mp-field"><label>适合年龄 <b>*</b><small>可多选</small></label><div class="teacher-radio-row">${dictionaryItems('suitable_age').map(value => `<label><input type="checkbox" name="application-age" value="${value}" ${(source.ages || []).includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div><div class="mp-field"><label for="application-intro">课程简介</label><textarea id="application-intro" placeholder="补充课程目标、教学内容和适合人群">${tEsc(source.intro)}</textarea></div><div class="mp-field"><label for="application-file">附加材料</label><input type="file" id="application-file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" aria-describedby="application-file-hint"><small class="mp-muted" id="application-file-name">${source.file ? `已选择：${tEsc(source.file)}` : '尚未选择图片'}</small><small class="mp-muted" id="application-file-hint">${applicationAttachmentSpecText()}</small></div></div></div><div class="teacher-application-form-actions"><a class="mp-button secondary" href="${relativePath('/teacher/pages/applications.html')}">取消</a>${tButton('提交审核', 'data-application-form-action="submit"')}</div></section>`));
 }
 function applicationReviewCopy(item) {
   if (item.status === '待审核') return ['等待教研审核', '申报已提交，审核期间课程内容不可修改。'];
@@ -1291,7 +1354,15 @@ function validateApplication() {
   const type = document.querySelector('[name="application-type"]:checked')?.value;
   const hours = Number(document.querySelector('#application-hours')?.value);
   if (!name) { tToast('请输入课程名称'); return false; }
-  if (!document.querySelector('#application-professional')?.value) { tToast('请选择所属专业'); return false; }
+  const professional = document.querySelector('#application-professional')?.value;
+  if (!professional) { tToast('请选择所属专业'); return false; }
+  const facts = teacherFactsById(currentTeacherIdForDemo());
+  if (!facts) { tToast('未找到当前教师档案，无法提交申报'); return false; }
+  const capacity = explainTeacherCapacity(facts, { purpose: 'apply', major: professional });
+  if (capacity.status === 'blocked') {
+    tToast(capacity.blocks.map(block => block.text).join('；'));
+    return false;
+  }
   if (type === '面授课程' && hours < 1) { tToast('面授课程请输入有效总课时'); return false; }
   if (!document.querySelector('#application-difficulty')?.value) { tToast('请选择难度等级'); return false; }
   if (!document.querySelectorAll('[name="application-age"]:checked').length) { tToast('请选择适合年龄'); return false; }
@@ -1311,7 +1382,12 @@ function initApplicationForm() {
   radios.forEach(radio => radio.addEventListener('change', syncHours));
   const submitApplication = () => {
     if (!validateApplication()) return;
-    const pickedFile = document.querySelector('#application-file')?.files?.[0]?.name || '';
+    const pickedFileRecord = document.querySelector('#application-file')?.files?.[0] || null;
+    if (pickedFileRecord) {
+      const attachmentError = validateApplicationAttachment(pickedFileRecord);
+      if (attachmentError) { tToast(attachmentError); return; }
+    }
+    const pickedFile = pickedFileRecord?.name || '';
     const id = new URLSearchParams(location.search).get('application');
     const existing = id ? currentApplication() : null;
     const teacherProfile = currentTeacher();
@@ -1360,7 +1436,16 @@ function initApplicationForm() {
   const fileNameNode = document.querySelector('#application-file-name');
   fileInput?.addEventListener('change', event => {
     const picked = event.target.files && event.target.files[0];
-    if (fileNameNode) fileNameNode.textContent = picked ? `已选择：${picked.name}` : '尚未选择文件';
+    if (picked) {
+      const attachmentError = validateApplicationAttachment(picked);
+      if (attachmentError) {
+        fileInput.value = '';
+        if (fileNameNode) fileNameNode.textContent = '尚未选择图片';
+        tToast(attachmentError);
+        return;
+      }
+    }
+    if (fileNameNode) fileNameNode.textContent = picked ? `已选择：${picked.name}` : '尚未选择图片';
   });
 }
 function initApplicationDetail() {
@@ -1993,7 +2078,7 @@ function defaultHomeworkDeadlineValue() {
 }
 function teacherHomeworkFormMarkup(classItem) {
   const resources = teachingResourcesForClass(classItem);
-  return `<form class="teacher-homework-page-form" id="lesson-homework-form"><div class="teacher-homework-form"><div class="mp-field"><label for="homework-title">作业标题 <b>*</b></label><input id="homework-title" maxlength="50" required placeholder="例如：第8次课身韵组合练习"></div><div class="mp-field"><label for="homework-description">作业描述 <b>*</b></label><textarea id="homework-description" maxlength="2000" rows="8" required placeholder="说明练习内容和提交要求（≤2000 字）"></textarea></div><div class="teacher-homework-form-grid"><div class="mp-field"><label for="homework-type">作业类型 <b>*</b></label><select id="homework-type" required><option value="">请选择</option><option>练习视频</option><option>乐谱练习</option><option>绘画作品</option><option>文字报告</option><option>其他</option></select></div><div class="mp-field"><label for="homework-deadline">截止时间 <b>*</b></label><input id="homework-deadline" type="datetime-local" value="${defaultHomeworkDeadlineValue()}" required><small class="mp-muted">默认按系统参数设置为发布后 ${homeworkDeadlineSettings().deadlineHours} 小时，可按本次作业调整。</small></div></div><fieldset class="teacher-homework-formats"><legend>提交格式 <b>*</b></legend>${['图片', '视频', '音频', '文字', 'PDF'].map(format => `<label><input type="checkbox" name="homework-format" value="${format}">${format}</label>`).join('')}</fieldset><label class="teacher-homework-required"><span><strong>设为必交作业</strong><small>开启后计入作业提交率</small></span><input type="checkbox" id="homework-required" checked></label><fieldset class="teacher-homework-resources"><legend>参考资料 <span>选填</span></legend>${resources.map((resource) => `<label title="${tEsc(resource.type)} · ${tEsc(resource.major)}"><input type="checkbox" name="homework-resource" value="${tEsc(resource.name)}" data-resource-id="${tEsc(resource.id)}">${tEsc(resource.name)}<small>${tEsc(resource.type)} · ${tEsc(resource.major)} · ${tEsc(resource.level)}</small></label>`).join('')}</fieldset></div><p class="mp-form-error" data-homework-error hidden></p><div class="teacher-homework-page-actions"><button type="submit" class="mp-button">发布作业</button></div></form>`;
+  return `<form class="teacher-homework-page-form" id="lesson-homework-form"><div class="teacher-homework-form"><div class="mp-field"><label for="homework-title">作业标题 <b>*</b></label><input id="homework-title" maxlength="50" required placeholder="例如：第8次课身韵组合练习"></div><div class="mp-field"><label for="homework-description">作业描述 <b>*</b></label><textarea id="homework-description" maxlength="2000" rows="8" required placeholder="说明练习内容和提交要求（≤2000 字）"></textarea></div><div class="teacher-homework-form-grid"><div class="mp-field"><label for="homework-type">作业类型 <b>*</b></label><select id="homework-type" required><option value="">请选择</option><option>练习视频</option><option>乐谱练习</option><option>绘画作品</option><option>文字报告</option><option>其他</option></select></div><div class="mp-field"><label for="homework-deadline">截止时间 <b>*</b></label><input id="homework-deadline" type="datetime-local" value="${defaultHomeworkDeadlineValue()}" required><small class="mp-muted">默认按系统参数设置为发布后 ${homeworkDeadlineSettings().deadlineHours} 小时，可按本次作业调整。</small></div></div><fieldset class="teacher-homework-formats"><legend>提交格式 <b>*</b></legend>${homeworkFormatOptions().map(format => `<label><input type="checkbox" name="homework-format" value="${format}">${format}</label>`).join('')}</fieldset><label class="teacher-homework-required"><span><strong>设为必交作业</strong><small>开启后计入作业提交率</small></span><input type="checkbox" id="homework-required" checked></label><fieldset class="teacher-homework-resources"><legend>参考资料 <span>选填</span></legend>${resources.map((resource) => `<label title="${tEsc(resource.type)} · ${tEsc(resource.major)}"><input type="checkbox" name="homework-resource" value="${tEsc(resource.name)}" data-resource-id="${tEsc(resource.id)}">${tEsc(resource.name)}<small>${tEsc(resource.type)} · ${tEsc(resource.major)} · ${tEsc(resource.level)}</small></label>`).join('')}</fieldset></div><p class="mp-form-error" data-homework-error hidden></p><div class="teacher-homework-page-actions"><button type="submit" class="mp-button">发布作业</button></div></form>`;
 }
 function renderTeacherHomeworkPage(classItem, session) {
   tLayout(`<div class="teacher-homework-page">${tStack(`<section class="teacher-homework-page-head"><div><span>课后任务</span><h2>发布作业</h2><p>${tEsc(classItem.name)} · 第 ${tEsc(session.index)} 次课</p></div></section>`, `<section class="teacher-homework-page-card"><div class="teacher-homework-page-card-head"><div><span>${tEsc(classItem.course)}</span><h3>填写作业内容</h3></div><span class="mp-pill gray">发布后推送至学员端</span></div>${teacherHomeworkFormMarkup(classItem)}</section>`)}</div>`);
@@ -2028,7 +2113,7 @@ function renderTeacherHomeworkPage(classItem, session) {
       sharedRecord = publishHomework(homeworkRecord);
     } catch (publishError) {
       error.hidden = false;
-      error.textContent = publishError?.message === 'HOMEWORK_DEADLINE_INVALID' ? '截止时间必须晚于当前时间。' : publishError?.message === 'HOMEWORK_DEADLINE_MUST_EXCEED_24_HOURS' ? '截止时间必须至少晚于发布时刻 24 小时。' : publishError?.message === 'HOMEWORK_LESSON_ALREADY_PUBLISHED' ? '本课次已发布作业，当前仅支持每课次 1 个作业。' : publishError?.message === 'HOMEWORK_OPERATOR_FORBIDDEN' ? '当前教师无权在该班级发布作业。' : '作业发布失败，请稍后重试。';
+      error.textContent = publishError?.message === 'HOMEWORK_DEADLINE_INVALID' ? '截止时间必须晚于当前时间。' : publishError?.message === 'HOMEWORK_DEADLINE_MUST_EXCEED_24_HOURS' ? '截止时间必须至少晚于发布时刻 24 小时。' : publishError?.message === 'HOMEWORK_LESSON_ALREADY_PUBLISHED' ? '本课次已发布作业，当前仅支持每课次 1 个作业。' : publishError?.message === 'HOMEWORK_OPERATOR_FORBIDDEN' ? '当前教师无权在该班级发布作业。' : publishError?.message === 'HOMEWORK_FORMAT_INVALID' ? '提交格式仅支持文本、图片、视频。' : '作业发布失败，请稍后重试。';
       return;
     }
     teacherState.lesson.homework = Array.isArray(teacherState.lesson.homework)

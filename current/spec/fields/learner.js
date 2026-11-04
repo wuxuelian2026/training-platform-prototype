@@ -86,17 +86,18 @@ const LEARNER_APP_FIELD_SPEC = {
     'learner/homework': {
       groups: [
         { heading: '作业提交字段', fields: [
-          { id: 'FD-LAPP-018', label: '作业说明', type: '文本', length: '≤ 500 字', required: '条件必填', note: '与附件至少填写一项；与附件同时为空时不可提交', constraints: { maxLength: 500 } },
-          { id: 'FD-LAPP-019', label: '附件', type: '文件', length: '按发布时选择的提交格式（图片 / 视频 / 音频 / PDF）', required: '条件必填', note: '与作业说明至少填写一项；可选格式以本次作业发布的提交格式为准；原型只记录文件名，不上传真实文件', constraints: { fileTypes: ['图片', '视频', '音频', 'PDF'], sourceField: 'FD-TAPP-009' } },
+          { id: 'FD-LAPP-018', label: '文本内容', type: '多行文本', length: '≤ 500 字', required: '文本格式必填', note: '仅在教师选择“文本”时展示；最多 500 字，其他格式不能以文本替代对应文件提交', constraints: { maxLength: 500, requiredWhen: 'formats.includes("文本")' } },
+          { id: 'FD-LAPP-019', label: '图片／视频', type: '文件', length: '按发布时选择的提交格式', required: '文件格式必填', note: '仅展示并接受教师已选的图片、视频格式；图片支持 JPG／JPEG／PNG／GIF／WebP，视频支持 MP4／MOV／AVI／M4V／WebM；大小上限分别读取后台图片、视频上传参数', constraints: { fileTypes: ['图片', '视频'], sourceField: 'FD-TAPP-009', maxFiles: 1, extensions: { 图片: ['jpg', 'jpeg', 'png', 'gif', 'webp'], 视频: ['mp4', 'mov', 'avi', 'm4v', 'webm'] }, sizeParams: { 图片: 'imageMb', 视频: 'videoMb' } } },
           { id: 'FD-LAPP-020', label: '提交状态', type: '只读', length: '未提交 / 草稿 / 已提交 / 已点评', required: '系统展示', note: '保存草稿不进入批阅；提交后进入教师批阅队列；教师点评后为已点评且学员端不可再编辑', constraints: { readOnly: true, system: true } },
           { id: 'FD-LAPP-021', label: '教师评语', type: '只读', length: '≤ 500 字', required: '系统展示', note: '批阅完成后展示，学员端不提供编辑入口', constraints: { readOnly: true, system: true } }
         ] }
       ],
       notes: [
         '作业标题、作业要求与截止时间来自教师端发布记录，学员端不可修改。',
-        '作业说明与附件至少填写一项；保存草稿不校验、不进入批阅；截止时间后不可提交。',
+        '只展示教师选择格式对应的提交控件与规格提示；文本最多 500 字，图片与视频分别展示扩展名和系统参数中的大小上限；不支持音频、文档或 PDF。',
+        '已选格式对应的内容至少填写一项；保存草稿也要通过格式、大小与文本长度校验，但不进入批阅；截止时间后不可提交。',
         '未提交的必交作业影响结业判定；提交后由授课教师批阅并给出评语。',
-        '原型只记录所选附件文件名，不做真实文件上传与内容校验。'
+        '原型只记录所选图片或视频文件名，不做真实文件上传与内容校验。'
       ]
     },
 

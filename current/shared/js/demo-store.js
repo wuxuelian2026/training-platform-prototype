@@ -115,6 +115,14 @@ function migrateCourseApplicationStatusLabel(state) {
   return changed;
 }
 
+// 2026-10-28：作业视频上传上限统一提高到 10GB；旧演示状态按一次性迁移升级，避免沿用 500MB 旧默认值。
+function migrateHomeworkVideoLimit(state) {
+  if (state.fileSpecVideoLimitVersion === 1) return false;
+  state.fileSpecVideoLimitVersion = 1;
+  state.fileSpecSettings = { ...(state.fileSpecSettings || {}), videoMb: 10240 };
+  return true;
+}
+
 function migrateLegacyClassDemoData(state) {
   let changed = false;
   const hasLegacyClassId = (record) => LEGACY_CLASS_DEMO_IDS.has(record?.classId) || LEGACY_CLASS_DEMO_IDS.has(record?.id);
@@ -272,7 +280,8 @@ const defaultState = () => ({
   // CR-2026-104：待支付订单支付时限由「参数配置」维护（默认 30 分钟）。
   orderSettings: { paymentTimeoutMinutes: 30 },
   // CR-2026-104：文件上传规格由「参数配置」维护（图片／文档／视频 MB，教学资源库 GB）。
-  fileSpecSettings: { imageMb: 10, documentMb: 50, videoMb: 500, resourceGb: 100 },
+  fileSpecSettings: { imageMb: 10, documentMb: 50, videoMb: 10240, resourceGb: 100 },
+  fileSpecVideoLimitVersion: 1,
   // CR-2026-104：消息失败重试策略由「参数配置」维护（次数 + 间隔分钟序列）。
   messageRetrySettings: { maxAttempts: 3, intervalsMinutes: [5, 30, 120] },
   // CR-2026-112：证书到期提醒窗口由后台参数配置，只允许 7／15／30／60，默认 30 天；
@@ -319,6 +328,7 @@ function readStored() {
     // CR-2026-103：课时时长由「参数配置」迁到「数据字典」——必须在与默认值合并之前迁移，
     // 否则默认字典会先填满 dataDictionary，旧配置被静默丢弃。
     const lessonDurationMigrated = migrateLessonDurationToDictionary(stored);
+    const homeworkVideoLimitMigrated = migrateHomeworkVideoLimit(stored);
     const base = defaultState();
     const merged = { ...base, ...stored, schemaVersion: SCHEMA_VERSION, accounts: stored.accounts || base.accounts, students: stored.students || base.students };
     // The repaired payload is written back once so the migrated ids are what the browser actually holds.
@@ -329,7 +339,7 @@ function readStored() {
     const legacyClassDemoMigrated = migrateLegacyClassDemoData(merged);
     const teachingDemoLinksMigrated = migrateTeachingDemoLinks(merged);
     const historicalExecutionsMigrated = migrateHistoricalLessonExecutions(merged);
-    if (courseReferencesMigrated || arrangeStatusMigrated || applicationStatusMigrated || displayMigrated || legacyClassDemoMigrated || teachingDemoLinksMigrated || historicalExecutionsMigrated || lessonDurationMigrated) {
+    if (courseReferencesMigrated || arrangeStatusMigrated || applicationStatusMigrated || displayMigrated || legacyClassDemoMigrated || teachingDemoLinksMigrated || historicalExecutionsMigrated || lessonDurationMigrated || homeworkVideoLimitMigrated) {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* private mode: in-memory migration still applies. */ }
     }
     return merged;
@@ -401,7 +411,7 @@ function fileSpecSettings() {
   return {
     imageMb: clampInt(settings.imageMb ?? 10, 1, 1024, 10),
     documentMb: clampInt(settings.documentMb ?? 50, 1, 1024, 50),
-    videoMb: clampInt(settings.videoMb ?? 500, 1, 10240, 500),
+    videoMb: clampInt(settings.videoMb ?? 10240, 1, 10240, 10240),
     resourceGb: clampInt(settings.resourceGb ?? 100, 1, 10240, 100)
   };
 }

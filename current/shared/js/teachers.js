@@ -9,12 +9,13 @@ const { demoId, demoTime, fileSpecSettings, readDemoState, upsertDemoRecord, wri
 const { contractDocumentHtml } = __classicRequire("shared/js/contract-document.js");
 const { finalContractFileName } = __classicRequire("shared/js/contract-terms.js");
 const { readXlsxSheetRows } = __classicRequire("shared/js/xlsx-lite.js");
-const { teacherFactsById } = __classicRequire("shared/js/teacher-facts.js");
-const { classSeed } = __classicRequire("shared/js/class-seed.js");
+const { TEACHER_FACTS, teacherFactsById } = __classicRequire("shared/js/teacher-facts.js");
+const { explainTeacherCapacity } = __classicRequire("shared/js/teacher-capacity.js");
+const { mergeClassSeed } = __classicRequire("shared/js/class-seed.js");
+const { lessonStatusOf } = __classicRequire("shared/js/class-lifecycle.js");
 const { certificateDedupKey, findDuplicateCertificate } = __classicRequire("shared/js/certificate-source.js");
 const { permissionsOfRole } = __classicRequire("shared/js/permissions.js");
 const { TEACHER_PROFILE_EDITABLE_FIELDS, TEACHER_PROFILE_LABELS, teacherProfileMask } = __classicRequire("shared/js/teacher-profile-fields.js");
-const { explainTeacherCapacity, summarizeTeacherCapacity } = __classicRequire("shared/js/teacher-capacity.js");
 const { machinesForPage, stateLabelsOf } = __classicRequire("spec/states/index.js");
 const { DEMO_TODAY } = __classicRequire("shared/js/demo-clock.js");
 
@@ -23,6 +24,7 @@ const teacherPage = teacherRoot?.dataset.teacherPage;
 // CR-2026-046 §4：合同域期限派生使用固定演示基准日，与教师端课表 `2026-09-12` 一致，避免 Mock 随时间漂移。
 const CONTRACT_DEMO_TODAY = DEMO_TODAY;
 let activeTeacherRow = null;
+let activeResignationHandoff = null;
 let activeContractRow = null;
 let toastTimer;
 let importedTeacherCount = 0;
@@ -58,13 +60,104 @@ const tagClass = (value) => ({
 
 function statusTag(value) { return `<span class="tag ${tagClass(value)}">${value}</span>`; }
 
+const clockMinutes = value => {
+  const [hour, minute] = String(value || '00:00').split(':').map(Number);
+  return hour * 60 + minute;
+};
+
+function resignationSessionsOverlap(left, right) {
+  if (!left?.date || left.date !== right?.date) return false;
+  const leftStart = clockMinutes(left.startTime || left.start);
+  const leftEnd = clockMinutes(left.endTime || left.end);
+  const rightStart = clockMinutes(right.startTime || right.start);
+  const rightEnd = clockMinutes(right.endTime || right.end);
+  return leftStart < rightEnd && rightStart < leftEnd;
+}
+
+function resignationHandoffPlan(teacherName, departureDate) {
+  const classes = mergeClassSeed(readDemoState().classes || []).filter(item => !item.cancelled && item.status !== '已取消');
+  const groups = classes.map(classRecord => {
+    const sessions = (classRecord.sessions || []).filter(session => {
+      const assignedTeacher = session.teacher || classRecord.teacher;
+      return assignedTeacher === teacherName && String(session.date || '') >= departureDate && lessonStatusOf(session) === '待上课';
+    });
+    return sessions.length ? { classRecord, sessions } : null;
+  }).filter(Boolean);
+  const ongoing = classes.reduce((count, classRecord) => count + (classRecord.sessions || []).filter(session =>
+    (session.teacher || classRecord.teacher) === teacherName && lessonStatusOf(session) === '上课中').length, 0);
+  const candidatesFor = group => TEACHER_FACTS
+    .filter(facts => facts.name !== teacherName && facts.profileStatus === '已建档' && facts.accountStatus === 'active' && !facts.departedAt)
+    .map(facts => {
+      const reason = [];
+      group.sessions.some(session => {
+        const eligibility = explainTeacherCapacity(facts, {
+          purpose: 'arrange', major: group.classRecord.professional || group.classRecord.major,
+          course: group.classRecord.course, date: session.date
+        });
+        if (eligibility.status === 'blocked') reason.push(...eligibility.blocks.map(item => item.text));
+        return eligibility.status === 'blocked';
+      });
+      const conflict = classes.some(otherClass => otherClass.id !== group.classRecord.id
+        && (otherClass.sessions || []).some(session => (session.teacher || otherClass.teacher) === facts.name
+          && group.sessions.some(target => resignationSessionsOverlap(target, session))));
+      if (conflict) reason.push('与现有课次时间冲突');
+      return { facts, available: !reason.length, reason: [...new Set(reason)].join('；') };
+    })
+    .sort((left, right) => Number(right.available) - Number(left.available) || left.facts.name.localeCompare(right.facts.name, 'zh-CN'));
+  return {
+    classes,
+    groups: groups.map(group => ({ ...group, candidates: candidatesFor(group) })),
+    ongoing,
+    sessionCount: groups.reduce((count, group) => count + group.sessions.length, 0),
+    studentCount: groups.reduce((count, group) => count + Number(group.classRecord.enrolled || 0), 0)
+  };
+}
+
+function renderResignationHandoff(teacherName, departureDate) {
+  const section = document.querySelector('#teacher-handoff-section');
+  const summary = document.querySelector('#teacher-handoff-summary');
+  const list = document.querySelector('#teacher-handoff-list');
+  const status = document.querySelector('#teacher-handoff-status');
+  const confirm = document.querySelector('#teacher-action-confirm');
+  if (!section || !summary || !list || !status || !confirm) return;
+  const plan = resignationHandoffPlan(teacherName, departureDate);
+  activeResignationHandoff = plan;
+  section.hidden = false;
+  summary.innerHTML = `<div><span>待交接班级</span><strong>${plan.groups.length}</strong></div><div><span>待上课次</span><strong>${plan.sessionCount}</strong></div><div><span>班级学员合计</span><strong>${plan.studentCount}</strong></div>${plan.ongoing ? `<div><span>进行中课次</span><strong>${plan.ongoing}</strong><small>仍由原教师完成</small></div>` : ''}`;
+  if (!plan.groups.length) {
+    status.textContent = '无需交接';
+    status.className = 'tag green';
+    list.innerHTML = '<div class="teacher-handoff-empty"><strong>离职生效日之后没有待上课次</strong><span>历史课次和已完成记录保持原教师归属。</span></div>';
+    confirm.disabled = false;
+    return;
+  }
+  let unresolved = 0;
+  list.innerHTML = plan.groups.map((group, groupIndex) => {
+    const first = group.sessions[0];
+    const last = group.sessions.at(-1);
+    const available = group.candidates.filter(item => item.available);
+    const reasons = group.candidates.filter(item => !item.available).slice(0, 2).map(item => `${item.facts.name}：${item.reason}`);
+    if (!available.length) unresolved += 1;
+    const autoTeacher = available.length === 1 ? available[0].facts.name : '';
+    return `<section class="teacher-handoff-row" data-handoff-class="${importEsc(group.classRecord.id)}"><div class="teacher-handoff-course"><strong>${importEsc(group.classRecord.name)}</strong><span>${importEsc(group.classRecord.course)} · ${importEsc(group.classRecord.professional || group.classRecord.major || '未关联专业')}</span><small>${group.sessions.length} 节 · ${importEsc(first.date)} 至 ${importEsc(last.date)} · 学员 ${Number(group.classRecord.enrolled || 0)} 人</small></div><label class="form-field"><span>接替教师 <b class="required-mark">*</b></span><select data-handoff-teacher="${importEsc(group.classRecord.id)}" ${available.length ? '' : 'disabled'}><option value="">${available.length ? '请选择接替教师' : '暂无符合条件教师'}</option>${available.map(item => `<option value="${importEsc(item.facts.name)}" ${autoTeacher === item.facts.name ? 'selected' : ''}>${importEsc(item.facts.name)}</option>`).join('')}</select>${reasons.length ? `<small>不可选：${importEsc(reasons.join('；'))}</small>` : '<small>已校验专业、证书、合同与时间冲突</small>'}</label></section>`;
+  }).join('');
+  status.textContent = unresolved ? `${unresolved} 个班级待补教师` : '待确认接替教师';
+  status.className = `tag ${unresolved ? 'red' : 'amber'}`;
+  const updateConfirmState = () => {
+    const selects = [...list.querySelectorAll('[data-handoff-teacher]')];
+    confirm.disabled = selects.some(select => !select.value);
+  };
+  list.querySelectorAll('[data-handoff-teacher]').forEach(select => select.addEventListener('change', updateConfirmState));
+  updateConfirmState();
+}
+
 function confirmTeacherAction(row, action) {
   activeTeacherRow = row;
   const teacher = row.dataset.teacher;
   const copy = {
     freeze: ['冻结教师账号', '确认冻结该教师账号？仅账号状态变为冻结，资料、人员、证书、合同和历史记录不变。', '确认冻结'],
     unfreeze: ['解冻教师账号', '确认解冻该教师账号？', '确认解冻'],
-    resign: ['办理教师离职', '确认办理离职？离职日期必填，默认当天。办理后教师无法登录或新增未来排课，但账号、资料、证书、合同与历史记录不被改写。', '确认离职']
+    resign: ['办理教师离职', '先确认离职信息并完成教学交接。历史课次保留原教师，离职生效日后的待上课次转交接替教师。', '确认离职']
   }[action];
   if (!copy) return;
   text('teacher-action-title', copy[0]);
@@ -72,14 +165,28 @@ function confirmTeacherAction(row, action) {
   text('teacher-action-teacher', `${teacher} · ${row.dataset.employeeNo}`);
   const confirm = document.querySelector('#teacher-action-confirm');
   if (confirm) { confirm.dataset.action = action; confirm.textContent = copy[2]; }
-  // 离职日期只在办理离职时出现，默认当天、允许改期（CR-2026-021）。
-  const dateField = document.querySelector('#teacher-action-date-field');
+  const confirmButton = document.querySelector('#teacher-action-confirm');
+  const resignFields = document.querySelector('#teacher-resign-fields');
+  const handoffSection = document.querySelector('#teacher-handoff-section');
+  // 离职日期和原因只在办理离职时出现，默认当天、允许改期。
+  const dateField = document.querySelector('#teacher-resign-fields');
   const dateInput = document.querySelector('#teacher-action-date');
-  if (dateField && dateInput) {
+  const reasonInput = document.querySelector('#teacher-action-reason');
+  if (dateField && dateInput && resignFields && handoffSection) {
     const needDate = action === 'resign';
-    dateField.hidden = !needDate;
+    resignFields.hidden = !needDate;
+    handoffSection.hidden = !needDate;
     dateInput.required = needDate;
-    if (needDate) dateInput.value = DEMO_TODAY;
+    if (reasonInput) reasonInput.required = needDate;
+    if (confirmButton) confirmButton.disabled = false;
+    if (needDate) {
+      dateInput.value = DEMO_TODAY;
+      dateInput.min = DEMO_TODAY;
+      if (reasonInput) reasonInput.value = '';
+      renderResignationHandoff(teacher, DEMO_TODAY);
+    } else {
+      activeResignationHandoff = null;
+    }
   }
   openDialog('teacher-action-dialog');
 }
@@ -95,75 +202,7 @@ function updateTeacherRow(row, action) {
   if (action === 'resign') {
     row.dataset.departedAt = String(document.querySelector('#teacher-action-date')?.value || '').trim() || DEMO_TODAY;
   }
-  renderTeacherCapability(row);
   renderTeacherActions(row, actionCell);
-}
-
-// 视图层：教师列表只回答「可授课几个专业、哪些专业有有效资质、档案与账号是否异常」，
-// 不再输出教师级“可排课”结论——那个结论只在具体（专业 × 课次日期）下成立。
-// CR-2026-029／030：授课专业与有效资质合并为一列（专业方向 + 有效资质 x/y）；
-// 当前能力独立成列，展示可申报／可排课／暂停使用，与教师详情页的能力结论同源。
-function renderTeacherCredential(row, summary) {
-  const cell = row.querySelector('[data-cell="credential"]');
-  if (!cell) return;
-  const tone = summary.qualifiedCount === summary.majorCount ? 'green' : summary.qualifiedCount ? 'amber' : 'red';
-  cell.className = `teacher-credential is-${tone}`;
-  // P2：结论标签开放「判定依据」，避免只有结论没有口径。
-  cell.innerHTML = `有效资质 ${summary.qualifiedCount}/${summary.majorCount}<button type="button" class="text-button" data-capacity-evidence aria-label="查看有效资质判定依据">依据</button>`;
-}
-// P2：把「有效资质 x/y」与「当前能力」两个结论开放为可解释的判定依据
-//（每个专业缺什么资质、命中哪份证书、合同是否覆盖、申报告知），调用方只展示校验器的输出。
-function openTeacherCapacityEvidence(facts) {
-  const summary = summarizeTeacherCapacity(facts);
-  // R55-UI-01：能力判定统一走演示基准日，不随运行机器的真实日期漂移。
-  const today = DEMO_TODAY;
-  const majorRows = summary.majors.map((item) => {
-    const schedule = explainTeacherCapacity(facts, { purpose: 'schedule', major: item.major, date: today });
-    const detail = schedule.status === 'available'
-      ? '<span class="tag brand">可排课</span>'
-      : `<span class="tag amber">暂不可排课</span><span class="sub-cell">${importEsc(schedule.reasons.join('；') || '—')}</span>`;
-    return `<tr><td>${importEsc(item.major)}</td><td>${item.qualified ? '<span class="tag green">有有效资质</span>' : '<span class="tag red">缺有效资质</span>'}</td><td>${importEsc(item.certificate || '—')}</td><td>${detail}</td></tr>`;
-  }).join('');
-  const contracts = facts.contracts || [];
-  const contractRows = contracts.length
-    ? contracts.map((contract) => `<tr><td>${importEsc(contract.number)}</td><td>${statusTag(contract.status)}</td><td>${importEsc(`${contract.startAt || '—'} 至 ${contract.endAt || '长期有效'}`)}</td><td>${importEsc((contract.courses || []).join('、') || '—')}</td><td>${importEsc((contract.majors || []).join('、') || '—')}</td></tr>`).join('')
-    : '<tr><td colspan="5">该教师暂无合同记录</td></tr>';
-  const applyResult = explainTeacherCapacity(facts, { purpose: 'apply' });
-  const dialog = document.createElement('dialog');
-  dialog.className = 'modal-dialog';
-  dialog.dataset.capacityEvidence = 'true';
-  dialog.innerHTML = `<div class="modal-card"><div class="modal-header"><div><h2>当前能力判定依据</h2><p>${importEsc(facts.name)} · ${importEsc(facts.id)}</p></div><button type="button" class="icon-button modal-close" data-dialog-close title="关闭" aria-label="关闭">×</button></div><section class="form-section first-form-section"><h3>专业资质（基准日 ${today}）</h3><div class="table-wrap"><table><thead><tr><th>授课专业</th><th>资质结论</th><th>命中的有效证书</th><th>今日能否排课</th></tr></thead><tbody>${majorRows || '<tr><td colspan="4">未配置授课专业</td></tr>'}</tbody></table></div><p class="sub-cell">判定口径：证书需为「已通过」并覆盖该专业、且在课次日期仍有效；合同需为「已签署」并覆盖该专业／课程与日期。申报不校验证书与合同。</p></section><section class="form-section"><h3>合同覆盖</h3><div class="table-wrap"><table><thead><tr><th>合同编号</th><th>签署状态</th><th>合同有效期</th><th>覆盖课程</th><th>覆盖专业</th></tr></thead><tbody>${contractRows}</tbody></table></div><p class="sub-cell">${importEsc(applyResult.status === 'available' ? '当前资料与账号状态允许申报课程。' : `申报告知：${applyResult.reasons.join('；')}`)}</p></section><div class="modal-actions"><button type="button" class="button primary" data-dialog-close>关闭</button></div></div>`;
-  document.body.appendChild(dialog);
-  dialog.showModal();
-  dialog.addEventListener('click', (event) => {
-    if (event.target.closest('[data-dialog-close]') || event.target === dialog) dialog.close();
-  });
-  dialog.addEventListener('close', () => dialog.remove());
-}
-
-function renderTeacherCapability(row) {
-  const cell = row.querySelector('[data-cell="capability"]');
-  if (!cell) return;
-  const facts = teacherFactsById(row.dataset.teacherId);
-  if (!facts) return;
-  const summary = summarizeTeacherCapacity(facts);
-  renderTeacherCredential(row, summary);
-  const applyResult = explainTeacherCapacity(facts, { purpose: 'apply' });
-  // R55-UI-01：可排课结论与「依据」弹窗共用同一演示基准日。
-  const today = DEMO_TODAY;
-  // 任一已配置专业在今天就绪即视为可排课；离职、冻结、资料未完善等阻断项统一显示暂停使用。
-  const schedulable = !summary.blocked && summary.majors.some((item) => explainTeacherCapacity(facts, { purpose: 'schedule', major: item.major, date: today }).status === 'available');
-  const tags = [];
-  if (summary.blocked) {
-    tags.push('<span class="tag gray">暂停使用</span>');
-    (applyResult.blocks || []).slice(0, 1).forEach((block) => tags.push(`<span class="tag red">${block.text}</span>`));
-  } else {
-    tags.push(`<span class="tag ${applyResult.status === 'available' ? 'brand' : 'amber'}">${applyResult.status === 'available' ? '可申报' : '暂不可申报'}</span>`);
-    tags.push(`<span class="tag ${schedulable ? 'green' : 'gray'}">${schedulable ? '可排课' : '暂不可排课'}</span>`);
-  }
-  cell.innerHTML = `${tags.join('')}<button type="button" class="text-button" data-capacity-evidence aria-label="查看当前能力判定依据">依据</button>`;
-  row.dataset.capabilities = summary.blocked ? '暂停使用' : (applyResult.status === 'available' ? '可申报' : '暂不可申报');
-  if (schedulable) row.dataset.capabilities += ',可排课';
 }
 
 function renderTeacherActions(row, cell) {
@@ -201,17 +240,13 @@ function updateFeaturedTeacher(row, checked) {
 
 function applyTeacherFilters() {
   const form = document.querySelector('#teacher-filter');
-  const capability = form?.querySelector('[name="capability"]')?.value || '';
-  const capabilityFilter = form?.querySelector('[name="capability"]')?.value || '';
   const account = form?.querySelector('[name="account"]')?.value || '';
   const category = form?.querySelector('[name="category"]')?.value || '';
   const keyword = (form?.querySelector('[name="keyword"]')?.value || '').trim();
   const rows = [...document.querySelectorAll('tr[data-teacher-id]')];
   let visible = 0;
   rows.forEach((row) => {
-    // CR-2026-030：教师列表不再以待办筛选；保留账号状态、授课专业、关键词与当前能力。
-    const matches = (!capabilityFilter || row.dataset.capabilities.split(',').includes(capabilityFilter))
-      && (!account || row.dataset.accountStatus === account)
+    const matches = (!account || row.dataset.accountStatus === account)
       && (!category || row.dataset.category === category)
       && (!keyword || `${row.dataset.teacher}${row.dataset.employeeNo}${row.dataset.phone}`.includes(keyword));
     row.hidden = !matches;
@@ -445,9 +480,7 @@ function appendImportedTeachers(rows, results) {
     row.dataset.profileStatus = '已建档';
     row.dataset.departedAt = '';
     row.dataset.accountStatus = 'active';
-    row.dataset.capabilities = '暂停使用';
-    // CR-2026-030：导入行按新列集合输出，能力列独立、不再有代办列；账号状态结果由提示与结果区表达。
-    row.innerHTML = `<td><a class="link teacher-name" href="profile.html?teacher_id=${encodeURIComponent(row.dataset.teacherId)}">${importEsc(item.name)}</a><span class="teacher-cell-sub">${no} · ${phone}</span></td><td data-cell="major">${importEsc(item.major)}<br /><span class="teacher-cell-sub">${importEsc(item.personnel)}</span><br /><span class="teacher-credential" data-cell="credential"></span></td><td data-cell="capability"><span class="tag gray">暂停使用</span></td><td data-cell="featured"></td><td>暂无授课</td><td class="action-cell" data-cell="actions"></td>`;
+    row.innerHTML = `<td><a class="link teacher-name" href="profile.html?teacher_id=${encodeURIComponent(row.dataset.teacherId)}">${importEsc(item.name)}</a><span class="teacher-cell-sub">${no} · ${phone}</span></td><td data-cell="major">${importEsc(item.major)}<br /><span class="teacher-cell-sub">${importEsc(item.personnel)}</span></td><td data-cell="featured"></td><td>暂无授课</td><td class="action-cell" data-cell="actions"></td>`;
     if (inviteFailed) toast(`${item.name} 已建档，但账号状态未完成，请联系管理员处理。`, 'error');
     renderTeacherActions(row, row.querySelector('[data-cell="actions"]'));
     renderFeaturedSwitch(row, true);
@@ -522,13 +555,6 @@ function downloadTeacherImportErrors() {
 
 function initTeacherList() {
   const form = document.querySelector('#teacher-filter');
-  const applyHashFilters = () => {
-    const hashFilter = new URLSearchParams(location.hash.slice(1));
-    ['capability', 'todo'].forEach((name) => {
-      const control = form?.querySelector(`[name="${name}"]`);
-      if (control) control.value = hashFilter.get(name) || '';
-    });
-  };
   form?.addEventListener('submit', (event) => { event.preventDefault(); applyTeacherFilters(); });
   form?.addEventListener('reset', () => window.setTimeout(applyTeacherFilters));
   document.querySelector('[data-action="teacher-import-open"]')?.addEventListener('click', () => { resetTeacherImport(); openDialog('teacher-import-dialog'); });
@@ -551,20 +577,10 @@ function initTeacherList() {
   const roleCan = (id) => (window.hbyxPermissions ? window.hbyxPermissions.can(id) : permissionsOfRole(currentRole).includes(id));
   const canManageFeatured = roleCan('PERM-TEACHER-007');
   document.querySelector('[data-action="teacher-import-open"]')?.addEventListener('click', (event) => { if (!roleCan('PERM-TEACHER-003')) { event.preventDefault(); event.stopImmediatePropagation(); } }, true);
-  applyHashFilters();
-  window.addEventListener('hashchange', () => { applyHashFilters(); applyTeacherFilters(); });
-  document.addEventListener('click', (event) => {
-    const trigger = event.target.closest('[data-capacity-evidence]');
-    if (!trigger) return;
-    const row = trigger.closest('tr[data-teacher-id]');
-    const facts = row ? teacherFactsById(row.dataset.teacherId) : null;
-    if (facts) openTeacherCapacityEvidence(facts);
-  });
   document.querySelectorAll('tr[data-teacher-id]').forEach((row) => {
     if (row.dataset.accountStatus === 'inactive') row.dataset.accountStatus = 'active';
     renderTeacherActions(row, row.querySelector('[data-cell="actions"]'));
     renderFeaturedSwitch(row, canManageFeatured);
-    renderTeacherCapability(row);
   });
   document.addEventListener('change', (event) => {
     if (!event.target.matches('[data-action="toggle-featured"]') || !canManageFeatured) return;
@@ -577,19 +593,70 @@ function initTeacherList() {
     if (!action || !row) return;
     if (['freeze', 'unfreeze', 'resign'].includes(action)) confirmTeacherAction(row, action);
   });
+  document.querySelector('#teacher-action-date')?.addEventListener('change', (event) => {
+    if (!activeTeacherRow || event.currentTarget.value < DEMO_TODAY) return;
+    renderResignationHandoff(activeTeacherRow.dataset.teacher, event.currentTarget.value);
+  });
   document.querySelector('#teacher-action-confirm')?.addEventListener('click', (event) => {
     if (!activeTeacherRow) return;
-    if (event.currentTarget.dataset.action === 'resign' && !String(document.querySelector('#teacher-action-date')?.value || '').trim()) {
+    if (event.currentTarget.dataset.action === 'resign') {
       const dateInput = document.querySelector('#teacher-action-date');
-      dateInput?.focus();
-      dateInput?.reportValidity?.();
-      toast('请填写离职日期。', 'error');
-      return;
+      const reasonInput = document.querySelector('#teacher-action-reason');
+      const departureDate = String(dateInput?.value || '').trim();
+      const reason = String(reasonInput?.value || '').trim();
+      if (!departureDate || departureDate < DEMO_TODAY) {
+        dateInput?.focus();
+        toast(`离职日期不得早于 ${DEMO_TODAY}`, 'error');
+        return;
+      }
+      if (!reason) {
+        reasonInput?.focus();
+        toast('请填写离职原因。', 'error');
+        return;
+      }
+      const plan = activeResignationHandoff || resignationHandoffPlan(activeTeacherRow.dataset.teacher, departureDate);
+      const selections = plan.groups.map(group => ({
+        group,
+        teacher: String(document.querySelector(`[data-handoff-teacher="${group.classRecord.id}"]`)?.value || '').trim()
+      }));
+      if (selections.some(item => !item.teacher)) {
+        toast('请为所有待交接班级选择接替教师。', 'error');
+        return;
+      }
+      const duplicateConflict = selections.some((left, index) => selections.slice(index + 1).some(right =>
+        left.teacher === right.teacher && left.group.sessions.some(session =>
+          right.group.sessions.some(other => resignationSessionsOverlap(session, other)))));
+      if (duplicateConflict) {
+        toast('同一接替教师在交接课次中存在时间冲突，请调整选择。', 'error');
+        return;
+      }
+      const handoffAt = demoTime();
+      selections.forEach(({ group, teacher }) => {
+        const sessionIndexes = new Set(group.sessions.map(session => Number(session.index)));
+        const sessions = (group.classRecord.sessions || []).map(session => sessionIndexes.has(Number(session.index))
+          ? { ...session, teacher, handoffFrom: session.teacher || group.classRecord.teacher, handoffAt }
+          : session);
+        upsertDemoRecord('classes', {
+          ...group.classRecord,
+          teacher,
+          sessions,
+          teacherHistory: [...(group.classRecord.teacherHistory || []), {
+            from: group.classRecord.teacher,
+            to: teacher,
+            effectiveAt: handoffAt,
+            reason,
+            sessionIndexes: [...sessionIndexes]
+          }],
+          updatedAt: handoffAt
+        });
+      });
+      activeTeacherRow.dataset.handoffClasses = String(selections.length);
     }
     updateTeacherRow(activeTeacherRow, event.currentTarget.dataset.action);
     closeDialog('teacher-action-dialog');
-    toast(event.currentTarget.dataset.action === 'resign' ? `已办理离职，离职日期 ${activeTeacherRow?.dataset.departedAt}；其他业务状态及历史记录保持不变。` : '教师账号状态已更新，其他业务状态保持不变。');
+    toast(event.currentTarget.dataset.action === 'resign' ? `已办理离职，离职日期 ${activeTeacherRow?.dataset.departedAt}；已完成 ${activeTeacherRow?.dataset.handoffClasses || 0} 个班级的教学交接。` : '教师账号状态已更新，其他业务状态保持不变。');
     applyTeacherFilters();
+    activeResignationHandoff = null;
     activeTeacherRow = null;
   });
   applyTeacherFilters();
@@ -1426,7 +1493,7 @@ function initSchedule() {
 }
 
 function initProfile() {
-  renderProfileCapacity();
+  renderTeacherProfileStatus();
   const params = new URLSearchParams(location.search);
   const facts = resolveTeacherFacts(params.get('teacher_id') || 'teacher-wang');
   if (facts) { renderTeacherProfileArchive(facts); renderTeacherSelfProfile(facts); }
@@ -1575,36 +1642,14 @@ function renderTeacherSelfProfile(facts) {
   auditRows.innerHTML = records.map((record) => record.changes.map((change, index) => `<tr>${index === 0 ? `<td rowspan="${record.changes.length}">${importEsc(record.at)}</td><td rowspan="${record.changes.length}">${importEsc(record.operator)}</td>` : ''}<td>${importEsc(change.label)}</td><td>${importEsc(change.before || '未填写')}</td><td>${importEsc(change.after || '未填写')}</td></tr>`).join('')).join('');
 }
 
-// 教师详情：按专业逐条给出资质结论，并列出申报层面的准入阻断。
-function renderProfileCapacity() {
-  const container = document.querySelector('.teacher-capability-detail');
+// 教师详情只展示档案事实，不在管理页面预计算申报或排课结论。
+function renderTeacherProfileStatus() {
   const facts = resolveTeacherFacts(new URLSearchParams(location.search).get('teacher_id') || 'teacher-wang');
-  if (!container || !facts) return;
-  const summary = summarizeTeacherCapacity(facts);
-  const apply = explainTeacherCapacity(facts, { purpose: 'apply' });
-  const withoutCertificate = summary.majors.filter((item) => !item.qualified).map((item) => item.major);
-  const arrangeRows = summary.majors.map((item) => {
-    const sample = classSeed.find((row) => row.teacher === facts.name && row.professional === item.major) || classSeed.find((row) => row.professional === item.major);
-    const result = explainTeacherCapacity(facts, { purpose: 'arrange', major: item.major, course: sample?.courseName || sample?.course || '', date: sample?.firstLessonDate || DEMO_TODAY });
-    return `${item.major}（${sample?.courseName || sample?.course || '示例课程'} · ${sample?.firstLessonDate || DEMO_TODAY}）：${result.status === 'available' ? '可排课' : `不可排课，${result.reasons.join('；')}`}`;
-  }).join('；');
-  const reasonRows = [
-    ...apply.blocks.map((block) => `<div><span class="tag red">阻断</span><p>${block.text}</p></div>`),
-    ...(withoutCertificate.length ? [`<div><span class="tag amber">排课提醒</span><p>${withoutCertificate.join('、')} 暂无有效资质，不影响申报，但发布与排课会按专业和课次日期校验。</p></div>`] : [])
-  ].join('');
-  container.innerHTML = `<div><span class="tag ${apply.status === 'available' ? 'brand' : 'gray'}">${apply.status === 'available' ? '可申报' : '暂不可申报'}</span><p>${apply.status === 'available' ? '资料已建档、离职日期为空（在职）、账号正常，且已配置授课专业。' : apply.reasons.join('；')}</p></div>${reasonRows}<div><span class="tag brand">授课专业 ${summary.majorCount} 个</span><p>${summary.majors.map((item) => `${item.major}：${item.qualified ? '有有效资质' : '缺有效资质'}`).join('；')}。</p></div><div><span class="tag ${arrangeRows.includes('不可排课') ? 'amber' : 'green'}">排课判定</span><p>${arrangeRows || '暂无授课专业，无法计算排课判定。'}</p><small>按具体专业、课程和课次日期重算；可申报与可排课不是同一结论。</small></div>`;
+  if (!facts) return;
   const departedStatus = document.querySelector('#teacher-departed-status');
   const departedNote = document.querySelector('#teacher-departed-note');
   if (departedStatus) departedStatus.textContent = facts.departedAt ? `离职 · ${facts.departedAt}` : '在职';
   if (departedNote) departedNote.textContent = facts.departedAt ? '离职后禁止登录与新增未来排课，历史记录保留。' : '离职日期为空即在职。';
-  const summaryResult = document.querySelector('.teacher-summary-result');
-  if (summaryResult) {
-    const today = DEMO_TODAY;
-    const certificates = teacherCertificateRecords(facts.id);
-    const usable = certificates.filter((item) => item.status === '已通过' && (!item.expiresAt || item.expiresAt >= today)).length;
-    const pending = certificates.length - usable;
-    summaryResult.innerHTML = `<strong>可用 ${usable} 份 <span aria-hidden="true">|</span> 待处理 ${pending} 份</strong><p>${summary.majors.map((item) => `${item.major}：${item.qualified ? '资质满足' : '待补充专业资质'}`).join('；')}。</p>`;
-  }
 }
 
 document.addEventListener('click', (event) => { if (event.target.closest('[data-dialog-close]')) event.target.closest('dialog')?.close(); });

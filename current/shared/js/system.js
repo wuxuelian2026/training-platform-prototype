@@ -145,7 +145,7 @@ function mountConfigurableLimitCards() {
   const card = document.createElement('section');
   card.className = 'card settings-card';
   card.dataset.limitSettings = 'true';
-  card.innerHTML = `<h2>订单与文件规格参数</h2><div class="form-grid">${field('待支付订单支付时限（分钟）', 'paymentTimeoutMinutes', 'number', '1-1440', false, settings.paymentTimeoutMinutes)}${field('图片上传上限（MB）', 'imageSpecMb', 'number', '1-1024', false, settings.fileSpec.imageMb)}${field('文档上传上限（MB）', 'documentSpecMb', 'number', '1-1024', false, settings.fileSpec.documentMb)}${field('视频上传上限（MB）', 'videoSpecMb', 'number', '1-10240', false, settings.fileSpec.videoMb)}${field('教学资源库单文件上限（GB）', 'resourceSpecGb', 'number', '1-10240', false, settings.fileSpec.resourceGb)}</div><p class="ops-form-help">待支付订单创建后按该时限关闭为「已取消（超时）」；文件规格用于图片、文档、视频与教学资源库的上传校验，证书、合同与教学资源上传读取同一份配置。</p>`;
+  card.innerHTML = `<h2>订单与文件规格参数</h2><div class="form-grid">${field('待支付订单支付时限（分钟）', 'paymentTimeoutMinutes', 'number', '1-1440', false, settings.paymentTimeoutMinutes)}${field('图片上传上限（MB）', 'imageSpecMb', 'number', '1-1024', false, settings.fileSpec.imageMb)}${field('文档上传上限（MB）', 'documentSpecMb', 'number', '1-1024', false, settings.fileSpec.documentMb)}${field('视频上传上限（GB）', 'videoSpecGb', 'number', '0.1-10', false, settings.fileSpec.videoMb / 1024)}${field('教学资源库单文件上限（GB）', 'resourceSpecGb', 'number', '1-10240', false, settings.fileSpec.resourceGb)}</div><p class="ops-form-help">待支付订单创建后按该时限关闭为「已取消（超时）」；视频上传上限默认 10GB（最大 10GB），文件规格用于图片、文档、视频与教学资源库的上传校验，证书、合同与教学资源上传读取同一份配置。</p>`;
   layout.append(card);
   const retryCard = document.createElement('section');
   retryCard.className = 'card settings-card';
@@ -236,12 +236,13 @@ function renderSettings() {
       windowDays: Number(form.get('classRefundWindowDays')),
       selfMaxCompletedPercent: Number(form.get('classRefundSelfMaxCompletedPercent'))
     };
-    const fileSpec = { imageMb: Number(form.get('imageSpecMb')), documentMb: Number(form.get('documentSpecMb')), videoMb: Number(form.get('videoSpecMb')), resourceGb: Number(form.get('resourceSpecGb')) };
+    const videoSpecGb = Number(form.get('videoSpecGb'));
+    const fileSpec = { imageMb: Number(form.get('imageSpecMb')), documentMb: Number(form.get('documentSpecMb')), videoMb: Math.round(videoSpecGb * 1024), resourceGb: Number(form.get('resourceSpecGb')) };
     const retryAttempts = Number(form.get('messageRetryAttempts'));
     const retryIntervals = [...new Set(String(form.get('messageRetryIntervals') || '').split(/[，,\s]+/).map((value) => Math.round(Number(value))).filter((value) => Number.isFinite(value) && value > 0 && value <= 1440))].sort((a, b) => a - b);
     const classRefundValid = inRange(classRefund.windowDays, 0, 365)
       && inRange(classRefund.selfMaxCompletedPercent, 0, 100);
-    if (!inRange(deadline, 24, 720) || !inRange(attendance, 0, 100) || !inRange(homeworkRate, 0, 100) || !inRange(refundPercent, 0, 100) || !inRange(refundWindow, 0, 365) || !inRange(payTimeout, 1, 1440) || !inRange(fileSpec.imageMb, 1, 1024) || !inRange(fileSpec.documentMb, 1, 1024) || !inRange(fileSpec.videoMb, 1, 10240) || !inRange(fileSpec.resourceGb, 1, 10240) || !inRange(retryAttempts, 1, 5) || !retryIntervals.length) {
+    if (!inRange(deadline, 24, 720) || !inRange(attendance, 0, 100) || !inRange(homeworkRate, 0, 100) || !inRange(refundPercent, 0, 100) || !inRange(refundWindow, 0, 365) || !inRange(payTimeout, 1, 1440) || !inRange(fileSpec.imageMb, 1, 1024) || !inRange(fileSpec.documentMb, 1, 1024) || !inRange(videoSpecGb, 0.1, 10) || !inRange(fileSpec.resourceGb, 1, 10240) || !inRange(retryAttempts, 1, 5) || !retryIntervals.length) {
       showToast('请检查参数范围；面授退款窗口 0–365 天、最大已消课比例 0–100%。');
       return;
     }

@@ -77,16 +77,16 @@ const TEACHER_APP_FIELD_SPEC = {
           { id: 'FD-TAPP-016', label: '课程类型', type: '单选', length: '视频课程 / 面授课程', required: '是', note: '决定后续编排与发布路径', constraints: { options: ['视频课程', '面授课程'] } },
           { id: 'FD-TAPP-017', label: '总课时', type: '数字', length: '≥ 1 的整数', required: '面授课程必填', note: '面授课程用于生成课次和工资统计；视频课程不按课时数校验', constraints: { min: 1, integer: true, requiredWhen: 'courseType=offline' } },
           { id: 'FD-TAPP-018', label: '课程简介', type: '多行文本', length: '≤ 500 字', required: '否', note: '补充课程目标、教学内容和适合人群', constraints: { maxLength: 500 } },
-          { id: 'FD-TAPP-029', label: '附加材料', type: '文件上传', length: '单个文件', required: '否', note: '选择后回显文件名并随申报记录保存；原型阶段不上传真实文件', constraints: { maxFiles: 1 } }
+          { id: 'FD-TAPP-029', label: '附加材料', type: '图片上传', length: '单个 JPG／JPEG／PNG／WebP', required: '否', note: '仅支持 JPG、JPEG、PNG、WebP 图片，单张上限读取后台「图片上传上限」参数；选择后回显文件名，原型阶段不上传真实文件', constraints: { maxFiles: 1, imageOnly: true, extensions: ['jpg', 'jpeg', 'png', 'webp'], sizeParam: 'imageMb' } }
         ] },
         // CR-2026-012 / CR-2026-014：教学属性与后台编排、发布环节复用同一份字段定义。
         { heading: '教学属性字段', fields: courseFieldRows('TAPP', 21, COURSE_TEACHING_FIELDS, { required: '是', note: '教师申报时维护；后台编排可修改，发布环节只读带入' }) }
       ],
       notes: [
         '课程申报不提供保存草稿，提交即进入待审核；驳回或撤销后重新提交沿用原申报编号。',
-        '提交前校验资料已建档、离职日期为空、账号正常且申报专业属于本人授课专业；不校验证书和合同。',
+        '所属专业只能从本人已配置的授课专业中选择；提交时校验资料已建档、离职日期为空、账号正常且申报专业属于本人授课专业，不校验证书和合同。',
         '难度等级与适合年龄在申报时必填，作为教学属性写入课程档案，后台审核页、编排页、课程库与学员端读取同一份值。',
-        'CR-2026-051：附加材料可选；未选择不影响提交，选择后随申报记录保存文件名。',
+        'CR-2026-051／CR-2026-158：附加材料可选且仅支持图片；未选择不影响提交，选择后随申报记录保存文件名。',
         'CR-2026-051：视频课程总课时由后台编排结果派生，申报阶段不填报。'
       ]
     },
@@ -97,7 +97,7 @@ const TEACHER_APP_FIELD_SPEC = {
           { id: 'FD-TAPP-006', label: '作业标题', type: '文本', length: '≤ 50 字', required: '是', note: '学员端作业本展示的标题', constraints: { maxLength: 50 } },
           { id: 'FD-TAPP-007', label: '作业描述', type: '长文本', length: '≤ 2000 字', required: '是', note: '作业要求与完成说明；使用普通多行长文本输入，不提供富文本编辑器', constraints: { maxLength: 2000 } },
           { id: 'FD-TAPP-008', label: '作业类型', type: '下拉', length: '练习视频 / 乐谱练习 / 绘画作品 / 文字报告 / 其他', required: '是', note: '决定学员端提交方式与批阅口径', constraints: { options: ['练习视频', '乐谱练习', '绘画作品', '文字报告', '其他'] } },
-          { id: 'FD-TAPP-009', label: '提交格式', type: '多选', length: '图片 / 视频 / 音频 / 文字 / PDF', required: '是', note: '至少选择一种允许提交的格式', constraints: { options: ['图片', '视频', '音频', '文字', 'PDF'], minItems: 1, multi: true } },
+          { id: 'FD-TAPP-009', label: '提交格式', type: '多选', length: '文本 / 图片 / 视频', required: '是', note: '至少选择一种允许提交的格式；学员端按所选格式展示对应扩展名与文件大小要求', constraints: { options: ['文本', '图片', '视频'], minItems: 1, multi: true } },
           { id: 'FD-TAPP-010', label: '截止时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '默认取「参数配置 → 作业默认截止时间（小时）」（当前默认 72 小时），可按本次作业调整；必须至少晚于发布时刻 24 小时', constraints: { format: 'YYYY-MM-DD HH:mm', systemParam: 'homeworkDeadlineHours', defaultOffsetHours: 72, minOffsetHours: 24 } },
           { id: 'FD-TAPP-011', label: '是否必交', type: '开关', length: '是 / 否', required: '否', note: '默认开启；必交作业未提交影响结业判定', constraints: { boolean: true } },
           { id: 'FD-TAPP-012', label: '参考资料', type: '多选', length: '至少 0 个资源', required: '否', note: '从教学资源库引用，随作业下发给学员', constraints: { multi: true } },
@@ -106,6 +106,7 @@ const TEACHER_APP_FIELD_SPEC = {
       ],
       notes: [
         '作业发布后推送至该班级学员的作业本，学员在截止时间前提交。',
+        '提交格式仅支持文本、图片、视频；历史记录中的“文字”读取时兼容显示为“文本”，不再提供音频、文档或 PDF 格式。',
         '教师只能对本人在授班级发布作业；发布时校验班级授课教师与当前登录教师一致，截止时间必须至少晚于发布时刻 24 小时，否则拒绝发布并提示。',
         '作业截止时间默认值与后台「参数配置 → 作业默认截止时间（小时）」同源，教师端发布表单不写死默认值。',
         '参考资料从教学资源库引用，不复制资源本体。'

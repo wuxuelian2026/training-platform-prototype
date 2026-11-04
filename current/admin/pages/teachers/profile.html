@@ -19,20 +19,17 @@
 
       <!-- CR-2026-045 §4.1：抬头区不随页签切换，承载身份、三张状态卡、待处理事项与操作入口。 -->
       <section class="profile-banner card">
-        <div><div class="teacher-inline-tags"><span class="tag brand" data-teacher-apply>可申报</span><span class="tag green" data-teacher-schedule>今日可排课</span></div><h2 id="teacher-profile-name">王玥</h2><p id="teacher-profile-identity">JS20260901 · 中国舞 / 民族民间舞 · 138****2026</p></div>
+        <div><h2 id="teacher-profile-name">王玥</h2><p id="teacher-profile-identity">JS20260901 · 中国舞 / 民族民间舞 · 138****2026</p></div>
         <div class="profile-summary"><span>最近授课</span><strong>2026-09-14 14:00</strong><span class="profile-summary-note">中国舞身韵训练</span></div>
       </section>
 
-      <div class="profile-action-strip card"><div><strong>当前待处理事项</strong><span id="teacher-profile-todo">中国舞教师资格证和当前适用合同即将到期；不影响当日可用结论，未来排课仍按专业与课次日期重检。</span></div><div class="toolbar-actions"><button type="button" class="button" data-profile-action="freeze">冻结账号</button><button type="button" class="button" data-profile-action="resign">办理离职</button></div></div>
+      <div class="profile-action-strip card"><div><strong>当前待处理事项</strong><span id="teacher-profile-todo">中国舞教师资格证和当前适用合同即将到期，请及时续期或续签；申报与排课时按实际业务条件校验。</span></div><div class="toolbar-actions"><button type="button" class="button" data-profile-action="freeze">冻结账号</button><button type="button" class="button" data-profile-action="resign">办理离职</button></div></div>
 
       <div class="teacher-state-grid">
         <section class="card teacher-state-card"><span>资料状态</span><strong data-teacher-profile-status>已建档</strong><p>基础必填资料已完成，缺失项在页签角标展示。</p></section>
         <section class="card teacher-state-card"><span>在职情况</span><strong id="teacher-departed-status">在职</strong><p id="teacher-departed-note">离职日期为空即在职。</p></section>
         <section class="card teacher-state-card"><span>账号状态</span><strong data-teacher-account-status>正常</strong><p>枚举值 active，可登录教师端。</p></section>
       </div>
-
-      <!-- §4.1.2：当前能力与原因同时取决于专业、证书、合同三个维度，上移至抬头区。 -->
-      <section class="card" id="teacher-capability-card"><div class="section-title-row"><div><h2>当前能力与原因</h2></div><span class="tag gray">专业 × 证书 × 合同</span></div><div class="teacher-capability-detail" data-capacity-apply></div></section>
 
       <div class="card teacher-tabcard">
         <div class="teacher-tabbar" role="tablist" aria-label="教师档案页签">

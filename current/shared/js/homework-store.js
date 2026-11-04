@@ -12,24 +12,95 @@ const { DEMO_NOW, demoDateTime } = __classicRequire("shared/js/demo-clock.js");
 const { teacherAccounts } = __classicRequire("shared/js/course-seed.js");
 const { emitNotificationEvent, suppressPendingNotifications } = __classicRequire("shared/js/notification-store.js");
 
-const formatRules = {
-  图片: ({ type = '', name = '' }) => type === '图片' || type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(name),
-  视频: ({ type = '', name = '' }) => type === '视频' || type.startsWith('video/') || /\.(mp4|mov|avi|m4v|webm)$/i.test(name),
-  音频: ({ type = '', name = '' }) => type === '音频' || type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg)$/i.test(name),
-  文档: ({ type = '', name = '' }) => type === '文档' || type === 'PDF' || type === 'application/pdf' || /\.(pdf|doc|docx)$/i.test(name),
-  PDF: ({ type = '', name = '' }) => type === 'PDF' || type === 'application/pdf' || /\.pdf$/i.test(name)
+const HOMEWORK_FORMAT_OPTIONS = ['文本', '图片', '视频'];
+const HOMEWORK_TEXT_MAX_LENGTH = 500;
+const HOMEWORK_FORMAT_ALIASES = { 文字: '文本' };
+const HOMEWORK_FILE_RULES = {
+  图片: {
+    extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    accept: '.jpg,.jpeg,.png,.gif,.webp',
+    extensionsText: 'JPG、JPEG、PNG、GIF、WebP',
+    limitLabel: '单张',
+    sizeParam: 'imageMb'
+  },
+  视频: {
+    extensions: ['mp4', 'mov', 'avi', 'm4v', 'webm'],
+    mimeTypes: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-m4v', 'video/webm'],
+    accept: '.mp4,.mov,.avi,.m4v,.webm',
+    extensionsText: 'MP4、MOV、AVI、M4V、WebM',
+    limitLabel: '单个',
+    sizeParam: 'videoMb'
+  }
 };
+
+function normalizeHomeworkFormat(format) {
+  return HOMEWORK_FORMAT_ALIASES[format] || format;
+}
+
+function normalizeHomeworkFormats(formats = []) {
+  return [...new Set((Array.isArray(formats) ? formats : []).map(normalizeHomeworkFormat).filter(Boolean))];
+}
+
+function homeworkFormatOptions() {
+  return [...HOMEWORK_FORMAT_OPTIONS];
+}
+
+function homeworkTextMaxLength() {
+  return HOMEWORK_TEXT_MAX_LENGTH;
+}
+
+function homeworkFileRuleFor(attachment = {}) {
+  const type = String(attachment.type || '').toLowerCase();
+  const name = String(attachment.name || '').toLowerCase();
+  return Object.entries(HOMEWORK_FILE_RULES).find(([format, rule]) => (
+    type === format
+    || rule.mimeTypes.includes(type)
+    || rule.extensions.some((extension) => name.endsWith(`.${extension}`))
+  )) || null;
+}
+
+function homeworkFileFormat(attachment = {}) {
+  return homeworkFileRuleFor(attachment)?.[0] || '';
+}
+
+function homeworkFileAccept(formats = []) {
+  return normalizeHomeworkFormats(formats).map((format) => HOMEWORK_FILE_RULES[format]?.accept).filter(Boolean).join(',');
+}
+
+function homeworkFileLimitLabel(limitMb) {
+  const value = Number(limitMb || 0);
+  if (value < 1024) return `${value}MB`;
+  const gigabytes = value / 1024;
+  return `${Number.isInteger(gigabytes) ? gigabytes : gigabytes.toFixed(1)}GB`;
+}
+
+function homeworkFormatRequirements(formats = []) {
+  const settings = fileSpecSettings();
+  return normalizeHomeworkFormats(formats)
+    .filter((format) => HOMEWORK_FORMAT_OPTIONS.includes(format))
+    .map((format) => {
+      if (format === '文本') {
+        return { format, text: `文本：最多 ${HOMEWORK_TEXT_MAX_LENGTH} 字，仅支持纯文本` };
+      }
+      const rule = HOMEWORK_FILE_RULES[format];
+      return {
+        format,
+        text: `${format}：支持 ${rule.extensionsText}，${rule.limitLabel}不超过 ${homeworkFileLimitLabel(settings[rule.sizeParam])}`
+      };
+    });
+}
 
 const seedHomeworks = [
   // CR-2026-146：王玥的芭蕾班 1–4 次课演示作业写入共享作业库，教师端、学员端和后台均按班级 ID + 课次序号读取。
   {
     id: 'HW-DEMO-BALLET-01-01', classId: 'class-mock-ready-02', lessonIndex: 1, courseId: 'COURSE-MOCK-1063',
-    title: '芭蕾基础动作练习', description: '完成本节课基本动作练习，记录动作感受与需要改进的地方。', type: '练习视频', formats: ['视频', '文字'], required: true,
+    title: '芭蕾基础动作练习', description: '完成本节课基本动作练习，记录动作感受与需要改进的地方。', type: '练习视频', formats: ['视频', '文本'], required: true,
     deadline: '2026-09-10 23:59', resources: ['芭蕾基础动作参考.jpg'], status: '已发布', publishedAt: '2026-09-03 12:00', publishedBy: 'teacher-wang', createdAt: '2026-09-03 12:00', updatedAt: '2026-09-03 12:00'
   },
   {
     id: 'HW-DEMO-BALLET-02-01', classId: 'class-mock-ready-02', lessonIndex: 2, courseId: 'COURSE-MOCK-1063',
-    title: '脚位与重心练习', description: '复习脚位转换和重心控制，提交练习视频并补充文字说明。', type: '练习视频', formats: ['视频', '文字'], required: true,
+    title: '脚位与重心练习', description: '复习脚位转换和重心控制，提交练习视频并补充文本说明。', type: '练习视频', formats: ['视频', '文本'], required: true,
     deadline: '2026-09-17 23:59', resources: ['芭蕾基础动作参考.jpg'], status: '已发布', publishedAt: '2026-09-10 12:00', publishedBy: 'teacher-wang', createdAt: '2026-09-10 12:00', updatedAt: '2026-09-10 12:00'
   },
   {
@@ -39,32 +110,32 @@ const seedHomeworks = [
   },
   {
     id: 'HW-DEMO-BALLET-04-01', classId: 'class-mock-ready-02', lessonIndex: 4, courseId: 'COURSE-MOCK-1063',
-    title: '组合动作复盘', description: '完成本阶段组合动作复盘，提交练习片段并说明一处需要继续练习的细节。', type: '文字报告', formats: ['文字'], required: false,
+    title: '组合动作复盘', description: '完成本阶段组合动作复盘，提交练习片段并说明一处需要继续练习的细节。', type: '文字报告', formats: ['文本'], required: false,
     deadline: '2026-10-01 23:59', resources: [], status: '已发布', publishedAt: '2026-09-24 12:00', publishedBy: 'teacher-wang', createdAt: '2026-09-24 12:00', updatedAt: '2026-09-24 12:00'
   },
   {
     id: 'HW-DEMO-TEACHING-01-03', classId: 'class-mock-ended-teaching-01', lessonIndex: 3, courseId: 'COURSE-MOCK-1033',
-    title: '钢琴基本功练习记录', description: '完成本周音阶与分解和弦练习，上传练习说明或演奏片段。', type: '练习记录', formats: ['视频', '文字'], required: true,
+    title: '钢琴基本功练习记录', description: '完成本周音阶与分解和弦练习，上传练习说明或演奏片段。', type: '练习记录', formats: ['视频', '文本'], required: true,
     deadline: '2026-09-27 23:59', resources: ['第3次课示范音频'], status: '已发布', publishedAt: '2026-09-17 12:00', publishedBy: 'teacher-linyue', createdAt: '2026-09-17 12:00', updatedAt: '2026-09-17 12:00'
   },
   {
     id: 'HW-DEMO-TEACHING-02-04', classId: 'class-mock-ended-teaching-02', lessonIndex: 4, courseId: 'COURSE-MOCK-1033',
-    title: '节奏练习视频', description: '完成本周节奏练习，提交一段练习视频并补充练习说明。', type: '练习视频', formats: ['视频', '文字'], required: true,
+    title: '节奏练习视频', description: '完成本周节奏练习，提交一段练习视频并补充练习说明。', type: '练习视频', formats: ['视频', '文本'], required: true,
     deadline: '2026-09-28 23:59', resources: [], status: '已发布', publishedAt: '2026-09-18 12:00', publishedBy: 'teacher-linyue', createdAt: '2026-09-18 12:00', updatedAt: '2026-09-18 12:00'
   },
   {
     id: 'HW-DEMO-SCENE-03-05', classId: 'class-mock-scene-03', lessonIndex: 5, courseId: 'COURSE-MOCK-1003',
-    title: '身韵组合练习', description: '完成本节课身韵组合练习，记录练习中的一个动作要点。', type: '练习视频', formats: ['视频', '文字'], required: true,
+    title: '身韵组合练习', description: '完成本节课身韵组合练习，记录练习中的一个动作要点。', type: '练习视频', formats: ['视频', '文本'], required: true,
     deadline: '2026-09-29 23:59', resources: ['身韵练习音乐'], status: '已发布', publishedAt: '2026-09-19 12:00', publishedBy: 'teacher-wang', createdAt: '2026-09-19 12:00', updatedAt: '2026-09-19 12:00'
   },
   {
     id: 'HW-DEMO-SCENE-04-06', classId: 'class-mock-scene-04', lessonIndex: 6, courseId: 'COURSE-MOCK-1003',
-    title: '组合动作复盘', description: '复盘本节课组合动作，提交练习视频或文字记录。', type: '练习视频', formats: ['视频', '文字'], required: true,
+    title: '组合动作复盘', description: '复盘本节课组合动作，提交练习视频或文本记录。', type: '练习视频', formats: ['视频', '文本'], required: true,
     deadline: '2026-09-30 23:59', resources: [], status: '已发布', publishedAt: '2026-09-20 12:00', publishedBy: 'teacher-wang', createdAt: '2026-09-20 12:00', updatedAt: '2026-09-20 12:00'
   },
   {
     id: 'HW-DEMO-SCENE-05-07', classId: 'class-mock-scene-05', lessonIndex: 7, courseId: 'COURSE-MOCK-1063',
-    title: '芭蕾基础训练记录', description: '完成基础训练并记录练习中的动作感受。', type: '文字报告', formats: ['文字'], required: false,
+    title: '芭蕾基础训练记录', description: '完成基础训练并记录练习中的动作感受。', type: '文字报告', formats: ['文本'], required: false,
     deadline: '2026-10-01 23:59', resources: [], status: '已发布', publishedAt: '2026-09-21 12:00', publishedBy: 'teacher-wang', createdAt: '2026-09-21 12:00', updatedAt: '2026-09-21 12:00'
   }
 ];
@@ -146,6 +217,7 @@ function mergeRows(collection) {
 }
 function listHomework(filters = {}) {
   return mergeRows('homeworks')
+    .map((item) => ({ ...item, formats: normalizeHomeworkFormats(item.formats || []) }))
     .filter((item) => (!filters.classId || item.classId === filters.classId) && (!filters.lessonIndex || String(item.lessonIndex) === String(filters.lessonIndex)) && (!filters.publishedBy || item.publishedBy === filters.publishedBy))
     .sort((a, b) => String(b.updatedAt || b.publishedAt).localeCompare(String(a.updatedAt || a.publishedAt)));
 }
@@ -190,16 +262,13 @@ function homeworkIsOverdue(homework, now = DEMO_NOW) {
   return Math.floor(current.getTime() / 60000) > Math.floor(deadline.getTime() / 60000);
 }
 function homeworkFormatAllowed(homework, attachment = {}) {
-  const candidate = { type: String(attachment.type || ''), name: String(attachment.name || '') };
-  return (homework?.formats || []).some((format) => formatRules[format]?.(candidate));
+  const fileFormat = homeworkFileFormat(attachment);
+  return Boolean(fileFormat) && normalizeHomeworkFormats(homework?.formats || []).includes(fileFormat);
 }
 function homeworkFileLimitMb(attachment = {}) {
   const settings = fileSpecSettings();
-  const type = String(attachment.type || '').toLowerCase();
-  const name = String(attachment.name || '').toLowerCase();
-  if (type === '视频' || type.startsWith('video/') || /\.(mp4|mov|avi|m4v|webm)$/i.test(name)) return settings.videoMb;
-  if (type === '图片' || type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(name)) return settings.imageMb;
-  return settings.documentMb;
+  const rule = homeworkFileRuleFor(attachment)?.[1];
+  return rule ? settings[rule.sizeParam] : 0;
 }
 
 function validateSubmission(homework, input, existing) {
@@ -216,7 +285,8 @@ function validateSubmission(homework, input, existing) {
   const content = String(input.content || '').trim();
   const attachments = Array.isArray(input.attachments) ? input.attachments : [];
   if (input.status === '已提交' && !content && !attachments.length) throw new Error('HOMEWORK_EMPTY_SUBMISSION');
-  if (content && !(homework.formats || []).includes('文字')) throw new Error('HOMEWORK_TEXT_NOT_ALLOWED');
+  if (content && !normalizeHomeworkFormats(homework.formats || []).includes('文本')) throw new Error('HOMEWORK_TEXT_NOT_ALLOWED');
+  if (content.length > HOMEWORK_TEXT_MAX_LENGTH) throw new Error('HOMEWORK_TEXT_TOO_LONG');
   for (const attachment of attachments) {
     if (!homeworkFormatAllowed(homework, attachment)) throw new Error('HOMEWORK_FILE_FORMAT_INVALID');
     if (Number(attachment.size || 0) > homeworkFileLimitMb(attachment) * 1024 * 1024) throw new Error('HOMEWORK_FILE_TOO_LARGE');
@@ -276,7 +346,9 @@ function expectedSubmissionRows(homework, now, students = null) {
 function publishHomework(input) {
   const now = demoTime();
   const deadline = demoDateTime(input.deadline);
+  const formats = normalizeHomeworkFormats(input.formats || []);
   if (!input.publishedBy) throw new Error('HOMEWORK_OPERATOR_FORBIDDEN');
+  if (!formats.length || formats.some((format) => !HOMEWORK_FORMAT_OPTIONS.includes(format))) throw new Error('HOMEWORK_FORMAT_INVALID');
   assertTeacherOwnsClass(input.classId, input.publishedBy);
   const minimumDeadline = demoDateTime(now).getTime() + 24 * 60 * 60 * 1000;
   if (!Number.isFinite(deadline.getTime()) || deadline.getTime() <= minimumDeadline) throw new Error('HOMEWORK_DEADLINE_MUST_EXCEED_24_HOURS');
@@ -290,7 +362,7 @@ function publishHomework(input) {
     ? existingHomework.rosterSnapshot.map((row) => ({ id: row.studentId, name: row.studentName }))
     : roster(input.classId);
   const record = {
-    ...input, id: homeworkId, status: '已发布', publishedAt: input.publishedAt || now, createdAt: input.createdAt || now, updatedAt: now,
+    ...input, id: homeworkId, formats, status: '已发布', publishedAt: input.publishedAt || now, createdAt: input.createdAt || now, updatedAt: now,
     publishedBy: input.publishedBy || 'teacher-demo',
     rosterFrozenAt: existingHomework?.rosterFrozenAt || now,
     rosterSize: frozenStudents.length,
@@ -468,6 +540,13 @@ __classicExports["getStudentSubmission"] = getStudentSubmission;
 __classicExports["homeworkIsOverdue"] = homeworkIsOverdue;
 __classicExports["homeworkFormatAllowed"] = homeworkFormatAllowed;
 __classicExports["homeworkFileLimitMb"] = homeworkFileLimitMb;
+__classicExports["homeworkFormatOptions"] = homeworkFormatOptions;
+__classicExports["homeworkTextMaxLength"] = homeworkTextMaxLength;
+__classicExports["homeworkFormatRequirements"] = homeworkFormatRequirements;
+__classicExports["homeworkFileAccept"] = homeworkFileAccept;
+__classicExports["homeworkFileFormat"] = homeworkFileFormat;
+__classicExports["homeworkFileLimitLabel"] = homeworkFileLimitLabel;
+__classicExports["normalizeHomeworkFormats"] = normalizeHomeworkFormats;
 __classicExports["submissionSummary"] = submissionSummary;
 __classicExports["homeworkRosterDrift"] = homeworkRosterDrift;
 __classicExports["publishHomework"] = publishHomework;

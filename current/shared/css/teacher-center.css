@@ -1,13 +1,12 @@
 .teacher-page .metric-value { color: var(--brand); }
 .teacher-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.teacher-capability-table table { min-width: 1180px; }
-.teacher-capability-table th:nth-child(1) { width: 180px; }
-.teacher-capability-table th:nth-child(2) { width: 170px; }
-.teacher-capability-table th:nth-child(3) { width: 150px; }
-.teacher-capability-table th:nth-child(4) { width: 260px; }
-.teacher-capability-table th:nth-child(5) { width: 110px; }
-.teacher-capability-table th:nth-child(6) { width: 180px; }
-.teacher-capability-table td { vertical-align: top; }
+.teacher-list-table table { min-width: 1020px; }
+.teacher-list-table th:nth-child(1) { width: 200px; }
+.teacher-list-table th:nth-child(2) { width: 260px; }
+.teacher-list-table th:nth-child(3) { width: 150px; }
+.teacher-list-table th:nth-child(4) { width: 200px; }
+.teacher-list-table th:nth-child(5) { width: 210px; }
+.teacher-list-table td { vertical-align: top; }
 .teacher-featured-switch { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 28px; cursor: pointer; }
 .teacher-featured-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .teacher-featured-track { position: relative; width: 36px; height: 20px; border-radius: 10px; background: #c8cdd4; transition: background-color .18s ease; }
@@ -20,7 +19,6 @@
 .teacher-name { margin-bottom: 5px; font-weight: 600; }
 .teacher-cell-sub { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .teacher-todo-list, .teacher-inline-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.teacher-capability-table [data-cell="capability"] .tag + .tag { margin-left: 6px; }
 .teacher-state-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
 .teacher-state-card span, .teacher-state-card strong { display: block; }
 .teacher-state-card > span { color: var(--muted); font-size: 12px; }
@@ -44,11 +42,32 @@
 .teacher-form .certificate-row-invalid input,
 .teacher-form .certificate-row-invalid select { border-color: #ff7875; }
 .teacher-form .form-actions { position: sticky; bottom: 0; z-index: 3; background: rgba(255,255,255,.96); }
-.teacher-action-dialog { width: min(520px, calc(100vw - 32px)); }
+.teacher-action-dialog { width: min(820px, calc(100vw - 32px)); }
 .teacher-action-dialog .modal-card { max-height: calc(100vh - 32px); }
 .teacher-action-summary { display: grid; gap: 6px; padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: #fafafa; }
 .teacher-action-summary strong { font-size: 16px; }
 .teacher-action-summary span { color: var(--muted); font-size: 13px; }
+.teacher-resign-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; margin-top: 16px; }
+.teacher-resign-fields textarea { min-height: 78px; resize: vertical; }
+.teacher-handoff { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.teacher-handoff-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.teacher-handoff-heading h3 { margin: 0; font-size: 16px; }
+.teacher-handoff-heading p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.teacher-handoff-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+.teacher-handoff-summary > div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fafafa; }
+.teacher-handoff-summary span, .teacher-handoff-summary small { display: block; color: var(--muted); font-size: 11px; }
+.teacher-handoff-summary strong { display: block; margin-top: 4px; font-size: 20px; }
+.teacher-handoff-list { display: grid; gap: 10px; }
+.teacher-handoff-row { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(220px, .8fr); align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; }
+.teacher-handoff-course strong, .teacher-handoff-course span, .teacher-handoff-course small { display: block; }
+.teacher-handoff-course span { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.teacher-handoff-course small { margin-top: 5px; color: var(--muted); font-size: 11px; }
+.teacher-handoff-row .form-field { margin: 0; }
+.teacher-handoff-row .form-field small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.teacher-handoff-empty { padding: 18px; border: 1px dashed var(--line); border-radius: 6px; background: #fafafa; }
+.teacher-handoff-empty strong, .teacher-handoff-empty span { display: block; }
+.teacher-handoff-empty span { margin-top: 5px; color: var(--muted); font-size: 12px; }
+.teacher-action-dialog #teacher-action-confirm:disabled { opacity: .5; cursor: not-allowed; }
 .teacher-import-dialog { width: min(860px, calc(100vw - 32px)); }
 .teacher-import-dialog [hidden] { display: none !important; }
 .teacher-import-section { padding: 18px 0; border-top: 1px solid var(--line); }
@@ -170,3 +189,9 @@
 .teacher-wizard-step .teacher-form-actions { margin-top: 12px; }
 /* 第二步时第一步的页签条与表单整体隐藏；.teacher-tabbar 自身声明了 display，需要显式覆盖。 */
 .teacher-tabbar[hidden], .card[hidden], .teacher-wizard-step[hidden] { display: none; }
+
+@media (max-width: 640px) {
+  .teacher-resign-fields, .teacher-handoff-row { grid-template-columns: 1fr; }
+  .teacher-handoff-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .teacher-handoff-heading { flex-direction: column; }
+}

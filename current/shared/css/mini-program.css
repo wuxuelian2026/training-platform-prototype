@@ -622,6 +622,10 @@ body { background: #f7f7f5; }
 .mp-homework-readonly-block { margin-top: 14px; padding-top: 11px; border-top: 1px solid #eee9e5; }
 .mp-homework-readonly-block strong { display: block; color: #514943; font-size: 10px; }
 .mp-homework-readonly-block p { margin: 6px 0 0; color: #514943; font-size: 11px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mp-homework-format-requirements { margin: 14px 0 0; padding: 11px 12px; border: 1px solid #e8dfd8; border-left: 3px solid var(--brand); border-radius: 6px; background: #fbf8f5; }
+.mp-homework-format-requirements strong { display: block; color: #514943; font-size: 10px; }
+.mp-homework-format-requirements ul { display: grid; gap: 5px; margin: 7px 0 0; padding: 0; list-style: none; }
+.mp-homework-format-requirements li { color: #6b625c; font-size: 10px; line-height: 1.55; overflow-wrap: anywhere; }
 @media (max-width: 420px) {
   .mp-homework-readonly-facts { grid-template-columns: 1fr; gap: 8px; }
 }
