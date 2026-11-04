@@ -334,3 +334,12 @@ html.is-matrix-dragging, html.is-matrix-dragging * { user-select: none; }
 .academic-adjustment-log li small { color: var(--muted); font-size: 11px; }
 .academic-time-range { display: flex; align-items: center; gap: 8px; }
 .academic-time-range input { min-width: 0; flex: 1; }
+/* ===== CR-2026-163：评价管理列表与详情 ===== */
+.star-cell { color: #c78d1e; white-space: nowrap; }
+.star-cell .star-score { display: inline-block; margin-left: 6px; color: #7a8291; font-size: 12px; }
+.review-dim-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px dashed #eef1f5; }
+.review-dim-row span { font-size: 13px; }
+.review-dim-row strong { color: #c78d1e; letter-spacing: 2px; }
+.review-dim-row strong em { margin-left: 6px; color: #7a8291; font-style: normal; font-size: 12px; letter-spacing: 0; }
+.review-detail-block { margin: 0 0 12px; }
+.review-detail-block h4 { margin: 0 0 4px; }

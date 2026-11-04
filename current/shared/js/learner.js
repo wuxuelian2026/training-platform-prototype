@@ -26,6 +26,8 @@ const { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, 
 const { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } = __classicRequire("shared/js/teacher-facts.js");
 const { isRichMarkup, richTextToHtml, sanitizeRichText } = __classicRequire("shared/js/rich-editor.js");
 const { classLessonProgress, classSalesProjection, classTeachingStatus, lessonStatusOf, sessionsInScheduleOrder } = __classicRequire("shared/js/class-lifecycle.js");
+// CR-2026-163：班级评价（学员端提交，后台评价管理只读）。
+const { REVIEW_DIMENSIONS, getClassReview, submitClassReview } = __classicRequire("shared/js/review-store.js");
 
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
@@ -1254,6 +1256,89 @@ function classResultActions(item, record) {
   const resultNote = `<p class="mp-class-result-actions-note">${statusNote}</p>`;
   return `<section class="mp-class-result-actions" aria-label="学习成果入口"><h3>学习成果</h3>${resultNote}<div class="mp-class-result-actions-grid">${action('查看学习报告', reportReady, '学习报告未生成')}${action('查看结业证书', certificateReady, '结业证书未生成')}</div></section>`;
 }
+// ===== CR-2026-163：班级评价（每学员每班 1 次；提交后只读回看）=====
+// 评价操作区固定在页面底部：未评价时按钮可用；已评价置灰，点击只打开只读回看。
+function classReviewSection(item) {
+  const existing = getClassReview(item.id, currentStudent()?.name);
+  const label = existing ? '已评价' : '评价';
+  const hint = existing ? '已提交评价 · 点击查看' : '对课程与授课教师进行五星评价（每班限 1 次）';
+  return `<section class="mp-class-review-actions" aria-label="班级评价入口"><button class="mp-button secondary ${existing ? 'is-disabled' : ''}" type="button" data-class-review="${existing ? 'view' : 'submit'}" ${existing ? 'aria-disabled="true"' : ''}><span>评价</span></button><p class="mp-class-review-hint">${esc(hint)}</p></section>`;
+}
+// 星级行：一组 5 颗星按钮；点击即选中，可改选（覆盖式，不点同一颗取消）。
+function reviewRatingRow(group, label, value = 0, readOnly = false) {
+  const stars = [1, 2, 3, 4, 5].map((score) => {
+    const on = score <= value;
+    return `<button class="mp-review-star${on ? ' is-on' : ''}" type="button" data-review-group="${group}" data-rating="${score}" aria-label="${score} 星" aria-pressed="${on}" ${readOnly ? 'disabled' : ''}>★</button>`;
+  }).join('');
+  return `<div class="mp-review-row"><span class="mp-review-label">${esc(label)}</span><div class="mp-review-stars" data-review-group="${group}" data-value="${value}">${stars}</div></div>`;
+}
+function reviewStarsSummary(review) {
+  const dims = REVIEW_DIMENSIONS.map(({ key, label }) => `<div class="mp-review-summary-row"><span>${esc(label)}</span><strong>${'★★★★★'.slice(0, review.teacherRatings[key])}</strong></div>`).join('');
+  return `<div class="mp-review-summary"><div class="mp-review-summary-row"><span>课程评价</span><strong>${'★★★★★'.slice(0, review.courseRating)}</strong></div>${dims}</div>`;
+}
+function openClassReviewDialog(item) {
+  document.querySelector('#class-review-dialog')?.remove();
+  const existing = getClassReview(item.id, currentStudent()?.name);
+  const readOnly = Boolean(existing);
+  const teacherRows = REVIEW_DIMENSIONS.map(({ key, label }) => reviewRatingRow(key, label, existing?.teacherRatings?.[key] || 0, readOnly)).join('');
+  const body = `<div class="mp-review-block"><h4>课程评价</h4>${reviewRatingRow('course', '课程整体满意度', existing?.courseRating || 0, readOnly)}</div>`
+    + `<div class="mp-review-block"><h4>教师评价</h4><p class="mp-review-block-note">请按五个维度分别评分（1–5 星）</p>${teacherRows}</div>`;
+  const actions = readOnly
+    ? '<button type="button" class="mp-button" data-dialog-close>关闭</button>'
+    : '<button type="button" class="mp-button" data-dialog-close>取消</button><button type="button" class="mp-button primary" data-review-submit disabled>提交评价</button>';
+  const dialog = document.createElement('dialog');
+  dialog.id = 'class-review-dialog';
+  dialog.className = 'mp-review-dialog';
+  dialog.innerHTML = `<div class="mp-review-dialog-head"><h3>班级评价</h3><p>${esc(item.className || item.name)} · ${esc(item.courseName || item.name)} · ${esc(item.teacher)}老师</p></div><div class="mp-review-dialog-body">${body}${readOnly ? reviewStarsSummary(existing) : ''}</div><div class="mp-review-dialog-actions">${actions}</div>`;
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  const close = () => { dialog.close(); dialog.remove(); };
+  dialog.querySelectorAll('[data-dialog-close]').forEach((node) => node.addEventListener('click', close));
+  if (readOnly) return;
+  // 星级点击：更新组值与星样式；全部评完（6 项）后放开提交。
+  const submitButton = dialog.querySelector('[data-review-submit]');
+  const syncSubmit = () => {
+    const groups = [...dialog.querySelectorAll('.mp-review-stars')];
+    const complete = groups.every((group) => Number(group.dataset.value) >= 1);
+    submitButton.disabled = !complete;
+    submitButton.textContent = complete ? '提交评价' : '待评完 6 项';
+  };
+  dialog.querySelectorAll('.mp-review-star').forEach((star) => star.addEventListener('click', () => {
+    const group = star.closest('.mp-review-stars');
+    const score = Number(star.dataset.rating);
+    group.dataset.value = String(score);
+    group.querySelectorAll('.mp-review-star').forEach((node) => {
+      const on = Number(node.dataset.rating) <= score;
+      node.classList.toggle('is-on', on);
+      node.setAttribute('aria-pressed', String(on));
+    });
+    syncSubmit();
+  }));
+  syncSubmit();
+  submitButton.addEventListener('click', () => {
+    const valueOf = (group) => Number(dialog.querySelector(`.mp-review-stars[data-review-group="${group}"]`)?.dataset.value || 0);
+    const result = submitClassReview({
+      classId: item.id,
+      className: item.className || item.name,
+      courseName: item.courseName || item.name,
+      teacher: item.teacher,
+      studentName: currentStudent()?.name,
+      courseRating: valueOf('course'),
+      teacherRatings: Object.fromEntries(REVIEW_DIMENSIONS.map(({ key }) => [key, valueOf(key)]))
+    });
+    if (!result.ok) { toast(result.reason); return; }
+    close();
+    toast('评价提交成功，感谢反馈。');
+    // 就地刷新评价入口状态（已评价置灰），不整页重载。
+    const section = document.querySelector('.mp-class-review-actions');
+    if (section) section.outerHTML = classReviewSection(item);
+    const button = document.querySelector('[data-class-review]');
+    button?.addEventListener('click', () => openClassReviewDialog(item));
+  });
+}
+function bindClassReviewActions(item) {
+  document.querySelector('[data-class-review]')?.addEventListener('click', () => openClassReviewDialog(item));
+}
 // 课次详情弹层：不新增独立页面（独立课次详情页属迭代2 范围）。
 // CR-2026-132：课次身份用「第 N 次 / 共 M 次」讲清进度，上课地点取该课次教室，
 // 未开始课次只展示安排，已上课次展示出勤结果、课后作业与教师评语。
@@ -1309,12 +1394,14 @@ function renderClassDetail(item, tab = params.get('tab') || 'overview') {
   // 有正式课次时才渲染「课次」分段；导航列数随实际分段数走，避免出现空锚点。
   const navSections = CLASS_DETAIL_SECTIONS.filter(([key]) => key !== 'lessons' || sessions.length > 0);
   const nav = `<nav class="mp-class-nav" aria-label="班级详情分段" style="grid-template-columns: repeat(${navSections.length}, 1fr) auto">${navSections.map(([key, label]) => `<button class="mp-tab" type="button" data-class-nav="${key}" aria-selected="false">${label}</button>`).join('')}<button class="mp-tab mp-class-nav-help" type="button" data-class-help>说明</button></nav>`;
-  // I1-CLASS-DETAIL-22：本页不设底部操作条（咨询走线下联系老师；分享只在课次段一处；进入学习改由学习中心进入）。
+  // I1-CLASS-DETAIL-22：本页不设咨询/分享底部操作条（咨询走线下联系老师；分享只在课次段一处；进入学习改由学习中心进入）。
+  // CR-2026-163：底部操作条仅保留「评价」一个动作（推翻 I1-CLASS-DETAIL-22 的「无底部操作条」表述，其余口径不变）。
   // I1-CLASS-DETAIL-17：作业入口只保留在课次行内，取消顶部「待提交作业」卡（客户 2026-09-23 口径）。
   // I1-CLASS-DETAIL-19：已结课班不渲染空的「下次上课」卡（无下一次课对结课班是噪音）。
   const nextCard = record.status === 'ended' ? '' : classNextSessionView(item, nextSession, sessions);
-  // 阅读顺序：结论 → 班级信息 → 课次（当前进度）→ 课程资料 → 已结束班级的结果入口。
-  layout(stack(nav, nextCard, classInfoView(item, record, sessions), classLessonsView(item, sessions, { ended: record.status === 'ended' }), classMaterialView(item), classResultActions(item, record)));
+  // 阅读顺序：结论 → 班级信息 → 课次（当前进度）→ 课程资料 → 已结束班级的结果入口 → 班级评价入口。
+  layout(stack(nav, nextCard, classInfoView(item, record, sessions), classLessonsView(item, sessions, { ended: record.status === 'ended' }), classMaterialView(item), classResultActions(item, record), classReviewSection(item)));
+  bindClassReviewActions(item);
   document.querySelectorAll('[data-class-share]').forEach(button => button.addEventListener('click', () => shareClassTimetable(item)));
   document.querySelectorAll('[data-class-fold]').forEach(button => button.addEventListener('click', () => {
     const body = document.getElementById(`class-fold-${button.dataset.classFold}`);

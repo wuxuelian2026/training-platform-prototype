@@ -136,6 +136,22 @@ const LEARNER_APP_FIELD_SPEC = {
         '修改密码需两次输入一致，修改成功后需重新登录；密码长度为 6–20 位。',
         '退出登录只清除本机登录态，不删除账号数据。'
       ]
+    },
+    'learner/class-detail': {
+      groups: [{ heading: '班级评价弹窗字段（CR-2026-163）', fields: [
+        { id: 'FD-LAPP-036', label: '评价入口', type: '按钮', length: '—', required: '是', note: '班级详情底部操作区；未评价可点击，已评价置灰为「已评价」并只读回看', constraints: { action: true } },
+        { id: 'FD-LAPP-037', label: '课程评价', type: '评分', length: '1–5 星', required: '是', note: '课程整体满意度，点击星即选中，可改选', constraints: { min: 1, max: 5 } },
+        { id: 'FD-LAPP-038', label: '课堂体验适配度', type: '评分', length: '1–5 星', required: '是', note: '教师评价维度一：课堂内容与学员水平的匹配程度', constraints: { min: 1, max: 5 } },
+        { id: 'FD-LAPP-039', label: '成长感知清晰度', type: '评分', length: '1–5 星', required: '是', note: '教师评价维度二：学员进步与成长反馈的可感知程度', constraints: { min: 1, max: 5 } },
+        { id: 'FD-LAPP-040', label: '家校沟通顺畅度', type: '评分', length: '1–5 星', required: '是', note: '教师评价维度三：与家长沟通的及时性与清晰度', constraints: { min: 1, max: 5 } },
+        { id: 'FD-LAPP-041', label: '教学稳定性与责任心', type: '评分', length: '1–5 星', required: '是', note: '教师评价维度四：授课稳定、认真负责的程度', constraints: { min: 1, max: 5 } },
+        { id: 'FD-LAPP-042', label: '实际教学成果', type: '评分', length: '1–5 星', required: '是', note: '教师评价维度五：阶段性学习成果的达成程度', constraints: { min: 1, max: 5 } },
+        { id: 'FD-LAPP-043', label: '提交评价', type: '按钮', length: '—', required: '是', note: '6 项全部评分后可用；提交成功后入口置灰并写入评价记录', constraints: { action: true } }
+      ] }],
+      notes: [
+        '每个学员每个班级限提交 1 次评价；判重键为班级 + 评价人，已评价仅支持只读回看。',
+        '评价提交后写入共享评价记录，后台「评价管理」只读展示；评价无文字评语（后续版本池）。'
+      ]
     }
   }
 };

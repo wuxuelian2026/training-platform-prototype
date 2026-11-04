@@ -18,6 +18,8 @@ const { classEnrollmentCondition, classScheduleChangeAllowed, classScheduleStatu
 const { homeworkLifecycleStatus, homeworkRosterDrift, listHomework, listSubmissions, submissionSummary } = __classicRequire("shared/js/homework-store.js");
 const { graduationSeed: graduation } = __classicRequire("shared/js/graduation-seed.js");
 const { CERTIFICATE_STATUS, ensureCompletionCertificate, listCompletionCertificates, voidCompletionCertificate } = __classicRequire("shared/js/completion-certificate-store.js");
+// CR-2026-163：班级评价只读监管视图（评价由学员端产生）。
+const { REVIEW_DIMENSIONS, listClassReviews, teacherAverage, starText } = __classicRequire("shared/js/review-store.js");
 
 const academicRoot = document.querySelector('[data-academic-page]');
 const academicPage = academicRoot?.dataset.academicPage;
@@ -1753,6 +1755,36 @@ function renderCompletionCertificates() {
   applyFilter('certificate-filter', rows, (form) => (item) => (!form.status?.value || item.status === form.status.value) && (!form.studentName?.value || item.studentName === form.studentName.value) && (!form.className?.value || item.className === form.className.value) && (!form.course?.value || item.course === form.course.value), row);
 }
 
+// ===== CR-2026-163：评价管理（只读列表 + 可搜索筛选 + 详情）=====
+function renderClassReviews() {
+  const rows = listClassReviews();
+  academicData = rows;
+  const classes = [...new Set(rows.map((item) => item.className))];
+  const courses = [...new Set(rows.map((item) => item.courseName))];
+  const teachers = [...new Set(rows.map((item) => item.teacher))];
+  pageFrame('评价管理', '学员端提交的班级评价 · 只读监管视图，不提供新增、修改或删除', '',
+    filterPanel('review-filter',
+      searchableSelect('班级名称', 'className', classes, false, '搜索并选择班级')
+      + searchableSelect('课程名称', 'courseName', courses, false, '搜索并选择课程')
+      + searchableSelect('授课教师', 'teacher', teachers, false, '搜索并选择教师'))
+    + table('<thead><tr><th>评价编号</th><th>班级名称</th><th>课程名称</th><th>授课老师</th><th>评价人</th><th>评价时间</th><th>课程评价</th><th>教师评价</th><th>操作</th></tr></thead>'));
+  const row = (item) => {
+    const avg = teacherAverage(item.teacherRatings);
+    return `<td><strong>${escapeHtml(item.id)}</strong></td><td>${escapeHtml(item.className)}</td><td>${escapeHtml(item.courseName)}</td><td>${escapeHtml(item.teacher || '—')}</td><td>${escapeHtml(item.studentName)}</td><td>${escapeHtml(item.createdAt || '—')}</td><td class="star-cell">${starText(item.courseRating)}<span class="star-score">${item.courseRating} 分</span></td><td class="star-cell">${avg ? starText(avg) + `<span class="star-score">${avg.toFixed(1)} 分均分</span>` : '—'}</td><td class="action-cell"><button class="text-button" data-academic-action="review-detail">查看详情</button></td>`;
+  };
+  renderRows(academicData, row);
+  bindAttendanceSearchSelects(document.querySelector('#review-filter'));
+  applyFilter('review-filter', academicData, (form) => { const { className, courseName, teacher } = form; return (item) => (!className?.value || item.className === className.value) && (!courseName?.value || item.courseName === courseName.value) && (!teacher?.value || item.teacher === teacher.value); }, row);
+}
+function openReviewDetail(row) {
+  if (!row) return;
+  const avg = teacherAverage(row.teacherRatings);
+  const dims = REVIEW_DIMENSIONS.map(({ key, label }) => `<div class="review-dim-row"><span>${escapeHtml(label)}</span><strong>${starText(row.teacherRatings[key])}<em>${row.teacherRatings[key]} 分</em></strong></div>`).join('');
+  openDialog('评价详情', `${escapeHtml(row.className)} · ${escapeHtml(row.courseName)} · ${escapeHtml(row.teacher)}老师 · 评价人：${escapeHtml(row.studentName)} · ${escapeHtml(row.createdAt || '—')}`,
+    `<div class="review-detail-block"><h4>课程评价</h4><div class="review-dim-row"><span>课程整体满意度</span><strong>${starText(row.courseRating)}<em>${row.courseRating} 分</em></strong></div></div>`
+    + `<div class="review-detail-block"><h4>教师评价${avg ? `（均分 ${avg.toFixed(1)} 分）` : ''}</h4>${dims}</div>`,
+    '<button type="button" class="button" data-dialog-close>关闭</button>');
+}
 function openSimpleForm(title, subtitle, body, onSubmit, actions = '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="academic-form" class="button primary">确认</button>') {
   const dialog = openDialog(title, subtitle, `<form id="academic-form" class="academic-dialog-grid">${body}</form>`, actions);
   dialog.querySelector('#academic-form')?.addEventListener('submit', (event) => { event.preventDefault(); onSubmit(new FormData(event.currentTarget), dialog); });
@@ -2008,6 +2040,7 @@ function handleAction(action, row) {
   if (action === 'campus-delete') return deleteCampus(row);
   if (action === 'building-delete') return deleteBuilding(row);
   if (action === 'venue-create' || action === 'venue-edit') return openVenueForm(action === 'venue-edit' ? row : null);
+  if (action === 'review-detail') return openReviewDetail(row);
   if (action === 'venue-import') return openVenueImport();
   if (action === 'venue-toggle') return toggleVenue(row);
   if (action === 'venue-delete') return deleteVenue(row);
@@ -2211,6 +2244,7 @@ if (academicPage === 'messages') renderMessages();
 if (academicPage === 'graduation') renderGraduation();
 if (academicPage === 'reports') renderReports();
 if (academicPage === 'certificates') renderCompletionCertificates();
+if (academicPage === 'reviews') renderClassReviews();
 
 
 __classicExports["openSchedulePlanner"] = openSchedulePlanner;

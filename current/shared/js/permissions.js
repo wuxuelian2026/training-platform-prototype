@@ -57,6 +57,7 @@ const PERMISSION_POINTS = [
   { id: 'PERM-ACADEMIC-007', module: '教务执行监管', object: '结业', action: '结业审核', scopes: TEACHING, note: '按学员复核结业结果' },
   { id: 'PERM-ACADEMIC-008', module: '教务执行监管', object: '学习报告', action: '报告管理', scopes: TEACHING, note: '生成、发布、撤回与删除学习报告' },
   { id: 'PERM-ACADEMIC-009', module: '教务执行监管', object: '结业证书', action: '证书管理', scopes: TEACHING, note: '查看、发放、作废结业证书' },
+  { id: 'PERM-ACADEMIC-010', module: '教务执行监管', object: '评价', action: '评价管理', scopes: TEACHING, note: '查看学员提交的班级评价列表与详情（CR-2026-163）' },
   // CR-2026-085：交易中心承接订单与退款单据（交易状态、退款发起与执行）；资金流水与结算仍在财务中心。
   // CR-2026-155 C9：退款取消审批环节，原「退款审批」权限点改为「退款发起」，编号保持不变。
   { id: 'PERM-TRADE-001', module: '交易中心', object: '订单', action: '订单查看', scopes: VIEW, note: '查看统一订单列表与订单详情' },
@@ -138,6 +139,7 @@ const ADMIN_PAGE_PERMISSIONS = {
   '/admin/pages/academic/graduation.html': ['PERM-ACADEMIC-007'],
   '/admin/pages/academic/reports.html': ['PERM-ACADEMIC-008'],
   '/admin/pages/academic/certificates.html': ['PERM-ACADEMIC-009'],
+  '/admin/pages/academic/reviews.html': ['PERM-ACADEMIC-010'],
   '/admin/pages/finance/salary.html': ['PERM-FINANCE-001'],
   '/admin/pages/finance/payments.html': ['PERM-FINANCE-002'],
   '/admin/pages/finance/refunds.html': ['PERM-TRADE-002'],

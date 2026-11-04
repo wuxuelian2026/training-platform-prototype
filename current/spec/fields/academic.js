@@ -125,6 +125,26 @@ const ACADEMIC_FIELD_SPEC = {
         { id: 'FD-ACADEMIC-097', label: '作废原因', type: '文本（只读）', length: '≤ 200 字', required: '作废时必填', note: '记录作废理由，操作人和操作时间同时留痕', constraints: { readOnly: true, maxLength: 200 } }
       ] }], notes: ['MVP 仅一套系统默认固定模板，不提供可视化模板编辑器；证书生成成功后保存 PDF 快照。']
     },
+    'academic/reviews': {
+      groups: [{ heading: '评价管理列表字段（CR-2026-163）', fields: [
+        { id: 'FD-ACADEMIC-101', label: '评价编号', type: '文本（只读）', length: '系统生成', required: '系统生成', note: 'REV 前缀全局唯一，按评价时间倒序展示', constraints: { readOnly: true, system: true } },
+        { id: 'FD-ACADEMIC-102', label: '班级名称', type: '关联对象（只读）', length: '班级档案快照', required: '系统派生', note: '评价提交时冻结的班级名称快照', constraints: { readOnly: true } },
+        { id: 'FD-ACADEMIC-103', label: '课程名称', type: '关联对象（只读）', length: '课程档案快照', required: '系统派生', note: '评价提交时冻结的课程名称快照', constraints: { readOnly: true } },
+        { id: 'FD-ACADEMIC-104', label: '授课老师', type: '关联对象（只读）', length: '教师姓名快照', required: '系统派生', note: '评价提交时冻结的授课教师快照', constraints: { readOnly: true } },
+        { id: 'FD-ACADEMIC-105', label: '评价人', type: '关联对象（只读）', length: '学员姓名快照', required: '系统派生', note: '提交评价的学员（家长账号当前学员）', constraints: { readOnly: true } },
+        { id: 'FD-ACADEMIC-106', label: '评价时间', type: '时间（只读）', length: 'YYYY-MM-DD HH:mm', required: '系统生成', note: '评价提交时间', constraints: { readOnly: true, system: true } },
+        { id: 'FD-ACADEMIC-107', label: '课程评价', type: '评分（只读）', length: '1–5 星', required: '是', note: '课程整体满意度星级与分值', constraints: { readOnly: true, min: 1, max: 5 } },
+        { id: 'FD-ACADEMIC-108', label: '教师评价', type: '评分（只读）', length: '均分 1.0–5.0', required: '是', note: '五维度星级之和 ÷ 5，保留 1 位小数', constraints: { readOnly: true, min: 1, max: 5 } },
+        { id: 'FD-ACADEMIC-109', label: '班级筛选', type: '下拉（可搜索）', length: '评价班级快照集合', required: '否', note: '模糊搜索并选择班级，清空恢复全量' },
+        { id: 'FD-ACADEMIC-110', label: '课程筛选', type: '下拉（可搜索）', length: '评价课程快照集合', required: '否', note: '模糊搜索并选择课程，清空恢复全量' },
+        { id: 'FD-ACADEMIC-111', label: '授课教师筛选', type: '下拉（可搜索）', length: '评价教师快照集合', required: '否', note: '模糊搜索并选择教师，清空恢复全量' },
+        { id: 'FD-ACADEMIC-112', label: '评价详情', type: '弹窗（只读）', length: '—', required: '—', note: '课程评价星级 + 教师评价五维度星级明细与均分', constraints: { action: true } }
+      ] }],
+      notes: [
+        '评价管理为只读监管视图，不提供新增、修改或删除；评价仅由学员端班级详情页提交。',
+        '每个学员每个班级限 1 次评价；教师评价五维度：课堂体验适配度、成长感知清晰度、家校沟通顺畅度、教学稳定性与责任心、实际教学成果。'
+      ]
+    },
     'academic/timetable': {
       groups: [{ heading: '课表筛选与视图字段', fields: [
         { id: 'FD-ACADEMIC-078', label: '视图', type: '页签', length: '课次列表 / 教室视图 / 教师视图 / 班级视图', required: '是', note: '四种视图共用同一份课次数据源' },

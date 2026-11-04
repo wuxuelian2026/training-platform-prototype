@@ -89,6 +89,7 @@ const navGroups = [
       ['毕', '结业审核', '/admin/pages/academic/graduation.html', 'academic'],
       ['报', '学习报告管理', '/admin/pages/academic/reports.html', 'academic']
       ,['证', '结业证书', '/admin/pages/academic/certificates.html', 'academic']
+      ,['评', '评价管理', '/admin/pages/academic/reviews.html', 'academic']
     ]
   },
   {
