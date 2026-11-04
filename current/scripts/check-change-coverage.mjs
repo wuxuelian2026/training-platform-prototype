@@ -19,8 +19,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repoRoot = path.resolve(root, '../..');
-const changesDir = path.join(repoRoot, 'PRD/开发实施PRD/changes');
-const baselineFile = path.join(repoRoot, 'PRD/开发实施PRD/12-测试与验收实施基线.md');
+const changesDir = path.join(repoRoot, '项目过程文档/PRD/开发实施PRD/changes');
+const baselineFile = path.join(repoRoot, '项目过程文档/PRD/开发实施PRD/12-测试与验收实施基线.md');
 const legacyFile = path.join(changesDir, '.legacy-no-tc.txt');
 
 if (!existsSync(changesDir)) {

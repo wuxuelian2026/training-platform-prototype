@@ -155,8 +155,8 @@ for (const key of duplicatedDefinitions) {
 // 规格里出现过的长度写法一旦出现在开发实施 PRD，说明业务口径被抄了第二份。
 const repoRoot = path.resolve(root, '../..');
 const devPrdFiles = [
-  'PRD/开发实施PRD/09-接口契约.md',
-  'PRD/开发实施PRD/10-数据库模型与约束.md'
+  '项目过程文档/PRD/开发实施PRD/09-接口契约.md',
+  '项目过程文档/PRD/开发实施PRD/10-数据库模型与约束.md'
 ];
 const lengthIdioms = [...new Set(teacherFields.map((field) => String(field.length || '')))]
   .filter((value) => /\d\s*(字|字符|位)/.test(value));
@@ -231,7 +231,7 @@ for (const machine of STATE_MACHINES) {
 }
 
 // 2.7) diagram: true 的状态机必须在 05-状态字典里能找到对应状态机图。
-const dictionaryPath = path.join(repoRoot, 'PRD/开发实施PRD/05-状态字典.md');
+const dictionaryPath = path.join(repoRoot, '项目过程文档/PRD/开发实施PRD/05-状态字典.md');
 if (existsSync(dictionaryPath)) {
   const dictionary = readFileSync(dictionaryPath, 'utf8');
   const sections = new Map();

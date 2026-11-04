@@ -16,8 +16,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repoRoot = path.resolve(root, '../..');
-const tableFile = path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/12-后台管理端-全局业务规则.md');
-const docDirs = ['PRD/原始完整版PRD-拆分版', 'PRD/开发实施PRD'];
+const tableFile = path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/12-后台管理端-全局业务规则.md');
+const docDirs = ['项目过程文档/PRD/原始完整版PRD-拆分版', '项目过程文档/PRD/开发实施PRD'];
 const ALLOWED_FILES = new Set(['12-后台管理端-全局业务规则.md', '05-状态字典.md', '12-测试与验收实施基线.md']);
 
 if (!existsSync(tableFile)) {

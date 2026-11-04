@@ -22,7 +22,7 @@ const { STATE_MACHINES, stateLabelsOf } = await loadClassicModule('spec/states/i
 
 const target = {
   marker: 'STATES index',
-  file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/13-后台管理端-状态字典.md')
+  file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/13-后台管理端-状态字典.md')
 };
 
 const renderIndex = () => [

@@ -209,7 +209,7 @@ const STATE_MACHINES = [
   {
     "id": "SM-REPORT",
     "object": "报告",
-    "diagram": true,
+    "diagram": false,
     "pages": [
       "academic/reports"
     ],

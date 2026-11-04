@@ -27,94 +27,94 @@ const PRD_TARGETS = [
   {
     pageKey: 'teachers/create',
     marker: 'FIELDS teachers/create',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/03-后台管理端-师资中心.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/03-后台管理端-师资中心.md')
   },
   {
     pageKey: 'inventory/categories',
     marker: 'FIELDS inventory/categories',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/09-后台管理端-物资中心.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/09-后台管理端-物资中心.md')
   },
   {
     pageKey: 'courses/catalog',
     marker: 'FIELDS courses/catalog',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/04-后台管理端-课程中心.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/04-后台管理端-课程中心.md')
   },
   {
     pageKey: 'inventory/materials',
     marker: 'FIELDS inventory/materials',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/09-后台管理端-物资中心.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/09-后台管理端-物资中心.md')
   },
   {
     pageKey: 'inventory/stock-in',
     marker: 'FIELDS inventory/stock-in',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/09-后台管理端-物资中心.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/09-后台管理端-物资中心.md')
   },
   {
     pageKey: 'inventory/stock-out',
     marker: 'FIELDS inventory/stock-out',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/09-后台管理端-物资中心.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/09-后台管理端-物资中心.md')
   },
   {
     pageKey: 'crm/classes',
     marker: 'FIELDS crm/classes',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/06-后台管理端-面授招生与CRM.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/06-后台管理端-面授招生与CRM.md')
   },
   {
     pageKey: 'crm/trials',
     marker: 'FIELDS crm/trials',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/06-后台管理端-面授招生与CRM.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/06-后台管理端-面授招生与CRM.md')
   },
   {
     pageKey: 'finance/refunds',
     marker: 'FIELDS finance/refunds',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/08-后台管理端-财务中心.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/08-后台管理端-财务中心.md')
   },
   {
     pageKey: 'academic/messages',
     marker: 'FIELDS academic/messages',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/07-后台管理端-教务执行监管.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/07-后台管理端-教务执行监管.md')
   },
   {
     pageKey: 'courses/application-review',
     marker: 'FIELDS courses/application-review',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/04-后台管理端-课程中心.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/04-后台管理端-课程中心.md')
   },
   {
     pageKey: 'courses/resources',
     marker: 'FIELDS courses/resources',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/04-后台管理端-课程中心.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/04-后台管理端-课程中心.md')
   },
   {
     pageKey: 'courses/library',
     marker: 'FIELDS courses/library',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/04-后台管理端-课程中心.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/04-后台管理端-课程中心.md')
   },
   {
     pageKey: 'mall/products',
     marker: 'FIELDS mall/products',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/05-后台管理端-商城运营.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/05-后台管理端-商城运营.md')
   },
   {
     pageKey: 'mall/banners',
     marker: 'FIELDS mall/banners',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/05-后台管理端-商城运营.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/05-后台管理端-商城运营.md')
   },
   {
     pageKey: 'teacher/class-detail',
     marker: 'FIELDS teacher/class-detail',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/18-小程序-教师端.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/18-小程序-教师端.md')
   },
   {
     pageKey: 'learner/login',
     groupIndex: 0,
     marker: 'FIELDS learner/login#code',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/19-小程序-学员端.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/19-小程序-学员端.md')
   },
   {
     pageKey: 'learner/login',
     groupIndex: 1,
     marker: 'FIELDS learner/login#password',
-    file: path.join(repoRoot, 'PRD/原始完整版PRD-拆分版/19-小程序-学员端.md')
+    file: path.join(repoRoot, '项目过程文档/PRD/原始完整版PRD-拆分版/19-小程序-学员端.md')
   }
 ];
 
