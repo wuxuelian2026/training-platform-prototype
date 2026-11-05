@@ -74,6 +74,12 @@ const navGroups = [
     ]
   },
   {
+    icon: '营', label: '招生营销', items: [
+      ['礼', '分享有礼活动', '/admin/pages/marketing/activity.html', 'marketing'],
+      ['裂', '裂变营销记录', '/admin/pages/marketing/records.html', 'marketing']
+    ]
+  },
+  {
     icon: '物', label: '物资中心', items: [
       ['类', '物资分类管理', '/admin/pages/inventory/categories.html', 'inventory'],
       ['物', '物资管理', '/admin/pages/inventory/materials.html', 'inventory'],

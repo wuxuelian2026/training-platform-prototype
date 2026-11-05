@@ -152,6 +152,29 @@ const LEARNER_APP_FIELD_SPEC = {
         '每个学员每个班级限提交 1 次评价；判重键为班级 + 评价人，已评价仅支持只读回看。',
         '评价提交后写入共享评价记录，后台「评价管理」只读展示；评价无文字评语（后续版本池）。'
       ]
+    },
+    // CR-2026-164：学员端分享有礼（我的模块入口 + 活动页 + 我的邀请）。
+    'learner/referral': {
+      groups: [
+        { heading: '分享有礼活动页字段', fields: [
+          { id: 'FD-LAPP-044', label: '分享有礼入口', type: '入口（胶囊广告图）', length: '—', required: '是', note: '「我的」页「我的订单」下方的胶囊广告图，图由后台配置，点击进入活动页；活动进行中带角标；不放页面顶部', constraints: { action: true } },
+          { id: 'FD-LAPP-045', label: '活动页背景图', type: '只读（图片）', length: '—', required: '系统展示', note: '后台独立配置，作为整页背景位于所有内容最底部；未配置时展示默认渐变底图', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-046', label: '活动规则', type: '只读（富文本/纯文本）', length: '—', required: '系统展示', note: '后台配置正文，换行保留，只读展示', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-047', label: '本人邀请码', type: '只读', length: '固定个人码', required: '系统生成', note: '按账号生成，全活动期不变', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-LAPP-048', label: '分享给好友', type: '按钮', length: '—', required: '是', note: '生成分享卡片预览（标题 + 带邀请码参数的进入链接）；扫码/点卡片同链路', constraints: { action: true } },
+          { id: 'FD-LAPP-049', label: '我的邀请入口', type: '入口（链接）', length: '—', required: '是', note: '活动页内入口，展示我邀请的用户列表', constraints: { action: true } },
+          { id: 'FD-LAPP-050', label: '被邀请人昵称', type: '只读（脱敏）', length: '—', required: '系统展示', note: '脱敏昵称；不展示手机号（隐私红线）', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-051', label: '注册时间', type: '只读', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '被邀请用户注册登录（绑定）时间', constraints: { readOnly: true, system: true } },
+          { id: 'FD-LAPP-052', label: '首单状态', type: '只读（派生）', length: '已出礼 / 待解锁', required: '系统派生', note: '已出礼=首单已支付（已解锁待发放或已发放）；待解锁=尚未完成首笔正价订单支付', constraints: { readOnly: true, derived: true, options: ['已出礼', '待解锁'] } }
+        ] }
+      ],
+      notes: [
+        '绑定只发生在新用户首次注册登录时：带码（?inv=邀请码）进入并登录成功后绑定推荐人，toast「邀请已生效」。',
+        '已注册用户（已有绑定）带码进入提示「已注册用户不可绑定推荐人」，静默忽略，不阻断正常使用。',
+        '自邀拦截：邀请码属于本人时不绑定、不产生记录。',
+        '首单口径：第一笔已支付的正价订单（0 元单、全额优惠券单不算）；礼品资格在支付成功节点判定。',
+        '礼品发放由后台人工确认，不做自动发放。'
+      ]
     }
   }
 };

@@ -224,7 +224,8 @@ const defaultState = () => ({
   schemaVersion: SCHEMA_VERSION,
   accounts: [
     { id: 'account-001', name: '演示家长A', phone: '138****2026' },
-    { id: 'account-002', name: '演示家长B', phone: '139****2027' }
+    { id: 'account-002', name: '演示家长B', phone: '139****2027' },
+    { id: 'account-003', name: '演示新用户C', phone: '137****2028' }
   ],
   currentAccountId: 'account-001',
   students: [

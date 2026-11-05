@@ -125,7 +125,9 @@ const SYSTEM_FIELD_SPEC = {
           { id: 'FD-SYSTEM-029', label: '关联学员', type: '只读', length: '—', required: '系统展示', note: '详情内完整列出该账号关联的全部学员，只读展示，不在此新增、解绑或编辑', constraints: { readOnly: true, system: true } },
           { id: 'FD-SYSTEM-030', label: '账号操作', type: '单选', length: '启用 / 禁用', required: '是', note: '超级管理员可启停；教务主管只读，其他后台角色无入口', constraints: { options: ['启用', '禁用'] } },
           { id: 'FD-SYSTEM-031', label: '禁用原因', type: '多行文本', length: '≤ 200 字', required: '禁用时必填', note: '写入账号操作记录，供后续审计与复核', constraints: { maxLength: 200, requiredWhen: 'FD-SYSTEM-030=禁用' } },
-          { id: 'FD-SYSTEM-032', label: '操作记录', type: '只读', length: '—', required: '系统生成', note: '记录操作类型、操作前后状态、操作人、操作时间与原因', constraints: { readOnly: true, system: true } }
+          { id: 'FD-SYSTEM-032', label: '操作记录', type: '只读', length: '—', required: '系统生成', note: '记录操作类型、操作前后状态、操作人、操作时间与原因', constraints: { readOnly: true, system: true } },
+          { id: 'FD-SYSTEM-061', label: '推荐人', type: '只读（派生）', length: '—', required: '系统派生', note: '该账号绑定的推荐人姓名；无绑定显示「—」；绑定仅发生在首次注册登录时且不可修改（CR-2026-164）', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-062', label: '拉新用户数', type: '只读（派生）', length: '非负整数', required: '系统派生', note: '该账号作为推荐人邀请的用户数；点击下钻到裂变营销记录并预筛该推荐人', constraints: { readOnly: true, derived: true, integer: true } }
         ] }
       ],
       notes: [

@@ -1983,3 +1983,87 @@ body:has([data-mobile-shell]):has(.mp-bottom-actions) .page-help-trigger { botto
 .mp-review-summary-row strong { color: #f5a623; letter-spacing: 2px; }
 .mp-review-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px 16px; border-top: 1px solid #eef1f5; }
 .mp-review-dialog-actions .mp-button[disabled] { opacity: .55; }
+
+/* ===== CR-2026-164：分享有礼（我的页入口 / 活动页 / 分享卡片 / 我的邀请） ===== */
+.mp-referral-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #fff1e0; color: #c4771b; font-size: 11px; font-weight: 600; }
+.mp-referral-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.mp-referral-head h2 { margin: 0; font-size: 17px; }
+.mp-referral-status { padding: 3px 10px; border-radius: 999px; background: #f1f3f6; color: #7a8291; font-size: 11px; }
+.mp-referral-status.is-running { background: #e7f6ee; color: #1f8a55; }
+.mp-referral-rules { margin-top: 8px; color: #4a5160; font-size: 13px; line-height: 1.8; }
+.mp-referral-code { display: grid; gap: 4px; margin-bottom: 12px; padding: 14px; border: 1px dashed #e2c9a8; border-radius: 10px; background: #fffaf3; text-align: center; }
+.mp-referral-code span { color: #7a8291; font-size: 12px; }
+.mp-referral-code strong { color: #b5721c; font-size: 26px; letter-spacing: 4px; }
+.mp-referral-code small { color: #7a8291; font-size: 11px; }
+.mp-referral-share { width: 100%; }
+.mp-referral-share[disabled] { opacity: .55; }
+.mp-referral-hint { margin: 10px 0 0; color: #8a91a0; font-size: 11px; line-height: 1.6; }
+.mp-referral-invites summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; }
+.mp-referral-invites summary::-webkit-details-marker { display: none; }
+.mp-referral-invites summary span { color: #7a8291; font-size: 12px; }
+.mp-referral-invite-list { display: grid; gap: 8px; margin-top: 12px; }
+.mp-referral-invite-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid #eee7e0; border-radius: 8px; background: #fff; }
+.mp-referral-invite-row strong { display: block; font-size: 13px; }
+.mp-referral-invite-row small { display: block; margin-top: 2px; color: #8a91a0; font-size: 11px; }
+.mp-referral-state { flex: 0 0 auto; padding: 3px 9px; border-radius: 999px; background: #f1f3f6; color: #7a8291; font-size: 11px; text-align: right; }
+.mp-referral-state.is-unlocked { background: #e7f6ee; color: #1f8a55; }
+.mp-empty { padding: 18px 12px; color: #8a91a0; font-size: 12px; text-align: center; }
+.mp-referral-share-dialog { width: min(92vw, 400px); margin: auto; padding: 0; border: none; border-radius: 12px; background: #fff; color: #1f2329; }
+.mp-referral-share-dialog::backdrop { background: rgba(15, 20, 30, .45); }
+.mp-referral-share-card { overflow: hidden; }
+.mp-referral-share-banner { display: flex; flex-direction: column; gap: 6px; padding: 26px 20px; background: linear-gradient(135deg, #f6d9b0, #e9b98a); color: #6b3f1d; }
+.mp-referral-share-banner strong { font-size: 18px; }
+.mp-referral-share-banner span { font-size: 12px; }
+.mp-referral-share-body { padding: 16px 20px; }
+.mp-referral-share-body p { margin: 0 0 8px; font-size: 13px; }
+.mp-referral-share-link { word-break: break-all; padding: 8px 10px; border-radius: 6px; background: #f7f9fb; color: #5a6272; font-size: 11px; line-height: 1.6; }
+
+
+/* ===== CR-2026-164 客户调整：「我的」页分享有礼胶囊广告图（位于「我的订单」下方） ===== */
+.mp-profile-referral-banner {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  min-width: 0; margin: 1px 0; padding: 9px 14px; overflow: hidden;
+  border-radius: 999px; text-decoration: none; color: #6b3f1d;
+  background: linear-gradient(100deg, #fff2dd 0%, #ffe1ba 58%, #ffd1a0 100%);
+  box-shadow: inset 0 0 0 1px rgba(196, 119, 27, .14);
+}
+.mp-profile-referral-banner::after {
+  content: ''; position: absolute; right: -16px; top: -30px;
+  width: 78px; height: 78px; border-radius: 50%; background: rgba(255, 255, 255, .38);
+  pointer-events: none;
+}
+.mp-profile-referral-banner:focus-visible { outline: 3px solid rgba(139, 2, 2, .16); outline-offset: 2px; }
+.mp-profile-referral-gift {
+  position: relative; z-index: 1; flex: 0 0 auto; display: grid; place-items: center;
+  width: 36px; height: 36px; border-radius: 50%; background: #c4771b; color: #fff;
+  font-size: 15px; font-weight: 700;
+}
+.mp-profile-referral-copy { position: relative; z-index: 1; display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.mp-profile-referral-copy strong { font-size: 14px; line-height: 1.2; }
+.mp-profile-referral-copy small { font-size: 11px; opacity: .82; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-profile-referral-banner .mp-referral-badge { position: relative; z-index: 1; flex: 0 0 auto; margin-left: 0; }
+.mp-profile-referral-arrow { position: relative; z-index: 1; flex: 0 0 auto; font-size: 19px; line-height: 1; }
+.mp-referral-badge.is-idle { background: #f1f3f6; color: #7a8291; }
+
+
+/* ===== CR-2026-164 客户调整：胶囊图入口 + 活动页整页背景（背景在内容最底部） ===== */
+.mp-profile-referral-banner.has-image {
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+  color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .65);
+}
+.mp-profile-referral-banner.has-image::before {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .48), rgba(0, 0, 0, .12));
+  pointer-events: none;
+}
+.mp-profile-referral-banner.has-image .mp-referral-badge { background: rgba(255, 255, 255, .92); color: #8a4a10; }
+.mp-referral-page {
+  position: relative; z-index: 0; padding: 12px 0 28px; border-radius: 12px;
+  background-size: cover; background-position: top center; background-repeat: no-repeat;
+}
+.mp-referral-page.is-default { background: linear-gradient(180deg, #fff3e2 0%, #fbf7f1 45%, #f7f8fa 100%); }
+.mp-referral-page.has-image::before {
+  content: ''; position: absolute; inset: 0; z-index: 0; border-radius: 12px;
+  background: rgba(255, 255, 255, .16); pointer-events: none;
+}
+.mp-referral-page > .mp-stack { position: relative; z-index: 1; }

@@ -82,6 +82,11 @@ if (roleButtons.length && roleInput) {
     else if (accountSelect) setCurrentAccountId(accountSelect.value);
     sessionStorage.setItem(roleKey, role);
     sessionStorage.setItem('hbyx-mini-logged-in', '1');
+    // CR-2026-164：带码（?inv=邀请码）进入时暂存邀请码，登录后由学员端页面完成绑定并提示；
+    // 绑定只能发生在首次注册登录时，已注册用户由 referral-store 拦截并提示。
+    const inviteCode = new URLSearchParams(location.search).get('inv');
+    if (inviteCode) sessionStorage.setItem('hbyx-referral-pending-inv', inviteCode);
+    else sessionStorage.removeItem('hbyx-referral-pending-inv');
     const redirect = new URLSearchParams(location.search).get('redirect');
     location.href = safeRedirect(redirect, role);
   });
@@ -91,6 +96,11 @@ if (roleButtons.length && roleInput) {
     else if (accountSelect) setCurrentAccountId(accountSelect.value);
     sessionStorage.setItem(roleKey, role);
     sessionStorage.setItem('hbyx-mini-logged-in', '1');
+    // CR-2026-164：带码（?inv=邀请码）进入时暂存邀请码，登录后由学员端页面完成绑定并提示；
+    // 绑定只能发生在首次注册登录时，已注册用户由 referral-store 拦截并提示。
+    const inviteCode = new URLSearchParams(location.search).get('inv');
+    if (inviteCode) sessionStorage.setItem('hbyx-referral-pending-inv', inviteCode);
+    else sessionStorage.removeItem('hbyx-referral-pending-inv');
     const redirect = new URLSearchParams(location.search).get('redirect');
     location.href = safeRedirect(redirect, role);
   });

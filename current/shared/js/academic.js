@@ -20,6 +20,9 @@ const { graduationSeed: graduation } = __classicRequire("shared/js/graduation-se
 const { CERTIFICATE_STATUS, ensureCompletionCertificate, listCompletionCertificates, voidCompletionCertificate } = __classicRequire("shared/js/completion-certificate-store.js");
 // CR-2026-163：班级评价只读监管视图（评价由学员端产生）。
 const { REVIEW_DIMENSIONS, listClassReviews, teacherAverage, starText } = __classicRequire("shared/js/review-store.js");
+// CR-2026-164：招生营销·分享有礼（复用教务页框架，避免重复实现表格/筛选/弹窗）。
+const { readActivity, saveActivity, listReferralRecords, giftStatusOf, firstOrderFact, confirmReferralGrant } = __classicRequire("shared/js/referral-store.js");
+const { roleHasPermission } = __classicRequire("shared/js/permissions.js");
 
 const academicRoot = document.querySelector('[data-academic-page]');
 const academicPage = academicRoot?.dataset.academicPage;
@@ -1785,6 +1788,165 @@ function openReviewDetail(row) {
     + `<div class="review-detail-block"><h4>教师评价${avg ? `（均分 ${avg.toFixed(1)} 分）` : ''}</h4>${dims}</div>`,
     '<button type="button" class="button" data-dialog-close>关闭</button>');
 }
+// ===== CR-2026-164：招生营销·分享有礼活动管理 =====
+function referralDateTimeInput(value) { return String(value || '').replace(' ', 'T'); }
+function renderMarketingActivity() {
+  const activity = readActivity();
+  academicData = [activity];
+  const pillPreview = activity.pillImage
+    ? `<div class="marketing-pill-preview has-image" style="background-image:url('${escapeHtml(activity.pillImage)}')"></div>`
+    : '<div class="marketing-pill-preview">胶囊广告图预览（未配置时学员端展示默认样式）</div>';
+  const bgPreview = activity.pageBackgroundImage
+    ? `<div class="marketing-page-bg-preview has-image" style="background-image:url('${escapeHtml(activity.pageBackgroundImage)}')"></div>`
+    : '<div class="marketing-page-bg-preview">活动页背景预览（未配置时学员端展示默认底图）</div>';
+  pageFrame('分享有礼活动', '维护单活动的两张图片、标题、规则与起止时间', '',
+    `<div class="card"><form id="referral-activity-form" class="marketing-activity-form">
+      <div class="marketing-image-grid">
+        <label class="form-field"><span>胶囊广告图</span>${pillPreview}<input type="file" name="pillFile" accept="image/*"></label>
+        <label class="form-field"><span>活动页背景图</span>${bgPreview}<input type="file" name="pageBgFile" accept="image/*"></label>
+      </div>
+      <label class="form-field"><span>活动标题 *</span><input name="title" maxlength="30" required value="${escapeHtml(activity.title)}"></label>
+      <label class="form-field"><span>活动规则 *</span><textarea name="rulesText" maxlength="2000" required>${escapeHtml(activity.rulesText)}</textarea></label>
+      <div class="academic-dialog-grid">
+        <label class="form-field"><span>开始时间 *</span><input type="datetime-local" name="startAt" required value="${escapeHtml(referralDateTimeInput(activity.startAt))}"></label>
+        <label class="form-field"><span>结束时间 *</span><input type="datetime-local" name="endAt" required value="${escapeHtml(referralDateTimeInput(activity.endAt))}"></label>
+      </div>
+      <div class="form-field"><span>活动状态</span><strong>${escapeHtml(activity.status)}</strong></div>
+      <div class="filter-actions"><button type="submit" class="button primary" data-perm="PERM-MARKET-001">保存配置</button></div>
+    </form></div>`);
+  // CR-2026-164 客户调整：两张图独立上传、压缩与预览；胶囊图用于「我的」页入口，背景图铺在活动页最底层。
+  const pending = { pillImage: activity.pillImage, pageBackgroundImage: activity.pageBackgroundImage };
+  const bindUpload = (inputName, targetKey, previewSelector, label) => {
+    document.querySelector(`#referral-activity-form [name=${inputName}]`)?.addEventListener('change', (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { showToast(`${label}不能超过 5MB`); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const image = new Image();
+        image.onload = () => {
+          const canvas = document.createElement('canvas');
+          const scale = Math.min(1, (targetKey === 'pillImage' ? 800 : 1200) / image.width);
+          canvas.width = Math.round(image.width * scale);
+          canvas.height = Math.round(image.height * scale);
+          canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+          pending[targetKey] = canvas.toDataURL('image/jpeg', 0.75);
+          const box = document.querySelector(previewSelector);
+          if (box) { box.classList.add('has-image'); box.style.backgroundImage = `url('${pending[targetKey]}')`; box.textContent = ''; }
+        };
+        image.src = String(reader.result);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+  bindUpload('pillFile', 'pillImage', '.marketing-pill-preview', '胶囊广告图');
+  bindUpload('pageBgFile', 'pageBackgroundImage', '.marketing-page-bg-preview', '活动页背景图');
+  document.querySelector('#referral-activity-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const value = (name) => String(form.elements.namedItem(name)?.value || '');
+    const startAt = value('startAt').replace('T', ' ');
+    const endAt = value('endAt').replace('T', ' ');
+    if (!startAt || !endAt || startAt >= endAt) { showToast('结束时间须晚于开始时间'); return; }
+    saveActivity({ title: value('title'), rulesText: value('rulesText'), pillImage: pending.pillImage, pageBackgroundImage: pending.pageBackgroundImage, startAt, endAt });
+    showToast('活动配置已保存，学员端活动页已同步。');
+    renderMarketingActivity();
+  });
+}
+
+// ===== CR-2026-164：裂变营销记录与礼品发放确认 =====
+function maskReferralNickname(name) {
+  const text = String(name || '').trim();
+  return text ? `${text.slice(0, 1)}**` : '匿名用户';
+}
+function referralStatusTag(status) {
+  const tone = status === '已发放' ? 'is-done' : status === '已解锁待发放' ? 'is-ready' : status === '无效' ? 'is-void' : '';
+  return `<span class="referral-status-tag ${tone}">${escapeHtml(status)}</span>`;
+}
+function currentGrantOperator() {
+  const names = { super_admin: '平台管理员', academic_lead: '李教务', course_consultant: '陈顾问', research_lead: '周教研', finance: '陈财务' };
+  const key = window.hbyxPermissions?.roleKey || new URLSearchParams(location.search).get('role') || '';
+  return names[key] || key;
+}
+function renderMarketingRecords() {
+  const rows = listReferralRecords();
+  academicData = rows;
+  const referrers = [...new Set(rows.map((item) => item.referrerName))];
+  const presetAccount = new URLSearchParams(location.search).get('referrer') || '';
+  const presetName = presetAccount ? (rows.find((item) => item.referrerAccountId === presetAccount)?.referrerName || '') : '';
+  const roleKey = window.hbyxPermissions?.roleKey || new URLSearchParams(location.search).get('role') || 'super_admin';
+  const canGrant = roleHasPermission(roleKey, 'PERM-MARKET-003');
+  pageFrame('裂变营销记录', '礼品资格在首单支付成功节点判定；发放保留人工确认（防刷兜底），确认动作写审计', '',
+    filterPanel('referral-filter',
+      searchableSelect('推荐人', 'referrerName', referrers, false, '搜索并选择推荐人')
+      + searchableSelect('礼品资格状态', 'giftStatus', ['待解锁', '已解锁待发放', '已发放', '无效'], false, '搜索并选择状态')
+      + '<div class="form-field"><label for="referral-reg-from">注册时间起</label><input id="referral-reg-from" type="date" name="regFrom"></div>'
+      + '<div class="form-field"><label for="referral-reg-to">注册时间止</label><input id="referral-reg-to" type="date" name="regTo"></div>')
+    + table('<thead><tr><th>推荐人</th><th>被邀请用户</th><th>注册时间</th><th>首单支付时间</th><th>订单金额</th><th>礼品资格状态</th><th>礼品发放状态</th><th>操作</th></tr></thead>'));
+  const rowTemplate = (item) => {
+    const status = giftStatusOf(item);
+    const fact = firstOrderFact(item);
+    const grant = item.grantRecord;
+    const grantText = grant ? `${grant.method} · ${grant.operator} · ${grant.grantedAt}` : '—';
+    return `<td><strong>${escapeHtml(item.referrerName)}</strong></td><td>${escapeHtml(maskReferralNickname(item.inviteeName))}</td><td>${escapeHtml(item.registeredAt || '—')}</td><td>${escapeHtml(fact.paidAt || '—')}</td><td>${fact.amount ? `¥${Number(fact.amount).toFixed(2)}` : '—'}</td><td>${referralStatusTag(status)}</td><td>${escapeHtml(grantText)}</td><td class="action-cell"><button class="text-button" data-academic-action="referral-detail">查看详情</button>${status === '已解锁待发放' && canGrant ? '<button class="text-button" data-academic-action="referral-grant" data-perm="PERM-MARKET-003">发放确认</button>' : ''}</td>`;
+  };
+  renderRows(rows, rowTemplate);
+  bindAttendanceSearchSelects(document.querySelector('#referral-filter'));
+  applyFilter('referral-filter', rows, (form) => {
+    const value = (name) => String(form.elements.namedItem(name)?.value || '');
+    const referrer = value('referrerName'), status = value('giftStatus'), from = value('regFrom'), to = value('regTo');
+    return (item) => (!referrer || item.referrerName === referrer)
+      && (!status || giftStatusOf(item) === status)
+      && (!from || String(item.registeredAt || '').slice(0, 10) >= from)
+      && (!to || String(item.registeredAt || '').slice(0, 10) <= to);
+  }, rowTemplate);
+  // 学员用户列表「拉新用户数」下钻：按推荐人账号预筛（同裂变营销列表）。
+  if (presetName) {
+    const form = document.querySelector('#referral-filter');
+    const select = form?.elements.namedItem('referrerName');
+    if (select) { select.value = presetName; form.requestSubmit?.(); }
+  }
+}
+function openReferralDetail(row) {
+  if (!row) return;
+  const fact = firstOrderFact(row);
+  const grant = row.grantRecord;
+  const pair = (label, value) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+  const body = `<div class="referral-detail-grid">
+    ${pair('记录编号', row.id)}${pair('推荐人', row.referrerName)}${pair('被邀请用户（脱敏）', maskReferralNickname(row.inviteeName))}
+    ${pair('注册时间', row.registeredAt || '—')}${pair('首单支付时间', fact.paidAt || '—')}
+    ${pair('订单金额', fact.amount ? `¥${Number(fact.amount).toFixed(2)}` : '—')}
+    ${pair('礼品资格状态', giftStatusOf(row))}${pair('发放方式', grant?.method || '—')}
+    ${pair('发放经办人', grant?.operator || '—')}${pair('发放时间', grant?.grantedAt || '—')}
+  </div>${grant ? `<div class="referral-grant-note">发放备注：${escapeHtml(grant.note || '—')}；确认后发放信息与审计留痕不可二次修改。</div>` : '<div class="referral-grant-note">发放确认前首单退款 → 资格作废；发放后退款 → 不追回。绑定关系不可修改。</div>'}`;
+  openDialog('裂变记录详情', `${row.referrerName} 邀请 ${maskReferralNickname(row.inviteeName)}`, body, '<button type="button" class="button" data-dialog-close>关闭</button>');
+}
+function openReferralGrantForm(row) {
+  if (!row) return;
+  const body = `<form id="academic-form" class="academic-dialog-grid" novalidate>
+    <p class="wide">确认向 <strong>${escapeHtml(row.referrerName)}</strong> 发放礼品（记录 ${escapeHtml(row.id)}）。请人工核实首单有效；确认后写入审计且不可二次修改。</p>
+    <label class="form-field wide"><span>发放方式 *</span><select name="method" required><option value="">请选择</option><option>实物礼品寄送</option><option>电子权益</option><option>线下到店领取</option></select></label>
+    <label class="form-field wide"><span>发放经办人 *</span><input name="operator" required maxlength="20" value="${escapeHtml(currentGrantOperator())}"></label>
+    <label class="form-field wide"><span>发放备注</span><textarea name="note" maxlength="200" placeholder="人工核实情况说明"></textarea></label>
+    <p class="form-error wide" data-referral-grant-error hidden></p>
+  </form>`;
+  const dialog = openDialog('礼品发放确认', '人工核实 · 防刷兜底 · 写审计', body,
+    '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="academic-form" class="button primary" data-perm="PERM-MARKET-003">确认发放</button>');
+  dialog.querySelector('#academic-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const result = confirmReferralGrant(row.id, { method: data.get('method'), operator: data.get('operator'), note: data.get('note') });
+    if (!result.ok) {
+      const error = dialog.querySelector('[data-referral-grant-error]');
+      if (error) { error.hidden = false; error.textContent = result.reason; }
+      return;
+    }
+    closeDialog();
+    showToast('已确认发放并写入审计记录。');
+    renderMarketingRecords();
+  });
+}
+
 function openSimpleForm(title, subtitle, body, onSubmit, actions = '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="academic-form" class="button primary">确认</button>') {
   const dialog = openDialog(title, subtitle, `<form id="academic-form" class="academic-dialog-grid">${body}</form>`, actions);
   dialog.querySelector('#academic-form')?.addEventListener('submit', (event) => { event.preventDefault(); onSubmit(new FormData(event.currentTarget), dialog); });
@@ -2041,6 +2203,8 @@ function handleAction(action, row) {
   if (action === 'building-delete') return deleteBuilding(row);
   if (action === 'venue-create' || action === 'venue-edit') return openVenueForm(action === 'venue-edit' ? row : null);
   if (action === 'review-detail') return openReviewDetail(row);
+  if (action === 'referral-detail') return openReferralDetail(row);
+  if (action === 'referral-grant') return openReferralGrantForm(row);
   if (action === 'venue-import') return openVenueImport();
   if (action === 'venue-toggle') return toggleVenue(row);
   if (action === 'venue-delete') return deleteVenue(row);
@@ -2245,6 +2409,8 @@ if (academicPage === 'graduation') renderGraduation();
 if (academicPage === 'reports') renderReports();
 if (academicPage === 'certificates') renderCompletionCertificates();
 if (academicPage === 'reviews') renderClassReviews();
+if (academicPage === 'marketing-activity') renderMarketingActivity();
+if (academicPage === 'marketing-records') renderMarketingRecords();
 
 
 __classicExports["openSchedulePlanner"] = openSchedulePlanner;

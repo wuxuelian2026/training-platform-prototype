@@ -162,6 +162,53 @@ const CRM_FIELD_SPEC = {
         { id: 'FD-CRM-089', label: '关联班级数', type: '统计（只读）', length: '非负整数', required: '系统派生', note: '按班级归属实时统计', constraints: { readOnly: true, derived: true, integer: true } },
         { id: 'FD-CRM-090', label: '待排课班级数', type: '统计（只读）', length: '非负整数', required: '系统派生', note: '按关联班级排课状态实时统计', constraints: { readOnly: true, derived: true, integer: true } }
       ] }], notes: ['批次固定为年度四季，由系统生成，不提供新增、删除或人工改状态。']
+    },
+    // CR-2026-164：招生营销·分享有礼（页面挂 CRM 模块，编号空间 FD-MARKET）。
+    'marketing/activity': {
+      groups: [
+        { heading: '分享有礼活动配置字段', fields: [
+          { id: 'FD-MARKET-001', label: '活动标题', type: '文本', length: '≤ 30 字', required: '是', note: '学员端活动页顶部展示', constraints: { maxLength: 30, required: true } },
+          { id: 'FD-MARKET-002', label: '胶囊广告图', type: '图片上传', length: '≤ 5MB', required: '否', note: '用于学员端「我的」页订单区下方的胶囊入口，点击进入活动页；未配置时展示默认渐变胶囊', constraints: { accept: 'image/*', maxSizeMb: 5 } },
+          { id: 'FD-MARKET-021', label: '活动页背景图', type: '图片上传', length: '≤ 5MB', required: '否', note: '铺在学员端活动页所有内容的最底部，内容卡片叠于其上；未配置时展示默认渐变底图', constraints: { accept: 'image/*', maxSizeMb: 5 } },
+          { id: 'FD-MARKET-003', label: '活动规则', type: '多行文本（纯文本/富文本）', length: '≤ 2000 字', required: '是', note: '换行保留，学员端只读展示；正文须包含平台免责口径', constraints: { maxLength: 2000, required: true } },
+          { id: 'FD-MARKET-004', label: '开始时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '活动开始时间', constraints: { required: true } },
+          { id: 'FD-MARKET-005', label: '结束时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '是', note: '须晚于开始时间', constraints: { required: true } },
+          { id: 'FD-MARKET-006', label: '活动状态', type: '只读（派生）', length: '未开始 / 进行中 / 已结束', required: '系统派生', note: '按起止时间自动推导，不提供手工切换', constraints: { readOnly: true, derived: true, options: ['未开始', '进行中', '已结束'] } },
+          { id: 'FD-MARKET-007', label: '保存配置', type: '按钮', length: '—', required: '是', note: '保存后学员端活动页同步读取同一份配置', constraints: { action: true } }
+        ] }
+      ],
+      notes: [
+        '最小版仅允许一个活动（单活动配置，无活动列表，不做多活动并存）。',
+        '活动结束后新注册不再计礼；已绑定推荐关系保留，已解锁礼品资格继续有效。',
+        '权限：PERM-MARKET-001（超级管理员、教务主管）。'
+      ]
+    },
+    'marketing/records': {
+      groups: [
+        { heading: '裂变营销记录筛选与列表字段', fields: [
+          { id: 'FD-MARKET-008', label: '推荐人（筛选）', type: '下拉', length: '—', required: '否', note: '按推荐人过滤；清空恢复全量', constraints: { options: [] } },
+          { id: 'FD-MARKET-009', label: '礼品资格状态（筛选）', type: '下拉', length: '待解锁 / 已解锁待发放 / 已发放 / 无效', required: '否', note: '按资格状态过滤', constraints: { options: ['待解锁', '已解锁待发放', '已发放', '无效'] } },
+          { id: 'FD-MARKET-010', label: '注册时间起（筛选）', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '按被邀请用户注册时间过滤' },
+          { id: 'FD-MARKET-011', label: '注册时间止（筛选）', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '须不早于注册时间起' },
+          { id: 'FD-MARKET-012', label: '被邀请用户', type: '只读', length: '—', required: '系统展示', note: '脱敏昵称，不展示完整手机号（隐私红线）', constraints: { readOnly: true, system: true } },
+          { id: 'FD-MARKET-013', label: '注册时间', type: '只读', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '被邀请用户注册登录时间（绑定发生时间）', constraints: { readOnly: true, system: true } },
+          { id: 'FD-MARKET-014', label: '首单支付时间', type: '只读', length: 'YYYY-MM-DD HH:mm', required: '系统派生', note: '第一笔已支付正价订单的支付时间；未解锁显示「—」', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-MARKET-015', label: '订单金额', type: '只读', length: '元，2 位小数', required: '系统派生', note: '首单金额；0 元单与全额优惠券单不计入首单口径', constraints: { readOnly: true, derived: true, money: true } },
+          { id: 'FD-MARKET-016', label: '礼品资格状态', type: '只读（派生）', length: '待解锁 / 已解锁待发放 / 已发放 / 无效', required: '系统派生', note: '待解锁=未出首单；已解锁待发放=首单已支付；无效=发放前退款等作废；已发放=人工确认后', constraints: { readOnly: true, derived: true, options: ['待解锁', '已解锁待发放', '已发放', '无效'] } },
+          { id: 'FD-MARKET-017', label: '发放方式', type: '下拉', length: '实物礼品寄送 / 电子权益 / 线下到店领取', required: '发放确认时必填', note: '人工确认发放时选择', constraints: { options: ['实物礼品寄送', '电子权益', '线下到店领取'], required: true } },
+          { id: 'FD-MARKET-018', label: '发放经办人', type: '文本', length: '≤ 20 字', required: '发放确认时必填', note: '默认当前登录账号；写审计（谁确认的、何时）', constraints: { maxLength: 20, required: true } },
+          { id: 'FD-MARKET-019', label: '发放备注', type: '多行文本', length: '≤ 200 字', required: '否', note: '人工核实时的情况说明，随审计留痕', constraints: { maxLength: 200 } },
+          { id: 'FD-MARKET-020', label: '发放确认', type: '按钮', length: '—', required: '条件可见', note: '仅「已解锁待发放」记录可见；受 PERM-MARKET-003 按钮级门禁；确认后不可二次修改', constraints: { action: true, perm: 'PERM-MARKET-003' } }
+        ] }
+      ],
+      notes: [
+        '绑定只发生在新用户首次注册登录时；已注册用户不可绑、不可改绑，绑定关系不可修改（争议单走线下）。',
+        '首单口径：第一笔已支付的正价订单（0 元单、全额优惠券单不算）；资格判定在支付成功节点。',
+        '发放确认前首单退款 → 资格作废（无效）；发放后退款 → 不追回。',
+        '自邀拦截：邀请码与被邀请人账号一致时不绑定。',
+        '礼品发放保留人工确认（防刷兜底），不做自动发放；确认动作写审计（经办人、时间、方式、备注）。',
+        '权限：查看 PERM-MARKET-002、发放确认 PERM-MARKET-003（超级管理员、课程顾问）。'
+      ]
     }
   }
 };

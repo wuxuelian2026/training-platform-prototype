@@ -28,6 +28,8 @@ const { isRichMarkup, richTextToHtml, sanitizeRichText } = __classicRequire("sha
 const { classLessonProgress, classSalesProjection, classTeachingStatus, lessonStatusOf, sessionsInScheduleOrder } = __classicRequire("shared/js/class-lifecycle.js");
 // CR-2026-163：班级评价（学员端提交，后台评价管理只读）。
 const { REVIEW_DIMENSIONS, getClassReview, submitClassReview } = __classicRequire("shared/js/review-store.js");
+// CR-2026-164：分享有礼（活动配置、邀请码、绑定与邀请记录）。
+const { inviteCodeOf, readActivity, referralRecordsOfReferrer, giftStatusOf, firstOrderFact, bindReferral } = __classicRequire("shared/js/referral-store.js");
 
 const main = document.querySelector('.mobile-main');
 const path = location.pathname;
@@ -2349,11 +2351,19 @@ function renderMessageDetail() {
 }
 function profileMetric(label, value, tone = '') { return `<span class="mp-profile-metric ${tone}"><strong>${value}</strong><small>${label}</small></span>`; }
 function renderProfile() {
+  const referralActivity = readActivity();
+  const referralStatus = referralActivity.status;
+  const referralBadge = referralStatus === '进行中'
+    ? '<span class="mp-referral-badge">活动中</span>'
+    : `<span class="mp-referral-badge is-idle">${esc(referralStatus)}</span>`;
+  // CR-2026-164 客户调整：入口不放页面顶部，改为「我的订单」下方的胶囊广告图。
+  const pillImage = referralActivity.pillImage;
+  const referralBanner = (href) => `<a class="mp-profile-referral-banner${pillImage ? ' has-image' : ''}"${pillImage ? ` style="background-image:url('${esc(pillImage)}')"` : ''} href="${href}" aria-label="分享有礼"><span class="mp-profile-referral-gift" aria-hidden="true">礼</span><span class="mp-profile-referral-copy"><strong>分享有礼</strong><small>邀请好友报名，首单支付后得礼品</small></span>${referralBadge}<span class="mp-profile-referral-arrow" aria-hidden="true">›</span></a>`;
   if (!isLoggedIn()) {
     const loginFor = target => `/login.html?redirect=${encodeURIComponent(target)}`;
     layout(stack(
       `<a class="mp-profile-entry mp-profile-login-entry" href="${loginFor('/learner/pages/profile.html')}"><div class="mp-profile-entry-head"><div><strong>登录 / 注册</strong><small>登录后管理个人资料和关联学员</small></div><span class="mp-link">去登录 ›</span></div></a>`,
-      `<section class="mp-profile-entry-list" aria-label="个人中心功能"><a class="mp-profile-entry" href="${loginFor('/learner/pages/profile.html')}"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">员</span><div><strong>学员管理</strong><small>切换或添加关联学员</small></div><span class="mp-link">›</span></div></a><a class="mp-profile-entry" href="${loginFor('/learner/pages/orders.html')}"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">单</span><div><strong>我的订单</strong><small>查看支付与退款记录</small></div><span class="mp-link">›</span></div></a><a class="mp-profile-entry" href="${loginFor('/learner/pages/consultation.html')}"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">咨</span><div><strong>我的咨询</strong><small>查看已关联的咨询记录</small></div><span class="mp-link">›</span></div></a><a class="mp-profile-entry mp-profile-message-entry" href="${loginFor('/learner/pages/messages.html')}"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">信</span><div><strong>消息通知</strong><small>查看课程与学习通知</small></div><span class="mp-link">›</span></div></a></section>`,
+      `<section class="mp-profile-entry-list" aria-label="个人中心功能"><a class="mp-profile-entry" href="${loginFor('/learner/pages/profile.html')}"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">员</span><div><strong>学员管理</strong><small>切换或添加关联学员</small></div><span class="mp-link">›</span></div></a><a class="mp-profile-entry" href="${loginFor('/learner/pages/orders.html')}"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">单</span><div><strong>我的订单</strong><small>查看支付与退款记录</small></div><span class="mp-link">›</span></div></a>${referralBanner(loginFor('/learner/pages/referral.html'))}<a class="mp-profile-entry" href="${loginFor('/learner/pages/consultation.html')}"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">咨</span><div><strong>我的咨询</strong><small>查看已关联的咨询记录</small></div><span class="mp-link">›</span></div></a><a class="mp-profile-entry mp-profile-message-entry" href="${loginFor('/learner/pages/messages.html')}"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">信</span><div><strong>消息通知</strong><small>查看课程与学习通知</small></div><span class="mp-link">›</span></div></a></section>`,
       `<a class="mp-profile-entry mp-profile-teacher-entry" href="/login.html?role=teacher"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">师</span><div><strong>教师工作台</strong><small>使用教师身份登录</small></div><span class="mp-link">进入 ›</span></div></a>`,
       `<a class="mp-profile-entry mp-profile-settings-entry" href="/learner/pages/settings.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">设</span><div><strong>设置</strong><small>账号设置、协议与关于我们</small></div><span class="mp-link">›</span></div></a>`
     ));
@@ -2366,10 +2376,70 @@ function renderProfile() {
   layout(stack(
     card(`<div class="mp-profile-identity"><span class="mp-avatar mp-profile-avatar" aria-hidden="true">林</span><div><h2>林女士</h2><p>手机号 ${esc(state.phone || '138****2026')}</p></div></div>`),
     card(`<div class="mp-profile-student-head"><h2>学员管理</h2></div><div class="mp-student-row is-current mp-current-student"><span class="mp-student-avatar" aria-hidden="true">${esc(currentStudent().name.slice(0, 1))}</span><div class="mp-student-copy"><strong>${esc(currentStudent().name)}</strong><small>${esc(currentStudent().relation)}</small></div><a class="mp-button secondary mp-student-switch" href="/learner/pages/student-management.html">学员管理</a></div>`),
-    `<section class="mp-profile-entry-list" aria-label="个人中心功能"><a class="mp-profile-entry" href="/learner/pages/orders.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">单</span><strong>我的订单</strong><span class="mp-link">查看全部 ›</span></div><div class="mp-profile-metrics">${profileMetric('待支付', orderCount('待支付'), 'amber')}${profileMetric('已支付', orderCount('已支付'), 'green')}${profileMetric('退款售后', orderCount('已退款'))}</div></a><a class="mp-profile-entry" href="/learner/pages/consultation.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">咨</span><strong>我的咨询</strong><span class="mp-link">查看记录 ›</span></div><div class="mp-profile-metrics mp-profile-consultation-metrics">${profileMetric('待回复', consultationCount('待回复'), 'amber')}${profileMetric('已回复', consultationCount('已回复'), 'green')}${profileMetric('已试听', consultationCount('已试听'))}${profileMetric('已报名', consultationCount('已报名'))}</div></a><a class="mp-profile-entry mp-profile-message-entry" href="/learner/pages/messages.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">信</span><strong>消息通知</strong>${unreadMessageCount ? `<span class="mp-profile-unread"><i aria-hidden="true"></i>${unreadMessageCount}条未读</span>` : '<span class="mp-muted">已读</span>'}<span class="mp-link">›</span></div></a></section>`,
+    `<section class="mp-profile-entry-list" aria-label="个人中心功能"><a class="mp-profile-entry" href="/learner/pages/orders.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">单</span><strong>我的订单</strong><span class="mp-link">查看全部 ›</span></div><div class="mp-profile-metrics">${profileMetric('待支付', orderCount('待支付'), 'amber')}${profileMetric('已支付', orderCount('已支付'), 'green')}${profileMetric('退款售后', orderCount('已退款'))}</div></a>${referralBanner('/learner/pages/referral.html')}<a class="mp-profile-entry" href="/learner/pages/consultation.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">咨</span><strong>我的咨询</strong><span class="mp-link">查看记录 ›</span></div><div class="mp-profile-metrics mp-profile-consultation-metrics">${profileMetric('待回复', consultationCount('待回复'), 'amber')}${profileMetric('已回复', consultationCount('已回复'), 'green')}${profileMetric('已试听', consultationCount('已试听'))}${profileMetric('已报名', consultationCount('已报名'))}</div></a><a class="mp-profile-entry mp-profile-message-entry" href="/learner/pages/messages.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">信</span><strong>消息通知</strong>${unreadMessageCount ? `<span class="mp-profile-unread"><i aria-hidden="true"></i>${unreadMessageCount}条未读</span>` : '<span class="mp-muted">已读</span>'}<span class="mp-link">›</span></div></a></section>`,
     `<a class="mp-profile-entry mp-profile-teacher-entry" href="/login.html?role=teacher"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">师</span><div><strong>教师工作台</strong><small>课表、班级与教学执行</small></div><span class="mp-link">进入 ›</span></div></a>`,
     `<a class="mp-profile-entry mp-profile-settings-entry" href="/learner/pages/settings.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">设</span><strong>设置</strong><span class="mp-link">›</span></div></a>`
   ));
+}
+// CR-2026-164 分享有礼：活动页、分享卡片与「我的邀请」。
+function maskReferralName(name) {
+  const text = String(name || '').trim();
+  return text ? `${text.slice(0, 1)}**` : '匿名用户';
+}
+function referralInviteState(row) {
+  const status = giftStatusOf(row);
+  const fact = firstOrderFact(row);
+  const unlocked = ['已解锁待发放', '已发放'].includes(status) || (Boolean(fact.paidAt) && !fact.refunded);
+  return status === '无效' ? '资格作废（首单已退款）' : unlocked ? '已出礼' : '待解锁';
+}
+function renderReferral() {
+  if (!isLoggedIn()) { go(`/login.html?redirect=${encodeURIComponent('/learner/pages/referral.html')}`); return; }
+  const activity = readActivity();
+  const running = activity.status === '进行中';
+  const accountId = getCurrentAccountId();
+  const code = inviteCodeOf(accountId);
+  const statusNotice = running ? '' : `<div class="mp-notice">活动${esc(activity.status)}：暂不能发起新邀请；已绑定的推荐关系与已解锁的礼品资格继续有效。</div>`;
+  const rules = esc(activity.rulesText || '活动规则待后台配置。').replace(/\n/g, '<br>');
+  const invites = referralRecordsOfReferrer(accountId);
+  const inviteRows = invites.length
+    ? invites.map((row) => `<div class="mp-referral-invite-row"><div><strong>${esc(maskReferralName(row.inviteeName))}</strong><small>注册 ${esc(row.registeredAt || '—')}</small></div><span class="mp-referral-state ${['已发放', '已解锁待发放'].includes(giftStatusOf(row)) ? 'is-unlocked' : ''}">${esc(referralInviteState(row))}</span></div>`).join('')
+    : '<div class="mp-empty">还没有邀请记录，分享给好友后会在这里显示进度。</div>';
+  const pageBg = activity.pageBackgroundImage;
+  const pageOpen = `<div class="mp-referral-page ${pageBg ? 'has-image' : 'is-default'}"${pageBg ? ` style="background-image:url('${esc(pageBg)}')"` : ''}>`;
+  layout(pageOpen + stack(
+    card(`<div class="mp-referral-head"><h2>${esc(activity.title || '分享有礼')}</h2><span class="mp-referral-status ${running ? 'is-running' : ''}">${esc(activity.status)}</span></div>`),
+    statusNotice,
+    card(`<h3>活动规则</h3><div class="mp-referral-rules">${rules}</div>`),
+    card(`<div class="mp-referral-code"><span>我的专属邀请码</span><strong>${esc(code)}</strong><small>全活动期不变，分享给好友即可绑定推荐关系</small></div><button type="button" class="mp-button primary mp-referral-share" data-referral-share ${running ? '' : 'disabled'}>${running ? '分享给好友' : '当前活动不可分享'}</button><p class="mp-referral-hint">原型演示：以生成分享卡片与复制邀请链接模拟微信分享能力，扫码与点卡片为同一条带码进入链路。</p>`),
+    card(`<details class="mp-referral-invites"><summary><strong>我的邀请</strong><span>${invites.length} 位好友</span></summary><div class="mp-referral-invite-list">${inviteRows}</div><p class="mp-referral-hint">仅展示脱敏昵称、注册时间与首单状态，不展示手机号（隐私红线）。</p></details>`)
+  ) + '</div>');
+  document.querySelector('[data-referral-share]')?.addEventListener('click', () => openReferralShareDialog(activity, code));
+}
+function openReferralShareDialog(activity, code) {
+  document.querySelector('#referral-share-dialog')?.remove();
+  const link = new URL(relativePath('/login.html'), location.href).href + `?role=learner&inv=${encodeURIComponent(code)}&redirect=${encodeURIComponent('/learner/index.html')}`;
+  const dialog = document.createElement('dialog');
+  dialog.id = 'referral-share-dialog';
+  dialog.className = 'mp-referral-share-dialog';
+  dialog.innerHTML = `<div class="mp-referral-share-card"><div class="mp-referral-share-banner"><strong>${esc(activity.title || '分享有礼')}</strong><span>邀请您一起参加</span></div><div class="mp-referral-share-body"><p>邀请码 <strong>${esc(code)}</strong></p><p class="mp-referral-share-link">${esc(link)}</p></div></div><div class="mp-review-dialog-actions"><button type="button" class="mp-button" data-dialog-close>关闭</button><button type="button" class="mp-button primary" data-referral-copy>复制邀请链接</button></div>`;
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  const close = () => { dialog.close(); dialog.remove(); };
+  dialog.querySelectorAll('[data-dialog-close]').forEach((node) => node.addEventListener('click', close));
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) close(); });
+  dialog.querySelector('[data-referral-copy]')?.addEventListener('click', () => {
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(link).then(() => toast('邀请链接已复制，可发送给好友')).catch(() => toast('已生成分享卡片，请手动复制邀请码'));
+    else toast('已生成分享卡片，请手动复制邀请码');
+  });
+}
+// 消费登录页暂存的邀请码：绑定只发生在首次注册登录时，结果以 toast 反馈。
+function consumeReferralInvite() {
+  const pending = sessionStorage.getItem('hbyx-referral-pending-inv');
+  if (!pending) return;
+  sessionStorage.removeItem('hbyx-referral-pending-inv');
+  if (!isMiniLoggedIn() || !isMiniRole('learner')) return;
+  const result = bindReferral(pending, getCurrentAccountId());
+  if (result.reason) toast(result.reason);
 }
 function renderStudentManagement() {
   if (!isLoggedIn()) { layout(stack(`<section class="mp-locked"><strong>登录后管理关联学员</strong><p>登录后可切换、添加和维护学员资料。</p><a class="mp-button" href="/login.html?redirect=${encodeURIComponent('/learner/pages/student-management.html')}">去登录</a></section>`)); return; }
@@ -2564,6 +2634,9 @@ subscribeDemoState(() => {
   if (path.endsWith('/order-detail.html')) renderOrderDetail();
 });
 
+// CR-2026-164：登录后首个学员端页面消费带码邀请，完成绑定并提示。
+consumeReferralInvite();
+
 // CR-2026-039：需要登录的页面未登录一律直接跳转登录页并带回跳地址；
 // 学员端「我的」页（profile）保留登录入口卡片与菜单，发现类内容页仍可未登录浏览。
 if (isMiniLoggedIn() && !isMiniRole('learner') && !isLearnerPublicPage(miniPageName(path))) {
@@ -2606,6 +2679,7 @@ else if (path.endsWith('/consultation.html')) renderConsultation();
 else if (path.endsWith('/consultation-detail.html')) renderConsultationDetail();
 else if (path.endsWith('/messages.html')) renderMessages();
 else if (path.endsWith('/message-detail.html')) renderMessageDetail();
+else if (path.endsWith('/referral.html')) renderReferral();
 else if (path.endsWith('/profile.html')) renderProfile();
 else if (path.endsWith('/student-management.html')) renderStudentManagement();
 else if (path.endsWith('/student-edit.html')) renderStudentEdit();

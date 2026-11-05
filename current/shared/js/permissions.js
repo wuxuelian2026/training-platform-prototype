@@ -58,6 +58,10 @@ const PERMISSION_POINTS = [
   { id: 'PERM-ACADEMIC-008', module: '教务执行监管', object: '学习报告', action: '报告管理', scopes: TEACHING, note: '生成、发布、撤回与删除学习报告' },
   { id: 'PERM-ACADEMIC-009', module: '教务执行监管', object: '结业证书', action: '证书管理', scopes: TEACHING, note: '查看、发放、作废结业证书' },
   { id: 'PERM-ACADEMIC-010', module: '教务执行监管', object: '评价', action: '评价管理', scopes: TEACHING, note: '查看学员提交的班级评价列表与详情（CR-2026-163）' },
+  // CR-2026-164：招生营销·分享有礼（活动管理 / 裂变记录查看 / 发放确认写审计）。
+  { id: 'PERM-MARKET-001', module: '招生营销', object: '分享有礼活动', action: '活动管理', scopes: SYSTEM, note: '维护单活动背景图、标题、规则与起止时间（CR-2026-164）' },
+  { id: 'PERM-MARKET-002', module: '招生营销', object: '裂变记录', action: '查看', scopes: VIEW, note: '查看裂变营销记录与礼品资格状态（CR-2026-164）' },
+  { id: 'PERM-MARKET-003', module: '招生营销', object: '裂变记录', action: '发放确认', scopes: ['all', 'self'], note: '人工确认礼品发放，写审计（经办人、时间、方式、备注）；按钮级门禁，确认后不可二次修改（CR-2026-164）' },
   // CR-2026-085：交易中心承接订单与退款单据（交易状态、退款发起与执行）；资金流水与结算仍在财务中心。
   // CR-2026-155 C9：退款取消审批环节，原「退款审批」权限点改为「退款发起」，编号保持不变。
   { id: 'PERM-TRADE-001', module: '交易中心', object: '订单', action: '订单查看', scopes: VIEW, note: '查看统一订单列表与订单详情' },
@@ -80,17 +84,20 @@ const ALL_PERMISSIONS = PERMISSION_POINTS.map((item) => item.id);
 // 预置角色初始勾选与原型既有可见性保持一致（避免演示账号突然少菜单／少按钮）：
 // 学员用户管理、教师导入、名师推荐三项在当前实现里只对平台管理员与教务主管开放。
 const TRADE_MUTATION_POINTS = ['PERM-TRADE-003', 'PERM-TRADE-004', 'PERM-TRADE-005'];
-const RESTRICTED_POINTS = ['PERM-SYSTEM-002', 'PERM-SYSTEM-005', 'PERM-TEACHER-003', 'PERM-TEACHER-007', ...TRADE_MUTATION_POINTS];
+const MARKET_POINTS = ['PERM-MARKET-001', 'PERM-MARKET-002', 'PERM-MARKET-003'];
+const RESTRICTED_POINTS = ['PERM-SYSTEM-002', 'PERM-SYSTEM-005', 'PERM-TEACHER-003', 'PERM-TEACHER-007', ...TRADE_MUTATION_POINTS, ...MARKET_POINTS];
 const BASELINE_ROLE = ALL_PERMISSIONS.filter((id) => !RESTRICTED_POINTS.includes(id));
 // CR-2026-117：教务主管预置按权限矩阵收敛——系统管理只保留「查看学员用户」，其余权限点不变。
-const ACADEMIC_LEAD_POINTS = ALL_PERMISSIONS.filter((id) => !['PERM-SYSTEM-001', 'PERM-SYSTEM-003', 'PERM-SYSTEM-004', 'PERM-SYSTEM-005', 'PERM-TRADE-004', 'PERM-TRADE-005'].includes(id));
+const ACADEMIC_LEAD_POINTS = ALL_PERMISSIONS.filter((id) => !['PERM-SYSTEM-001', 'PERM-SYSTEM-003', 'PERM-SYSTEM-004', 'PERM-SYSTEM-005', 'PERM-TRADE-004', 'PERM-TRADE-005', 'PERM-MARKET-002', 'PERM-MARKET-003'].includes(id));
+// 课程顾问仅持有裂变记录查看与发放确认；教研主管、财务不持有任何招生营销权限点。
+const COURSE_CONSULTANT_POINTS = [...new Set([...BASELINE_ROLE, 'PERM-MARKET-002', 'PERM-MARKET-003'])];
 const FINANCE_POINTS = [...new Set([...BASELINE_ROLE, 'PERM-TRADE-004', 'PERM-TRADE-005'])];
 const ROLE_PRESETS = [
   { key: 'super_admin', name: '超级管理员', description: '全局配置、系统运维（预置初始数据）', permissions: ALL_PERMISSIONS },
   { key: 'research_lead', name: '教研主管', description: '课程质量、教师资质审核（预置初始数据）', permissions: BASELINE_ROLE },
   // CR-2026-117：教务主管预置按权限矩阵收敛——系统管理只保留「查看学员用户」，其余权限点不变。
 { key: 'academic_lead', name: '教务主管', description: '教学调度、教务执行、物资管理（预置初始数据）', permissions: ACADEMIC_LEAD_POINTS },
-  { key: 'course_consultant', name: '课程顾问', description: '客户跟进与销售转化（预置初始数据）', permissions: BASELINE_ROLE },
+  { key: 'course_consultant', name: '课程顾问', description: '客户跟进与销售转化（预置初始数据）', permissions: COURSE_CONSULTANT_POINTS },
   { key: 'finance', name: '财务', description: '财务核算与对账（预置初始数据）', permissions: FINANCE_POINTS }
 ];
 const permissionPointsByModule = () => {
@@ -147,7 +154,9 @@ const ADMIN_PAGE_PERMISSIONS = {
   '/admin/pages/system/student-users.html': ['PERM-SYSTEM-002'],
   '/admin/pages/system/roles.html': ['PERM-SYSTEM-003'],
   '/admin/pages/system/settings.html': ['PERM-SYSTEM-004'],
-  '/admin/pages/system/dictionaries.html': ['PERM-SYSTEM-005']
+  '/admin/pages/system/dictionaries.html': ['PERM-SYSTEM-005'],
+  '/admin/pages/marketing/activity.html': ['PERM-MARKET-001'],
+  '/admin/pages/marketing/records.html': ['PERM-MARKET-002']
 };
 const pagePermissionState = (pathname, roleKey) => {
   const required = ADMIN_PAGE_PERMISSIONS[pathname] || [];
