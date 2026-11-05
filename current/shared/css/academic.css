@@ -343,6 +343,25 @@ html.is-matrix-dragging, html.is-matrix-dragging * { user-select: none; }
 .review-dim-row strong em { margin-left: 6px; color: #7a8291; font-style: normal; font-size: 12px; letter-spacing: 0; }
 .review-detail-block { margin: 0 0 12px; }
 .review-detail-block h4 { margin: 0 0 4px; }
+/* CR-2026-165 补充描述：列表单行摘要，详情保留换行原文 */
+/* 评价管理新增第 9 列后按固定列宽压缩，避免标准后台视口下要横向滚动才看得到补充描述 */
+.academic-table.review-table table { table-layout: fixed; width: 100%; min-width: 1120px; }
+.academic-table.review-table th:nth-child(1) { width: 12%; }
+.academic-table.review-table th:nth-child(2) { width: 13%; }
+.academic-table.review-table th:nth-child(3) { width: 11%; }
+.academic-table.review-table th:nth-child(4) { width: 8%; }
+.academic-table.review-table th:nth-child(5) { width: 7%; }
+.academic-table.review-table th:nth-child(6) { width: 12%; }
+.academic-table.review-table th:nth-child(7) { width: 10%; }
+.academic-table.review-table th:nth-child(8) { width: 10%; }
+.academic-table.review-table th:nth-child(9) { width: 11%; }
+.academic-table.review-table th:nth-child(10) { width: 6%; }
+/* 固定列宽下长文本不得溢出到相邻列；评分列与操作列保持原样不裁切 */
+.academic-table.review-table td:nth-child(-n+6),
+.academic-table.review-table td:nth-child(9) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-comment-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4a5260; font-size: 12px; }
+.review-comment-cell.is-empty { color: #9aa2ae; }
+.review-detail-comment { padding: 10px 12px; border-radius: 8px; background: #f7f9fb; color: #3c4452; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
 
 /* ===== CR-2026-164：招生营销（活动配置 / 裂变记录 / 发放确认） ===== */
 .marketing-activity-form { display: grid; gap: 14px; }

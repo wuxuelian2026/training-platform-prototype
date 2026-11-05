@@ -1968,7 +1968,9 @@ body:has([data-mobile-shell]):has(.mp-bottom-actions) .page-help-trigger { botto
 .mp-review-dialog-head { padding: 16px 18px 10px; border-bottom: 1px solid #eef1f5; }
 .mp-review-dialog-head h3 { margin: 0 0 4px; font-size: 16px; }
 .mp-review-dialog-head p { margin: 0; font-size: 12px; color: #7a8291; }
-.mp-review-dialog-body { padding: 14px 18px; max-height: 60vh; overflow-y: auto; }
+/* CR-2026-165：补充描述加入后放宽弹窗内容区，保证文本域与字数计数首屏可见；小屏仍可滚动 */
+.mp-review-dialog-body { padding: 14px 18px; max-height: min(70vh, 620px); overflow-y: auto; outline: none; }
+.mp-review-dialog-body:focus-visible { outline: 2px solid #bcd6f5; outline-offset: -2px; }
 .mp-review-block { margin: 0 0 14px; }
 .mp-review-block h4 { margin: 0 0 6px; font-size: 14px; }
 .mp-review-block-note { margin: 0 0 8px; font-size: 12px; color: #7a8291; }
@@ -1983,6 +1985,13 @@ body:has([data-mobile-shell]):has(.mp-bottom-actions) .page-help-trigger { botto
 .mp-review-summary-row strong { color: #f5a623; letter-spacing: 2px; }
 .mp-review-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px 16px; border-top: 1px solid #eef1f5; }
 .mp-review-dialog-actions .mp-button[disabled] { opacity: .55; }
+/* CR-2026-165 补充描述：编辑态文本域 + 计数 + 提示；只读态保留换行原文 */
+.mp-review-supplement { display: block; width: 100%; box-sizing: border-box; min-height: 84px; padding: 10px 12px; border: 1px solid #d8dee7; border-radius: 8px; background: #fff; color: #1f2329; font: inherit; font-size: 13px; line-height: 1.5; resize: vertical; }
+.mp-review-supplement::placeholder { color: #a2a9b5; }
+.mp-review-supplement:focus { outline: 2px solid #bcd6f5; border-color: #7aa7e0; }
+.mp-review-supplement-meta { margin-top: 6px; text-align: right; font-size: 11px; color: #8a91a0; }
+.mp-review-supplement-hint { margin: 4px 0 0; font-size: 11px; line-height: 1.5; color: #8a91a0; }
+.mp-review-supplement-text { padding: 10px 12px; border-radius: 8px; background: #f7f9fb; font-size: 13px; line-height: 1.6; color: #3c4452; white-space: pre-wrap; word-break: break-word; }
 
 /* ===== CR-2026-164：分享有礼（我的页入口 / 活动页 / 分享卡片 / 我的邀请） ===== */
 .mp-referral-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #fff1e0; color: #c4771b; font-size: 11px; font-weight: 600; }
@@ -2090,3 +2099,59 @@ body:has([data-mobile-shell]):has(.mp-bottom-actions) .page-help-trigger { botto
 .mp-referral-qr-fallback { padding: 14px; border-radius: 6px; background: #f7f9fb; color: #7a8291; font-size: 11px; text-align: center; }
 .mp-referral-share-qr { display: flex; justify-content: center; padding: 16px 0 4px; }
 .mp-referral-share-qr .mp-referral-qr { width: 132px; height: 132px; }
+
+
+/* ===== 家校沟通（方案 v1.1）：通用会话式界面 =====
+   仅呈现层，复用项目自有配色与间距；不引入 IM 能力（无长连接 / 在线状态 / 已读回执 / 输入中 / 消息撤回）。 */
+.hs-chat-page { min-width: 0; padding-bottom: 112px; }
+.hs-chat-page.is-list { padding-bottom: 12px; }
+.hs-chat-topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 10px 12px; background: #fff; border: 1px solid #e9e4df; border-radius: 10px; }
+.hs-chat-topbar-main { flex: 1 1 auto; min-width: 0; }
+.hs-chat-topbar-main strong { display: block; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.hs-chat-topbar-main span { display: block; overflow: hidden; margin-top: 2px; color: #8a91a0; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.hs-chat-back { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #595959; font-size: 24px; line-height: 1; }
+.hs-chat-icon-btn { flex: 0 0 auto; min-width: 32px; height: 32px; padding: 0 8px; border: 1px solid #e3e0da; border-radius: 8px; background: #fff; color: #8b0202; font-size: 18px; line-height: 1; }
+.hs-chat-icon-btn.is-text { font-size: 12px; color: #7a8291; }
+.hs-chat-list { overflow: hidden; background: #fff; border: 1px solid #e9e4df; border-radius: 10px; }
+.hs-chat-item { display: flex; gap: 10px; padding: 12px; border-bottom: 1px solid #f0ece7; color: inherit; text-decoration: none; }
+.hs-chat-item:last-child { border-bottom: 0; }
+.hs-chat-item:active { background: #faf6f0; }
+.hs-avatar { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: #fff1f0; color: #8b0202; font-size: 14px; font-weight: 700; }
+.hs-chat-item-body { flex: 1 1 auto; min-width: 0; }
+.hs-chat-item-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hs-chat-item-row + .hs-chat-item-row { margin-top: 4px; }
+.hs-chat-item-row strong { flex: 1 1 auto; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.hs-chat-item-row time { flex: 0 0 auto; color: #9aa0aa; font-size: 11px; }
+.hs-chat-preview { flex: 1 1 auto; overflow: hidden; color: #7a8291; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.hs-chat-unread { flex: 0 0 auto; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #8b0202; color: #fff; font-size: 11px; }
+.hs-chat-state { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; background: #f1f3f6; color: #7a8291; font-size: 11px; }
+.hs-chat-state.is-pending { background: #fff4e5; color: #b5721c; }
+.hs-chat-state.is-replied { background: #e7f6ee; color: #1f8a55; }
+.hs-chat-empty { padding: 42px 12px; color: #8a91a0; font-size: 13px; text-align: center; }
+.hs-new-form { margin-bottom: 10px; }
+
+.hs-chat-bubbles { min-height: 180px; padding: 2px 2px 8px; }
+.hs-bubble-row { display: flex; align-items: flex-end; gap: 8px; margin: 12px 0; }
+.hs-bubble-row.is-mine { flex-direction: row-reverse; }
+.hs-bubble { max-width: 76%; padding: 9px 12px; border: 1px solid #e9e4df; border-radius: 12px; background: #fff; color: #1f2329; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.hs-bubble-row.is-mine .hs-bubble { border-color: #f2d8d6; background: #fff1f0; }
+.hs-bubble-meta { margin-top: 4px; color: #9aa0aa; font-size: 11px; }
+
+/* 吸底输入栏：复用项目既有 .mp-bottom-actions 定位范式，避开 62px 底部导航 */
+.hs-composer-bar { position: fixed; right: 0; bottom: calc(62px + env(safe-area-inset-bottom)); left: 0; z-index: 11; width: min(100%, 520px); margin: 0 auto; padding: 8px 12px 10px; border-top: 1px solid #e6dfda; background: rgba(255,255,255,.98); box-shadow: 0 -4px 15px rgba(40,30,24,.06); }
+.hs-composer-row { display: flex; align-items: flex-end; gap: 8px; }
+.hs-composer-row textarea { flex: 1 1 auto; min-width: 0; min-height: 40px; max-height: 96px; padding: 9px 10px; border: 1px solid #e3e0da; border-radius: 8px; background: #faf9f7; color: inherit; font: inherit; font-size: 14px; line-height: 1.5; resize: none; }
+.hs-composer-row .mp-button { flex: 0 0 auto; min-height: 40px; padding: 0 14px; }
+.hs-composer-hint { margin: 5px 0 0; color: #8a91a0; font-size: 11px; line-height: 1.5; }
+.hs-quick-chips { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 6px; }
+.hs-quick-chip { flex: 0 0 auto; padding: 5px 10px; border: 1px solid #e3e0da; border-radius: 14px; background: #fff; color: #595959; font-size: 12px; white-space: nowrap; }
+.hs-preview-layer { margin-top: 8px; padding: 10px; border: 1px dashed #d9d3cc; border-radius: 8px; background: #faf9f7; }
+.hs-preview-layer strong { font-size: 13px; }
+.hs-preview-layer p { margin: 6px 0; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.hs-preview-actions { display: flex; gap: 8px; margin-top: 8px; }
+.hs-preview-actions .mp-button { min-height: 36px; }
+
+/* 班级详情底部操作条：家校沟通入口与评价按钮同排，仅按钮 + 未读数字 */
+.hs-entry-button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 96px; }
+.hs-entry-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; background: #d97706; color: #fff; font-size: 11px; line-height: 1; }
+

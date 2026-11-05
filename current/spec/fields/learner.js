@@ -146,11 +146,13 @@ const LEARNER_APP_FIELD_SPEC = {
         { id: 'FD-LAPP-040', label: '家校沟通顺畅度', type: '评分', length: '1–5 星', required: '是', note: '教师评价维度三：与家长沟通的及时性与清晰度', constraints: { min: 1, max: 5 } },
         { id: 'FD-LAPP-041', label: '教学稳定性与责任心', type: '评分', length: '1–5 星', required: '是', note: '教师评价维度四：授课稳定、认真负责的程度', constraints: { min: 1, max: 5 } },
         { id: 'FD-LAPP-042', label: '实际教学成果', type: '评分', length: '1–5 星', required: '是', note: '教师评价维度五：阶段性学习成果的达成程度', constraints: { min: 1, max: 5 } },
-        { id: 'FD-LAPP-043', label: '提交评价', type: '按钮', length: '—', required: '是', note: '6 项全部评分后可用；提交成功后入口置灰并写入评价记录', constraints: { action: true } }
+        { id: 'FD-LAPP-043', label: '提交评价', type: '按钮', length: '—', required: '是', note: '6 项全部评分后可用；提交成功后入口置灰并写入评价记录', constraints: { action: true } },
+        { id: 'FD-LAPP-055', label: '补充描述', type: '多行文本', length: '≤ 200 字（Unicode 码点）', required: '否', note: 'CR-2026-165：选填，位于 6 项星级之后；实时显示「已输入 N/200 字」，超出按码点截断（不依赖原生 maxlength），emoji 计 1 字；提交时去首尾空白、保留内部换行；不参与 6 项星级提交门槛；提交后不可修改，只读回看以纯文本展示（空值不显示区块）；提示「请勿填写手机号、身份证号等敏感信息」，展示前先转义', constraints: { maxLength: 200, optional: true } }
       ] }],
       notes: [
         '每个学员每个班级限提交 1 次评价；判重键为班级 + 评价人，已评价仅支持只读回看。',
-        '评价提交后写入共享评价记录，后台「评价管理」只读展示；评价无文字评语（后续版本池）。'
+        '评价提交后写入共享评价记录，后台「评价管理」只读展示。',
+        'CR-2026-165：补充描述字段由学员端弹窗产生（FD-LAPP-055），与后台 FD-ACADEMIC-113 同源；提交门槛仍是 6 项星级，文字为空时存空字符串。'
       ]
     },
     // CR-2026-164：学员端分享有礼（我的模块入口 + 活动页 + 我的邀请）。

@@ -138,11 +138,13 @@ const ACADEMIC_FIELD_SPEC = {
         { id: 'FD-ACADEMIC-109', label: '班级筛选', type: '下拉（可搜索）', length: '评价班级快照集合', required: '否', note: '模糊搜索并选择班级，清空恢复全量' },
         { id: 'FD-ACADEMIC-110', label: '课程筛选', type: '下拉（可搜索）', length: '评价课程快照集合', required: '否', note: '模糊搜索并选择课程，清空恢复全量' },
         { id: 'FD-ACADEMIC-111', label: '授课教师筛选', type: '下拉（可搜索）', length: '评价教师快照集合', required: '否', note: '模糊搜索并选择教师，清空恢复全量' },
-        { id: 'FD-ACADEMIC-112', label: '评价详情', type: '弹窗（只读）', length: '—', required: '—', note: '课程评价星级 + 教师评价五维度星级明细与均分', constraints: { action: true } }
+        { id: 'FD-ACADEMIC-112', label: '评价详情', type: '弹窗（只读）', length: '—', required: '—', note: '课程评价星级 + 教师评价五维度星级明细与均分 + 补充描述完整原文（CR-2026-165，保留换行，空值显示「未填写」）', constraints: { action: true } },
+        { id: 'FD-ACADEMIC-113', label: '补充描述', type: '文本（只读）', length: '≤ 200 字（Unicode 码点）', required: '否', note: 'CR-2026-165：与学员端 FD-LAPP-055 同源；列表第 9 列折叠换行后单行截断前 30 字、超出以「…」结尾、title 显示全文，空值「—」；详情完整展示并保留换行，空值「未填写」；历史记录缺字段按空值处理；两端展示前先转义，禁止 HTML 注入', constraints: { readOnly: true, maxLength: 200 } }
       ] }],
       notes: [
         '评价管理为只读监管视图，不提供新增、修改或删除；评价仅由学员端班级详情页提交。',
-        '每个学员每个班级限 1 次评价；教师评价五维度：课堂体验适配度、成长感知清晰度、家校沟通顺畅度、教学稳定性与责任心、实际教学成果。'
+        '每个学员每个班级限 1 次评价；教师评价五维度：课堂体验适配度、成长感知清晰度、家校沟通顺畅度、教学稳定性与责任心、实际教学成果。',
+        'CR-2026-165：补充描述为用户自由文本，原型不自动脱敏主动填写的反馈原文；真实系统的告知同意、敏感信息过滤、留存期与审核口径按公司合规与法务要求确认。'
       ]
     },
     'academic/timetable': {

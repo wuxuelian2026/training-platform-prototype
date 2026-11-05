@@ -1758,7 +1758,13 @@ function renderCompletionCertificates() {
   applyFilter('certificate-filter', rows, (form) => (item) => (!form.status?.value || item.status === form.status.value) && (!form.studentName?.value || item.studentName === form.studentName.value) && (!form.className?.value || item.className === form.className.value) && (!form.course?.value || item.course === form.course.value), row);
 }
 
-// ===== CR-2026-163：评价管理（只读列表 + 可搜索筛选 + 详情）=====
+// ===== CR-2026-163：评价管理（只读列表 + 可搜索筛选 + 详情）；CR-2026-165 新增补充描述列与详情 =====
+// 列表只做单行摘要：折叠换行后按码点取前 30 字，完整原文放 title；空值由调用方渲染为「—」。
+function reviewSupplementSummary(value) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  const chars = Array.from(text);
+  return chars.length > 30 ? `${chars.slice(0, 30).join('')}…` : text;
+}
 function renderClassReviews() {
   const rows = listClassReviews();
   academicData = rows;
@@ -1770,10 +1776,12 @@ function renderClassReviews() {
       searchableSelect('班级名称', 'className', classes, false, '搜索并选择班级')
       + searchableSelect('课程名称', 'courseName', courses, false, '搜索并选择课程')
       + searchableSelect('授课教师', 'teacher', teachers, false, '搜索并选择教师'))
-    + table('<thead><tr><th>评价编号</th><th>班级名称</th><th>课程名称</th><th>授课老师</th><th>评价人</th><th>评价时间</th><th>课程评价</th><th>教师评价</th><th>操作</th></tr></thead>'));
+    + table('<thead><tr><th>评价编号</th><th>班级名称</th><th>课程名称</th><th>授课老师</th><th>评价人</th><th>评价时间</th><th>课程评价</th><th>教师评价</th><th>补充描述</th><th>操作</th></tr></thead>', 'review-table'));
   const row = (item) => {
     const avg = teacherAverage(item.teacherRatings);
-    return `<td><strong>${escapeHtml(item.id)}</strong></td><td>${escapeHtml(item.className)}</td><td>${escapeHtml(item.courseName)}</td><td>${escapeHtml(item.teacher || '—')}</td><td>${escapeHtml(item.studentName)}</td><td>${escapeHtml(item.createdAt || '—')}</td><td class="star-cell">${starText(item.courseRating)}<span class="star-score">${item.courseRating} 分</span></td><td class="star-cell">${avg ? starText(avg) + `<span class="star-score">${avg.toFixed(1)} 分均分</span>` : '—'}</td><td class="action-cell"><button class="text-button" data-academic-action="review-detail">查看详情</button></td>`;
+    const supplement = String(item.supplementText || '');
+    const summary = reviewSupplementSummary(supplement);
+    return `<td><strong>${escapeHtml(item.id)}</strong></td><td>${escapeHtml(item.className)}</td><td>${escapeHtml(item.courseName)}</td><td>${escapeHtml(item.teacher || '—')}</td><td>${escapeHtml(item.studentName)}</td><td>${escapeHtml(item.createdAt || '—')}</td><td class="star-cell">${starText(item.courseRating)}<span class="star-score">${item.courseRating} 分</span></td><td class="star-cell">${avg ? starText(avg) + `<span class="star-score">${avg.toFixed(1)} 分均分</span>` : '—'}</td><td class="review-comment-cell${summary ? '' : ' is-empty'}" title="${escapeHtml(supplement)}">${escapeHtml(summary || '—')}</td><td class="action-cell"><button class="text-button" data-academic-action="review-detail">查看详情</button></td>`;
   };
   renderRows(academicData, row);
   bindAttendanceSearchSelects(document.querySelector('#review-filter'));
@@ -1785,7 +1793,8 @@ function openReviewDetail(row) {
   const dims = REVIEW_DIMENSIONS.map(({ key, label }) => `<div class="review-dim-row"><span>${escapeHtml(label)}</span><strong>${starText(row.teacherRatings[key])}<em>${row.teacherRatings[key]} 分</em></strong></div>`).join('');
   openDialog('评价详情', `${escapeHtml(row.className)} · ${escapeHtml(row.courseName)} · ${escapeHtml(row.teacher)}老师 · 评价人：${escapeHtml(row.studentName)} · ${escapeHtml(row.createdAt || '—')}`,
     `<div class="review-detail-block"><h4>课程评价</h4><div class="review-dim-row"><span>课程整体满意度</span><strong>${starText(row.courseRating)}<em>${row.courseRating} 分</em></strong></div></div>`
-    + `<div class="review-detail-block"><h4>教师评价${avg ? `（均分 ${avg.toFixed(1)} 分）` : ''}</h4>${dims}</div>`,
+    + `<div class="review-detail-block"><h4>教师评价${avg ? `（均分 ${avg.toFixed(1)} 分）` : ''}</h4>${dims}</div>`
+    + `<div class="review-detail-block"><h4>补充描述</h4><div class="review-detail-comment">${escapeHtml(row.supplementText || '未填写')}</div></div>`,
     '<button type="button" class="button" data-dialog-close>关闭</button>');
 }
 // ===== CR-2026-164：招生营销·分享有礼活动管理 =====

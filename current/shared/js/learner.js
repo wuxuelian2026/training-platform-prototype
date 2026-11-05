@@ -27,7 +27,7 @@ const { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } = __classicRequi
 const { isRichMarkup, richTextToHtml, sanitizeRichText } = __classicRequire("shared/js/rich-editor.js");
 const { classLessonProgress, classSalesProjection, classTeachingStatus, lessonStatusOf, sessionsInScheduleOrder } = __classicRequire("shared/js/class-lifecycle.js");
 // CR-2026-163：班级评价（学员端提交，后台评价管理只读）。
-const { REVIEW_DIMENSIONS, getClassReview, submitClassReview } = __classicRequire("shared/js/review-store.js");
+const { REVIEW_DIMENSIONS, getClassReview, submitClassReview, MAX_SUPPLEMENT_LENGTH, normalizeSupplementText } = __classicRequire("shared/js/review-store.js");
 // CR-2026-164：分享有礼（活动配置、邀请码、绑定与邀请记录）。
 const { inviteCodeOf, readActivity, referralRecordsOfReferrer, giftStatusOf, firstOrderFact, bindReferral } = __classicRequire("shared/js/referral-store.js");
 
@@ -1283,8 +1283,13 @@ function openClassReviewDialog(item) {
   const existing = getClassReview(item.id, currentStudent()?.name);
   const readOnly = Boolean(existing);
   const teacherRows = REVIEW_DIMENSIONS.map(({ key, label }) => reviewRatingRow(key, label, existing?.teacherRatings?.[key] || 0, readOnly)).join('');
+  // CR-2026-165：补充描述选填、≤200 字；编辑态为文本域 + 实时计数，只读回看态为纯文本原文（空值不渲染区块）。
+  const supplementBlock = readOnly
+    ? (existing?.supplementText ? `<div class="mp-review-block"><h4>补充描述</h4><div class="mp-review-supplement-text">${esc(existing.supplementText)}</div></div>` : '')
+    : `<div class="mp-review-block"><h4>补充描述（选填）</h4><textarea class="mp-review-supplement" data-review-supplement rows="3" placeholder="说说课程或老师给你印象最深的地方（${MAX_SUPPLEMENT_LENGTH} 字以内）" aria-describedby="review-supplement-hint"></textarea><div class="mp-review-supplement-meta"><span data-review-supplement-count>已输入 0/${MAX_SUPPLEMENT_LENGTH} 字</span></div><p class="mp-review-supplement-hint" id="review-supplement-hint">请勿填写手机号、身份证号等敏感信息</p></div>`;
   const body = `<div class="mp-review-block"><h4>课程评价</h4>${reviewRatingRow('course', '课程整体满意度', existing?.courseRating || 0, readOnly)}</div>`
-    + `<div class="mp-review-block"><h4>教师评价</h4><p class="mp-review-block-note">请按五个维度分别评分（1–5 星）</p>${teacherRows}</div>`;
+    + `<div class="mp-review-block"><h4>教师评价</h4><p class="mp-review-block-note">请按五个维度分别评分（1–5 星）</p>${teacherRows}</div>`
+    + supplementBlock;
   const actions = readOnly
     ? '<button type="button" class="mp-button" data-dialog-close>关闭</button>'
     : '<button type="button" class="mp-button" data-dialog-close>取消</button><button type="button" class="mp-button primary" data-review-submit disabled>提交评价</button>';
@@ -1297,6 +1302,15 @@ function openClassReviewDialog(item) {
   const close = () => { dialog.close(); dialog.remove(); };
   dialog.querySelectorAll('[data-dialog-close]').forEach((node) => node.addEventListener('click', close));
   if (readOnly) return;
+  // CR-2026-165：按 Unicode 码点计数与截断（不依赖原生 maxlength，emoji 计 1 字），文字不参与提交门槛。
+  const supplement = dialog.querySelector('[data-review-supplement]');
+  const supplementCount = dialog.querySelector('[data-review-supplement-count]');
+  const syncSupplement = () => {
+    const chars = Array.from(supplement.value);
+    if (chars.length > MAX_SUPPLEMENT_LENGTH) supplement.value = chars.slice(0, MAX_SUPPLEMENT_LENGTH).join('');
+    supplementCount.textContent = `已输入 ${Array.from(supplement.value).length}/${MAX_SUPPLEMENT_LENGTH} 字`;
+  };
+  supplement.addEventListener('input', syncSupplement);
   // 星级点击：更新组值与星样式；全部评完（6 项）后放开提交。
   const submitButton = dialog.querySelector('[data-review-submit]');
   const syncSubmit = () => {
@@ -1326,7 +1340,8 @@ function openClassReviewDialog(item) {
       teacher: item.teacher,
       studentName: currentStudent()?.name,
       courseRating: valueOf('course'),
-      teacherRatings: Object.fromEntries(REVIEW_DIMENSIONS.map(({ key }) => [key, valueOf(key)]))
+      teacherRatings: Object.fromEntries(REVIEW_DIMENSIONS.map(({ key }) => [key, valueOf(key)])),
+      supplementText: normalizeSupplementText(supplement.value)
     });
     if (!result.ok) { toast(result.reason); return; }
     close();

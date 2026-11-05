@@ -2,7 +2,7 @@
   const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
   const __classicExports = {};
   const __classicRequire = (id) => __classicModules[id];
-// 班级评价共享演示存储（CR-2026-163）。
+// 班级评价共享演示存储（CR-2026-163；补充描述字段 CR-2026-165）。
 // 评价由学员端产生，后台评价管理只读；两端通过 demo-store 的 localStorage 交换数据，
 // 页面级 sessionStorage 不承载评价记录。评价为一次性动作，无状态流转，不登记状态机。
 const { readDemoState, writeDemoState } = __classicRequire("shared/js/demo-store.js");
@@ -17,7 +17,15 @@ const REVIEW_DIMENSIONS = [
   { key: 'outcome', label: '实际教学成果' }
 ];
 
+// CR-2026-165：补充描述上限与归一化（按 Unicode 码点计，含空格与换行；emoji 计 1 字）。
+// 学员端计数/截断与提交兜底三处共用本函数，保证「所见即所存」；后台只读不改写。
+const MAX_SUPPLEMENT_LENGTH = 200;
+function normalizeSupplementText(value) {
+  return Array.from(String(value ?? '')).slice(0, MAX_SUPPLEMENT_LENGTH).join('').trim();
+}
+
 // 演示 seed：两条不同班级评价（学员端提交后追加，不清空 seed）。
+// CR-2026-165：分别覆盖「有补充描述（含换行）」与「补充描述为空」两种展示态；文案为虚构演示数据。
 const REVIEW_SEEDS = [
   {
     id: 'REV20260910001',
@@ -28,6 +36,7 @@ const REVIEW_SEEDS = [
     studentName: '林知夏',
     courseRating: 5,
     teacherRatings: { classroomFit: 5, growthClarity: 4, homeCommunication: 5, stability: 4, outcome: 4 },
+    supplementText: '孩子回家会主动哼课上教的旋律，老师每节课的反馈也很具体。\n希望节奏练习能再多一点。',
     createdAt: '2026-09-10 16:40'
   },
   {
@@ -39,6 +48,7 @@ const REVIEW_SEEDS = [
     studentName: '周予安',
     courseRating: 4,
     teacherRatings: { classroomFit: 4, growthClarity: 4, homeCommunication: 5, stability: 5, outcome: 4 },
+    supplementText: '',
     createdAt: '2026-09-11 10:20'
   }
 ];
@@ -59,9 +69,11 @@ function storedReviews() {
 }
 
 // 合并 seed 与已提交记录（按 id 去重，学员端新提交覆盖同 id）。
+// CR-2026-165：统一补齐 supplementText，历史缺字段或超长数据都在这里归一化为合法值。
 function listClassReviews() {
-  const byId = new Map(REVIEW_SEEDS.map((row) => [row.id, { ...row, teacherRatings: normalizeRatings(row.teacherRatings) }]));
-  storedReviews().forEach((row) => byId.set(row.id, { ...row, teacherRatings: normalizeRatings(row.teacherRatings) }));
+  const decorate = (row) => ({ ...row, teacherRatings: normalizeRatings(row.teacherRatings), supplementText: normalizeSupplementText(row.supplementText) });
+  const byId = new Map(REVIEW_SEEDS.map((row) => [row.id, decorate(row)]));
+  storedReviews().forEach((row) => byId.set(row.id, decorate(row)));
   return [...byId.values()].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 }
 
@@ -82,7 +94,7 @@ function starText(value) {
   return '★★★★★'.slice(0, score) + '☆☆☆☆☆'.slice(0, Math.max(0, 5 - score));
 }
 
-// 提交评价：6 项全部必评（1–5 整数）；同班级同评价人幂等拦截。
+// 提交评价：6 项星级全部必评（1–5 整数），补充描述选填且 ≤ 200 字；同班级同评价人幂等拦截。
 // 返回 { ok, review?, reason? }。
 function submitClassReview(payload = {}) {
   const classId = String(payload.classId || '');
@@ -103,6 +115,7 @@ function submitClassReview(payload = {}) {
     studentName,
     courseRating,
     teacherRatings,
+    supplementText: normalizeSupplementText(payload.supplementText),
     createdAt: DEMO_NOW
   };
   writeDemoState((next) => {
@@ -113,6 +126,8 @@ function submitClassReview(payload = {}) {
 }
 
   __classicExports["REVIEW_DIMENSIONS"] = REVIEW_DIMENSIONS;
+  __classicExports["MAX_SUPPLEMENT_LENGTH"] = MAX_SUPPLEMENT_LENGTH;
+  __classicExports["normalizeSupplementText"] = normalizeSupplementText;
   __classicExports["listClassReviews"] = listClassReviews;
   __classicExports["getClassReview"] = getClassReview;
   __classicExports["teacherAverage"] = teacherAverage;
