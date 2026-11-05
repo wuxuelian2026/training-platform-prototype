@@ -2381,16 +2381,53 @@ function renderProfile() {
     `<a class="mp-profile-entry mp-profile-settings-entry" href="/learner/pages/settings.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">设</span><strong>设置</strong><span class="mp-link">›</span></div></a>`
   ));
 }
-// CR-2026-164 分享有礼：活动页、分享卡片与「我的邀请」。
+// CR-2026-164 分享有礼：活动页、分享卡片与「我的邀请」独立页。
 function maskReferralName(name) {
   const text = String(name || '').trim();
   return text ? `${text.slice(0, 1)}**` : '匿名用户';
 }
-function referralInviteState(row) {
-  const status = giftStatusOf(row);
-  const fact = firstOrderFact(row);
-  const unlocked = ['已解锁待发放', '已发放'].includes(status) || (Boolean(fact.paidAt) && !fact.refunded);
-  return status === '无效' ? '资格作废（首单已退款）' : unlocked ? '已出礼' : '待解锁';
+// CR-2026-164 v1.2：学员端状态文案收敛为用户语言四态，与后台礼品资格状态一一对应。
+// 禁用「已出礼」——它把「已解锁待发放」与「已发放」合并，显示首单支付时间后会让用户误认为礼品已寄出。
+function referralInviteState(status) {
+  if (status === '待解锁') return '待首单';
+  if (status === '已解锁待发放') return '已付款·待核实发放';
+  if (status === '已发放') return '已发放';
+  return '资格作废（首单已退款）';
+}
+// 分享链接：二维码内容与「复制链接」内容同源，扫码 / 点卡片为同一条带码进入链路。
+function referralInviteLink(code) {
+  return new URL(relativePath('/login.html'), location.href).href + `?role=learner&inv=${encodeURIComponent(code)}&redirect=${encodeURIComponent('/learner/index.html')}`;
+}
+// CR-2026-164 v1.2：邀请码真实二维码（qrcode-generator 2.0.4，MIT，离线本地脚本）。
+// 仅在活动页注入该脚本；缺失时给出可读降级，不伪造二维码图案。
+function referralQrSvg(link, cell = 4, margin = 2) {
+  const factory = typeof window !== 'undefined' ? window.qrcode : null;
+  if (typeof factory !== 'function') return '<div class="mp-referral-qr-fallback">二维码组件未加载，请复制邀请链接分享</div>';
+  try {
+    const qr = factory(0, 'M');
+    qr.addData(link);
+    qr.make();
+    const count = qr.getModuleCount();
+    let path = '';
+    for (let row = 0; row < count; row += 1) {
+      for (let col = 0; col < count; col += 1) {
+        if (qr.isDark(row, col)) path += `M${(col + margin) * cell} ${(row + margin) * cell}h${cell}v${cell}h-${cell}z`;
+      }
+    }
+    const size = (count + margin * 2) * cell;
+    return `<svg class="mp-referral-qr" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="邀请二维码，扫码进入小程序并绑定推荐人"><rect width="${size}" height="${size}" fill="#fff"/><path d="${path}" fill="#1f2329"/></svg>`;
+  } catch (error) {
+    return '<div class="mp-referral-qr-fallback">二维码生成失败，请复制邀请链接分享</div>';
+  }
+}
+function referralInviteRows(invites) {
+  if (!invites.length) return '<div class="mp-empty">还没有邀请记录，分享给好友后会在这里显示进度。</div>';
+  return invites.map((row) => {
+    const status = giftStatusOf(row);
+    // 首单支付时间取支付成功时点 paidAt（非下单/注册时间），与后台裂变记录第 4 列同源 firstOrderFact()。
+    const paidAt = firstOrderFact(row).paidAt;
+    return `<div class="mp-referral-invite-row"><div><strong>${esc(maskReferralName(row.inviteeName))}</strong><small>注册 ${esc(row.registeredAt || '—')}</small><small class="is-time">首单支付 ${esc(paidAt || '—')}</small></div><span class="mp-referral-state ${['已发放', '已解锁待发放'].includes(status) ? 'is-unlocked' : ''}">${esc(referralInviteState(status))}</span></div>`;
+  }).join('');
 }
 function renderReferral() {
   if (!isLoggedIn()) { go(`/login.html?redirect=${encodeURIComponent('/learner/pages/referral.html')}`); return; }
@@ -2398,30 +2435,39 @@ function renderReferral() {
   const running = activity.status === '进行中';
   const accountId = getCurrentAccountId();
   const code = inviteCodeOf(accountId);
+  const link = referralInviteLink(code);
   const statusNotice = running ? '' : `<div class="mp-notice">活动${esc(activity.status)}：暂不能发起新邀请；已绑定的推荐关系与已解锁的礼品资格继续有效。</div>`;
   const rules = esc(activity.rulesText || '活动规则待后台配置。').replace(/\n/g, '<br>');
-  const invites = referralRecordsOfReferrer(accountId);
-  const inviteRows = invites.length
-    ? invites.map((row) => `<div class="mp-referral-invite-row"><div><strong>${esc(maskReferralName(row.inviteeName))}</strong><small>注册 ${esc(row.registeredAt || '—')}</small></div><span class="mp-referral-state ${['已发放', '已解锁待发放'].includes(giftStatusOf(row)) ? 'is-unlocked' : ''}">${esc(referralInviteState(row))}</span></div>`).join('')
-    : '<div class="mp-empty">还没有邀请记录，分享给好友后会在这里显示进度。</div>';
+  const inviteCount = referralRecordsOfReferrer(accountId).length;
   const pageBg = activity.pageBackgroundImage;
   const pageOpen = `<div class="mp-referral-page ${pageBg ? 'has-image' : 'is-default'}"${pageBg ? ` style="background-image:url('${esc(pageBg)}')"` : ''}>`;
-  layout(pageOpen + stack(
-    card(`<div class="mp-referral-head"><h2>${esc(activity.title || '分享有礼')}</h2><span class="mp-referral-status ${running ? 'is-running' : ''}">${esc(activity.status)}</span></div>`),
+  // 客户反馈：标题区与整页背景一体，不再用独立白卡片分割。
+  const hero = `<div class="mp-referral-hero"><div><h2>${esc(activity.title || '分享有礼')}</h2><p>邀请好友报名，首单支付即得礼品资格</p></div><span class="mp-referral-status ${running ? 'is-running' : ''}">${esc(activity.status)}</span></div>`;
+  layout(pageOpen + hero + stack(
     statusNotice,
     card(`<h3>活动规则</h3><div class="mp-referral-rules">${rules}</div>`),
-    card(`<div class="mp-referral-code"><span>我的专属邀请码</span><strong>${esc(code)}</strong><small>全活动期不变，分享给好友即可绑定推荐关系</small></div><button type="button" class="mp-button primary mp-referral-share" data-referral-share ${running ? '' : 'disabled'}>${running ? '分享给好友' : '当前活动不可分享'}</button><p class="mp-referral-hint">原型演示：以生成分享卡片与复制邀请链接模拟微信分享能力，扫码与点卡片为同一条带码进入链路。</p>`),
-    card(`<details class="mp-referral-invites"><summary><strong>我的邀请</strong><span>${invites.length} 位好友</span></summary><div class="mp-referral-invite-list">${inviteRows}</div><p class="mp-referral-hint">仅展示脱敏昵称、注册时间与首单状态，不展示手机号（隐私红线）。</p></details>`)
+    card(`<div class="mp-referral-code"><span>我的专属邀请码</span><strong>${esc(code)}</strong><div class="mp-referral-qr-wrap">${referralQrSvg(link)}</div><small>扫码或点分享卡片进入，绑定后不可修改</small></div><button type="button" class="mp-button primary mp-referral-share" data-referral-share ${running ? '' : 'disabled'}>${running ? '分享给好友' : '当前活动不可分享'}</button><p class="mp-referral-hint">原型演示：以生成分享卡片与复制邀请链接模拟微信分享能力，扫码与点卡片为同一条带码进入链路。</p>`),
+    // 客户反馈：我的邀请为独立页面入口，不做展开收起。
+    `<a class="mp-referral-invites-entry" href="/learner/pages/referral-invites.html"><span><strong>我的邀请</strong><small>查看邀请进度与首单支付时间</small></span><span class="mp-referral-invites-count">${inviteCount} 位好友 <i aria-hidden="true">›</i></span></a>`
   ) + '</div>');
   document.querySelector('[data-referral-share]')?.addEventListener('click', () => openReferralShareDialog(activity, code));
 }
+// CR-2026-164 v1.2：我的邀请独立页（点击入口打开，不在活动页折叠展开）。
+function renderReferralInvites() {
+  if (!isLoggedIn()) { go(`/login.html?redirect=${encodeURIComponent('/learner/pages/referral-invites.html')}`); return; }
+  const invites = referralRecordsOfReferrer(getCurrentAccountId());
+  layout(stack(
+    `<div class="mp-referral-invites-head"><div><h2>我的邀请</h2><p>共 ${invites.length} 位好友通过你的邀请进入</p></div><a class="mp-link" href="/learner/pages/referral.html">返回活动页 ›</a></div>`,
+    card(`<div class="mp-referral-invite-list is-page">${referralInviteRows(invites)}</div><p class="mp-referral-hint">仅展示脱敏昵称、注册时间、首单支付时间与礼品资格状态，不展示手机号、订单号、订单金额（隐私红线）。礼品由平台核实后发放。</p>`)
+  ));
+}
 function openReferralShareDialog(activity, code) {
   document.querySelector('#referral-share-dialog')?.remove();
-  const link = new URL(relativePath('/login.html'), location.href).href + `?role=learner&inv=${encodeURIComponent(code)}&redirect=${encodeURIComponent('/learner/index.html')}`;
+  const link = referralInviteLink(code);
   const dialog = document.createElement('dialog');
   dialog.id = 'referral-share-dialog';
   dialog.className = 'mp-referral-share-dialog';
-  dialog.innerHTML = `<div class="mp-referral-share-card"><div class="mp-referral-share-banner"><strong>${esc(activity.title || '分享有礼')}</strong><span>邀请您一起参加</span></div><div class="mp-referral-share-body"><p>邀请码 <strong>${esc(code)}</strong></p><p class="mp-referral-share-link">${esc(link)}</p></div></div><div class="mp-review-dialog-actions"><button type="button" class="mp-button" data-dialog-close>关闭</button><button type="button" class="mp-button primary" data-referral-copy>复制邀请链接</button></div>`;
+  dialog.innerHTML = `<div class="mp-referral-share-card"><div class="mp-referral-share-banner"><strong>${esc(activity.title || '分享有礼')}</strong><span>邀请您一起参加</span></div><div class="mp-referral-share-body"><div class="mp-referral-share-qr">${referralQrSvg(link)}</div><p>邀请码 <strong>${esc(code)}</strong></p><p class="mp-referral-share-link">${esc(link)}</p></div></div><div class="mp-review-dialog-actions"><button type="button" class="mp-button" data-dialog-close>关闭</button><button type="button" class="mp-button primary" data-referral-copy>复制邀请链接</button></div>`;
   document.body.appendChild(dialog);
   dialog.showModal();
   const close = () => { dialog.close(); dialog.remove(); };
@@ -2680,6 +2726,7 @@ else if (path.endsWith('/consultation-detail.html')) renderConsultationDetail();
 else if (path.endsWith('/messages.html')) renderMessages();
 else if (path.endsWith('/message-detail.html')) renderMessageDetail();
 else if (path.endsWith('/referral.html')) renderReferral();
+else if (path.endsWith('/referral-invites.html')) renderReferralInvites();
 else if (path.endsWith('/profile.html')) renderProfile();
 else if (path.endsWith('/student-management.html')) renderStudentManagement();
 else if (path.endsWith('/student-edit.html')) renderStudentEdit();

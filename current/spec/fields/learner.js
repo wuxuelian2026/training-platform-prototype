@@ -162,10 +162,12 @@ const LEARNER_APP_FIELD_SPEC = {
           { id: 'FD-LAPP-046', label: '活动规则', type: '只读（富文本/纯文本）', length: '—', required: '系统展示', note: '后台配置正文，换行保留，只读展示', constraints: { readOnly: true, system: true } },
           { id: 'FD-LAPP-047', label: '本人邀请码', type: '只读', length: '固定个人码', required: '系统生成', note: '按账号生成，全活动期不变', constraints: { readOnly: true, derived: true } },
           { id: 'FD-LAPP-048', label: '分享给好友', type: '按钮', length: '—', required: '是', note: '生成分享卡片预览（标题 + 带邀请码参数的进入链接）；扫码/点卡片同链路', constraints: { action: true } },
-          { id: 'FD-LAPP-049', label: '我的邀请入口', type: '入口（链接）', length: '—', required: '是', note: '活动页内入口，展示我邀请的用户列表', constraints: { action: true } },
+          { id: 'FD-LAPP-049', label: '我的邀请入口', type: '入口（链接）', length: '—', required: '是', note: 'CR-2026-164 v1.3：点击打开独立页面 /learner/pages/referral-invites.html，不使用 details 展开收起；入口展示好友数', constraints: { action: true } },
           { id: 'FD-LAPP-050', label: '被邀请人昵称', type: '只读（脱敏）', length: '—', required: '系统展示', note: '脱敏昵称；不展示手机号（隐私红线）', constraints: { readOnly: true, system: true } },
           { id: 'FD-LAPP-051', label: '注册时间', type: '只读', length: 'YYYY-MM-DD HH:mm', required: '系统记录', note: '被邀请用户注册登录（绑定）时间', constraints: { readOnly: true, system: true } },
-          { id: 'FD-LAPP-052', label: '首单状态', type: '只读（派生）', length: '已出礼 / 待解锁', required: '系统派生', note: '已出礼=首单已支付（已解锁待发放或已发放）；待解锁=尚未完成首笔正价订单支付', constraints: { readOnly: true, derived: true, options: ['已出礼', '待解锁'] } }
+          { id: 'FD-LAPP-052', label: '礼品资格状态', type: '只读（派生）', length: '待首单 / 已付款·待核实发放 / 已发放 / 资格作废（首单已退款）', required: '系统派生', note: 'CR-2026-164 v1.2：学员端用户语言四态，与后台待解锁/已解锁待发放/已发放/无效一一对应；禁止使用「已出礼」（合并已解锁待发放与已发放会误导用户）', constraints: { readOnly: true, derived: true, options: ['待首单', '已付款·待核实发放', '已发放', '资格作废（首单已退款）'] } },
+          { id: 'FD-LAPP-053', label: '首单支付时间', type: '只读（派生）', length: 'YYYY-MM-DD HH:mm', required: '系统派生', note: 'CR-2026-164 v1.2：被邀请人第一笔已支付正价订单的支付成功时间 paidAt（非下单时间、非注册时间）；与后台裂变记录第 4 列同源 firstOrderFact()；未出首单显示「—」；不得展示订单号、订单金额、手机号、真实姓名', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-LAPP-054', label: '邀请码二维码', type: '只读（图片/SVG）', length: '—', required: '系统生成', note: 'CR-2026-164 v1.3：内容为带邀请码的进入链接，与「复制邀请链接」同源；扫码与点分享卡片为同一条带码进入链路；本地离线生成，组件缺失时显示可读降级文案，禁止伪造二维码图案；活动页与分享卡片均展示', constraints: { readOnly: true, system: true } }
         ] }
       ],
       notes: [
@@ -173,7 +175,9 @@ const LEARNER_APP_FIELD_SPEC = {
         '已注册用户（已有绑定）带码进入提示「已注册用户不可绑定推荐人」，静默忽略，不阻断正常使用。',
         '自邀拦截：邀请码属于本人时不绑定、不产生记录。',
         '首单口径：第一笔已支付的正价订单（0 元单、全额优惠券单不算）；礼品资格在支付成功节点判定。',
-        '礼品发放由后台人工确认，不做自动发放。'
+        '礼品发放由后台人工确认，不做自动发放。',
+        'CR-2026-164 v1.2：我的邀请展示脱敏昵称 + 注册时间 + 首单支付时间 + 礼品资格状态四态；隐私红线为不展示手机号、订单号、订单金额、真实姓名。',
+        'CR-2026-164 v1.3：我的邀请改为独立页面 learner/referral-invites（不做展开收起），复用本页 FD-LAPP-049~053 字段规格；活动页标题区与整页背景一体，邀请码附真实二维码。'
       ]
     }
   }
