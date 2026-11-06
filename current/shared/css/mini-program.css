@@ -2155,3 +2155,21 @@ body:has([data-mobile-shell]):has(.mp-bottom-actions) .page-help-trigger { botto
 .hs-entry-button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 96px; }
 .hs-entry-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; background: #d97706; color: #fff; font-size: 11px; line-height: 1; }
 
+/* CR-2026-166：兴趣专业字段与默认值回落提示 */
+.mp-interest-notice { margin: 0 0 10px; padding: 9px 12px; border: 1px solid #f5dfae; border-radius: 8px; background: #fff7e8; color: #8a5b13; font-size: 12px; line-height: 1.6; }
+#profile-student-interest-hint { display: block; margin-top: 6px; color: #8a91a0; font-size: 11px; line-height: 1.5; }
+.mp-form-error[data-interest-invalid] { display: block; margin-top: 4px; }
+
+/* CR-2026-166 v1.1：兴趣专业标签多选 */
+.mp-interest-field { border-top: 1px solid #f0f1f4; padding-top: 14px; }
+.mp-interest-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.mp-interest-tag { position: relative; display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid #e3e6ec; border-radius: 999px; background: #fff; color: #4a5260; font-size: 12px; line-height: 1.4; cursor: pointer; user-select: none; }
+.mp-interest-tag input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.mp-interest-tag:has(input:checked) { border-color: #7aa7e8; background: #eaf3ff; color: #1c5fb3; }
+.mp-interest-tag.is-invalid { border-color: #e8a9a9; background: #fff3f3; color: #a33; }
+.mp-interest-tag:focus-within { outline: 2px solid #7aa7e8; outline-offset: 2px; }
+
+/* CR-2026-166 v1.2：三级级联多选的已选路径标签 */
+.mp-cascade-selected { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e6e8ed; }
+.mp-cascade-selected-tag { padding: 4px 9px; border: 1px solid #7aa7e8; border-radius: 999px; background: #eaf3ff; color: #1c5fb3; font-size: 11px; line-height: 1.4; cursor: pointer; }
+.mp-cascade-selected-empty { color: #8a91a0; font-size: 11px; line-height: 1.6; }

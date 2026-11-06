@@ -36,7 +36,8 @@ const LEARNER_APP_FIELD_SPEC = {
           { id: 'FD-LAPP-009', label: '性别', type: '单选', length: '男 / 女', required: '是', note: '用于班级与课程适配', constraints: { options: ['男', '女'] } },
           { id: 'FD-LAPP-010', label: '出生年月', type: '日期', length: 'YYYY-MM', required: '是', note: '不得晚于当前月份，用于适龄校验', constraints: { format: 'YYYY-MM' } },
           { id: 'FD-LAPP-011', label: '与账号关系', type: '下拉', length: '预置关系选项', required: '是', note: '说明该学员与当前登录账号的关系' },
-          { id: 'FD-LAPP-035', label: '学员照片', type: '图片', length: 'JPG/PNG，上传后压缩展示', required: '是', note: 'CR-2026-155 C6：新增与编辑学员资料时必填；未上传照片无法保存。照片随学员档案保存，用于后台结业证书预览展示；历史档案编辑时需补传' }
+          { id: 'FD-LAPP-035', label: '学员照片', type: '图片', length: 'JPG/PNG，上传后压缩展示', required: '是', note: 'CR-2026-155 C6：新增与编辑学员资料时必填；未上传照片无法保存。照片随学员档案保存，用于后台结业证书预览展示；历史档案编辑时需补传' },
+          { id: 'FD-LAPP-056', label: '兴趣专业', type: '标签（多选）', length: '后台专业目录启用叶子，可多选', required: '否', note: 'CR-2026-166 v1.1：选填、标签多选，位于表单最下方（照片之后、操作按钮之前）；标签取 shared/js/catalog-store.js 的启用叶子（叶子名可见、title 为「门类 / 分类 / 专业」三级路径），值以数组存当前学员 interestMajors；可全不选；旧单选 interestMajor 只读兼容；目录节点停用/删除后编辑态保留并标注「已失效」提示重选；不参与照片等既有必填校验', constraints: { optionsSource: 'catalog-store.enabledMajorOptions', multiple: true } }
         ] }
       ],
       notes: [
@@ -44,7 +45,29 @@ const LEARNER_APP_FIELD_SPEC = {
         '学员资料的增删改不改变账号下的视频学习权限与学习进度，视频权限按账号共享。',
         '面授订单必须关联具体学员，报名、考勤、作业与结业数据按学员隔离。',
         '出生年月用于适龄校验，修改后不影响已发生的报名与订单记录。',
-        '学员照片为必填项（CR-2026-155 C6）：新增与编辑均需上传，保存后用于后台结业证书预览等场景。'
+        '学员照片为必填项（CR-2026-155 C6）：新增与编辑均需上传，保存后用于后台结业证书预览等场景。',
+        'CR-2026-166 v1.2：兴趣专业以数组挂在当前学员档案（非家长账号），切换当前学员后两列表默认值按新学员重算；多个兴趣全部预置为已选路径，专业筛选三级级联多选并按 OR 过滤；历史档案缺字段按未设置处理。'
+      ]
+    },
+    'learner/courses': {
+      groups: [
+        { heading: '专业筛选字段', fields: [
+          { id: 'FD-LAPP-057', label: '专业筛选默认值', type: '只读（派生）', length: '—', required: '系统派生', note: 'CR-2026-166 v1.2：首次进入时把当前学员全部命中兴趣预置为已选路径（三级级联多选、OR 过滤：命中任一路径即展示），优先级 URL 显式参数 > 会话手动筛选 > 兴趣；URL 参数进入时沿用单条路径；叶子精确匹配 professional 失败时按门类关键词反查 field/discipline；无匹配或结果为空回落全量并提示；每页仅生效一次', constraints: { readOnly: true, derived: true } }
+        ] }
+      ],
+      notes: [
+        '专业筛选树仍由课程数据反推，本期不改课程 seed；兴趣选项来自后台专业目录单一事实源 catalog-store.js（CR-2026-166 A② 取舍）。',
+        '本期只做筛选默认值，不做推荐算法、个性化排序、能力测评或推荐理由展示。'
+      ]
+    },
+    'learner/fast-registration': {
+      groups: [
+        { heading: '专业筛选字段', fields: [
+          { id: 'FD-LAPP-058', label: '专业筛选默认值', type: '只读（派生）', length: '—', required: '系统派生', note: 'CR-2026-166 v1.2：与课程列表同一套 interestPresetFor() 规则（多兴趣全量预置、级联多选 OR、已选标签可单个移除）；从课程详情带 ?courseId= 进入时 URL 参数优先，兴趣不覆盖课程范围', constraints: { readOnly: true, derived: true } }
+        ] }
+      ],
+      notes: [
+        '默认值优先级与一次性生效规则见拆分版 19 §6.1；会话标记按 studentId 隔离。'
       ]
     },
     'learner/fast-registration-detail': {

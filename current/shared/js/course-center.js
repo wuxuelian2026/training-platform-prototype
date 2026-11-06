@@ -3,6 +3,8 @@
   const __classicExports = {};
   const __classicRequire = (id) => __classicModules[id];
 const { relativePath } = __classicRequire("shared/js/paths.js");
+// CR-2026-166：专业目录改为共享单一事实源，后台目录页与学员端兴趣字段共用。
+const { readCatalog, persistCatalog, professionalTreeOf } = __classicRequire("shared/js/catalog-store.js");
 const { demoId, demoTime, dictionaryDefault, dictionaryItems, fileSpecSettings, readDemoState, removeDemoRecord, updateDemoRecord, upsertDemoRecord } = __classicRequire("shared/js/demo-store.js");
 const { applicationSeed, courseIdForApplication, courseMockSeed, teacherAccounts, toCanonicalCourseId } = __classicRequire("shared/js/course-seed.js");
 const { courseArchiveKey, courseEditLock, courseEditLockLabel } = __classicRequire("shared/js/course-version.js");
@@ -22,12 +24,6 @@ const courseDifficultyOptions = () => dictionaryItems('course_difficulty');
 const courseAgeOptions = () => dictionaryItems('suitable_age');
 const courseDefaultDifficulty = () => dictionaryDefault('course_difficulty') || courseDifficultyOptions()[0] || '';
 
-const professionalTree = {
-  '音乐类': { '声乐': ['声乐演唱', '童声合唱'], '器乐': ['钢琴', '古筝'] },
-  '舞蹈类': { '舞蹈表演': ['中国舞', '芭蕾舞'], '舞蹈编导': ['舞蹈编导'] },
-  '美术类': { '绘画': ['中国画', '少儿绘画'], '设计': ['视觉传达设计'] },
-  '戏剧类': { '表演': ['戏剧表演', '朗诵与主持'] }
-};
 
 const applications = applicationSeed();
 
@@ -73,30 +69,13 @@ function courseOutlineView(chapters, emptyHint = '尚未维护章节与课时。
   return `<div class="course-outline-readonly">${list.map((chapter, chapterIndex) => `<section class="course-detail-section wide"><h3>第 ${chapterIndex + 1} 章 · ${escapeHtml(chapter.name)}</h3><p class="course-hint">${escapeHtml(chapter.desc || '暂无章节描述')}</p><div class="lesson-list">${(chapter.lessons || []).map((lesson, lessonIndex) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>第 ${lessonIndex + 1} 课时 · ${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target || '未填写教学目标')}</p></div></div><div class="lesson-meta"><span>${escapeHtml(String(lesson.duration ?? '—'))} 分钟</span><span>${escapeHtml(lesson.kind || '—')}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${(lesson.resources || []).length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section>`).join('')}</div>`;
 }
 
-const catalog = {
-  groupStatus: { '音乐类': '启用', '舞蹈类': '启用', '美术类': '停用', '戏剧类': '启用' },
-  groupSort: { '音乐类': 1, '舞蹈类': 2, '美术类': 3, '戏剧类': 4 },
-  groupIcon: {},
-  categories: [
-    { id: 'cat-1', name: '声乐', parent: '音乐类', sort: 1, status: '启用' },
-    { id: 'cat-2', name: '器乐', parent: '音乐类', sort: 2, status: '启用' },
-    { id: 'cat-3', name: '舞蹈表演', parent: '舞蹈类', sort: 1, status: '启用' },
-    { id: 'cat-4', name: '绘画', parent: '美术类', sort: 1, status: '启用' },
-    { id: 'cat-5', name: '表演', parent: '戏剧类', sort: 1, status: '启用' }
-  ],
-  majors: [
-    { id: 'major-1', name: '声乐演唱', parent: '声乐', group: '音乐类', sort: 1, status: '启用', teachers: 6, courses: 8, resources: 12 },
-    { id: 'major-2', name: '童声合唱', parent: '声乐', group: '音乐类', sort: 2, status: '启用', teachers: 2, courses: 3, resources: 4 },
-    { id: 'major-3', name: '钢琴', parent: '器乐', group: '音乐类', sort: 1, status: '启用', teachers: 5, courses: 5, resources: 8 },
-    { id: 'major-4', name: '古筝', parent: '器乐', group: '音乐类', sort: 2, status: '启用', teachers: 3, courses: 4, resources: 5 },
-    { id: 'major-5', name: '中国舞', parent: '舞蹈表演', group: '舞蹈类', sort: 1, status: '启用', teachers: 8, courses: 10, resources: 16 },
-    { id: 'major-6', name: '芭蕾舞', parent: '舞蹈表演', group: '舞蹈类', sort: 2, status: '启用', teachers: 4, courses: 4, resources: 6 },
-    { id: 'major-7', name: '中国画', parent: '绘画', group: '美术类', sort: 1, status: '启用', teachers: 4, courses: 5, resources: 9 },
-    { id: 'major-8', name: '少儿绘画', parent: '绘画', group: '美术类', sort: 2, status: '启用', teachers: 2, courses: 2, resources: 3 },
-    { id: 'major-9', name: '戏剧表演', parent: '表演', group: '戏剧类', sort: 1, status: '启用', teachers: 3, courses: 4, resources: 5 },
-    { id: 'major-10', name: '朗诵与主持', parent: '表演', group: '戏剧类', sort: 2, status: '启用', teachers: 2, courses: 3, resources: 2 }
-  ]
-};
+const catalog = readCatalog();
+let professionalTree = professionalTreeOf(catalog);
+// 目录变更后重新派生树并写盘；覆盖启停/改名/增删/表单保存等全部入口（均为目录页重绘或点击事件）。
+function syncCatalog() {
+  professionalTree = professionalTreeOf(catalog);
+  persistCatalog();
+}
 
 // I1-DEC-19: seed courses adopt the application-derived course id, and the course library keeps
 // its sourceCourseId bound to that same id so both ends share one primary key.
@@ -672,6 +651,7 @@ const majorReferenceTotal = (references) => references.teachers.length + referen
 const majorReferenceSummary = (references) => `教师 ${references.teachers.length} · 课程 ${references.courses.length} · 资源 ${references.resources.length}`;
 
 function renderCatalog(page) {
+  syncCatalog();
   const groups = Object.keys(professionalTree).sort((a, b) => (catalog.groupSort[a] ?? 999) - (catalog.groupSort[b] ?? 999) || a.localeCompare(b, 'zh-CN'));
   if (!(state.expandedCatalog instanceof Set)) state.expandedCatalog = new Set(groups.map((group) => `group:${group}`));
   const isOpen = (key) => state.expandedCatalog.has(key);
@@ -1224,6 +1204,7 @@ function handleClick(event) {
   if (action === 'catalog-delete') deleteCatalog(target.dataset.type, target.dataset.id, target.dataset.value);
   if (action === 'catalog-toggle-confirm') confirmCatalogToggle(target.dataset.id);
   if (action === 'catalog-delete-confirm') confirmCatalogDelete(target.dataset.id);
+  syncCatalog();
 }
 
 function handleChange(event) {

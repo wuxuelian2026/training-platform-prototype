@@ -19,6 +19,8 @@ const { getHomework, listHomework, getStudentSubmission, homeworkFileAccept, hom
 const { resolveHomeBanners } = __classicRequire("shared/js/banner-seed.js");
 const { isLearnerPublicPage, isMiniLoggedIn, isMiniRole, miniPageName, redirectMiniLogin } = __classicRequire("shared/js/mobile-guard.js");
 const { toCanonicalCourseId } = __classicRequire("shared/js/course-seed.js");
+// CR-2026-166：兴趣专业选项与失效校验读取后台专业目录单一事实源。
+const { enabledMajorOptions, groupKeywordOf, isMajorEnabled, majorPathOf } = __classicRequire("shared/js/catalog-store.js");
 const { REFUND_ORIGIN, classRefundSuggestion, createRefundRequest, openRefundForOrder, refundsForOrder } = __classicRequire("shared/js/refund-store.js");
 const { syncNotificationReads } = __classicRequire("shared/js/notification-store.js");
 const { allProducts, productForCourse } = __classicRequire("shared/js/product-seed.js");
@@ -521,6 +523,78 @@ function renderTeacherDetail() {
     card(`<div class="mp-section-head"><h3>已发布课程</h3><span class="mp-muted">${related.length}门</span></div><div class="mp-list" style="margin-top:10px">${related.length ? related.map(row => courseCard(row)).join('') : '<div class="mp-empty">暂无已发布课程</div>'}</div>`)
   ));
 }
+// ===== CR-2026-166：兴趣专业与两列表专业筛选默认值 =====
+// 会话标记按「页面 + 当前学员」隔离：首次进入预置一次，用户手动改动后不再拉回。
+const INTEREST_SESSION_PREFIX = 'hbyx-cr166-';
+const interestSessionKey = (page, kind) => `${INTEREST_SESSION_PREFIX}${kind}-${page}-${state.currentStudentId || ''}`;
+const interestSessionGet = (page, kind) => { try { return sessionStorage.getItem(interestSessionKey(page, kind)) === '1'; } catch (error) { return false; } };
+const interestSessionSet = (page, kind) => { try { sessionStorage.setItem(interestSessionKey(page, kind), '1'); } catch (error) { /* 会话存储不可用时退化为每次进入生效 */ } };
+const markInterestTouched = (page) => interestSessionSet(page, 'touched');
+const interestNoticeHtml = (notice) => notice ? `<div class="mp-interest-notice" role="status">${esc(notice)}</div>` : '';
+// CR-2026-166 v1.2：三级级联多选，路径为「门类/分类/专业」中的任意深度，OR 过滤。
+const majorPathKey = (path) => [path?.discipline || '', path?.field || '', path?.professional || ''].join('/');
+// v1.2：课程反推树存在三层同名的叶子专业（如 钢琴 / 钢琴 / 钢琴），展示时折叠连续重复段。
+function majorPathText(path) {
+  const parts = [path?.discipline, path?.field, path?.professional].filter(Boolean);
+  return parts.filter((value, index) => index === 0 || value !== parts[index - 1]).join(' / ');
+}
+function majorPathsText(paths) {
+  if (!paths?.length) return '';
+  if (paths.length === 1) return majorPathText(paths[0]);
+  return `已选 ${paths.length} 个专业`;
+}
+const cascadeNodePath = (step, value, node) => step === 'discipline'
+  ? { discipline: value, field: '', professional: '' }
+  : step === 'field' ? { discipline: node.discipline, field: value, professional: '' }
+    : { discipline: node.discipline, field: node.field, professional: value };
+
+// 值域对齐采用 A②：兴趣选项来自后台目录启用叶子，默认值在课程反推筛选树中自深向浅匹配；
+// 不改任何课程 seed。scopeItems 用于判定预置后当前页签/范围是否真的有结果，避免默认后空列表。
+function interestPresetFor(page, tree, scopeItems) {
+  const urlKeys = ['category', 'field', 'professional', 'courseId', 'q', 'level', 'type'];
+  if (urlKeys.some((key) => params.has(key)) || interestSessionGet(page, 'touched') || interestSessionGet(page, 'applied')) return null;
+  const raw = currentStudent()?.interestMajors;
+  const names = (Array.isArray(raw) ? raw : (currentStudent()?.interestMajor ? [currentStudent().interestMajor] : []))
+    .map((value) => String(value || '').trim()).filter(Boolean);
+  if (!names.length) return null;
+  interestSessionSet(page, 'applied');
+  const hasResult = (sel) => (scopeItems || []).some((item) =>
+    (!sel.discipline || item.discipline === sel.discipline)
+    && (!sel.field || item.field === sel.field)
+    && (!sel.professional || item.professional === sel.professional));
+  let allInvalid = true;
+  const paths = [];
+  // 多兴趣按标签选择顺序全部预置为已选路径，筛选时 OR 命中。
+  for (const name of names) {
+    if (!isMajorEnabled(name)) continue;
+    allInvalid = false;
+    const path = majorPathOf(name);
+    const keyword = groupKeywordOf(path?.group);
+    const candidates = [];
+    // a) 叶子专业名精确匹配
+    (tree || []).forEach((discipline) => (discipline.children || []).forEach((field) => (field.children || []).forEach((professional) => {
+      if (professional === name) candidates.push({ discipline: discipline.value, field: field.value, professional });
+    })));
+    // b/c) 门类关键词反查 field / discipline（后台「音乐类」→ 学员端「音乐」）
+    if (keyword) {
+      (tree || []).forEach((discipline) => (discipline.children || []).forEach((field) => {
+        if (String(field.value).includes(keyword)) candidates.push({ discipline: discipline.value, field: field.value, professional: '' });
+      }));
+      (tree || []).forEach((discipline) => {
+        if (String(discipline.value).includes(keyword)) candidates.push({ discipline: discipline.value, field: '', professional: '' });
+      });
+    }
+    const hit = candidates.find((candidate) => hasResult(candidate));
+    if (hit && !paths.some((path) => majorPathKey(path) === majorPathKey(hit))) paths.push(hit);
+  }
+  if (paths.length) return { paths, notice: '' };
+  // v1.2：快速报名页展示班级、课程列表展示课程，回落文案跟随页面对象，避免口径串页。
+  const scopeLabel = page === 'fast' ? '班级' : '课程';
+  return { paths: [], notice: allInvalid
+    ? `兴趣专业已调整，请重新选择；当前展示全部${scopeLabel}。`
+    : `暂未找到与兴趣匹配的${scopeLabel}，已展示全部${scopeLabel}。` };
+}
+
 function renderCourses() {
   const requestedCategory = params.get('category') || '';
   const disciplineOptions = [...new Set(state.courses.map(item => item.discipline).filter(Boolean))];
@@ -532,7 +606,7 @@ function renderCourses() {
   const initialCourseTab = params.get('type') === 'video' ? 'video' : 'class';
   const optionList = (options, selected, emptyText) => `<option value="">${emptyText}</option>${options.map(option => `<option value="${esc(option)}" ${option === selected ? 'selected' : ''}>${esc(option)}</option>`).join('')}`;
   const initialMatch = state.courses.find(item => (initialProfessional && item.professional === initialProfessional) || (initialField && item.field === initialField));
-  const selectedMajor = {
+  const initialSelectedMajor = {
     discipline: initialDiscipline || initialMatch?.discipline || '',
     field: initialField || (initialProfessional ? initialMatch?.field : '') || '',
     professional: initialProfessional
@@ -544,7 +618,11 @@ function renderCourses() {
       children: [...new Set(state.courses.filter(item => item.discipline === discipline && item.field === field).map(item => item.professional).filter(Boolean))]
     }))
   }));
-  layout(stack(`<form id="course-search-form" class="mp-course-search" role="search"><input id="course-search" aria-label="搜索课程或专业" placeholder="搜索课程或专业" value="${esc(params.get('q') || '')}"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form>`, `<section class="mp-course-browser" aria-label="课程浏览"><div class="mp-tabs mp-course-type-tabs" role="tablist"><button class="mp-tab ${initialCourseTab === 'class' ? 'active' : ''}" type="button" data-course-tab="class" role="tab" aria-selected="${initialCourseTab === 'class'}">面授课程</button><button class="mp-tab ${initialCourseTab === 'video' ? 'active' : ''}" type="button" data-course-tab="video" role="tab" aria-selected="${initialCourseTab === 'video'}">视频课程</button></div><div class="mp-course-filter-row" aria-label="课程筛选条件"><button id="course-profession-trigger" class="mp-course-filter-chip" type="button" aria-haspopup="dialog" aria-controls="course-profession-dialog" aria-expanded="false"><span id="course-profession-value">专业</span><i aria-hidden="true">⌄</i></button><button id="course-level-trigger" class="mp-course-filter-chip" type="button"><span>难度</span><i aria-hidden="true">⌄</i></button><button id="course-age-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>适合年龄</span><i aria-hidden="true">⌄</i></button></div></section>`, `<section class="mp-course-list-section"><div class="mp-course-list-head"><div class="mp-list-summary"><h2>课程列表</h2><span id="course-result-count" class="mp-muted"></span></div><div class="mp-sort-switch" role="group" aria-label="课程排序"><button class="active" type="button" data-course-sort="latest" aria-pressed="true">最新</button><button type="button" data-course-sort="sales" aria-pressed="false">销量</button></div></div><div id="course-list" class="mp-list"></div></section>`, `<dialog id="course-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="course-cascade-title"><header class="mp-cascade-head"><div><h2 id="course-cascade-title">选择专业</h2><p id="course-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="course-cascade-path" class="mp-cascade-path"></div><div id="course-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="course-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="course-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`, `<dialog id="course-choice-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-choice-title"><header class="mp-cascade-head"><div><h2 id="course-choice-title">选择筛选条件</h2><p>点击选项后立即生效</p></div><button class="mp-cascade-close" type="button" data-choice-close aria-label="关闭筛选">×</button></header><div id="course-choice-options" class="mp-cascade-options" role="listbox"></div></section></dialog>`));
+  // CR-2026-166 v1.2：多兴趣全部预置为已选路径（OR）；URL 显式参数优先，沿用该单路径。
+  const preset = interestPresetFor('courses', professionalTree, state.courses.filter((item) => item.type === initialCourseTab));
+  const urlPath = [initialSelectedMajor.discipline, initialSelectedMajor.field, initialSelectedMajor.professional].some(Boolean) ? [initialSelectedMajor] : [];
+  const selectedPaths = preset?.paths?.length ? [...preset.paths] : (preset ? [] : urlPath);
+  layout(stack(interestNoticeHtml(preset?.notice), `<form id="course-search-form" class="mp-course-search" role="search"><input id="course-search" aria-label="搜索课程或专业" placeholder="搜索课程或专业" value="${esc(params.get('q') || '')}"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form>`, `<section class="mp-course-browser" aria-label="课程浏览"><div class="mp-tabs mp-course-type-tabs" role="tablist"><button class="mp-tab ${initialCourseTab === 'class' ? 'active' : ''}" type="button" data-course-tab="class" role="tab" aria-selected="${initialCourseTab === 'class'}">面授课程</button><button class="mp-tab ${initialCourseTab === 'video' ? 'active' : ''}" type="button" data-course-tab="video" role="tab" aria-selected="${initialCourseTab === 'video'}">视频课程</button></div><div class="mp-course-filter-row" aria-label="课程筛选条件"><button id="course-profession-trigger" class="mp-course-filter-chip" type="button" aria-haspopup="dialog" aria-controls="course-profession-dialog" aria-expanded="false"><span id="course-profession-value">专业</span><i aria-hidden="true">⌄</i></button><button id="course-level-trigger" class="mp-course-filter-chip" type="button"><span>难度</span><i aria-hidden="true">⌄</i></button><button id="course-age-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>适合年龄</span><i aria-hidden="true">⌄</i></button></div></section>`, `<section class="mp-course-list-section"><div class="mp-course-list-head"><div class="mp-list-summary"><h2>课程列表</h2><span id="course-result-count" class="mp-muted"></span></div><div class="mp-sort-switch" role="group" aria-label="课程排序"><button class="active" type="button" data-course-sort="latest" aria-pressed="true">最新</button><button type="button" data-course-sort="sales" aria-pressed="false">销量</button></div></div><div id="course-list" class="mp-list"></div></section>`, `<dialog id="course-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="course-cascade-title"><header class="mp-cascade-head"><div><h2 id="course-cascade-title">选择专业</h2><p id="course-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="course-cascade-path" class="mp-cascade-path"></div><div id="course-cascade-options" class="mp-cascade-options" role="listbox"></div><div id="course-cascade-selected" class="mp-cascade-selected" aria-label="已选专业"></div><footer class="mp-cascade-actions"><button id="course-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="course-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`, `<dialog id="course-choice-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-choice-title"><header class="mp-cascade-head"><div><h2 id="course-choice-title">选择筛选条件</h2><p>点击选项后立即生效</p></div><button class="mp-cascade-close" type="button" data-choice-close aria-label="关闭筛选">×</button></header><div id="course-choice-options" class="mp-cascade-options" role="listbox"></div></section></dialog>`));
   const professionTrigger = document.querySelector('#course-profession-trigger');
   const professionValue = document.querySelector('#course-profession-value');
   const cascadeDialog = document.querySelector('#course-profession-dialog');
@@ -566,10 +644,19 @@ function renderCourses() {
     { key: 'field', label: '专业分类' },
     { key: 'professional', label: '专业' }
   ];
-  let draftMajor = { ...selectedMajor };
-  let activeCascadeStep = selectedMajor.professional ? 'professional' : selectedMajor.field ? 'professional' : selectedMajor.discipline ? 'field' : 'discipline';
+  let draftMajor = { discipline: '', field: '', professional: '' };
+  let draftPaths = [];
+  let activeCascadeStep = 'discipline';
+  // CR-2026-166 v1.2：弹窗内已选路径标签，点击单个移除。
+  const renderSelectedPaths = () => {
+    const box = document.querySelector('#course-cascade-selected');
+    if (!box) return;
+    box.innerHTML = draftPaths.length
+      ? draftPaths.map((item, index) => `<button type="button" class="mp-cascade-selected-tag" data-course-remove-path="${index}" data-path-key="${esc(majorPathKey(item))}" aria-label="移除已选专业">${esc(majorPathText(item))} ×</button>`).join('')
+      : '<span class="mp-cascade-selected-empty">未选择专业时展示全部课程</span>';
+  };
   const updateProfessionValue = () => {
-    const pathText = [selectedMajor.discipline, selectedMajor.field, selectedMajor.professional].filter(Boolean).join(' / ');
+    const pathText = majorPathsText(selectedPaths);
     professionValue.textContent = pathText || '专业';
     professionTrigger.classList.toggle('has-value', Boolean(pathText));
   };
@@ -617,25 +704,31 @@ function renderCourses() {
     cascadeCaption.textContent = `请选择${stepName}`;
     const values = cascadeValues();
     cascadeOptions.innerHTML = values.length ? values.map(value => {
-      const selected = draftMajor[activeCascadeStep] === value;
+      const selected = draftPaths.some((item) => majorPathKey(item) === majorPathKey(cascadeNodePath(activeCascadeStep, value, draftMajor)));
       return `<button type="button" class="mp-cascade-option ${selected ? 'selected' : ''}" data-cascade-value="${esc(value)}" role="option" aria-selected="${selected}"><span>${esc(value)}</span><span aria-hidden="true">${selected ? '✓' : activeCascadeStep === 'professional' ? '' : '›'}</span></button>`;
     }).join('') : '<div class="mp-cascade-empty">请先选择上一级专业</div>';
-    cascadeConfirm.disabled = !draftMajor.professional;
+    cascadeConfirm.disabled = false; // v1.2：允许空选（=全部专业）
+    renderSelectedPaths();
   };
   let categoryFilter = requestedCategory;
+  // CR-2026-166 v1.2：路径内 AND、路径间 OR；空选 = 不限专业。
+  const majorMatch = (item) => !selectedPaths.length || selectedPaths.some((sel) =>
+    (!sel.discipline || item.discipline === sel.discipline)
+    && (!sel.field || item.field === sel.field)
+    && (!sel.professional || item.professional === sel.professional));
   const draw = () => {
     const keyword = document.querySelector('#course-search').value.trim().toLowerCase();
-    const { discipline, field, professional } = selectedMajor;
     const items = sortedLearnerItems(state.courses.filter(item => {
       const searchable = `${item.name}${item.type === 'video' ? item.teacher : ''}${item.category}${item.discipline || ''}${item.field || ''}${item.professional || ''}`.toLowerCase();
       const categoryMatch = !categoryFilter || [item.discipline, item.field, item.professional, item.category].filter(Boolean).some(value => value.includes(categoryFilter));
-      return item.type === activeCourseTab && categoryMatch && (!discipline || item.discipline === discipline) && (!field || item.field === field) && (!professional || item.professional === professional) && (!level || item.level === level) && (item.type !== 'class' || !age || String(item.age).includes(age)) && searchable.includes(keyword);
+      return item.type === activeCourseTab && categoryMatch && majorMatch(item) && (!level || item.level === level) && (item.type !== 'class' || !age || String(item.age).includes(age)) && searchable.includes(keyword);
     }), activeSort);
     document.querySelector('#course-list').innerHTML = items.length ? items.map(item => courseCard(item)).join('') : `<div class="mp-empty">暂无符合条件的课程</div>`;
     document.querySelector('#course-result-count').textContent = `${items.length}门课程`;
   };
   professionTrigger.addEventListener('click', () => {
-    draftMajor = { ...selectedMajor };
+    draftPaths = selectedPaths.map((item) => ({ ...item }));
+    draftMajor = draftPaths[0] ? { ...draftPaths[0] } : { discipline: '', field: '', professional: '' };
     activeCascadeStep = draftMajor.professional ? 'professional' : draftMajor.field ? 'professional' : draftMajor.discipline ? 'field' : 'discipline';
     renderCascade();
     professionTrigger.setAttribute('aria-expanded', 'true');
@@ -650,26 +743,38 @@ function renderCourses() {
   cascadeOptions.addEventListener('click', event => {
     const value = event.target.closest('[data-cascade-value]')?.dataset.cascadeValue;
     if (!value) return;
+    // 任意层级节点都可勾选；再次点击同一节点即取消该路径。
+    const nodePath = cascadeNodePath(activeCascadeStep, value, draftMajor);
+    const index = draftPaths.findIndex((item) => majorPathKey(item) === majorPathKey(nodePath));
+    if (index >= 0) draftPaths.splice(index, 1);
+    else draftPaths.push(nodePath);
     if (activeCascadeStep === 'discipline') {
       draftMajor = { discipline: value, field: '', professional: '' };
       activeCascadeStep = 'field';
     } else if (activeCascadeStep === 'field') {
       draftMajor = { ...draftMajor, field: value, professional: '' };
       activeCascadeStep = 'professional';
-    } else {
-      draftMajor = { ...draftMajor, professional: value };
     }
     renderCascade();
   });
+  document.querySelector('#course-cascade-selected').addEventListener('click', event => {
+    const index = event.target.closest('[data-course-remove-path]')?.dataset.courseRemovePath;
+    if (index === undefined) return;
+    draftPaths.splice(Number(index), 1);
+    renderCascade();
+  });
   cascadeConfirm.addEventListener('click', () => {
-    Object.assign(selectedMajor, draftMajor);
+    markInterestTouched('courses');
+    selectedPaths.splice(0, selectedPaths.length, ...draftPaths);
     categoryFilter = '';
     updateProfessionValue();
     cascadeDialog.close();
     draw();
   });
   document.querySelector('#course-cascade-clear').addEventListener('click', () => {
-    Object.assign(selectedMajor, { discipline: '', field: '', professional: '' });
+    markInterestTouched('courses');
+    selectedPaths.length = 0;
+    draftPaths.length = 0;
     categoryFilter = '';
     updateProfessionValue();
     cascadeDialog.close();
@@ -815,7 +920,19 @@ function fastRegistrationCard(item) {
 function renderFastRegistration() {
   const courseIdFilter = params.get('courseId') || '';
   const filteredCourse = courseIdFilter ? state.courses.find(item => item.id === courseIdFilter) : null;
-  const classItems = (state.classOptions || []).filter(item => (!courseIdFilter || item.courseId === courseIdFilter) && item.visible && item.learnerStatus !== '报名结束' && !['CLASS_STARTED', 'CLASS_CANCELLED'].includes(item.unavailableReasonCode));
+  // CR-2026-166 v1.2：班级档案仅带叶子专业（professional / category），缺 discipline、field。
+  // 与课程列表共用同一套三级路径（路径内 AND、路径间 OR）前必须补齐，否则兴趣预置判定为无结果、
+  // 手动多选也会把班级全部滤掉。补齐只作用在本页内存副本，不改课程 / 班级 seed 与共享 store。
+  const courseById = new Map(state.courses.map(item => [item.id, item]));
+  const classItems = (state.classOptions || [])
+    .filter(item => (!courseIdFilter || item.courseId === courseIdFilter) && item.visible && item.learnerStatus !== '报名结束' && !['CLASS_STARTED', 'CLASS_CANCELLED'].includes(item.unavailableReasonCode))
+    .map(item => {
+      const source = courseById.get(item.courseId) || {};
+      const professional = item.professional || item.category || source.professional || '';
+      const field = item.field || source.field || professional;
+      const discipline = item.discipline || source.discipline || professional;
+      return { ...item, discipline, field, professional };
+    });
   const campusOptions = [...new Set(classItems.map(item => item.campus).filter(Boolean))];
   const disciplineOptions = [...new Set(state.courses.map(item => item.discipline).filter(Boolean))];
   const professionalTree = disciplineOptions.map(discipline => ({
@@ -826,8 +943,10 @@ function renderFastRegistration() {
     }))
   }));
   const filterOptions = (items, emptyText) => `<option value="">${emptyText}</option>${items.map(item => `<option value="${esc(item)}">${esc(item)}</option>`).join('')}`;
-  layout(stack(`<section class="mp-fast-toolbar" aria-label="报名筛选"><form id="fast-course-search-form" class="mp-course-search" role="search"><input id="fast-course-search" type="search" aria-label="搜索课程名称" placeholder="搜索课程名称"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form><div class="mp-tabs"><button class="mp-tab" data-season="春季">春季</button><button class="mp-tab" data-season="暑假">暑假</button><button class="mp-tab active" data-season="秋季">秋季</button><button class="mp-tab" data-season="寒假">寒假</button></div><div class="mp-fast-filter-chips" aria-label="报名筛选条件"><button id="fast-profession-trigger" class="mp-fast-filter-chip" type="button" aria-haspopup="dialog" aria-controls="fast-profession-dialog" aria-expanded="false"><span>专业</span><b id="fast-profession-value">全部专业</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="campus"><span>校区</span><b id="fast-campus-value">全部校区</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="weekday"><span>上课时间</span><b id="fast-weekday-value">全部时间</b><i aria-hidden="true">›</i></button><button id="fast-filter-reset" class="mp-fast-reset" type="button" aria-label="重置筛选" title="重置筛选" hidden><span aria-hidden="true">↺</span></button></div></section>`, `<section class="mp-fast-results"><div class="mp-fast-list-head"><div class="mp-fast-summary"><span id="fast-course-scope"></span><span id="fast-result-count" class="mp-muted" aria-live="polite"></span></div><div class="mp-sort-switch" role="group" aria-label="快速报名排序"><button class="active" type="button" data-fast-sort="latest" aria-pressed="true">最新</button><button type="button" data-fast-sort="sales" aria-pressed="false">销量</button></div></div><div id="class-list" class="mp-registration-list"></div></section>`, `<dialog id="fast-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="fast-cascade-title"><header class="mp-cascade-head"><div><h2 id="fast-cascade-title">选择专业</h2><p id="fast-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="fast-cascade-path" class="mp-cascade-path"></div><div id="fast-cascade-options" class="mp-cascade-options" role="listbox"></div><footer class="mp-cascade-actions"><button id="fast-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="fast-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`));
-  const selectedMajor = { discipline: '', field: '', professional: '' };
+  // CR-2026-166 v1.2：与课程列表同一套规则；带 courseId 进入时 URL 优先，不覆盖课程范围。
+  const preset = interestPresetFor('fast', professionalTree, classItems.filter((item) => (item.season || '秋季') === '秋季'));
+  const selectedPaths = preset?.paths?.length ? [...preset.paths] : [];
+  layout(stack(interestNoticeHtml(preset?.notice), `<section class="mp-fast-toolbar" aria-label="报名筛选"><form id="fast-course-search-form" class="mp-course-search" role="search"><input id="fast-course-search" type="search" aria-label="搜索课程名称" placeholder="搜索课程名称"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form><div class="mp-tabs"><button class="mp-tab" data-season="春季">春季</button><button class="mp-tab" data-season="暑假">暑假</button><button class="mp-tab active" data-season="秋季">秋季</button><button class="mp-tab" data-season="寒假">寒假</button></div><div class="mp-fast-filter-chips" aria-label="报名筛选条件"><button id="fast-profession-trigger" class="mp-fast-filter-chip" type="button" aria-haspopup="dialog" aria-controls="fast-profession-dialog" aria-expanded="false"><span>专业</span><b id="fast-profession-value">全部专业</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="campus"><span>校区</span><b id="fast-campus-value">全部校区</b><i aria-hidden="true">›</i></button><button class="mp-fast-filter-chip" type="button" data-fast-choice="weekday"><span>上课时间</span><b id="fast-weekday-value">全部时间</b><i aria-hidden="true">›</i></button><button id="fast-filter-reset" class="mp-fast-reset" type="button" aria-label="重置筛选" title="重置筛选" hidden><span aria-hidden="true">↺</span></button></div></section>`, `<section class="mp-fast-results"><div class="mp-fast-list-head"><div class="mp-fast-summary"><span id="fast-course-scope"></span><span id="fast-result-count" class="mp-muted" aria-live="polite"></span></div><div class="mp-sort-switch" role="group" aria-label="快速报名排序"><button class="active" type="button" data-fast-sort="latest" aria-pressed="true">最新</button><button type="button" data-fast-sort="sales" aria-pressed="false">销量</button></div></div><div id="class-list" class="mp-registration-list"></div></section>`, `<dialog id="fast-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="fast-cascade-title"><header class="mp-cascade-head"><div><h2 id="fast-cascade-title">选择专业</h2><p id="fast-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="fast-cascade-path" class="mp-cascade-path"></div><div id="fast-cascade-options" class="mp-cascade-options" role="listbox"></div><div id="fast-cascade-selected" class="mp-cascade-selected" aria-label="已选专业"></div><footer class="mp-cascade-actions"><button id="fast-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="fast-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`));
   const professionTrigger = document.querySelector('#fast-profession-trigger');
   const professionValue = document.querySelector('#fast-profession-value');
   professionTrigger.querySelector(':scope > span')?.remove();
@@ -842,10 +961,19 @@ function renderFastRegistration() {
   let selectedWeekday = '';
   let activeSort = params.get('sort') === 'sales' ? 'sales' : 'latest';
   const cascadeSteps = [{ key: 'discipline', label: '专业门类' }, { key: 'field', label: '专业分类' }, { key: 'professional', label: '专业' }];
-  let draftMajor = { ...selectedMajor };
+  let draftMajor = { discipline: '', field: '', professional: '' };
+  let draftPaths = [];
   let activeCascadeStep = 'discipline';
+  // CR-2026-166 v1.2：弹窗内已选路径标签，点击单个移除。
+  const renderSelectedPaths = () => {
+    const box = document.querySelector('#fast-cascade-selected');
+    if (!box) return;
+    box.innerHTML = draftPaths.length
+      ? draftPaths.map((item, index) => `<button type="button" class="mp-cascade-selected-tag" data-fast-remove-path="${index}" data-path-key="${esc(majorPathKey(item))}" aria-label="移除已选专业">${esc(majorPathText(item))} ×</button>`).join('')
+      : '<span class="mp-cascade-selected-empty">未选择专业时展示全部班级</span>';
+  };
   const updateProfessionValue = () => {
-    const pathText = [selectedMajor.discipline, selectedMajor.field, selectedMajor.professional].filter(Boolean).join(' / ');
+    const pathText = majorPathsText(selectedPaths);
     professionValue.textContent = pathText || '全部专业';
     professionTrigger.classList.toggle('has-value', Boolean(pathText));
     professionTrigger.setAttribute('aria-label', `专业：${pathText || '全部专业'}`);
@@ -878,10 +1006,11 @@ function renderFastRegistration() {
     cascadeCaption.textContent = `请选择${stepName}`;
     const values = cascadeValues();
     cascadeOptions.innerHTML = values.length ? values.map(value => {
-      const selected = draftMajor[activeCascadeStep] === value;
+      const selected = draftPaths.some((item) => majorPathKey(item) === majorPathKey(cascadeNodePath(activeCascadeStep, value, draftMajor)));
       return `<button type="button" class="mp-cascade-option ${selected ? 'selected' : ''}" data-fast-cascade-value="${esc(value)}" role="option" aria-selected="${selected}"><span>${esc(value)}</span><span aria-hidden="true">${selected ? '✓' : activeCascadeStep === 'professional' ? '' : '›'}</span></button>`;
     }).join('') : '<div class="mp-cascade-empty">请先选择上一级专业</div>';
-    cascadeConfirm.disabled = !draftMajor.professional;
+    cascadeConfirm.disabled = false; // v1.2：允许空选（=全部专业）
+    renderSelectedPaths();
   };
   const scheduleMatches = (schedule, type) => {
     if (!type) return true;
@@ -890,12 +1019,17 @@ function renderFastRegistration() {
     if (type === 'sunday') return value.includes('周日');
     return ['周一', '周二', '周三', '周四', '周五'].some(day => value.includes(day));
   };
+  // CR-2026-166 v1.2：路径内 AND、路径间 OR；空选 = 不限专业。
+  const majorMatch = (item) => !selectedPaths.length || selectedPaths.some((sel) =>
+    (!sel.discipline || item.discipline === sel.discipline)
+    && (!sel.field || item.field === sel.field)
+    && (!sel.professional || item.professional === sel.professional));
   const draw = () => {
     const activeSeason = document.querySelector('[data-season].active')?.dataset.season || '秋季';
     const keyword = document.querySelector('#fast-course-search').value.trim().toLowerCase();
-    const items = sortedLearnerItems(classItems.filter(item => (item.season || '秋季') === activeSeason && (!selectedMajor.discipline || item.discipline === selectedMajor.discipline) && (!selectedMajor.field || item.field === selectedMajor.field) && (!selectedMajor.professional || item.professional === selectedMajor.professional) && (!selectedCampus || item.campus === selectedCampus) && scheduleMatches(item.schedule, selectedWeekday) && String(item.courseName || item.name || '').toLowerCase().includes(keyword)), activeSort);
+    const items = sortedLearnerItems(classItems.filter(item => (item.season || '秋季') === activeSeason && majorMatch(item) && (!selectedCampus || item.campus === selectedCampus) && scheduleMatches(item.schedule, selectedWeekday) && String(item.courseName || item.name || '').toLowerCase().includes(keyword)), activeSort);
     document.querySelector('#fast-course-scope').textContent = filteredCourse ? filteredCourse.name : '';
-    document.querySelector('#fast-filter-reset').hidden = !(keyword || selectedMajor.discipline || selectedMajor.field || selectedMajor.professional || selectedCampus || selectedWeekday);
+    document.querySelector('#fast-filter-reset').hidden = !(keyword || selectedPaths.length || selectedCampus || selectedWeekday);
     document.querySelector('#fast-result-count').textContent = `${items.length}个班级`;
     document.querySelector('#class-list').innerHTML = items.length ? items.map(fastRegistrationCard).join('') : '<div class="mp-empty">暂无符合条件的班级</div>';
   };
@@ -905,7 +1039,8 @@ function renderFastRegistration() {
     draw();
   }));
   professionTrigger.addEventListener('click', () => {
-    draftMajor = { ...selectedMajor };
+    draftPaths = selectedPaths.map((item) => ({ ...item }));
+    draftMajor = draftPaths[0] ? { ...draftPaths[0] } : { discipline: '', field: '', professional: '' };
     activeCascadeStep = draftMajor.professional ? 'professional' : draftMajor.field ? 'professional' : draftMajor.discipline ? 'field' : 'discipline';
     renderCascade();
     professionTrigger.setAttribute('aria-expanded', 'true');
@@ -920,19 +1055,31 @@ function renderFastRegistration() {
   cascadeOptions.addEventListener('click', event => {
     const value = event.target.closest('[data-fast-cascade-value]')?.dataset.fastCascadeValue;
     if (!value) return;
+    const nodePath = cascadeNodePath(activeCascadeStep, value, draftMajor);
+    const index = draftPaths.findIndex((item) => majorPathKey(item) === majorPathKey(nodePath));
+    if (index >= 0) draftPaths.splice(index, 1);
+    else draftPaths.push(nodePath);
     if (activeCascadeStep === 'discipline') { draftMajor = { discipline: value, field: '', professional: '' }; activeCascadeStep = 'field'; }
     else if (activeCascadeStep === 'field') { draftMajor = { ...draftMajor, field: value, professional: '' }; activeCascadeStep = 'professional'; }
-    else draftMajor = { ...draftMajor, professional: value };
+    renderCascade();
+  });
+  document.querySelector('#fast-cascade-selected').addEventListener('click', event => {
+    const index = event.target.closest('[data-fast-remove-path]')?.dataset.fastRemovePath;
+    if (index === undefined) return;
+    draftPaths.splice(Number(index), 1);
     renderCascade();
   });
   cascadeConfirm.addEventListener('click', () => {
-    Object.assign(selectedMajor, draftMajor);
+    markInterestTouched('fast');
+    selectedPaths.splice(0, selectedPaths.length, ...draftPaths);
     updateProfessionValue();
     cascadeDialog.close();
     draw();
   });
   document.querySelector('#fast-cascade-clear').addEventListener('click', () => {
-    Object.assign(selectedMajor, { discipline: '', field: '', professional: '' });
+    markInterestTouched('fast');
+    selectedPaths.length = 0;
+    draftPaths.length = 0;
     updateProfessionValue();
     cascadeDialog.close();
     draw();
@@ -966,7 +1113,7 @@ function renderFastRegistration() {
   document.querySelectorAll('[data-fast-choice]').forEach(chip => chip.addEventListener('click', () => openFastChoice(chip.dataset.fastChoice)));
   document.querySelector('#fast-course-search').addEventListener('input', draw);
   document.querySelector('#fast-course-search-form').addEventListener('submit', event => { event.preventDefault(); draw(); });
-  document.querySelector('#fast-filter-reset').addEventListener('click', () => { Object.assign(selectedMajor, { discipline: '', field: '', professional: '' }); selectedCampus = ''; selectedWeekday = ''; document.querySelector('#fast-course-search').value = ''; updateProfessionValue(); updateFastFilterChips(); draw(); });
+  document.querySelector('#fast-filter-reset').addEventListener('click', () => { markInterestTouched('fast'); selectedPaths.length = 0; selectedCampus = ''; selectedWeekday = ''; document.querySelector('#fast-course-search').value = ''; updateProfessionValue(); updateFastFilterChips(); draw(); });
   document.querySelectorAll('[data-fast-sort]').forEach(control => control.addEventListener('click', () => {
     activeSort = control.dataset.fastSort;
     document.querySelectorAll('[data-fast-sort]').forEach(item => { const active = item === control; item.classList.toggle('active', active); item.setAttribute('aria-pressed', String(active)); });
@@ -2564,7 +2711,18 @@ function renderStudentEdit() {
   const isEditing = Boolean(student);
   const gender = student?.gender || (student?.relation === '女儿' ? '女' : student?.relation === '儿子' ? '男' : '');
   const relationOptions = ['女儿', '儿子', '本人', '其他'];
-  layout(stack(card(`<form id="student-edit-form" class="mp-form"><div class="mp-field"><label for="profile-student-name">学员姓名</label><input id="profile-student-name" required maxlength="20" placeholder="请输入学员姓名" value="${esc(student?.name || '')}"><small id="profile-student-error" class="mp-form-error" hidden></small></div><fieldset class="mp-student-gender"><legend>性别</legend><div class="mp-student-gender-options"><label><input type="radio" name="profile-student-gender" value="女" required ${gender === '女' ? 'checked' : ''}><span>女</span></label><label><input type="radio" name="profile-student-gender" value="男" ${gender === '男' ? 'checked' : ''}><span>男</span></label></div></fieldset><div class="mp-field"><label for="profile-student-birth-month">出生年月</label><input id="profile-student-birth-month" type="month" max="${maxBirthMonth}" required value="${esc(student?.birthMonth || '')}"></div><div class="mp-field"><label for="profile-student-relation">与账号关系</label><select id="profile-student-relation">${relationOptions.map(option => `<option ${option === student?.relation ? 'selected' : ''}>${option}</option>`).join('')}</select></div><div class="mp-field"><label for="profile-student-photo">学员照片（必填）</label><div class="mp-photo-uploader"><span class="mp-photo-preview" id="profile-student-photo-preview" aria-hidden="true">${student?.photo ? `<img src="${esc(student.photo)}" alt="">` : esc((student?.name || '学员').slice(0, 1))}</span><div class="mp-photo-actions"><input id="profile-student-photo" type="file" accept="image/*"><small>上传学员本人清晰照片（JPG/PNG），用于结业证书等场景；未选择照片无法保存。</small><small id="profile-student-photo-error" class="mp-form-error" hidden></small></div></div></div><div class="mp-actions"><a class="mp-button secondary" href="/learner/pages/student-management.html">取消</a><button class="mp-button" type="submit">${isEditing ? '保存修改' : '添加并切换'}</button></div></form>`), isEditing ? `<button id="student-edit-delete" class="mp-student-danger-action" type="button">删除学员</button>` : ''));
+  // CR-2026-166 v1.1：兴趣专业为标签多选，位于表单最下方（照片之后、操作按钮之前）。
+  const interestOptions = enabledMajorOptions();
+  const savedInterests = Array.isArray(student?.interestMajors)
+    ? student.interestMajors.filter(Boolean)
+    : (student?.interestMajor ? [student.interestMajor] : []);
+  const invalidSaved = savedInterests.filter((name) => !isMajorEnabled(name));
+  const interestTags = [
+    ...invalidSaved.map((name) => `<label class="mp-interest-tag is-invalid" title="该专业已在后台停用或删除，请重新选择"><input type="checkbox" data-interest-tag value="${esc(name)}" checked><span>${esc(name)}（已失效）</span></label>`),
+    ...interestOptions.map((option) => `<label class="mp-interest-tag" title="${esc(option.label)}"><input type="checkbox" data-interest-tag value="${esc(option.value)}" ${savedInterests.includes(option.value) ? 'checked' : ''}><span>${esc(option.value)}</span></label>`)
+  ].join('');
+  const interestFieldHtml = `<div class="mp-field mp-interest-field"><label>兴趣专业（选填，可多选）</label><div class="mp-interest-tags" data-interest-tags aria-describedby="profile-student-interest-hint">${interestTags}</div><small id="profile-student-interest-hint">用于课程列表与快速报名的专业筛选默认值，可多选、可全不选；不填写不影响报名。</small>${invalidSaved.length ? '<small class="mp-form-error" data-interest-invalid>部分兴趣专业已在后台停用或删除，请重新选择；未改动前保留原值。</small>' : ''}</div>`;
+  layout(stack(card(`<form id="student-edit-form" class="mp-form"><div class="mp-field"><label for="profile-student-name">学员姓名</label><input id="profile-student-name" required maxlength="20" placeholder="请输入学员姓名" value="${esc(student?.name || '')}"><small id="profile-student-error" class="mp-form-error" hidden></small></div><fieldset class="mp-student-gender"><legend>性别</legend><div class="mp-student-gender-options"><label><input type="radio" name="profile-student-gender" value="女" required ${gender === '女' ? 'checked' : ''}><span>女</span></label><label><input type="radio" name="profile-student-gender" value="男" ${gender === '男' ? 'checked' : ''}><span>男</span></label></div></fieldset><div class="mp-field"><label for="profile-student-birth-month">出生年月</label><input id="profile-student-birth-month" type="month" max="${maxBirthMonth}" required value="${esc(student?.birthMonth || '')}"></div><div class="mp-field"><label for="profile-student-relation">与账号关系</label><select id="profile-student-relation">${relationOptions.map(option => `<option ${option === student?.relation ? 'selected' : ''}>${option}</option>`).join('')}</select></div><div class="mp-field"><label for="profile-student-photo">学员照片（必填）</label><div class="mp-photo-uploader"><span class="mp-photo-preview" id="profile-student-photo-preview" aria-hidden="true">${student?.photo ? `<img src="${esc(student.photo)}" alt="">` : esc((student?.name || '学员').slice(0, 1))}</span><div class="mp-photo-actions"><input id="profile-student-photo" type="file" accept="image/*"><small>上传学员本人清晰照片（JPG/PNG），用于结业证书等场景；未选择照片无法保存。</small><small id="profile-student-photo-error" class="mp-form-error" hidden></small></div></div></div>${interestFieldHtml}<div class="mp-actions"><a class="mp-button secondary" href="/learner/pages/student-management.html">取消</a><button class="mp-button" type="submit">${isEditing ? '保存修改' : '添加并切换'}</button></div></form>`), isEditing ? `<button id="student-edit-delete" class="mp-student-danger-action" type="button">删除学员</button>` : ''));
   // CR-2026-155 C6：照片必填校验与即时预览（压缩后随档案持久化）。
   let photoData = student?.photo || '';
   const photoInput = document.querySelector('#profile-student-photo');
@@ -2594,9 +2752,11 @@ function renderStudentEdit() {
     // CR-2026-155 C6：学员照片必填，未上传（含历史档案补编辑）时阻止保存并就地提示。
     if (!photoData) { if (photoError) { photoError.hidden = false; photoError.textContent = '学员照片为必填项，请上传照片后再保存。'; } return; }
     if (state.students.some(item => item.id !== student?.id && item.name === name)) { error.hidden = false; error.textContent = '该学员已存在，请直接切换当前学员。'; return; }
-    const values = { name, gender: selectedGender, birthMonth, relation: document.querySelector('#profile-student-relation').value, photo: photoData };
+    const interestMajors = [...document.querySelectorAll('[data-interest-tag]:checked')].map((input) => input.value);
+    const values = { name, gender: selectedGender, birthMonth, relation: document.querySelector('#profile-student-relation').value, photo: photoData, interestMajors };
     if (student) {
       Object.assign(student, values);
+      delete student.interestMajor; // CR-2026-166 v1.1：旧单选字段只读兼容，不再写入
       upsertDemoRecord('students', { ...student, accountId: state.accountId });
     }
     else {
