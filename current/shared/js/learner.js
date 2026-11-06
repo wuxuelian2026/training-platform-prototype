@@ -524,6 +524,8 @@ function renderTeacherDetail() {
   ));
 }
 // ===== CR-2026-166：兴趣专业与两列表专业筛选默认值 =====
+// CR-2026-166 v1.3：兴趣标签最多选 3 个；编辑页保存、回显与两列表默认值共用同一上限。
+const MAX_INTEREST_TAGS = 3;
 // 会话标记按「页面 + 当前学员」隔离：首次进入预置一次，用户手动改动后不再拉回。
 const INTEREST_SESSION_PREFIX = 'hbyx-cr166-';
 const interestSessionKey = (page, kind) => `${INTEREST_SESSION_PREFIX}${kind}-${page}-${state.currentStudentId || ''}`;
@@ -555,7 +557,8 @@ function interestPresetFor(page, tree, scopeItems) {
   if (urlKeys.some((key) => params.has(key)) || interestSessionGet(page, 'touched') || interestSessionGet(page, 'applied')) return null;
   const raw = currentStudent()?.interestMajors;
   const names = (Array.isArray(raw) ? raw : (currentStudent()?.interestMajor ? [currentStudent().interestMajor] : []))
-    .map((value) => String(value || '').trim()).filter(Boolean);
+    .map((value) => String(value || '').trim()).filter(Boolean)
+    .slice(0, MAX_INTEREST_TAGS); // CR-2026-166 v1.3：与学员资料上限一致，历史超限档案只取前 3 项
   if (!names.length) return null;
   interestSessionSet(page, 'applied');
   const hasResult = (sel) => (scopeItems || []).some((item) =>
@@ -2712,17 +2715,37 @@ function renderStudentEdit() {
   const gender = student?.gender || (student?.relation === '女儿' ? '女' : student?.relation === '儿子' ? '男' : '');
   const relationOptions = ['女儿', '儿子', '本人', '其他'];
   // CR-2026-166 v1.1：兴趣专业为标签多选，位于表单最下方（照片之后、操作按钮之前）。
+  // CR-2026-166 v1.3：兴趣最多选 3 个标签（上限含已失效项）；历史超限档案编辑态只回显前 3 项并显式提示。
   const interestOptions = enabledMajorOptions();
-  const savedInterests = Array.isArray(student?.interestMajors)
+  const rawInterests = Array.isArray(student?.interestMajors)
     ? student.interestMajors.filter(Boolean)
     : (student?.interestMajor ? [student.interestMajor] : []);
+  const interestOverflow = rawInterests.length > MAX_INTEREST_TAGS;
+  const savedInterests = rawInterests.slice(0, MAX_INTEREST_TAGS);
   const invalidSaved = savedInterests.filter((name) => !isMajorEnabled(name));
   const interestTags = [
     ...invalidSaved.map((name) => `<label class="mp-interest-tag is-invalid" title="该专业已在后台停用或删除，请重新选择"><input type="checkbox" data-interest-tag value="${esc(name)}" checked><span>${esc(name)}（已失效）</span></label>`),
     ...interestOptions.map((option) => `<label class="mp-interest-tag" title="${esc(option.label)}"><input type="checkbox" data-interest-tag value="${esc(option.value)}" ${savedInterests.includes(option.value) ? 'checked' : ''}><span>${esc(option.value)}</span></label>`)
   ].join('');
-  const interestFieldHtml = `<div class="mp-field mp-interest-field"><label>兴趣专业（选填，可多选）</label><div class="mp-interest-tags" data-interest-tags aria-describedby="profile-student-interest-hint">${interestTags}</div><small id="profile-student-interest-hint">用于课程列表与快速报名的专业筛选默认值，可多选、可全不选；不填写不影响报名。</small>${invalidSaved.length ? '<small class="mp-form-error" data-interest-invalid>部分兴趣专业已在后台停用或删除，请重新选择；未改动前保留原值。</small>' : ''}</div>`;
+  const interestFieldHtml = `<div class="mp-field mp-interest-field"><label>兴趣专业（选填，可多选）</label><div class="mp-interest-tags" data-interest-tags aria-describedby="profile-student-interest-hint">${interestTags}</div><div class="mp-interest-meta"><small id="profile-student-interest-hint">用于课程列表与快速报名的专业筛选默认值，最多选 ${MAX_INTEREST_TAGS} 项，可多选、可全不选；不填写不影响报名。</small><span class="mp-interest-counter" data-interest-counter aria-live="polite">已选 0/${MAX_INTEREST_TAGS}</span></div>${interestOverflow ? `<small class="mp-form-error" data-interest-overflow>原档案兴趣超过 ${MAX_INTEREST_TAGS} 项，已保留前 ${MAX_INTEREST_TAGS} 项，保存后生效。</small>` : ''}${invalidSaved.length ? '<small class="mp-form-error" data-interest-invalid>部分兴趣专业已在后台停用或删除，请重新选择；未改动前保留原值。</small>' : ''}</div>`;
   layout(stack(card(`<form id="student-edit-form" class="mp-form"><div class="mp-field"><label for="profile-student-name">学员姓名</label><input id="profile-student-name" required maxlength="20" placeholder="请输入学员姓名" value="${esc(student?.name || '')}"><small id="profile-student-error" class="mp-form-error" hidden></small></div><fieldset class="mp-student-gender"><legend>性别</legend><div class="mp-student-gender-options"><label><input type="radio" name="profile-student-gender" value="女" required ${gender === '女' ? 'checked' : ''}><span>女</span></label><label><input type="radio" name="profile-student-gender" value="男" ${gender === '男' ? 'checked' : ''}><span>男</span></label></div></fieldset><div class="mp-field"><label for="profile-student-birth-month">出生年月</label><input id="profile-student-birth-month" type="month" max="${maxBirthMonth}" required value="${esc(student?.birthMonth || '')}"></div><div class="mp-field"><label for="profile-student-relation">与账号关系</label><select id="profile-student-relation">${relationOptions.map(option => `<option ${option === student?.relation ? 'selected' : ''}>${option}</option>`).join('')}</select></div><div class="mp-field"><label for="profile-student-photo">学员照片（必填）</label><div class="mp-photo-uploader"><span class="mp-photo-preview" id="profile-student-photo-preview" aria-hidden="true">${student?.photo ? `<img src="${esc(student.photo)}" alt="">` : esc((student?.name || '学员').slice(0, 1))}</span><div class="mp-photo-actions"><input id="profile-student-photo" type="file" accept="image/*"><small>上传学员本人清晰照片（JPG/PNG），用于结业证书等场景；未选择照片无法保存。</small><small id="profile-student-photo-error" class="mp-form-error" hidden></small></div></div></div>${interestFieldHtml}<div class="mp-actions"><a class="mp-button secondary" href="/learner/pages/student-management.html">取消</a><button class="mp-button" type="submit">${isEditing ? '保存修改' : '添加并切换'}</button></div></form>`), isEditing ? `<button id="student-edit-delete" class="mp-student-danger-action" type="button">删除学员</button>` : ''));
+  // CR-2026-166 v1.3：达到上限后禁用未选标签，取消任一后恢复；计数实时展示。
+  const interestTagInputs = [...document.querySelectorAll('[data-interest-tag]')];
+  const interestCounter = document.querySelector('[data-interest-counter]');
+  const syncInterestLimit = () => {
+    const checked = interestTagInputs.filter((input) => input.checked).length;
+    const full = checked >= MAX_INTEREST_TAGS;
+    interestTagInputs.forEach((input) => {
+      input.disabled = full && !input.checked;
+      input.closest('.mp-interest-tag')?.classList.toggle('is-disabled', input.disabled);
+    });
+    if (interestCounter) {
+      interestCounter.textContent = `已选 ${checked}/${MAX_INTEREST_TAGS}`;
+      interestCounter.classList.toggle('is-full', full);
+    }
+  };
+  document.querySelector('[data-interest-tags]')?.addEventListener('change', syncInterestLimit);
+  syncInterestLimit();
   // CR-2026-155 C6：照片必填校验与即时预览（压缩后随档案持久化）。
   let photoData = student?.photo || '';
   const photoInput = document.querySelector('#profile-student-photo');
@@ -2752,7 +2775,10 @@ function renderStudentEdit() {
     // CR-2026-155 C6：学员照片必填，未上传（含历史档案补编辑）时阻止保存并就地提示。
     if (!photoData) { if (photoError) { photoError.hidden = false; photoError.textContent = '学员照片为必填项，请上传照片后再保存。'; } return; }
     if (state.students.some(item => item.id !== student?.id && item.name === name)) { error.hidden = false; error.textContent = '该学员已存在，请直接切换当前学员。'; return; }
-    const interestMajors = [...document.querySelectorAll('[data-interest-tag]:checked')].map((input) => input.value);
+    const checkedInterests = [...document.querySelectorAll('[data-interest-tag]:checked')].map((input) => input.value);
+    // CR-2026-166 v1.3：保存层二次校验，防御 DOM 直接改动或历史脏数据突破上限。
+    const interestMajors = checkedInterests.slice(0, MAX_INTEREST_TAGS);
+    if (checkedInterests.length > MAX_INTEREST_TAGS) toast(`兴趣专业最多选 ${MAX_INTEREST_TAGS} 项，已保留前 ${MAX_INTEREST_TAGS} 项`);
     const values = { name, gender: selectedGender, birthMonth, relation: document.querySelector('#profile-student-relation').value, photo: photoData, interestMajors };
     if (student) {
       Object.assign(student, values);

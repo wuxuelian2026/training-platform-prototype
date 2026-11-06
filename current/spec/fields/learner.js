@@ -37,7 +37,7 @@ const LEARNER_APP_FIELD_SPEC = {
           { id: 'FD-LAPP-010', label: '出生年月', type: '日期', length: 'YYYY-MM', required: '是', note: '不得晚于当前月份，用于适龄校验', constraints: { format: 'YYYY-MM' } },
           { id: 'FD-LAPP-011', label: '与账号关系', type: '下拉', length: '预置关系选项', required: '是', note: '说明该学员与当前登录账号的关系' },
           { id: 'FD-LAPP-035', label: '学员照片', type: '图片', length: 'JPG/PNG，上传后压缩展示', required: '是', note: 'CR-2026-155 C6：新增与编辑学员资料时必填；未上传照片无法保存。照片随学员档案保存，用于后台结业证书预览展示；历史档案编辑时需补传' },
-          { id: 'FD-LAPP-056', label: '兴趣专业', type: '标签（多选）', length: '后台专业目录启用叶子，可多选', required: '否', note: 'CR-2026-166 v1.1：选填、标签多选，位于表单最下方（照片之后、操作按钮之前）；标签取 shared/js/catalog-store.js 的启用叶子（叶子名可见、title 为「门类 / 分类 / 专业」三级路径），值以数组存当前学员 interestMajors；可全不选；旧单选 interestMajor 只读兼容；目录节点停用/删除后编辑态保留并标注「已失效」提示重选；不参与照片等既有必填校验', constraints: { optionsSource: 'catalog-store.enabledMajorOptions', multiple: true } }
+          { id: 'FD-LAPP-056', label: '兴趣专业', type: '标签（多选）', length: '后台专业目录启用叶子，可多选', required: '否', note: 'CR-2026-166 v1.1：选填、标签多选，位于表单最下方（照片之后、操作按钮之前）；标签取 shared/js/catalog-store.js 的启用叶子（叶子名可见、title 为「门类 / 分类 / 专业」三级路径），值以数组存当前学员 interestMajors；可全不选；旧单选 interestMajor 只读兼容；目录节点停用/删除后编辑态保留并标注「已失效」提示重选；不参与照片等既有必填校验；CR-2026-166 v1.3：最多选 3 个标签（含已失效项），达上限后禁用未选标签并显示「已选 N/3」，保存层二次校验截断前 3 项，历史超限档案只回显前 3 项并提示', constraints: { optionsSource: 'catalog-store.enabledMajorOptions', multiple: true, maxSelected: 3 } }
         ] }
       ],
       notes: [
@@ -46,7 +46,8 @@ const LEARNER_APP_FIELD_SPEC = {
         '面授订单必须关联具体学员，报名、考勤、作业与结业数据按学员隔离。',
         '出生年月用于适龄校验，修改后不影响已发生的报名与订单记录。',
         '学员照片为必填项（CR-2026-155 C6）：新增与编辑均需上传，保存后用于后台结业证书预览等场景。',
-        'CR-2026-166 v1.2：兴趣专业以数组挂在当前学员档案（非家长账号），切换当前学员后两列表默认值按新学员重算；多个兴趣全部预置为已选路径，专业筛选三级级联多选并按 OR 过滤；历史档案缺字段按未设置处理。'
+        'CR-2026-166 v1.2：兴趣专业以数组挂在当前学员档案（非家长账号），切换当前学员后两列表默认值按新学员重算；多个兴趣全部预置为已选路径，专业筛选三级级联多选并按 OR 过滤；历史档案缺字段按未设置处理。',
+        'CR-2026-166 v1.3：兴趣专业最多选 3 个标签（含已失效项），表单实时计数「已选 N/3」，达上限禁用未选标签、取消任一恢复；保存层二次校验与历史超限回显提示；两列表默认值按兴趣数组前 3 项预置，路径数 ≤3。'
       ]
     },
     'learner/courses': {
