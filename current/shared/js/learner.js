@@ -526,12 +526,20 @@ function renderTeacherDetail() {
 // ===== CR-2026-166：兴趣专业与两列表专业筛选默认值 =====
 // CR-2026-166 v1.3：兴趣标签最多选 3 个；编辑页保存、回显与两列表默认值共用同一上限。
 const MAX_INTEREST_TAGS = 3;
-// 会话标记按「页面 + 当前学员」隔离：首次进入预置一次，用户手动改动后不再拉回。
+// 会话标记按「页面 + 当前学员」隔离。
+// CR-2026-166 v1.4：取消 applied 一次性标记——未手动改动则每次进入都按兴趣预置；
+// 用户手动改动筛选后置 touched 不再拉回，可由「按我的兴趣筛选」一键清除。
 const INTEREST_SESSION_PREFIX = 'hbyx-cr166-';
 const interestSessionKey = (page, kind) => `${INTEREST_SESSION_PREFIX}${kind}-${page}-${state.currentStudentId || ''}`;
 const interestSessionGet = (page, kind) => { try { return sessionStorage.getItem(interestSessionKey(page, kind)) === '1'; } catch (error) { return false; } };
 const interestSessionSet = (page, kind) => { try { sessionStorage.setItem(interestSessionKey(page, kind), '1'); } catch (error) { /* 会话存储不可用时退化为每次进入生效 */ } };
 const markInterestTouched = (page) => interestSessionSet(page, 'touched');
+// v1.4：一键恢复兴趣默认值时清除手动改动标记；applied 为 v1.3 及以前的历史口径残留，一并清掉。
+const clearInterestMarks = (page) => {
+  ['touched', 'applied'].forEach((kind) => {
+    try { sessionStorage.removeItem(interestSessionKey(page, kind)); } catch (error) { /* 会话存储不可用时忽略 */ }
+  });
+};
 const interestNoticeHtml = (notice) => notice ? `<div class="mp-interest-notice" role="status">${esc(notice)}</div>` : '';
 // CR-2026-166 v1.2：三级级联多选，路径为「门类/分类/专业」中的任意深度，OR 过滤。
 const majorPathKey = (path) => [path?.discipline || '', path?.field || '', path?.professional || ''].join('/');
@@ -552,15 +560,16 @@ const cascadeNodePath = (step, value, node) => step === 'discipline'
 
 // 值域对齐采用 A②：兴趣选项来自后台目录启用叶子，默认值在课程反推筛选树中自深向浅匹配；
 // 不改任何课程 seed。scopeItems 用于判定预置后当前页签/范围是否真的有结果，避免默认后空列表。
-function interestPresetFor(page, tree, scopeItems) {
+function interestPresetFor(page, tree, scopeItems, options = {}) {
   const urlKeys = ['category', 'field', 'professional', 'courseId', 'q', 'level', 'type'];
-  if (urlKeys.some((key) => params.has(key)) || interestSessionGet(page, 'touched') || interestSessionGet(page, 'applied')) return null;
+  // CR-2026-166 v1.4：未手动改动（touched）则每次进入都按兴趣预置；URL 显式参数仍优先。
+  // options.force 供「按我的兴趣筛选」主动恢复使用，忽略 URL 与 touched。
+  if (!options.force && (urlKeys.some((key) => params.has(key)) || interestSessionGet(page, 'touched'))) return null;
   const raw = currentStudent()?.interestMajors;
   const names = (Array.isArray(raw) ? raw : (currentStudent()?.interestMajor ? [currentStudent().interestMajor] : []))
     .map((value) => String(value || '').trim()).filter(Boolean)
     .slice(0, MAX_INTEREST_TAGS); // CR-2026-166 v1.3：与学员资料上限一致，历史超限档案只取前 3 项
   if (!names.length) return null;
-  interestSessionSet(page, 'applied');
   const hasResult = (sel) => (scopeItems || []).some((item) =>
     (!sel.discipline || item.discipline === sel.discipline)
     && (!sel.field || item.field === sel.field)
@@ -654,9 +663,10 @@ function renderCourses() {
   const renderSelectedPaths = () => {
     const box = document.querySelector('#course-cascade-selected');
     if (!box) return;
-    box.innerHTML = draftPaths.length
+    box.innerHTML = (draftPaths.length
       ? draftPaths.map((item, index) => `<button type="button" class="mp-cascade-selected-tag" data-course-remove-path="${index}" data-path-key="${esc(majorPathKey(item))}" aria-label="移除已选专业">${esc(majorPathText(item))} ×</button>`).join('')
-      : '<span class="mp-cascade-selected-empty">未选择专业时展示全部课程</span>';
+      : '<span class="mp-cascade-selected-empty">未选择专业时展示全部课程</span>')
+      + '<a class="mp-link" href="#" data-course-interest-restore style="flex-basis:100%;text-align:right">按我的兴趣筛选</a>';
   };
   const updateProfessionValue = () => {
     const pathText = majorPathsText(selectedPaths);
@@ -761,6 +771,25 @@ function renderCourses() {
     renderCascade();
   });
   document.querySelector('#course-cascade-selected').addEventListener('click', event => {
+    // CR-2026-166 v1.4：手动改动后仍可一键恢复兴趣默认值（按当前页签重算）。
+    if (event.target.closest('[data-course-interest-restore]')) {
+      event.preventDefault();
+      const preset = interestPresetFor('courses', professionalTree,
+        state.courses.filter((item) => item.type === activeCourseTab), { force: true });
+      if (!preset) { toast('请先在学员资料中设置兴趣专业'); return; }
+      clearInterestMarks('courses');
+      selectedPaths.splice(0, selectedPaths.length, ...preset.paths);
+      draftPaths = preset.paths.map((item) => ({ ...item }));
+      draftMajor = { discipline: '', field: '', professional: '' };
+      activeCascadeStep = 'discipline';
+      categoryFilter = '';
+      updateProfessionValue();
+      renderCascade();
+      cascadeDialog.close();
+      draw();
+      toast(preset.notice || '已按你的兴趣专业筛选');
+      return;
+    }
     const index = event.target.closest('[data-course-remove-path]')?.dataset.courseRemovePath;
     if (index === undefined) return;
     draftPaths.splice(Number(index), 1);
@@ -971,9 +1000,10 @@ function renderFastRegistration() {
   const renderSelectedPaths = () => {
     const box = document.querySelector('#fast-cascade-selected');
     if (!box) return;
-    box.innerHTML = draftPaths.length
+    box.innerHTML = (draftPaths.length
       ? draftPaths.map((item, index) => `<button type="button" class="mp-cascade-selected-tag" data-fast-remove-path="${index}" data-path-key="${esc(majorPathKey(item))}" aria-label="移除已选专业">${esc(majorPathText(item))} ×</button>`).join('')
-      : '<span class="mp-cascade-selected-empty">未选择专业时展示全部班级</span>';
+      : '<span class="mp-cascade-selected-empty">未选择专业时展示全部班级</span>')
+      + '<a class="mp-link" href="#" data-fast-interest-restore style="flex-basis:100%;text-align:right">按我的兴趣筛选</a>';
   };
   const updateProfessionValue = () => {
     const pathText = majorPathsText(selectedPaths);
@@ -1067,6 +1097,26 @@ function renderFastRegistration() {
     renderCascade();
   });
   document.querySelector('#fast-cascade-selected').addEventListener('click', event => {
+    // CR-2026-166 v1.4：与课程列表同一套一键恢复规则（按当前季节重算）。
+    if (event.target.closest('[data-fast-interest-restore]')) {
+      event.preventDefault();
+      const season = document.querySelector('[data-season].active')?.dataset.season || '秋季';
+      const preset = interestPresetFor('fast', professionalTree,
+        classItems.filter((item) => (item.season || '秋季') === season), { force: true });
+      if (!preset) { toast('请先在学员资料中设置兴趣专业'); return; }
+      clearInterestMarks('fast');
+      selectedPaths.splice(0, selectedPaths.length, ...preset.paths);
+      draftPaths = preset.paths.map((item) => ({ ...item }));
+      draftMajor = { discipline: '', field: '', professional: '' };
+      activeCascadeStep = 'discipline';
+      updateProfessionValue();
+      updateFastFilterChips();
+      renderCascade();
+      cascadeDialog.close();
+      draw();
+      toast(preset.notice || '已按你的兴趣专业筛选');
+      return;
+    }
     const index = event.target.closest('[data-fast-remove-path]')?.dataset.fastRemovePath;
     if (index === undefined) return;
     draftPaths.splice(Number(index), 1);
@@ -2780,6 +2830,14 @@ function renderStudentEdit() {
     const interestMajors = checkedInterests.slice(0, MAX_INTEREST_TAGS);
     if (checkedInterests.length > MAX_INTEREST_TAGS) toast(`兴趣专业最多选 ${MAX_INTEREST_TAGS} 项，已保留前 ${MAX_INTEREST_TAGS} 项`);
     const values = { name, gender: selectedGender, birthMonth, relation: document.querySelector('#profile-student-relation').value, photo: photoData, interestMajors };
+    // CR-2026-166 v1.4：兴趣变更后清除两列表手动筛选标记，下次进入按新兴趣重算默认值。
+    const prevInterests = Array.isArray(student?.interestMajors)
+      ? student.interestMajors
+      : (student?.interestMajor ? [student.interestMajor] : []);
+    if (JSON.stringify(prevInterests) !== JSON.stringify(interestMajors)) {
+      clearInterestMarks('courses');
+      clearInterestMarks('fast');
+    }
     if (student) {
       Object.assign(student, values);
       delete student.interestMajor; // CR-2026-166 v1.1：旧单选字段只读兼容，不再写入

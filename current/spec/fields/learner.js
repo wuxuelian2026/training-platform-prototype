@@ -47,28 +47,30 @@ const LEARNER_APP_FIELD_SPEC = {
         '出生年月用于适龄校验，修改后不影响已发生的报名与订单记录。',
         '学员照片为必填项（CR-2026-155 C6）：新增与编辑均需上传，保存后用于后台结业证书预览等场景。',
         'CR-2026-166 v1.2：兴趣专业以数组挂在当前学员档案（非家长账号），切换当前学员后两列表默认值按新学员重算；多个兴趣全部预置为已选路径，专业筛选三级级联多选并按 OR 过滤；历史档案缺字段按未设置处理。',
-        'CR-2026-166 v1.3：兴趣专业最多选 3 个标签（含已失效项），表单实时计数「已选 N/3」，达上限禁用未选标签、取消任一恢复；保存层二次校验与历史超限回显提示；两列表默认值按兴趣数组前 3 项预置，路径数 ≤3。'
+        'CR-2026-166 v1.3：兴趣专业最多选 3 个标签（含已失效项），表单实时计数「已选 N/3」，达上限禁用未选标签、取消任一恢复；保存层二次校验与历史超限回显提示；两列表默认值按兴趣数组前 3 项预置，路径数 ≤3。',
+        'CR-2026-166 v1.4：未手动改动筛选时两列表每次进入都按当前兴趣重算默认值；保存兴趣且数组变化时清除两列表 touched，下次进入按新兴趣重算；两列表弹窗均提供「按我的兴趣筛选」一键恢复。验收项 TC-COURSE-INTEREST-010。'
       ]
     },
     'learner/courses': {
       groups: [
         { heading: '专业筛选字段', fields: [
-          { id: 'FD-LAPP-057', label: '专业筛选默认值', type: '只读（派生）', length: '—', required: '系统派生', note: 'CR-2026-166 v1.2：首次进入时把当前学员全部命中兴趣预置为已选路径（三级级联多选、OR 过滤：命中任一路径即展示），优先级 URL 显式参数 > 会话手动筛选 > 兴趣；URL 参数进入时沿用单条路径；叶子精确匹配 professional 失败时按门类关键词反查 field/discipline；无匹配或结果为空回落全量并提示；每页仅生效一次', constraints: { readOnly: true, derived: true } }
+          { id: 'FD-LAPP-057', label: '专业筛选默认值', type: '只读（派生）', length: '—', required: '系统派生', note: 'CR-2026-166 v1.2 / v1.4：未置 touched 时每次进入都按当前学员兴趣前 3 项中的全部命中兴趣重算预置为已选路径（三级级联多选、OR 过滤），不再限首次进入一次；优先级 URL 显式参数 > touched > 兴趣，URL 参数进入沿用单条路径；叶子精确匹配 professional 失败时按门类关键词反查 field/discipline；无匹配或结果为空回落全量并提示；用户手动改动后置 touched 不拉回，可在级联弹窗「按我的兴趣筛选」一键恢复', constraints: { readOnly: true, derived: true } }
         ] }
       ],
       notes: [
         '专业筛选树仍由课程数据反推，本期不改课程 seed；兴趣选项来自后台专业目录单一事实源 catalog-store.js（CR-2026-166 A② 取舍）。',
-        '本期只做筛选默认值，不做推荐算法、个性化排序、能力测评或推荐理由展示。'
+        '本期只做筛选默认值，不做推荐算法、个性化排序、能力测评或推荐理由展示。',
+        'CR-2026-166 v1.4：取消 applied 一次性标记，未置 touched 时每次进入都按当前兴趣重算预置；弹窗「按我的兴趣筛选」按当前页范围强制恢复并清除 touched/applied 残留；URL 显式参数优先级不变，一键恢复忽略 URL 但不写回 URL。验收项 TC-COURSE-INTEREST-010。'
       ]
     },
     'learner/fast-registration': {
       groups: [
         { heading: '专业筛选字段', fields: [
-          { id: 'FD-LAPP-058', label: '专业筛选默认值', type: '只读（派生）', length: '—', required: '系统派生', note: 'CR-2026-166 v1.2：与课程列表同一套 interestPresetFor() 规则（多兴趣全量预置、级联多选 OR、已选标签可单个移除）；从课程详情带 ?courseId= 进入时 URL 参数优先，兴趣不覆盖课程范围', constraints: { readOnly: true, derived: true } }
+          { id: 'FD-LAPP-058', label: '专业筛选默认值', type: '只读（派生）', length: '—', required: '系统派生', note: 'CR-2026-166 v1.2 / v1.4：与课程列表同一套 interestPresetFor() 规则（多兴趣全量预置、级联多选 OR、已选标签可单个移除、未改动则每次进入重算预置）；从课程详情带 ?courseId= 进入时 URL 参数优先，兴趣不覆盖课程范围；弹窗内「按我的兴趣筛选」可按当前批次范围强制恢复', constraints: { readOnly: true, derived: true } }
         ] }
       ],
       notes: [
-        '默认值优先级与一次性生效规则见拆分版 19 §6.1；会话标记按 studentId 隔离。'
+        'CR-2026-166 v1.4：默认值优先级与生效时机（URL > touched > 兴趣、未改动则每次进入重算、一键恢复）见拆分版 19 §5.2/§6；会话标记按 studentId 隔离。'
       ]
     },
     'learner/fast-registration-detail': {
