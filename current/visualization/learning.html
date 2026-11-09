@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171a1d">
+  <title>学情与招生 · 培训驾驶舱</title>
+  <link rel="stylesheet" href="../shared/css/visualization.css">
+</head>
+<body data-view="learning">
+  <main class="dashboard-screen">
+    <header class="dashboard-header">
+      <div class="brand">
+        <h1>培训驾驶舱 <small>演示</small></h1>
+        <p>湖北艺术职业学院 · 继续教育学院</p>
+      </div>
+      <nav class="dashboard-tabs" aria-label="驾驶舱视图">
+        <a href="./index.html" data-page="index.html">经营总览</a>
+        <a href="./learning.html" data-page="learning.html" class="is-active" aria-current="page">学情与招生</a>
+      </nav>
+      <div class="header-controls">
+        <div class="period-label"><span id="academic-range"></span><span id="as-of"></span></div>
+        <label class="filter-field">年份<select id="academic-year-filter" aria-label="年份"></select></label>
+        <button type="button" class="icon-button" id="refresh" title="刷新数据" aria-label="刷新数据"></button>
+        <button type="button" class="icon-button" id="fullscreen" title="全屏查看" aria-label="全屏查看"></button>
+        <button type="button" class="dashboard-help-button" id="export-report">导出报告</button>
+        <button type="button" class="dashboard-help-button" id="dashboard-help">页面说明</button>
+      </div>
+    </header>
+
+    <section class="overview-stats analysis-stats" aria-label="学情与招生概览">
+      <div class="overview-metric">
+        <h2>在读学员</h2>
+        <div class="metric" id="learn-students"></div><div class="metric-meta" id="learn-students-meta"></div>
+      </div>
+      <div class="overview-metric">
+        <h2>平均出勤率</h2>
+        <div class="metric" id="learn-attendance"></div><div class="metric-meta" id="learn-attendance-meta"></div>
+      </div>
+      <!-- CR-2026-171 按评审要求隐藏顶部指标，代码与口径保留；恢复时去掉 hidden 并同步列数 -->
+      <div class="overview-metric" hidden data-hidden-by="CR-2026-171">
+        <h2>作业提交率</h2>
+        <div class="metric" id="learn-homework"></div><div class="metric-meta" id="learn-homework-meta"></div>
+      </div>
+      <div class="overview-metric">
+        <h2>家长参评率</h2>
+        <div class="metric" id="learn-review"></div><div class="metric-meta" id="learn-review-meta"></div>
+      </div>
+      <div class="overview-metric" hidden data-hidden-by="CR-2026-171">
+        <h2>线索转报名率</h2>
+        <div class="metric" id="learn-conversion"></div><div class="metric-meta" id="learn-conversion-meta"></div>
+      </div>
+      <div class="overview-metric">
+        <h2>期间流失率</h2>
+        <div class="metric" id="learn-churn"></div><div class="metric-meta" id="learn-churn-meta"></div>
+      </div>
+    </section>
+
+    <section class="dashboard-grid learning-grid" aria-label="学情与招生分析">
+      <article class="analysis-panel lp-cell lp-conversion">
+        <div class="panel-heading"><h2>招生转化与来源</h2><span class="panel-period">Top10</span></div>
+        <dl class="conversion-mini">
+          <div><dt>线索转报名率</dt><dd id="conversion-rate"></dd></div>
+          <div><dt>新增线索</dt><dd id="conversion-leads"></dd></div>
+          <div><dt>已转化</dt><dd id="conversion-converted"></dd></div>
+        </dl>
+        <div class="rank-scroll">
+        <table class="data-table source-table source-mini">
+            <caption class="sr-only">按已转化线索数排序的招生来源</caption>
+            <thead><tr><th scope="col">来源</th><th scope="col">新增</th><th scope="col">转化</th><th scope="col">转化率</th></tr></thead>
+            <tbody id="source-ranking"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <!-- CR-2026-171 按评审要求隐藏展示，代码与数据口径保留；恢复时去掉 hidden 并同步栅格行数 -->
+      <article class="analysis-panel lp-cell lp-enrollment" hidden data-hidden-by="CR-2026-171">
+        <div class="panel-heading"><h2>面授报名趋势</h2><span class="panel-period">人次</span></div>
+        <div class="enrollment-chart" id="enrollment-chart" role="group" aria-label="学年月度新增有效报名人次"></div>
+      </article>
+
+      <article class="analysis-panel lp-cell lp-course">
+        <div class="panel-heading"><h2>课程学情对比</h2><span class="panel-period">Top10</span></div>
+        <div class="rank-scroll">
+        <table class="data-table course-learning-table">
+            <caption class="sr-only">按在读人次排序的课程出勤与作业提交</caption>
+            <thead><tr><th scope="col">课程</th><th scope="col">人次</th><th scope="col">出勤</th><th scope="col">作业</th></tr></thead>
+            <tbody id="course-learning"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="analysis-panel lp-cell lp-quality">
+        <div class="panel-heading"><h2>教学质量</h2><span class="panel-period">Top10</span></div>
+        <div class="rank-scroll">
+        <table class="data-table quality-table">
+            <caption class="sr-only">按综合分排序的教师教学质量</caption>
+            <thead><tr><th scope="col">教师</th><th scope="col">综合</th><th scope="col">出勤</th><th scope="col">作业</th><th scope="col">评分</th></tr></thead>
+            <tbody id="teacher-quality"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="analysis-panel lp-cell lp-review">
+        <div class="panel-heading"><h2>家长评价</h2><span class="panel-period" id="review-scope"></span></div>
+        <div class="review-summary" id="review-summary"></div>
+        <div class="review-dims" id="review-dims"></div>
+        <div class="review-stars" id="review-stars"></div>
+      </article>
+
+      <!-- CR-2026-171 按评审要求隐藏展示，代码与数据口径保留；恢复时去掉 hidden 并同步栅格行数 -->
+      <article class="analysis-panel lp-cell lp-feedback" hidden data-hidden-by="CR-2026-171">
+        <div class="panel-heading"><h2>负面反馈原声</h2><span class="panel-period">Top10</span></div>
+        <div class="feedback-list rank-scroll" id="feedback-list"></div>
+      </article>
+
+      <article class="analysis-panel lp-cell lp-watch">
+        <div class="panel-heading"><h2>需关注学员</h2><span class="panel-period" id="watch-scope">Top10</span></div>
+        <div class="ranking-scroll watch-scroll rank-scroll"><table class="data-table watch-table">
+          <caption class="sr-only">按综合分升序的需关注学员</caption>
+          <thead><tr><th scope="col">学员</th><th scope="col">出勤</th><th scope="col">作业</th></tr></thead>
+          <tbody id="watch-list"></tbody>
+        </table></div>
+      </article>
+
+      <!-- CR-2026-171 按评审要求隐藏展示，代码与数据口径保留；恢复时去掉 hidden 并同步栅格行数 -->
+      <article class="analysis-panel lp-cell lp-churn" hidden data-hidden-by="CR-2026-171">
+        <div class="panel-heading"><h2>流失预警</h2><span class="panel-period" id="churn-scope"></span></div>
+        <div class="churn-summary" id="churn-summary"></div>
+        <div class="churn-reasons rank-scroll" id="churn-reasons"></div>
+      </article>
+      <article class="analysis-panel lp-cell lp-churn-courses">
+        <div class="panel-heading"><h2>流失高发课程</h2><span class="panel-period">Top10</span></div>
+        <div class="rank-scroll">
+        <table class="data-table churn-course-table">
+            <caption class="sr-only">按流失人次排序的课程流失率</caption>
+            <thead><tr><th scope="col">课程</th><th scope="col">流失</th><th scope="col">在册</th><th scope="col">流失率</th></tr></thead>
+            <tbody id="churn-top-courses"></tbody>
+          </table>
+        </div>
+      </article>
+
+    </section>
+
+    <footer class="dashboard-footer"><span id="scope"></span><span id="updated" aria-live="polite"></span></footer>
+  </main>
+  <script type="module" src="../shared/js/visualization.js"></script>
+</body>
+</html>

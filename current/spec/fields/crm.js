@@ -63,7 +63,8 @@ const CRM_FIELD_SPEC = {
         ] },
         { heading: '学籍异动', fields: [
           { id: 'FD-CRM-091', label: '异动类型', type: '枚举', length: '退班 / 转班 / 退学', required: '是', note: '班级名册唯一变更入口；转班需选转入班级', constraints: { enum: ['退班','转班','退学'] } },
-          { id: 'FD-CRM-092', label: '异动原因', type: '多行文本', length: '≤ 200 字', required: '是', note: '写入异动记录，必填', constraints: { maxLength: 200 } },
+          { id: 'FD-CRM-092', label: '流失原因 / 转班原因', type: '下拉（字典项）', length: '取字典当前项', required: '是', note: 'CR-2026-167：由自由文本改为字典下拉。退班／退学读「流失原因」字典（churn_reason），转班读「转班原因」字典（transfer_reason）；选项在「系统管理 → 数据字典」维护，页面不得写死；切换异动类型时选项与字段名同步切换（流失原因／转班原因）', constraints: { dictionary: ['churn_reason', 'transfer_reason'] } },
+          { id: 'FD-CRM-105', label: '补充说明', type: '多行文本', length: '≤ 100 字', required: '否', note: 'CR-2026-167：选填，承载个案细节（如「搬家到汉口，接送单程 40 分钟」）；写入异动记录并随同步退费一并带入退款备注，但不参与流失原因统计', constraints: { maxLength: 100 } },
           { id: 'FD-CRM-093', label: '转入班级', type: '下拉', length: '转班时必填', required: '转班时必填', note: '目标班级 class_id；退班/退学不填', constraints: { requiredIf: "type='转班'" } },
           { id: 'FD-CRM-094', label: '同步退费', type: '开关', length: '是 / 否', required: '否', note: '退班/退学可开启；金额固定为订单实收全额（学籍异动入口不做部分退款，申请窗口与最大已消课比例仅作资格判定、不参与金额计算）；开启后发起即生成退款中退款单、无审批环节（CR-2026-155 C9）；不受自助窗口与消课上限拦截；如需只退部分金额，改由「统一订单管理」订单列表发起退款', constraints: { enum: ['是','否'] } },
           { id: 'FD-CRM-095', label: '异动记录', type: '列表（只读）', length: 'enrollmentChanges', required: '系统生成', note: '含类型/原因/转入班级/退费关联/操作人与时间', constraints: { readOnly: true, derived: true } },

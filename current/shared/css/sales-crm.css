@@ -140,3 +140,11 @@
 /* UI 复核 CR-2026-020／031：未选择关联课程时的展示信息占位字段。 */
 .rich-editor-placeholder { min-height: 96px; border: 1px dashed var(--line, #d7dbe6); border-radius: 6px; padding: 12px; color: var(--text-muted, #5b6478); font-size: 13px; display: flex; align-items: center; }
 .sales-display-section [disabled] { background: var(--surface-muted, #f5f6f9); }
+
+/* CR-P-001：线索详情的人工绑定控件（线索 ↔ 学员档案），写入收口 CRM。 */
+.lead-binding-control { display: grid; gap: 6px; }
+.lead-binding-current { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lead-binding-item { display: inline-flex; align-items: center; gap: 6px; }
+.lead-binding-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lead-binding-form select { min-width: 180px; }
+.lead-binding-control small { line-height: 1.5; }

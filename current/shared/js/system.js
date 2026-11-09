@@ -13,6 +13,8 @@ let systemData = null;
 let systemToastTimer;
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+// 线索与档案的关联登记、线索到期标签；跟进记录直接读取档案已登记事项。
+const followupsApi = () => __classicRequire("shared/js/followups.js") || {};
 const statusClass = (value) => ({ 启用: 'green', 禁用: 'gray', 草稿: 'gray', 已保存: 'green', 有效: 'green' }[value] || 'gray');
 const tag = (value) => `<span class="tag ${statusClass(value)}">${escapeHtml(value)}</span>`;
 function showToast(message) { const element = document.querySelector('[data-system-toast]'); if (!element) return; element.textContent = message; element.hidden = false; clearTimeout(systemToastTimer); systemToastTimer = setTimeout(() => { element.hidden = true; }, 2800); }
@@ -91,18 +93,25 @@ function bootstrapRolePermissions() {
   });
 }
 const studentUsers = [
-  { id: 'parent-001', accountNo: 'STU-20260001', name: '林女士', phone: '138****2026', login: '验证码登录', status: '启用', registered: '2026-08-20 09:12', firstLogin: '2026-08-20 09:13', lastLogin: '2026-09-11 10:20', ip: '10.0.***.26', students: [{ name: '林知夏', relation: '女儿', gender: '女', age: '9岁', phone: '138****1122', status: '正常', current: true, classes: 1, courses: 2 }, { name: '林知远', relation: '儿子', gender: '男', age: '10岁', phone: '138****3344', status: '正常', current: false, classes: 0, courses: 1 }], audits: [] },
-  { id: 'parent-002', accountNo: 'STU-20260002', name: '周女士', phone: '139****2027', login: '微信授权', status: '启用', registered: '2026-08-22 14:05', firstLogin: '2026-08-22 14:06', lastLogin: '2026-09-10 16:40', ip: '10.0.***.27', students: [{ name: '周予安', relation: '女儿', gender: '女', age: '10岁', phone: '139****7788', status: '正常', current: true, classes: 1, courses: 1 }], audits: [] },
-  { id: 'parent-003', accountNo: 'STU-20260003', name: '赵先生', phone: '136****0048', login: '密码登录', status: '禁用', registered: '2026-07-15 11:20', firstLogin: '2026-07-15 11:22', lastLogin: '2026-08-30 18:01', ip: '10.0.***.48', disabledReason: '用户主动申请停用', students: [{ name: '赵一诺', relation: '儿子', gender: '男', age: '8岁', phone: '136****9911', status: '正常', current: true, classes: 0, courses: 0 }], audits: [{ action: '禁用', before: '启用', after: '禁用', operator: '超级管理员', time: '2026-08-30 18:05', reason: '用户主动申请停用' }] }
+  { id: 'parent-001', accountNo: 'STU-20260001', name: '林女士', phone: '138****2026', login: '验证码登录', status: '启用', registered: '2026-08-20 09:12', firstLogin: '2026-08-20 09:13', lastLogin: '2026-09-11 10:20', ip: '10.0.***.26', students: [
+    { id: 'learner-001', name: '林知夏', relation: '女儿', gender: '女', age: '9岁', birthday: '2017-03-12', phone: '138****1122', status: '正常', current: true, courses: 2, linkedAt: '2026-08-20', source: '微信朋友圈裂变', guardian: '林女士（母亲）', emergency: '林先生 139****0666', tags: ['活跃', '绘画特长'], stage: '进阶期', orders: [{ course: '少儿创意绘画 L2', klass: '周六上午班', amount: '¥2,380', status: '已支付', paidAt: '2026-02-18' }, { course: '少儿创意绘画 L3', klass: '周六上午班（秋季进阶）', amount: '¥2,580', status: '已支付', paidAt: '2026-08-20' }], classes: [{ id: 'cls-001-1', name: '周六上午班', course: '少儿创意绘画 L2', term: '2026 春季', teacher: '赵老师', schedule: '每周六 09:00-10:30', campus: '龙泉校区 · 艺术楼105', enrollDate: '2026-02-18', startDate: '2026-02-22', endDate: '2026-06-28', status: '已结业', attendance: { rate: '96%', total: 16, present: 15, absent: 1 }, homework: { rate: '94%', submitted: 15, pending: 1 }, reviews: [{ term: '2026 春季', comment: '色彩运用更成熟，构图有想法' }], certificates: [{ name: '少儿绘画二级', issuedAt: '2026-06-29', status: '已发放' }], graduation: { status: '已结业', graduatedAt: '2026-06-28', note: '完成全部课时，作品集评审通过' } }, { id: 'cls-001-2', name: '周六上午班（秋季进阶）', course: '少儿创意绘画 L3', term: '2026 秋季', teacher: '赵老师', schedule: '每周六 09:00-10:30', campus: '龙泉校区 · 艺术楼105', enrollDate: '2026-08-20', startDate: '2026-09-05', endDate: '2027-01-20', status: '在读', attendance: { rate: '88%', total: 8, present: 7, absent: 1 }, homework: { rate: '80%', submitted: 6, pending: 2 }, reviews: [{ term: '2026 秋季（进行中）', comment: '构图进步明显，进阶表现突出' }], certificates: [], graduation: { status: '在读', graduatedAt: '', note: '' } }] },
+    { id: 'learner-002', name: '林知远', relation: '儿子', gender: '男', age: '10岁', birthday: '2016-07-08', phone: '138****3344', status: '正常', current: false, courses: 1, linkedAt: '2026-08-20', source: '微信朋友圈裂变', guardian: '林女士（母亲）', emergency: '林先生 139****0666', tags: ['历史学员'], stage: '已结业', orders: [{ course: '少儿硬笔书法 L1', klass: '周日班', amount: '¥1,980', status: '已支付', paidAt: '2025-08-25' }], classes: [{ id: 'cls-002-1', name: '周日班', course: '少儿硬笔书法 L1', term: '2025 秋季', teacher: '孙老师', schedule: '每周日 10:00-11:30', campus: '南湖校区 · 书法教室', enrollDate: '2025-08-25', startDate: '2025-09-06', endDate: '2026-01-18', status: '已结业', attendance: { rate: '90%', total: 18, present: 16, absent: 2 }, homework: { rate: '85%', submitted: 15, pending: 0 }, reviews: [{ term: '2025 秋季', comment: '书写规范度提升' }], certificates: [{ name: '少儿书法结业', issuedAt: '2026-01-20', status: '已发放' }], graduation: { status: '已结业', graduatedAt: '2026-01-18', note: '完成硬笔书法基础课程并结业' } }] }
+  ], audits: [] },
+  { id: 'parent-002', accountNo: 'STU-20260002', name: '周女士', phone: '139****2027', login: '微信授权', status: '启用', registered: '2026-08-22 14:05', firstLogin: '2026-08-22 14:06', lastLogin: '2026-09-10 16:40', ip: '10.0.***.27', students: [
+    { id: 'learner-003', name: '周予安', relation: '女儿', gender: '女', age: '10岁', birthday: '2016-02-14', phone: '139****7788', status: '正常', current: true, courses: 1, linkedAt: '2026-08-22', source: '老学员推荐', guardian: '周女士（母亲）', emergency: '周先生 137****0555', tags: ['活跃', '舞蹈特长'], stage: '入门期', orders: [{ course: '少儿中国舞 L1', klass: '周五晚班', amount: '¥2,180', status: '已支付', paidAt: '2026-08-22' }], classes: [{ id: 'cls-003-1', name: '周五晚班', course: '少儿中国舞 L1', term: '2026 秋季', teacher: '王玥', schedule: '每周五 19:00-20:30', campus: '龙泉校区 · 舞蹈房', enrollDate: '2026-08-22', startDate: '2026-09-04', endDate: '2027-01-15', status: '在读', attendance: { rate: '100%', total: 6, present: 6, absent: 0 }, homework: { rate: '100%', submitted: 6, pending: 0 }, reviews: [{ term: '2026 秋季（进行中）', comment: '节奏感好，课堂积极' }], certificates: [], graduation: { status: '在读', graduatedAt: '', note: '' } }] }
+  ], audits: [] },
+  { id: 'parent-003', accountNo: 'STU-20260003', name: '赵先生', phone: '136****0048', login: '密码登录', status: '禁用', registered: '2026-07-15 11:20', firstLogin: '2026-07-15 11:22', lastLogin: '2026-08-30 18:01', ip: '10.0.***.48', disabledReason: '用户主动申请停用', students: [
+    { id: 'learner-004', name: '赵一诺', relation: '儿子', gender: '男', age: '8岁', birthday: '2018-05-30', phone: '136****9911', status: '正常', current: true, courses: 0, linkedAt: '2026-07-15', source: '地推活动', guardian: '赵先生（父亲）', emergency: '赵女士 135****0777', tags: ['沉睡', '待激活'], stage: '未报名', orders: [], classes: [] }
+  ], audits: [{ action: '禁用', before: '启用', after: '禁用', operator: '超级管理员', time: '2026-08-30 18:05', reason: '用户主动申请停用' }] }
 ];
 const studentUserRole = new URLSearchParams(window.location.search).get('role') || systemRoot?.closest('[data-admin-shell]')?.dataset.role || 'super_admin';
-const studentUserAccounts = studentUsers.map((item) => ({ ...item, avatar: item.name.slice(-1), loginMethod: item.login, registeredAt: item.registered, firstLoginAt: item.firstLogin, lastLoginAt: item.lastLogin, lastLoginIp: item.ip, consentAt: item.registered, stateChangedAt: item.audits[0]?.time || item.registered, stateChangedBy: item.audits[0]?.operator || '系统', learners: item.students.map((student) => ({ ...student, birthday: student.age, linkedAt: item.registered })), audits: item.audits.map((audit) => ({ ...audit, at: audit.at || audit.time })) }));
+const studentUserAccounts = studentUsers.map((item) => ({ ...item, avatar: item.name.slice(-1), loginMethod: item.login, registeredAt: item.registered, firstLoginAt: item.firstLogin, lastLoginAt: item.lastLogin, lastLoginIp: item.ip, consentAt: item.registered, stateChangedAt: item.audits[0]?.time || item.registered, stateChangedBy: item.audits[0]?.operator || '系统', learners: item.students.map((student) => ({ ...student, linkedAt: item.registered })), audits: item.audits.map((audit) => ({ ...audit, at: audit.at || audit.time })) }));
 
 // CR-2026-027：学员用户管理的可访问与可操作按权限点判定（PERM-SYSTEM-002 查看 / 启停），不再按角色名。
 function currentRoleKey() { return window.hbyxPermissions?.roleKey || new URLSearchParams(location.search).get('role') || systemRoot?.closest('[data-admin-shell]')?.dataset.role || 'super_admin'; }
 const roleCan = (id) => (window.hbyxPermissions ? window.hbyxPermissions.can(id) : permissionsOfRole(currentRoleKey()).includes(id));
 function renderStudentUsers() { const rows = studentUsers; if (!roleCan('PERM-SYSTEM-002')) { const point = permissionById('PERM-SYSTEM-002'); pageFrame('暂无权限', '当前账号未获得访问本页所需的权限点。', '', `<div class="card empty">缺少权限点：${point ? `${point.id} ${point.action}（${point.note}）` : 'PERM-SYSTEM-002'}。请在「角色权限管理」中开启后重试；前端隐藏入口不代表已授权，接口层同样按权限点与数据范围校验。</div>`); return; } const canToggle = roleCan('PERM-SYSTEM-001'); pageFrame('学员用户管理', canToggle ? '超级管理员可查看并启停账号；关联学员只读展示，敏感信息默认脱敏。' : '教务主管仅可查看账号和关联学员，不能执行启停操作。', '', metrics([['账号总数', rows.length, '家长/监护人账号'], ['启用', rows.filter(r => r.status === '启用').length, '可正常登录'], ['禁用', rows.filter(r => r.status === '禁用').length, '登录已阻断'], ['关联学员', rows.reduce((n, r) => n + r.students.length, 0), '详情完整展示']]) + filterPanel('student-user-filter', field('关键词', 'keyword', 'text', '昵称 / 手机号 / 账号编号', true) + select('账号状态', 'status', ['启用', '禁用']) + select('登录方式', 'login', ['验证码登录', '密码登录', '微信授权'])) + table('<thead><tr><th>账号</th><th>登录手机号</th><th>登录方式</th><th>关联学员数</th><th>状态</th><th>最近登录</th><th>注册时间</th><th>操作</th></tr></thead>')); const row = r => `<td><strong>${r.name}</strong><br><span class="muted">${r.accountNo}</span></td><td>${r.phone}</td><td>${r.login}</td><td>${r.students.length}</td><td>${tag(r.status)}</td><td>${r.lastLogin}</td><td>${r.registered}</td><td class="action-cell"><button class="text-button" data-system-action="student-detail">查看详情</button>${canToggle ? `<button class="text-button ${r.status === '启用' ? 'danger-link' : ''}" data-system-action="student-toggle">${r.status === '启用' ? '禁用' : '启用'}</button>` : ''}</td>`; renderRows(rows, row); bindFilter('student-user-filter', rows, form => { const keyword = form.keyword.value.trim(); return r => (!keyword || `${r.name}${r.phone}${r.accountNo}`.includes(keyword)) && (!form.status.value || r.status === form.status.value) && (!form.login.value || r.login === form.login.value); }, row); }
-function openStudentDetail(row) { const students = row.students.map(s => `<tr><td>${s.name}</td><td>${s.relation}</td><td>${s.gender}</td><td>${s.age}</td><td>${s.phone}</td><td>${s.status}</td><td>${s.current ? '是' : '否'}</td><td>${s.classes}</td><td>${s.courses}</td></tr>`).join(''); const audits = row.audits.length ? row.audits.map(a => `<tr><td>${a.action}</td><td>${a.before}</td><td>${a.after}</td><td>${a.operator}</td><td>${a.time}</td><td>${a.reason}</td></tr>`).join('') : '<tr><td colspan="6">暂无状态变更记录</td></tr>'; openDialog(`${row.name} · 学员用户详情`, `${row.accountNo} · 账号与关联学员`, `<h3>账号信息</h3><dl class="system-detail-list"><dt>登录手机号</dt><dd>${row.phone}</dd><dt>登录方式</dt><dd>${row.login}</dd><dt>状态</dt><dd>${tag(row.status)}</dd><dt>注册时间</dt><dd>${row.registered}</dd><dt>首次登录</dt><dd>${row.firstLogin}</dd><dt>最近登录/IP</dt><dd>${row.lastLogin} / ${row.ip}</dd><dt>禁用原因</dt><dd>${row.disabledReason || '—'}</dd></dl><h3>关联学员</h3><div class="table-wrap"><table><thead><tr><th>姓名</th><th>关系</th><th>性别</th><th>年龄段</th><th>手机号</th><th>状态</th><th>当前</th><th>在读班级</th><th>已报名课程</th></tr></thead><tbody>${students}</tbody></table></div><h3>操作记录</h3><div class="table-wrap"><table><thead><tr><th>操作</th><th>操作前</th><th>操作后</th><th>操作人</th><th>时间</th><th>原因</th></tr></thead><tbody>${audits}</tbody></table></div>`); }
+function openStudentDetail(row) { const students = row.students.map(s => `<tr><td>${s.name}</td><td>${s.relation}</td><td>${s.gender}</td><td>${s.age}</td><td>${s.phone}</td><td>${s.status}</td><td>${s.current ? '是' : '否'}</td><td>${(s.classes || []).length}</td><td>${s.courses}</td></tr>`).join(''); const audits = row.audits.length ? row.audits.map(a => `<tr><td>${a.action}</td><td>${a.before}</td><td>${a.after}</td><td>${a.operator}</td><td>${a.time}</td><td>${a.reason}</td></tr>`).join('') : '<tr><td colspan="6">暂无状态变更记录</td></tr>'; openDialog(`${row.name} · 学员用户详情`, `${row.accountNo} · 账号与关联学员`, `<h3>账号信息</h3><dl class="system-detail-list"><dt>登录手机号</dt><dd>${row.phone}</dd><dt>登录方式</dt><dd>${row.login}</dd><dt>状态</dt><dd>${tag(row.status)}</dd><dt>注册时间</dt><dd>${row.registered}</dd><dt>首次登录</dt><dd>${row.firstLogin}</dd><dt>最近登录/IP</dt><dd>${row.lastLogin} / ${row.ip}</dd><dt>禁用原因</dt><dd>${row.disabledReason || '—'}</dd></dl><h3>关联学员</h3><div class="table-wrap"><table><thead><tr><th>姓名</th><th>关系</th><th>性别</th><th>年龄段</th><th>手机号</th><th>状态</th><th>当前</th><th>在读班级</th><th>已报名课程</th></tr></thead><tbody>${students}</tbody></table></div><h3>操作记录</h3><div class="table-wrap"><table><thead><tr><th>操作</th><th>操作前</th><th>操作后</th><th>操作人</th><th>时间</th><th>原因</th></tr></thead><tbody>${audits}</tbody></table></div>`); }
 function renderUsers() {
   systemData = users;
   pageFrame('后台用户管理', '', '<button class="button primary" data-system-action="user-create">新增用户</button>', metrics([['用户总数', users.length, '后台账号'], ['启用', users.filter((u) => u.status === '启用').length, '可正常登录'], ['禁用', users.filter((u) => u.status === '禁用').length, '账号不可登录'], ['今日登录', users.filter((u) => u.lastLogin.startsWith('2026-09-08')).length, '按最后登录时间']]) + filterPanel('user-filter', select('用户状态', 'status', ['启用', '禁用']) + select('所属角色', 'role', ['超级管理员', '教研主管', '教务主管', '课程顾问', '财务']) + field('关键词', 'keyword', 'text', '姓名 / 账号 / 手机号', true)) + table('<thead><tr><th>用户</th><th>登录账号</th><th>手机号</th><th>所属角色</th><th>状态</th><th>最后登录</th><th>最后登录 IP</th><th>操作</th></tr></thead>'));
@@ -158,7 +167,7 @@ function mountConfigurableLimitCards() {
 // CR-2026-103：数据字典维护页。业务枚举（难度等级、适合年龄、课时类型、课时时长）
 // 统一在这里维护；字典类型由产品口径固定，新增类型需走变更单。
 // CR-2026-155 C2：课时时长字典冻结（单节课固定 45 分钟），本页只读展示、不提供增删改。
-const DICTIONARY_TYPE_ORDER = ['course_difficulty', 'suitable_age', 'lesson_kind', 'lesson_duration'];
+const DICTIONARY_TYPE_ORDER = ['course_difficulty', 'suitable_age', 'lesson_kind', 'lesson_duration', 'churn_reason', 'transfer_reason'];
 const FROZEN_DICTIONARY_TYPES = ['lesson_duration'];
 function renderDictionaries() {
   const all = dataDictionary();
@@ -176,7 +185,9 @@ function renderDictionaries() {
     course_difficulty: '课程申报、课程库编排与后台新增面授课程读取同一份字典；发布商品与班级时只读带入。',
     suitable_age: '课程申报、课程库编排、后台新增面授课程与学员端筛选读取同一份字典。',
     lesson_kind: '课程库编排的课时类型读取同一份字典。',
-    lesson_duration: '课时时长字典已冻结：单节课固定 45 分钟，排班、班级默认课时与课程库编排统一按 45 分钟取值，不再支持新增或调整其他时长。'
+    lesson_duration: '课时时长字典已冻结：单节课固定 45 分钟，排班、班级默认课时与课程库编排统一按 45 分钟取值，不再支持新增或调整其他时长。',
+    churn_reason: '学籍异动表单的「流失原因」下拉读取本字典（仅退班／退学使用）；学情分析「流失原因分布」按本字典归并统计，字典项改名或合并后历史记录按原值保留、统计按分类映射，删除中的字典项不再出现在下拉里但历史记录仍可查。',
+    transfer_reason: '学籍异动表单的「转班原因」下拉读取本字典；转班属于机构内在读班级变更，不计入流失，也不进入流失原因统计。'
   };
   const content = `<section class="card dictionary-card"><div class="dictionary-head"><div><h2>${escapeHtml(current.label)}${isFrozen ? '<small class="sub-cell">已冻结</small>' : ''}</h2><p class="ops-form-help">${escapeHtml(consumers[activeType] || '本字典由页面与接口统一读取。')}</p></div>${isFrozen ? '' : '<button type="button" class="button primary" data-dict-save>保存字典</button>'}</div><div class="dictionary-list" data-dict-list>${current.items.map(row).join('')}</div>${isFrozen ? '' : `<div class="toolbar-actions"><button type="button" class="button" data-dict-add>新增字典项</button></div>`}${defaultValueSelect}<p class="ops-form-help">${isFrozen ? '该字典项由业务裁定冻结（CR-2026-155 C2），如需调整须先走变更单。' : (isNumber ? '字典项为大于 0 的整数，保存时按数值去重升序；默认值必须属于字典项，删除默认项时默认值回落到首项。' : '字典项保存时去重并保持维护顺序；留空的字典项不会保存。')}</p></section>`;
   pageFrame('数据字典', '业务枚举统一在这里维护：字典项增删后即时生效，页面与接口读取同一份字典，不得写死选项。', '', `<div class="dictionary-tabs">${tabs}</div>${content}`);
@@ -290,13 +301,110 @@ function renderStudentUsersV2() {
   renderRows(studentUserAccounts, row);
   bindFilter('student-user-filter', studentUserAccounts, (form) => { const keyword = form.keyword.value.trim(); return (item) => (!keyword || `${item.name}${item.phone}${item.accountNo}${item.learners.map((learner) => `${learner.name}${learner.phone}`).join('')}`.includes(keyword)) && (!form.status.value || item.status === form.status.value) && (!form.loginMethod.value || item.loginMethod === form.loginMethod.value); }, row);
 }
+// 学员档案列表（学员中心二级菜单）：把原「学员用户详情 › 关联学员」表格聚合为独立列表页。
+// 表格列与字段口径 1:1 复用关联学员表，不新增字段；支持 ?accountId= 仅看该账号下关联学员。
+function renderStudentArchive() {
+  loadStudentUserState();
+  if (!studentUserCanView()) { pageFrame('学员档案', '', '', '<section class="card system-state-card system-state-error" role="alert"><strong>暂无权限访问</strong><p>当前角色无权查看学员档案。</p><a class="button" href="/admin/index.html">返回工作台</a></section>'); return; }
+  const accountId = new URLSearchParams(window.location.search).get('accountId');
+  const account = accountId ? studentUserAccounts.find((item) => item.id === accountId) : null;
+  const learners = account ? account.learners : studentUserAccounts.reduce((list, item) => list.concat(item.learners), []);
+  systemData = learners;
+  const controls = account ? `<a class="button" href="/admin/pages/system/student-archive.html">查看全部学员档案</a>` : '';
+  const description = account
+    ? `当前仅显示账号「${escapeHtml(account.name)}」下关联的 ${account.learners.length} 名学员。`
+    : `汇总全部账号下关联的 ${learners.length} 名学员。`;
+  const rows = learners.map((learner) => `<tr><td><a class="text-button" href="/admin/pages/system/student-profile.html?learnerId=${encodeURIComponent(learner.id)}">${escapeHtml(learner.name)}</a></td><td>${escapeHtml(learner.relation)}</td><td>${escapeHtml(learner.gender)}</td><td>${escapeHtml(learner.birthday)}</td><td>${escapeHtml(learner.phone)}</td><td>${escapeHtml(learner.status)}</td><td>${learner.current ? '<span class="tag brand">当前学员</span>' : '—'}</td><td>${escapeHtml(learner.linkedAt)}</td><td>${(learner.classes || []).length}</td><td>${learner.courses}</td></tr>`).join('');
+  const body = rows || '<tr><td colspan="10"><div class="empty">暂无关联学员。</div></td></tr>';
+  pageFrame('学员档案', description, controls, `<div class="table-wrap student-subtable-wrap"><table class="student-subtable"><thead><tr><th>学员</th><th>关系</th><th>性别</th><th>出生日期</th><th>手机号</th><th>学员状态</th><th>当前学员</th><th>关联时间</th><th>在读班级</th><th>已报名课程</th></tr></thead><tbody>${body}</tbody></table></div>`);
+}
 function renderStudentUserDetail(account) {
   if (!studentUserCanView()) { renderStudentUsers(); return; }
   systemData = studentUserAccounts;
   if (!account) { pageFrame('学员用户详情', '未找到对应的学员端登录账号。', '', '<section class="card system-state-card system-state-error"><strong>账号不存在或已被移除</strong><p>请返回学员用户列表重新选择。</p><a class="button" href="/admin/pages/system/student-users.html">返回列表</a></section>'); return; }
   const action = studentUserCanToggle() ? `<button class="button ${account.status === '启用' ? 'danger-button' : 'primary'}" type="button" data-system-action="student-user-toggle">${account.status === '启用' ? '禁用账号' : '启用账号'}</button>` : '';
-  pageFrame('学员用户详情', '仅查看账号信息、关联学员和状态变更记录；关联学员不在此编辑。', `<a class="button" href="/admin/pages/system/student-users.html?role=${encodeURIComponent(studentUserRole)}">返回列表</a>${action}`, `<div class="profile-banner card"><div class="display-profile"><span class="avatar-placeholder">${escapeHtml(account.avatar)}</span><div><span class="tag ${account.status === '启用' ? 'green' : 'gray'}">${escapeHtml(account.status)}</span><h2>${escapeHtml(account.name)}</h2><p>${escapeHtml(account.accountNo)} · ${escapeHtml(account.phone)}</p></div></div><div class="profile-summary"><span>关联学员</span><strong>${account.learners.length} 人</strong></div></div><div class="detail-grid"><section class="card"><h2>账号信息</h2><dl class="info-grid"><div><dt>账号编号</dt><dd>${escapeHtml(account.accountNo)}</dd></div><div><dt>账号昵称</dt><dd>${escapeHtml(account.name)}</dd></div><div><dt>登录手机号</dt><dd>${escapeHtml(account.phone)}</dd></div><div><dt>登录方式</dt><dd>${escapeHtml(account.loginMethod)}</dd></div><div><dt>账号状态</dt><dd>${tag(account.status)}</dd></div><div><dt>注册时间</dt><dd>${escapeHtml(account.registeredAt)}</dd></div><div><dt>首次登录时间</dt><dd>${escapeHtml(account.firstLoginAt)}</dd></div><div><dt>最近登录时间</dt><dd>${escapeHtml(account.lastLoginAt)}</dd></div><div><dt>最近登录 IP</dt><dd>${escapeHtml(account.lastLoginIp)}</dd></div><div><dt>协议同意时间</dt><dd>${escapeHtml(account.consentAt)}</dd></div><div><dt>禁用原因</dt><dd>${escapeHtml(account.disabledReason || '—')}</dd></div><div><dt>最近状态变更</dt><dd>${escapeHtml(account.stateChangedAt)} · ${escapeHtml(account.stateChangedBy)}</dd></div></dl></section><section class="card"><div class="section-title-row"><div><h2>关联学员</h2></div><span class="tag gray">${account.learners.length} 人</span></div><div class="table-wrap student-subtable-wrap"><table class="student-subtable"><thead><tr><th>学员</th><th>关系</th><th>性别</th><th>出生日期</th><th>手机号</th><th>学员状态</th><th>当前学员</th><th>关联时间</th><th>在读班级</th><th>已报名课程</th></tr></thead><tbody>${account.learners.map((learner) => `<tr><td><strong>${escapeHtml(learner.name)}</strong></td><td>${escapeHtml(learner.relation)}</td><td>${escapeHtml(learner.gender)}</td><td>${escapeHtml(learner.birthday)}</td><td>${escapeHtml(learner.phone)}</td><td>${escapeHtml(learner.status)}</td><td>${learner.current ? '<span class="tag brand">当前学员</span>' : '—'}</td><td>${escapeHtml(learner.linkedAt)}</td><td>${learner.classes}</td><td>${learner.courses}</td></tr>`).join('')}</tbody></table></div></section><section class="card detail-grid-wide"><div class="section-title-row"><div><h2>账号操作记录</h2></div><span class="tag gray">审计记录</span></div><div class="table-wrap student-subtable-wrap"><table class="student-audit-table"><thead><tr><th>操作</th><th>操作前状态</th><th>操作后状态</th><th>操作人</th><th>操作时间</th><th>操作原因</th></tr></thead><tbody>${account.audits.map((audit) => `<tr><td>${escapeHtml(audit.action)}</td><td>${escapeHtml(audit.before)}</td><td>${escapeHtml(audit.after)}</td><td>${escapeHtml(audit.operator)}</td><td>${escapeHtml(audit.at)}</td><td>${escapeHtml(audit.reason)}</td></tr>`).join('')}</tbody></table></div></section></div>`);
+  pageFrame('学员用户详情', '仅查看账号信息与状态变更记录；关联学员请前往「学员档案」查看。', `<a class="button" href="/admin/pages/system/student-users.html?role=${encodeURIComponent(studentUserRole)}">返回列表</a>${action}`, `<div class="profile-banner card"><div class="display-profile"><span class="avatar-placeholder">${escapeHtml(account.avatar)}</span><div><span class="tag ${account.status === '启用' ? 'green' : 'gray'}">${escapeHtml(account.status)}</span><h2>${escapeHtml(account.name)}</h2><p>${escapeHtml(account.accountNo)} · ${escapeHtml(account.phone)}</p></div></div><div class="profile-summary"><span>关联学员</span><strong><a class="text-button" href="/admin/pages/system/student-archive.html?accountId=${encodeURIComponent(account.id)}&role=${encodeURIComponent(studentUserRole)}">${account.learners.length} 人 ›</a></strong></div></div><div class="detail-grid"><section class="card"><h2>账号信息</h2><dl class="info-grid"><div><dt>账号编号</dt><dd>${escapeHtml(account.accountNo)}</dd></div><div><dt>账号昵称</dt><dd>${escapeHtml(account.name)}</dd></div><div><dt>登录手机号</dt><dd>${escapeHtml(account.phone)}</dd></div><div><dt>登录方式</dt><dd>${escapeHtml(account.loginMethod)}</dd></div><div><dt>账号状态</dt><dd>${tag(account.status)}</dd></div><div><dt>注册时间</dt><dd>${escapeHtml(account.registeredAt)}</dd></div><div><dt>首次登录时间</dt><dd>${escapeHtml(account.firstLoginAt)}</dd></div><div><dt>最近登录时间</dt><dd>${escapeHtml(account.lastLoginAt)}</dd></div><div><dt>最近登录 IP</dt><dd>${escapeHtml(account.lastLoginIp)}</dd></div><div><dt>协议同意时间</dt><dd>${escapeHtml(account.consentAt)}</dd></div><div><dt>禁用原因</dt><dd>${escapeHtml(account.disabledReason || '—')}</dd></div><div><dt>最近状态变更</dt><dd>${escapeHtml(account.stateChangedAt)} · ${escapeHtml(account.stateChangedBy)}</dd></div></dl></section><section class="card detail-grid-wide"><div class="section-title-row"><div><h2>账号操作记录</h2></div><span class="tag gray">审计记录</span></div><div class="table-wrap student-subtable-wrap"><table class="student-audit-table"><thead><tr><th>操作</th><th>操作前状态</th><th>操作后状态</th><th>操作人</th><th>操作时间</th><th>操作原因</th></tr></thead><tbody>${account.audits.map((audit) => `<tr><td>${escapeHtml(audit.action)}</td><td>${escapeHtml(audit.before)}</td><td>${escapeHtml(audit.after)}</td><td>${escapeHtml(audit.operator)}</td><td>${escapeHtml(audit.at)}</td><td>${escapeHtml(audit.reason)}</td></tr>`).join('')}</tbody></table></div></section></div>`);
 }
+function renderStudentProfile(learnerId) {
+  const account = studentUserAccounts.find((acc) => acc.learners.some((l) => l.id === learnerId));
+  const learner = account && account.learners.find((l) => l.id === learnerId);
+  if (!learner) {
+    pageFrame('学员档案', '未找到对应的学员档案。', '', '<section class="card system-state-card system-state-error"><strong>学员不存在或已被移除</strong><p>请从「学员档案」列表重新进入。</p><a class="button" href="/admin/pages/system/student-archive.html">返回学员档案列表</a></section>');
+    return;
+  }
+  const ordersBody = (learner.orders && learner.orders.length)
+    ? `<div class="table-wrap student-subtable-wrap"><table class="student-subtable"><thead><tr><th>课程</th><th>班级</th><th>金额</th><th>状态</th><th>支付时间</th></tr></thead><tbody>${learner.orders.map((o) => `<tr><td>${escapeHtml(o.course)}</td><td>${escapeHtml(o.klass)}</td><td>${escapeHtml(o.amount)}</td><td>${tag(o.status)}</td><td>${escapeHtml(o.paidAt)}</td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="empty">暂无报名记录</div>';
+  // 学习轨迹：按班级聚合，入学日期倒序。
+  const learnStatusTag = (value) => {
+    const map = { '已结业': 'green', '在读': 'brand', '已生成': 'green', '未生成': 'gray', '暂无': 'gray', '已发放': 'green' };
+    return `<span class="tag ${map[value] || 'gray'}">${escapeHtml(value)}</span>`;
+  };
+      const sortedClasses = (learner.classes || []).slice().sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+      const learningTable = (list) => {
+        if (!list.length) return '<div class="empty">该学员暂未报名任何班级，学习轨迹为空。</div>';
+        const rows = list.map((c) => {
+          const att = c.attendance || {}; const hw = c.homework || {}; const reviews = c.reviews || []; const certs = c.certificates || [];
+          const reportStatus = (c.graduation && c.graduation.status === '已结业') ? '已生成' : '未生成';
+          const certStatus = certs.length ? certs[0].status : '暂无';
+          const comment = reviews.length ? reviews.map((r) => r.comment).join('；') : '—';
+          return `<tr>
+            <td><strong>${escapeHtml(c.name)}</strong></td>
+            <td>${escapeHtml(c.course)}</td>
+            <td>${escapeHtml(c.teacher || '—')}</td>
+            <td>${att.total || 0}</td>
+            <td>${escapeHtml(c.enrollDate || '—')} ~ ${escapeHtml(c.endDate || '—')}</td>
+            <td>${escapeHtml(att.rate || '—')}</td>
+            <td>${escapeHtml(hw.rate || '—')}</td>
+            <td>${escapeHtml(comment)}</td>
+            <td>${learnStatusTag(c.graduation ? c.graduation.status : '在读')}</td>
+            <td>${learnStatusTag(reportStatus)}</td>
+            <td>${learnStatusTag(certStatus)}</td>
+          </tr>`;
+        }).join('');
+        return `<div class="table-wrap"><table class="student-subtable learning-trail-table"><thead><tr>
+          <th>班级名称</th><th>课程名称</th><th>授课教师</th><th>总课时</th><th>入学-结业时间</th>
+          <th>出勤率</th><th>作业完成率</th><th>教师评语</th><th>结业状态</th><th>学习报告状态</th><th>证书状态</th>
+        </tr></thead><tbody>${rows}</tbody></table></div>`;
+      };
+  // CR-P-001：跟进记录只读投影到关联线索的 CRM 跟进记录（唯一事实源在线索侧）。
+  // 档案侧不提供写入，也不引用家校互动数据；原「互动时间线」整块下线。
+  const followBody = followupsApi().learnerFollowUpsHtml?.(learner) || '<div class="empty compact">暂无跟进记录</div>';
+  const overview = `
+    <div class="profile-banner card"><div class="display-profile"><span class="avatar-placeholder">${escapeHtml(learner.name.slice(-1))}</span><div><span class="tag ${learner.current ? 'brand' : 'gray'}">${learner.current ? '当前学员' : '历史学员'}</span><h2>${escapeHtml(learner.name)}</h2><p>${escapeHtml(learner.relation)} · ${escapeHtml(learner.gender)} · ${escapeHtml(learner.age)} · ${escapeHtml(learner.birthday)}</p></div></div><div class="profile-summary"><span>学员状态</span><strong>${escapeHtml(learner.status)}</strong></div></div>
+    <div class="detail-grid">
+      <section class="card"><h2>基础档案</h2><dl class="info-grid">
+        <div><dt>学员姓名</dt><dd>${escapeHtml(learner.name)}</dd></div>
+        <div><dt>与账号关系</dt><dd>${escapeHtml(learner.relation)}</dd></div>
+        <div><dt>性别 / 年龄</dt><dd>${escapeHtml(learner.gender)} · ${escapeHtml(learner.age)}</dd></div>
+        <div><dt>出生日期</dt><dd>${escapeHtml(learner.birthday)}</dd></div>
+        <div><dt>手机号</dt><dd>${escapeHtml(learner.phone)}</dd></div>
+        <div><dt>来源渠道</dt><dd>${escapeHtml(learner.source)}</dd></div>
+        <div><dt>监护人</dt><dd>${escapeHtml(learner.guardian)}</dd></div>
+        <div><dt>紧急联系人</dt><dd>${escapeHtml(learner.emergency)}</dd></div>
+        <div><dt>关联账号</dt><dd><a class="text-button" href="/admin/pages/system/student-users.html?accountId=${encodeURIComponent(account.id)}&role=${encodeURIComponent(studentUserRole)}">${escapeHtml(account.name)}（${escapeHtml(account.accountNo)}）</a></dd></div>
+        ${followupsApi().leadProfileLinkHtml?.(learner) || ''}
+      </dl></section>
+      <section class="card"><div class="section-title-row"><div><h2>报名与订单</h2></div><span class="tag gray">${learner.orders ? learner.orders.length : 0} 笔</span></div>${ordersBody}</section>
+    </div>`;
+      const learning = `
+        <section class="card detail-grid-wide">
+          <div class="section-title-row"><div><h2>学习轨迹</h2></div><span class="tag gray">${sortedClasses.length} 个班级</span></div>
+          ${learningTable(sortedClasses)}
+        </section>`;
+  const followup = `
+    <section class="card"><div class="section-title-row"><div><h2>跟进记录</h2></div><span class="tag gray">只读 · CRM 线索</span></div>${followBody}</section>`;
+      const tabs = [['overview', '档案概览', overview], ['learning', '学习轨迹', learning], ['followup', '跟进记录', followup]];
+  pageFrame('学员档案', `${escapeHtml(learner.name)} · 学员档案`, `<a class="button" href="/admin/pages/system/student-archive.html">返回学员档案</a>`, `<div class="profile-tabs"><div class="profile-tab-list" role="tablist">${tabs.map(([key, label], i) => `<button type="button" class="profile-tab${i === 0 ? ' is-active' : ''}" data-profile-tab="${key}" role="tab" aria-selected="${i === 0}">${label}</button>`).join('')}</div>${tabs.map(([key, , body], i) => `<div class="profile-panel${i === 0 ? ' is-active' : ''}" data-profile-panel="${key}" role="tabpanel">${body}</div>`).join('')}</div>`);
+  const tabButtons = systemRoot.querySelectorAll('[data-profile-tab]');
+  tabButtons.forEach((btn) => btn.addEventListener('click', () => {
+    tabButtons.forEach((b) => { b.classList.remove('is-active'); b.setAttribute('aria-selected', 'false'); });
+    systemRoot.querySelectorAll('[data-profile-panel]').forEach((p) => p.classList.remove('is-active'));
+    btn.classList.add('is-active'); btn.setAttribute('aria-selected', 'true');
+    systemRoot.querySelector('[data-profile-panel="' + btn.dataset.profileTab + '"]')?.classList.add('is-active');
+  }));
+}
+
 function openStudentUserToggle(account) {
   const disabling = account.status === '启用';
   const body = `<form id="student-user-toggle-form" class="system-dialog-grid"><p class="wide">将${disabling ? '禁用' : '启用'}账号“${escapeHtml(account.name)}”（${escapeHtml(account.accountNo)}）。${disabling ? '禁用后当前有效会话立即失效，关联学员和历史业务数据保留。' : '启用后账号可重新登录，不自动恢复旧会话。'}</p>${disabling ? '<label class="form-field wide"><span>禁用原因 *</span><textarea name="reason" aria-required="true" placeholder="请输入禁用原因"></textarea></label>' : ''}<p class="form-error wide" data-student-user-error hidden></p></form>`;
@@ -374,6 +482,8 @@ document.addEventListener('click', (event) => {
 });
 if (systemPage === 'users') renderUsers();
 if (systemPage === 'student-users') { loadStudentUserState(); const accountId = new URLSearchParams(window.location.search).get('accountId'); if (accountId) renderStudentUserDetail(studentUserAccounts.find((item) => item.id === accountId)); else renderStudentUsersV2(); }
+else if (systemPage === 'student-profile') { const learnerId = new URLSearchParams(window.location.search).get('learnerId'); renderStudentProfile(learnerId); }
+else if (systemPage === 'student-archive') { loadStudentUserState(); renderStudentArchive(); }
 if (systemPage === 'roles') renderRoles();
 // CR-2026-102：排课策略参数（教师转场最小间隔、跨校区额外预留）由参数配置维护；
 // 课表风险提示与排课／调整校验同源读取，时间轴等固定规则仍不在此配置。

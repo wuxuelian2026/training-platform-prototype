@@ -233,6 +233,33 @@ const defaultState = () => ({
     { id: 'student-002', accountId: 'account-001', name: '林知远', gender: '男', birthMonth: '2015-10', relation: '儿子' },
     { id: 'student-101', accountId: 'account-002', name: '周予安', gender: '女', birthMonth: '2016-06', relation: '女儿' }
   ],
+  // CR-P-001：以下四组均为【原型演示数据，全部虚构】，仅用于评审走查，不代表真实业务记录。
+  // 生产口径：线索跟进记录由服务端 CRM 按线索编号查询；关联关系由服务端保存人工确认结果与审计，
+  // 前端禁止按姓名、手机号等弱标识自动匹配（防止不同主体的 PII 串号）。
+  // leads 由 CRM 写入跟进时 upsertDemoRecord('leads', row) 追加；为空时档案侧读取 leadFollowUpBaseline 基线。
+  leads: [],
+  leadFollowUpBaseline: {
+    'CL20260908012': [
+      { at: '2026-09-08 10:30', method: '电话', content: '确认试听时间与校区，家长希望安排周五晚班', next: '2026-09-09 10:00', owner: '赵顾问' },
+      { at: '2026-09-09 15:20', method: '微信', content: '发送试听确认与报到须知，家长已确认参加', next: '2026-09-12 09:00', owner: '赵顾问' }
+    ],
+    'CL20260902005': [
+      { at: '2026-09-03 11:05', method: '面谈', content: '老学员进阶咨询：中国舞 L2 秋季进阶班', next: '2026-09-06 10:00', owner: '赵顾问' },
+      { at: '2026-09-06 16:40', method: '电话', content: '已说明进阶班课程安排，家长待确认报名时间', next: '—', owner: '赵顾问' }
+    ]
+  },
+  // 人工确认的「线索 ↔ 学员档案」绑定；一学员可绑多条线索，一条线索只绑一个学员。
+  leadLearnerBindings: [
+    { id: 'bind-001', leadId: 'lead-zhou', leadNo: 'CL20260908012', learnerId: 'learner-003', confirmedBy: '李教务', confirmedAt: '2026-09-12 10:00' },
+    { id: 'bind-002', leadId: 'lead-zhou-l2', leadNo: 'CL20260902005', learnerId: 'learner-003', confirmedBy: '李教务', confirmedAt: '2026-09-12 10:02' }
+  ],
+  leadBindingAudit: [],
+  // 人工确认的「班级名册学员 ↔ 学员档案」映射；两套 ID 不同源，禁止按姓名自动关联。
+  studentArchiveLinks: [
+    { studentId: 'student-001', learnerId: 'learner-001', confirmedBy: '李教务', confirmedAt: '2026-09-12 10:10' },
+    { studentId: 'student-002', learnerId: 'learner-002', confirmedBy: '李教务', confirmedAt: '2026-09-12 10:11' },
+    { studentId: 'student-101', learnerId: 'learner-003', confirmedBy: '李教务', confirmedAt: '2026-09-12 10:12' }
+  ],
   applications: [],
   courses: [],
   resources: [],
@@ -307,7 +334,20 @@ const DICTIONARY_FALLBACK = {
   course_difficulty: { label: '难度等级', kind: 'text', items: ['启蒙', '初级', '中级', '高级', '考级冲刺'] },
   suitable_age: { label: '适合年龄', kind: 'text', items: ['全年龄段', '少儿', '青少年', '成人'] },
   lesson_kind: { label: '课时类型', kind: 'text', items: ['理论', '示范', '练习', '综合'] },
-  lesson_duration: { label: '课时时长', kind: 'number', unit: '分钟', items: [45], defaultItem: 45 }
+  lesson_duration: { label: '课时时长', kind: 'number', unit: '分钟', items: [45], defaultItem: 45 },
+  // CR-2026-167：流失原因与转班原因分字典维护。
+  // 两者是不同性质：退班／退学是学员离开机构（真流失），转班只是在读班级变更（机构内留存），
+  // 因此不共用一个枚举——共用会让「流失原因」饼图混进转班原因，归因失真。
+  churn_reason: {
+    label: '流失原因',
+    kind: 'text',
+    items: ['上课时间冲突', '接送与距离不便', '兴趣转移', '课程难度不匹配', '教师或班级不适应', '教学效果未达预期', '家庭经济原因', '身体健康原因', '迁居外地', '其他']
+  },
+  transfer_reason: {
+    label: '转班原因',
+    kind: 'text',
+    items: ['上课时间冲突', '学习进度不匹配', '教师适配', '班级满员分流', '家长主动要求', '其他']
+  }
 };
 
 // CR-2026-155 C2：课时时长字典冻结——单节课固定 45 分钟，字典项不再随配置调整，

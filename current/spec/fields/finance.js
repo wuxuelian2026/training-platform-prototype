@@ -11,29 +11,36 @@ const FINANCE_FIELD_SPEC = {
     'finance/salary': {
       groups: [
         { heading: '工资查询字段', fields: [
-          { id: 'FD-FINANCE-013', label: '工资状态', type: '下拉', length: '全部 / 草稿 / 已发布', required: '否', note: '按工资单状态筛选' },
+          { id: 'FD-FINANCE-013', label: '工资状态', type: '下拉', length: '全部 / 草稿 / 已发布', required: '否', note: '按工资单状态筛选（CR-2026-170：草稿 / 已发布，已作废留痕可查）' },
           { id: 'FD-FINANCE-014', label: '工资月份', type: '月份', length: 'YYYY-MM', required: '否', note: '默认当前工资月份', constraints: { format: 'YYYY-MM' } },
           { id: 'FD-FINANCE-015', label: '教师姓名', type: '文本', length: '2–30 字', required: '否', note: '支持模糊搜索', constraints: { minLength: 2, maxLength: 30 } },
           { id: 'FD-FINANCE-016', label: '所属专业', type: '级联下拉', length: '系统目录', required: '否', note: '按专业筛选工资记录' }
         ] },
-        { heading: '工资详情与调整字段', fields: [
-          { id: 'FD-FINANCE-017', label: '教师姓名', type: '只读文本', length: '2–30 字', required: '系统', note: '工资单所属教师', constraints: { readOnly: true, system: true } },
-          { id: 'FD-FINANCE-018', label: '工资月份', type: '只读文本', length: 'YYYY-MM', required: '系统', note: '工资归属月份', constraints: { readOnly: true, system: true } },
-          { id: 'FD-FINANCE-019', label: '课次明细', type: '只读表格', length: '系统生成', required: '系统', note: '展示课程、课次数、课次费标准和小计', constraints: { readOnly: true, system: true } },
-          { id: 'FD-FINANCE-020', label: '合计课次', type: '只读数字', length: '非负整数', required: '系统', note: '有效计薪课次总数', constraints: { readOnly: true, system: true, integer: true, min: 0 } },
-          { id: 'FD-FINANCE-021', label: '应发工资', type: '只读金额', length: '金额', required: '系统', note: '按有效课次与生效合同费率计算', constraints: { readOnly: true, system: true } },
-          { id: 'FD-FINANCE-022', label: '调整金额', type: '金额', length: '金额', required: '否', note: '正数为补贴，负数为扣款；有值时必须填写调整原因' },
-          { id: 'FD-FINANCE-023', label: '调整原因', type: '文本', length: '≤ 200 字', required: '有调整金额时必填', note: '说明补贴或扣款依据', constraints: { maxLength: 200 } },
-          { id: 'FD-FINANCE-024', label: '实发工资', type: '只读金额', length: '金额', required: '系统', note: '应发工资加调整金额', constraints: { readOnly: true, system: true } },
-          { id: 'FD-FINANCE-025', label: '备注', type: '文本', length: '≤ 200 字', required: '否', note: '财务补充说明', constraints: { maxLength: 200 } },
-          { id: 'FD-FINANCE-026', label: '工资状态', type: '只读标签', length: '草稿 / 已发布', required: '系统', note: '发布后主单金额锁定', constraints: { readOnly: true, system: true } }
+        { heading: '工资单字段（CR-2026-170：金额由教务导入，课时由系统统计）', fields: [
+          { id: 'FD-FINANCE-017', label: '教师 / 工号', type: '只读文本', length: '2–30 字', required: '系统', note: '教师工号为导入唯一键组成部分', constraints: { readOnly: true, system: true } },
+          { id: 'FD-FINANCE-018', label: '工资月份', type: '只读文本', length: 'YYYY-MM', required: '系统', note: '工资归属月份，年月格式校验', constraints: { readOnly: true, system: true } },
+          { id: 'FD-FINANCE-019', label: '课时日明细', type: '只读表格', length: '系统生成', required: '系统', note: '按自然日归集（日期、课时、课程/班级）；日明细合计＝月度系统课时', constraints: { readOnly: true, system: true } },
+          { id: 'FD-FINANCE-020', label: '系统课时', type: '只读数字', length: '非负整数', required: '系统', note: '由排课与考勤自动统计（课时 = 有效课次数 × 连上节数）；次月 1 日锁定上月', constraints: { readOnly: true, system: true, integer: true, min: 0 } },
+          { id: 'FD-FINANCE-047', label: '课酬标准', type: '金额（导入）', length: '元/课时，2 位小数', required: '是', note: '教务导入；用于偏差勾稽（课时费 ÷ 系统课时 与标准的偏差 >5% 须填原因）', constraints: { min: 0, decimals: 2, source: 'import' } },
+          { id: 'FD-FINANCE-048', label: '课时费', type: '金额（导入）', length: '2 位小数', required: '是', note: '教务导入；与系统课时做勾稽比对', constraints: { min: 0, decimals: 2, source: 'import' } },
+          { id: 'FD-FINANCE-049', label: '其他', type: '金额（导入）', length: '2 位小数，可为负', required: '否', note: '其他调整（补贴/扣款合列）', constraints: { decimals: 2, source: 'import' } },
+          { id: 'FD-FINANCE-021', label: '应发', type: '金额（导入）', length: '2 位小数', required: '是', note: '教务导入，系统不自动算薪', constraints: { min: 0, decimals: 2, source: 'import' } },
+          { id: 'FD-FINANCE-050', label: '扣税', type: '金额（导入）', length: '2 位小数', required: '是', note: '教务导入', constraints: { min: 0, decimals: 2, source: 'import' } },
+          { id: 'FD-FINANCE-024', label: '实发', type: '金额（导入）', length: '2 位小数', required: '是', note: '教务导入；发布后金额锁定', constraints: { decimals: 2, source: 'import' } },
+          { id: 'FD-FINANCE-025', label: '备注', type: '文本', length: '≤ 200 字', required: '否', note: '教务导入随行备注，可写核对说明', constraints: { maxLength: 200, source: 'import' } },
+          { id: 'FD-FINANCE-051', label: '偏差原因', type: '文本', length: '≤ 200 字', required: '偏差 >5% 时必填', note: '导入预览中｜课时费 ÷ 系统课时 − 课酬标准｜÷ 课酬标准 > 5% 的行必填', constraints: { maxLength: 200 } },
+          { id: 'FD-FINANCE-052', label: '导入批次号', type: '只读文本', length: 'IMP+日期+序号', required: '系统', note: '批次留痕：批次号、月份、文件、操作人、时间、成功/失败/覆盖条数', constraints: { readOnly: true, system: true } },
+          { id: 'FD-FINANCE-026', label: '工资状态', type: '只读标签', length: '草稿 / 已发布 / 已作废', required: '系统', note: '草稿教师端不可见；发布后金额锁定；作废重发须填原因并留痕', constraints: { readOnly: true, system: true } }
         ] }
       ],
       notes: [
-        '每月 1 日生成上月工资草稿；工资按有效课次和课次结束时生效的合同费率计算。',
-        '发布前必须通过考勤、教学记录、合同费率和工资差异校验；阻断原因在列表与详情展示。',
-        '已发布工资不可直接覆盖，后续补差必须形成独立调整记录并保留审计。',
-        '教师端仅可查询已发布且属于本人的工资记录。'
+        'CR-2026-170：金额由教务按月导入（模板 9 列 = 教师工号 + 年月、课酬标准、课时费、其他、应发、扣税、实发、备注；无课时列），系统不自动算薪；合同不承载任何价格。',
+        '课时与课时日明细由系统从排课／考勤自动统计，按自然日归集；日明细合计＝月度系统课时；次月 1 日锁定上月，补录不追溯已发布工资单。',
+        '导入唯一键 = 教师工号 × 年月；重复导入命中草稿须二次确认覆盖并保留历史版本；命中已发布阻断（须先作废重发）；工号无当月系统课时的行阻断。',
+        '偏差勾稽：｜课时费 ÷ 系统课时 − 课酬标准｜÷ 课酬标准 > 5% 仅提示不阻断，但须填写偏差原因后放行；导入保存当时课时快照。',
+        '导入落草稿（教师端不可见）；发布为按钮级动作（二次确认：人数、实发金额合计、异常提示），发布后金额锁定；更正走作废重发（原因必填）或草稿覆盖重导，全量留痕。',
+        '课程单课时时长（45/60/90/120 四档）仅为排课属性，不参与任何计价；修改课程时长不影响任何已发布工资金额。',
+        '教师端仅可查询已发布且属于本人的工资记录，展示 8 字段＋系统课时与日明细展开，只读，无在线申诉入口（如有疑问请联系教务）。'
       ]
     },
     'finance/payments': {

@@ -1,5 +1,6 @@
-import { createElement, RefreshCw, Maximize, Minimize, ArrowLeft } from 'lucide';
+import { createElement, RefreshCw, Maximize, Minimize } from 'lucide';
 import { TIME_ZONE, academicYearStart, createDemoFacts, compareAcademicYears } from './visualization-data.js';
+import { createLearningFacts, aggregateLearning, REVIEW_DIMENSIONS } from './visualization-learning.js';
 import { incomeChartModel } from './visualization-chart.js';
 import { mountDashboardHelp } from './visualization-help.js';
 
@@ -11,7 +12,9 @@ const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({
 })[char]);
 const yearFilter = byId('academic-year-filter');
 const factsCache = new Map();
-const admissionsView = document.body.dataset.view === 'admissions';
+const learningCache = new Map();
+const view = document.body.dataset.view;
+const learningView = view === 'learning';
 
 function setMetric(id, value, unit) {
   byId(id).innerHTML = '<span>' + value + '</span><small>' + unit + '</small>';
@@ -159,7 +162,8 @@ function renderOverview(comparison) {
   mountRankingAutoScroll();
 }
 
-function renderAdmissions(data) {
+// CR-2026-169：招生三面板压成两块，并入「学情与招生」视图；口径仍取经营侧的对比结果。
+function renderAdmissionsPanels(data) {
   const conversion = data.admissionsConversion;
   setMetric('conversion-rate', conversion.rate === null ? '—' : (conversion.rate * 100).toFixed(1), conversion.rate === null ? '' : '%');
   setMetric('conversion-leads', format(conversion.leads), '条');
@@ -176,22 +180,118 @@ function renderAdmissions(data) {
     '<span>' + (row.future ? '—' : format(row.enrolled)) + '</span></div><span>' + row.label + '</span></div>').join('');
 }
 
+const percentText = value => (value === null || value === undefined ? '—' : value.toFixed(1) + '%');
+const starsText = value => '★★★★★'.slice(0, value) + '☆☆☆☆☆'.slice(0, Math.max(0, 5 - value));
+
+// 学情与招生：学情面板只读 learning 事实，招生面板只读经营侧对比结果；两者口径互不覆盖。
+function renderLearning(data, dashboard) {
+  const totals = data.totals;
+  setMetric('learn-students', format(totals.students), '人');
+  byId('learn-students-meta').textContent = '在读 ' + format(totals.enrollments) + ' 人次 · ' + format(totals.classes) + ' 个班';
+  setMetric('learn-attendance', percentText(totals.attendanceRate).replace('%', ''), totals.attendanceRate === null ? '' : '%');
+  byId('learn-attendance-meta').textContent = '有效出勤 ' + format(totals.attendancePresent) + ' / 应出勤 ' + format(totals.attendanceExpected) + ' 课次';
+  setMetric('learn-homework', percentText(totals.homeworkRate).replace('%', ''), totals.homeworkRate === null ? '' : '%');
+  byId('learn-homework-meta').textContent = '已交 ' + format(totals.homeworkSubmitted) + ' / 应交 ' + format(totals.homeworkExpected) + ' 份';
+  setMetric('learn-review', percentText(totals.participation).replace('%', ''), totals.participation === null ? '' : '%');
+  byId('learn-review-meta').textContent = '已评 ' + format(totals.reviewCount) + ' / 应评 ' + format(totals.reviewBase) +
+    ' · 课程均分 ' + (totals.courseRating ?? '—') + ' 星';
+  const conversion = dashboard.admissionsConversion;
+  setMetric('learn-conversion', conversion.rate === null ? '—' : (conversion.rate * 100).toFixed(1), conversion.rate === null ? '' : '%');
+  byId('learn-conversion-meta').textContent = '已转化 ' + format(conversion.converted) + ' / 新增 ' + format(conversion.leads) + ' 条';
+  setMetric('learn-churn', percentText(totals.churnRate).replace('%', ''), totals.churnRate === null ? '' : '%');
+  byId('learn-churn-meta').textContent = '流失 ' + format(totals.churnCount) + ' / 在册 ' + format(totals.churnBase) + ' 人次';
+
+  byId('watch-list').innerHTML = data.watchlist.length ? data.watchlist.map(row =>
+    '<tr><td><span class="cell-main">' + escapeHtml(row.name) + '</span><span class="cell-sub">' +
+    escapeHtml(row.className) + ' · ' + escapeHtml(row.reason) + '</span></td><td class="cell-alert">' +
+    row.attendanceRate.toFixed(0) + '%</td><td class="cell-alert">' + row.homeworkRate.toFixed(0) + '%</td></tr>').join('')
+    : '<tr><td colspan="3" class="empty-cell">暂无综合分低于 70 的学员</td></tr>';
+  byId('watch-scope').textContent = 'Top10 · 共 ' + format(totals.warning) + ' 人';
+
+  byId('course-learning').innerHTML = data.courses.map(row =>
+    '<tr><td><span class="cell-main" title="' + escapeHtml(row.name) + ' · ' + escapeHtml(row.major) +
+    ' · 进度 ' + percentText(row.progressRate) + '">' + escapeHtml(row.name) + '</span></td><td>' + format(row.students) +
+    '</td><td>' + percentText(row.attendanceRate) + '</td><td>' + percentText(row.homeworkRate) + '</td></tr>').join('');
+
+  byId('teacher-quality').innerHTML = data.teachers.map((row, index) =>
+    '<tr><td><span class="rank-name-line"><span class="rank-number">' + (index + 1) + '</span><span class="cell-main">' +
+    escapeHtml(row.name) + '</span></span><span class="cell-sub">短板 · ' + escapeHtml(row.weak) + '</span></td><td class="rank-value">' +
+    (row.rating === null ? '—' : row.score.toFixed(1)) + '</td><td>' + percentText(row.attendanceRate) + '</td><td>' +
+    percentText(row.homeworkRate) + '</td><td>' + (row.rating === null ? '—' : row.rating.toFixed(1)) + '</td></tr>').join('');
+
+  const review = data.review;
+  byId('review-scope').textContent = '参评率 ' + percentText(review.participation);
+  byId('review-summary').innerHTML = '<span>课程评分 <b>' + (review.courseRating ?? '—') + '</b><small>星</small></span>' +
+    '<span>教师评分 <b>' + (review.teacherRating ?? '—') + '</b><small>星</small></span>' +
+    '<span class="review-count">已评 ' + format(review.count) + ' / 应评 ' + format(review.base) +
+    ' · 带文本 ' + percentText(review.textRate) + '</span>';
+  byId('review-dims').innerHTML = REVIEW_DIMENSIONS.map(({ key, label }) => {
+    const row = review.dimensions.find(item => item.key === key) || { value: null };
+    return '<div class="dim-row"><span>' + label + '</span><div class="dim-bar"><i style="width:' +
+      ((row.value ?? 0) / 5 * 100).toFixed(1) + '%"></i></div><b>' + (row.value === null ? '—' : row.value.toFixed(1)) + '</b></div>';
+  }).join('');
+  const starTotal = review.distribution.reduce((total, row) => total + row.count, 0);
+  byId('review-stars').innerHTML = starTotal ? '<div class="star-bar" aria-label="' +
+    review.distribution.map(row => row.stars + '星 ' + row.count + ' 条').join('，') + '">' +
+    review.distribution.map(row => row.count ? '<i class="star-band star-' + row.stars + '" style="width:' +
+      (row.count / starTotal * 100).toFixed(1) + '%"></i>' : '').join('') + '</div>' +
+    '<div class="star-legend">' + review.distribution.map(row => '<span><i class="star-' + row.stars + '"></i>' +
+      row.stars + '星<b>' + row.count + '</b></span>').join('') + '</div>'
+    : '<span class="review-empty">暂无班级评价</span>';
+
+  byId('churn-scope').textContent = '流失 ' + format(data.churn.count) + ' 人次';
+  byId('churn-summary').innerHTML = '<div class="churn-rate"><b>' + percentText(data.churn.rate).replace('%', '') +
+    '</b><small>%</small><span>期间流失率</span></div><div class="churn-facts"><span>在册 ' + format(data.churn.base) +
+    ' 人次</span><span>需关注学员 ' + format(totals.warning) + ' 人</span></div>';
+  const reasonMax = Math.max(1, ...data.churn.reasons.map(row => row.count));
+  byId('churn-reasons').innerHTML = data.churn.reasons.length ? data.churn.reasons.map(row =>
+    '<div class="reason-row" title="' + escapeHtml(row.name) + '：' + row.count + ' 人次，占 ' + percentText(row.share) + '">' +
+    '<span>' + escapeHtml(row.name) + '</span><div class="reason-bar"><i style="width:' + (row.count / reasonMax * 100).toFixed(1) +
+    '%"></i></div><b>' + row.count + '</b><small>' + percentText(row.share) + '</small></div>').join('')
+    : '<p class="review-empty">统计期内无流失记录</p>';
+
+  byId('churn-top-courses').innerHTML = data.churn.topCourses.length
+    ? data.churn.topCourses.map(row =>
+        '<tr><td><span class="cell-main" title="' + escapeHtml(row.name) + '">' + escapeHtml(row.name) + '</span></td><td>' +
+        format(row.count) + '</td><td>' + format(row.base) + '</td><td>' + percentText(row.rate) + '</td></tr>').join('')
+    : '<tr><td colspan="4" class="empty-cell">统计期内暂无流失记录</td></tr>';
+
+  byId('feedback-list').innerHTML = review.low.length ? review.low.map(row =>
+    '<figure class="feedback-card"><div class="feedback-stars">' + starsText(row.courseRating) +
+    '<span>' + row.lowest + ' 星短板</span></div><blockquote>' + escapeHtml(row.text) + '</blockquote>' +
+    '<figcaption>' + escapeHtml(row.studentName) + '家长 · ' + escapeHtml(row.className) + ' · ' +
+    escapeHtml(row.teacher) + '</figcaption></figure>').join('')
+    : '<p class="review-empty">暂无带文本的低分评价</p>';
+  renderAdmissionsPanels(dashboard);
+}
+
 function renderDashboard() {
   const now = new Date();
   const year = Number(yearFilter.value);
   if (!factsCache.has(year)) factsCache.set(year, createDemoFacts(year));
-  const comparison = compareAcademicYears(factsCache.get(year), year, now);
-  const data = comparison.current;
-  byId('academic-range').textContent = data.period.startDate.replaceAll('-', '.') + ' - ' + data.period.endDate.replaceAll('-', '.');
-  byId('as-of').textContent = '截至 ' + data.period.cutoffDate.replaceAll('-', '.');
-  byId('scope').textContent = '演示数据 · ' + data.period.label + '学年 · 全部校区';
+  const facts = factsCache.get(year);
+  const comparison = compareAcademicYears(facts, year, now);
+  let period = comparison.current.period;
+  if (learningView) {
+    const key = year + '#' + now.toISOString().slice(0, 10);
+    if (!learningCache.has(key)) learningCache.set(key, aggregateLearning(createLearningFacts(facts, year, now)));
+    const data = learningCache.get(key);
+    period = data.period;
+    renderLearning(data, comparison.current);
+  } else {
+    renderOverview(comparison);
+  }
+  document.querySelectorAll('.learning-grid .lp-cell:not([hidden]) .rank-scroll').forEach(node => { node.scrollTop = 0; });
+  byId('academic-range').textContent = period.startDate.replaceAll('-', '.') + ' - ' + period.endDate.replaceAll('-', '.');
+  byId('as-of').textContent = '截至 ' + period.cutoffDate.replaceAll('-', '.');
+  byId('scope').textContent = '演示数据 · ' + period.label + '学年 · 全部校区';
   byId('updated').textContent = '更新于 ' + new Intl.DateTimeFormat('zh-CN', { timeZone: TIME_ZONE, timeStyle: 'medium' }).format(now);
-  if (admissionsView) byId('analysis-link').href = './index.html?year=' + year;
+  document.querySelectorAll('[data-page]').forEach(link => {
+    link.href = './' + link.dataset.page + '?year=' + year;
+  });
   const url = new URL(window.location.href);
   url.searchParams.set('year', year);
   window.history.replaceState(null, '', url);
-  if (admissionsView) renderAdmissions(data);
-  else renderOverview(comparison);
 }
 
 function setIcon(id, icon) {
@@ -204,7 +304,6 @@ yearFilter.innerHTML = availableYears.map(year =>
   '<option value="' + year + '">' + year + '</option>').join('');
 setIcon('refresh', RefreshCw);
 setIcon('fullscreen', Maximize);
-if (admissionsView) setIcon('navigation-icon', ArrowLeft);
 const requestedYear = Number(new URLSearchParams(window.location.search).get('year'));
 yearFilter.value = String(availableYears.includes(requestedYear) ? requestedYear : currentYear);
 yearFilter.addEventListener('change', renderDashboard);
@@ -223,5 +322,35 @@ byId('fullscreen').addEventListener('click', async () => {
     byId('updated').textContent = '当前窗口暂不支持全屏';
   }
 });
-mountDashboardHelp();
+// 排行列表超出可视高度时自动循环滚动；悬停／聚焦暂停，打印与降低动态效果时不启动。
+// ?scroll=0 可关闭，便于静态截图与验收。
+function mountAutoScroll() {
+  if (!learningView) return;
+  if (new URLSearchParams(window.location.search).get('scroll') === '0') return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('.learning-grid .lp-cell:not([hidden]) .rank-scroll').forEach(node => {
+    let paused = false;
+    let hold = 0;
+    const tick = () => {
+      if (paused || document.hidden) return;
+      const max = node.scrollHeight - node.clientHeight;
+      if (max <= 4) return;
+      if (hold > 0) { hold -= 50; return; }
+      if (node.scrollTop >= max - 0.5) { node.scrollTop = 0; hold = 1200; return; }
+      node.scrollTop = Math.min(max, node.scrollTop + 0.7);
+    };
+    node.addEventListener('mouseenter', () => { paused = true; });
+    node.addEventListener('mouseleave', () => { paused = false; });
+    node.addEventListener('focusin', () => { paused = true; });
+    node.addEventListener('focusout', () => { paused = false; });
+    setTimeout(() => setInterval(tick, 50), 1800);
+  });
+}
+
+mountDashboardHelp(view);
+if (learningView) {
+  // 顶部「导出报告」走浏览器打印，配合 CSS 打印样式输出一页报告；口径说明复用「页面说明」按钮，不引入服务端导出依赖。
+  byId('export-report').addEventListener('click', () => window.print());
+}
 renderDashboard();
+mountAutoScroll();

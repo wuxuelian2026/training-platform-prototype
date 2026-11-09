@@ -187,7 +187,6 @@ const TEACHER_FIELD_SPEC = {
           { id: 'FD-TEACHER-041', label: '工作校区', type: '下拉', length: '预置校区', required: '是', note: '合同约定的服务校区', constraints: { dictionary: '校区' } },
           { id: 'FD-TEACHER-042', label: '合同起始日期', type: '日期', length: 'YYYY-MM-DD', required: '是', note: '合同生效日期', constraints: { format: 'YYYY-MM-DD' } },
           { id: 'FD-TEACHER-043', label: '合同截止日期', type: '日期', length: 'YYYY-MM-DD', required: '是', note: '需晚于起始日期', constraints: { format: 'YYYY-MM-DD', afterField: 'FD-TEACHER-042' } },
-          { id: 'FD-TEACHER-044', label: '课时费标准', type: '金额', length: '大于 0', required: '是', note: '每课次含税单价，用于工资核算', constraints: { exclusiveMin: 0, decimals: 2 } },
           { id: 'FD-TEACHER-045', label: '无固定期限', type: '开关', length: '是 / 否', required: '否', note: '开启后合同截止日期不作为必填', constraints: { boolean: true, whenOn: 'FD-TEACHER-043' } },
           { id: 'FD-TEACHER-049', label: '合同状态', type: '只读', length: '2 个状态值', required: '系统计算', note: '发起合同时上传已签字盖章的最终版 PDF 后直接为已签署；终止后为已终止（终态）', constraints: { system: true, readOnly: true, options: ['已签署 signed', '已终止 terminated'] } },
           { id: 'FD-TEACHER-065', label: '期限状态', type: '只读', length: '3 个派生值', required: '系统计算', note: '按合同起止日期派生：有效 active／即将到期 expiring／已到期 expired；不设「未生效」，未到起始日期按有效计算', constraints: { system: true, readOnly: true, derived: true, options: ['有效 active', '即将到期 expiring', '已到期 expired'] } },
@@ -199,7 +198,7 @@ const TEACHER_FIELD_SPEC = {
       notes: [
         '一份合同可以覆盖多门课程；同一教师对同一课程在同一时段只允许一份生效合同。',
         '后续申报通过新课程时，由后台针对该课程另行发起合同补充，不在已推送或已生效的合同上追加课程。',
-        '教师工资按课次数乘以合同约定的每课次含税单价计算。',
+        'CR-2026-170：合同不承载价格信息，课酬标准以已签章 PDF 约定为准；工资金额由教务按月导入，系统不自动算薪。',
         '续签基于原合同带入信息，生成新合同编号，原合同不被覆盖。',
         '终止须记录原因及生效日期，两端同步，已完成课次和历史计薪保留。',
         '合同文件由后台发起合同时直接上传已签字盖章的最终版 PDF，不再经过教师签署、学校签署或签署截止日期流程。',

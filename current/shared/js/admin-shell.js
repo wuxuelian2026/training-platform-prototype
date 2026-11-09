@@ -74,6 +74,14 @@ const navGroups = [
     ]
   },
   {
+    // 学员中心：承接学员域菜单（学员用户管理 / 学员档案）。
+    // CR-P-001：按产品裁定上移到「CRM管理」正下方，让「线索 → 学员档案」链路在侧边栏相邻。
+    icon: '员', label: '学员中心', items: [
+      ['学', '学员用户管理', '/admin/pages/system/student-users.html', 'system'],
+      ['档', '学员档案', '/admin/pages/system/student-archive.html', 'system']
+    ]
+  },
+  {
     icon: '营', label: '招生营销', items: [
       ['礼', '分享有礼活动', '/admin/pages/marketing/activity.html', 'marketing'],
       ['裂', '裂变营销记录', '/admin/pages/marketing/records.html', 'marketing']
@@ -96,6 +104,8 @@ const navGroups = [
       ['报', '学习报告管理', '/admin/pages/academic/reports.html', 'academic']
       ,['证', '结业证书', '/admin/pages/academic/certificates.html', 'academic']
       ,['评', '评价管理', '/admin/pages/academic/reviews.html', 'academic']
+      // CR-家校互动 v1.1：纯人工留言 + 通知，挂在教务执行监管下，不新建一级模块。
+      ,['校', '家校沟通监管', '/admin/pages/academic/home-school.html', 'academic']
     ]
   },
   {
@@ -114,7 +124,6 @@ const navGroups = [
   {
     icon: '设', label: '系统管理', items: [
       ['用', '后台用户管理', '/admin/pages/system/users.html', 'system'],
-      ['学', '学员用户管理', '/admin/pages/system/student-users.html', 'system'],
       ['权', '角色权限管理', '/admin/pages/system/roles.html', 'system'],
       ['典', '数据字典', '/admin/pages/system/dictionaries.html', 'system'],
       ['参', '参数配置', '/admin/pages/system/settings.html', 'system']

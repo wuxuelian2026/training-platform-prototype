@@ -2,7 +2,7 @@
   const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
   const __classicExports = {};
   const __classicRequire = (id) => __classicModules[id];
-const { demoId, demoTime, readDemoState, removeDemoRecord, resetDemoData, subscribeDemoState, updateDemoRecord, upsertDemoRecord } = __classicRequire("shared/js/demo-store.js");
+const { demoId, demoTime, dictionaryItems, readDemoState, removeDemoRecord, resetDemoData, subscribeDemoState, updateDemoRecord, upsertDemoRecord } = __classicRequire("shared/js/demo-store.js");
 const { DEMO_TODAY } = __classicRequire("shared/js/demo-clock.js");
 const { cloneClassSeed } = __classicRequire("shared/js/class-seed.js");
 const { cloneBatchSeed } = __classicRequire("shared/js/batch-seed.js");
@@ -20,6 +20,8 @@ const { REFUND_ORIGIN, classRefundSuggestion, createRefundRequest, openRefundFor
 // CR-2026-155 C10：班级详情「学员与记录」的考勤率／作业提交率按已上课次聚合，取数口径与教师端、
 // 课次详情同源（lesson-records 单一口径）；该模块仅班级管理页加载，未加载时按「—」兜底，不报错。
 const lessonRecordsModule = () => __classicRequire("shared/js/lesson-records.js");
+// 线索到期标签与线索↔档案的关联登记。
+const followupsApi = () => __classicRequire("shared/js/followups.js") || {};
 
 const businessRoot = document.querySelector('[data-business-page]');
 const businessPage = businessRoot?.dataset.businessPage;
@@ -109,7 +111,16 @@ const dataSets = {
     { id: 'trial-he', leadNo: 'CL20260905003', student: '何安', phone: '137****3130', course: '少儿美术启蒙班', time: '2026-09-15 18:30', campus: '南湖校区', status: '已确认', source: '转介绍', owner: '赵顾问' }
   ],
   leads: [
-    { id: 'lead-zhou', number: 'CL20260908012', student: '周女士', phone: '139****8612', course: '少儿中国舞基础班', source: '线上咨询', status: '已跟进', next: '2026-09-09', owner: '赵顾问', followUps: [] },
+    // CR-P-001：演示跟进记录（虚构）与 demo-store 的 leadFollowUpBaseline 保持一致，
+    // 保证「CRM 线索详情」与「学员档案只读投影」两处口径一致；真实写入仍以 CRM 为准。
+    { id: 'lead-zhou', number: 'CL20260908012', student: '周女士', phone: '139****8612', course: '少儿中国舞基础班', source: '线上咨询', status: '已跟进', next: '2026-09-09', owner: '赵顾问', followUps: [
+      { at: '2026-09-08 10:30', method: '电话', content: '确认试听时间与校区，家长希望安排周五晚班', next: '2026-09-09 10:00', owner: '赵顾问' },
+      { at: '2026-09-09 15:20', method: '微信', content: '发送试听确认与报到须知，家长已确认参加', next: '2026-09-12 09:00', owner: '赵顾问' }
+    ] },
+    { id: 'lead-zhou-l2', number: 'CL20260902005', student: '周女士', phone: '139****8612', course: '少儿中国舞 L2（进阶咨询）', source: '老学员咨询', status: '已跟进', next: '—', owner: '赵顾问', followUps: [
+      { at: '2026-09-03 11:05', method: '面谈', content: '老学员进阶咨询：中国舞 L2 秋季进阶班', next: '2026-09-06 10:00', owner: '赵顾问' },
+      { at: '2026-09-06 16:40', method: '电话', content: '已说明进阶班课程安排，家长待确认报名时间', next: '—', owner: '赵顾问' }
+    ] },
     { id: 'lead-li', number: 'CL20260907008', student: '李先生', phone: '138****5541', course: '成人声乐班', source: '后台登记', status: '已跟进', next: '2026-09-12', owner: '赵顾问' },
     { id: 'lead-he', number: 'CL20260905003', student: '何女士', phone: '137****3130', course: '少儿国画入门', source: '转介绍', status: '已转化', next: '—', owner: '赵顾问', intentCourseId: 'COURSE-CR-2026-0003', intentCourseName: '少儿国画入门', intentClassId: 'class-mock-enrolling-01', intentClassName: '秋季少儿国画招生中1班', intentTeacherName: '李青', classId: 'class-mock-enrolling-01', className: '秋季少儿国画招生中1班', teacherName: '李青', intentRemark: '希望安排周末班。' },
     { id: 'lead-sun', number: 'CL20260904006', student: '孙先生', phone: '136****7192', course: '中国画基础', source: '活动', status: '已流失', next: '—', owner: '赵顾问' }
@@ -1080,7 +1091,7 @@ function renderLeads() {
   });
   // CR-2026-038：线索状态按首次有效跟进收口为待跟进／已跟进／已转化／已流失。
   const leadMetrics = (list) => metricCards([['待跟进', list.filter((row) => row.status === '待跟进').length, '尚未完成首次有效跟进'], ['已跟进', list.filter((row) => row.status === '已跟进').length, '已完成至少一次有效跟进'], ['已转化', list.filter((row) => row.status === '已转化').length, '已生成报名结果'], ['已流失', list.filter((row) => row.status === '已流失').length, '保留历史记录', list.length ? Math.round((list.filter((row) => row.status === '已流失').length / list.length) * 100) : 0]]);
-  // CR-2026-152：报名转化不再独立成页，漏斗与转化率作为线索跟进页顶部的只读派生区。
+  // CR-2026-152：报名转化不再独立成页，漏斗与转化率展示在线索跟进页顶部。
   const conversions = derivedConversions();
   const convertedCount = conversions.filter((row) => row.status === '已报名').length;
   const attendedCount = conversions.filter((row) => row.trial === '已试听').length;
@@ -1089,9 +1100,9 @@ function renderLeads() {
   const funnelBase = conversions.length || 1;
   const funnelSteps = [['当前线索', conversions.length], ['有效跟进', followedCount], ['已试听', attendedCount], ['已报名', convertedCount]];
   const funnel = funnelSteps.map(([label, count], index) => `<div class="crm-funnel-step"><div class="crm-funnel-head"><strong>${label}</strong><span>${count} · ${Math.round((count / funnelBase) * 100)}%</span></div><div class="crm-funnel-bar"><span style="width:${Math.round((count / funnelBase) * 100)}%"></span></div>${index ? `<small>较上一阶段 ${funnelSteps[index - 1][1] ? Math.round((count / funnelSteps[index - 1][1]) * 100) : 0}%</small>` : '<small>统计基准</small>'}</div>`).join('');
-  const funnelSection = `<section class="crm-funnel"><div class="crm-funnel-title"><h3>报名转化漏斗</h3><span>只读派生统计 · 报名转化率 ${conversionRate}</span></div><p>按当前全部线索、跟进、试听和有效报名事实实时计算，不单独维护数据与状态；待支付、已取消、退款中、已退款订单不计入已报名。</p><div class="crm-funnel-grid">${funnel}</div></section>`;
+  const funnelSection = `<section class="crm-funnel"><div class="crm-funnel-title"><h3>报名转化漏斗</h3><span>报名转化率 ${conversionRate}</span></div><div class="crm-funnel-grid">${funnel}</div></section>`;
   pageFrame('线索跟进', '', '<button class="button" data-business-action="lead-export">导出线索与转化</button><button class="button primary" data-business-action="lead-create">新增线索</button>', leadMetrics(businessData) + funnelSection + filterPanel('lead-filter', selectField('线索状态', 'status', ['待跟进', '已跟进', '已转化', '已流失']) + selectField('来源类型', 'source', leadSources) + selectField('线索标签', 'tag', LEAD_TAG_OPTIONS) + inputField('关键词', 'keyword', '学员姓名 / 手机号', true)) + table('<thead><tr><th>线索编号</th><th>联系人</th><th>手机号</th><th>意向课程</th><th>关联班级</th><th>关联教师</th><th>来源</th><th>线索状态</th><th>标签</th><th>下次跟进</th><th>负责人</th><th>操作</th></tr></thead>'));
-  const rows = (row) => `<td>${escapeHtml(row.number)}</td><td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.phone)}</td><td>${escapeHtml(row.course || row.intentCourseName || '—')}</td><td>${escapeHtml(row.className || row.intentClassName || '未指定')}</td><td>${escapeHtml(row.teacherName || row.intentTeacherName || '未指定')}</td><td>${escapeHtml(row.source)}</td><td>${tag(row.status)}</td><td><div class="crm-lead-tags">${leadTagsDisplay(row)}</div></td><td>${escapeHtml(row.next)}</td><td>${escapeHtml(row.owner)}</td><td class="action-cell"><button class="text-button" data-perm="PERM-CRM-005" data-business-action="lead-edit">编辑线索</button><button class="text-button" data-business-action="lead-follow">填写跟进</button>${['待跟进', '已跟进'].includes(row.status) ? '<button class="text-button" data-business-action="lead-trial">转为试听</button>' : ''}${row.status === '已流失' ? '<button class="text-button" data-business-action="lead-reactivate">重新激活</button>' : ''}<button class="text-button" data-business-action="lead-view">查看</button></td>`;
+  const rows = (row) => `<td>${escapeHtml(row.number)}</td><td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.phone)}</td><td>${escapeHtml(row.course || row.intentCourseName || '—')}</td><td>${escapeHtml(row.className || row.intentClassName || '未指定')}</td><td>${escapeHtml(row.teacherName || row.intentTeacherName || '未指定')}</td><td>${escapeHtml(row.source)}</td><td>${tag(row.status)}</td><td><div class="crm-lead-tags">${leadTagsDisplay(row)}</div></td><td>${followupsApi().leadReminderHtml?.(row) || escapeHtml(row.next)}</td><td>${escapeHtml(row.owner)}</td><td class="action-cell"><button class="text-button" data-perm="PERM-CRM-005" data-business-action="lead-edit">编辑线索</button><button class="text-button" data-business-action="lead-follow">填写跟进</button>${['待跟进', '已跟进'].includes(row.status) ? '<button class="text-button" data-business-action="lead-trial">转为试听</button>' : ''}${row.status === '已流失' ? '<button class="text-button" data-business-action="lead-reactivate">重新激活</button>' : ''}<button class="text-button" data-business-action="lead-view">查看</button></td>`;
   renderRows(businessData, rows, () => true);
   document.querySelector('#lead-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const { status, source, tag: tagField, keyword } = event.currentTarget; renderRows(businessData, rows, (row) => (!status.value || row.status === status.value) && (!source.value || row.source === source.value) && (!tagField.value || leadTagsOf(row).includes(tagField.value)) && (!keyword.value.trim() || `${row.student}${row.phone}`.includes(keyword.value.trim()))); });
 }
@@ -1277,10 +1288,11 @@ function openClassDetail(row) {
   const shared = readDemoState();
   const enrollments = (shared.enrollments || []).filter(item => item.classId === row.id && item.status === '已分班');
   const students = shared.students || [];
-  const roster = enrollments.length ? enrollments.map(item => { const student = students.find(entry => entry.id === item.studentId); return `<tr><td>${escapeHtml(student?.name || item.studentId)}</td><td>${escapeHtml(item.enrolledAt || '—')}</td><td>已分班</td></tr>`; }).join('') : '<tr><td colspan="3">暂无学员报名</td></tr>';
+  // CR-P-001：班级名册 studentId 与档案 learnerId 不同源，只认人工确认映射；未建档不按姓名猜测。
+  const roster = enrollments.length ? enrollments.map(item => { const student = students.find(entry => entry.id === item.studentId); const archiveLink = followupsApi().studentArchiveLinkHtml?.(item.studentId) || '<span class="muted">未建档</span>'; return `<tr><td>${escapeHtml(student?.name || item.studentId)}</td><td>${escapeHtml(item.enrolledAt || '—')}</td><td>已分班</td><td>${archiveLink}</td></tr>`; }).join('') : '<tr><td colspan="4">暂无学员报名</td></tr>';
   const sessions = Array.isArray(row.sessions) ? row.sessions : [];
   const projection = classStageProjection(row);
-  const body = `${workspaceTabs([['overview', '班级与招生'], ['course', '关联课程'], ['display', '展示信息'], ['teaching', '状态与教学'], ['students', '学员与记录']], 'overview')}<section data-workspace-panel="overview" class="sales-workspace-panel">${readonlyRows([['班级名称', row.name], ['所属批次', batchNameForClass(row)], ['招生容量', row.capacity || 0], ['课程定价', `¥${row.price}`], ['是否支持试听', row.trialEnabled || '是'], ['试听是否收费', row.trialFee || '否'], ['试听价格', row.trialFee === '是' ? `¥${row.trialPrice || 0}` : '免费'], ['试听说明', row.trialNote || '—'], ['报名开始时间', row.enrollStart || '—'], ['报名截止时间', row.deadline || '—'], ['班级状态', deriveClassStatus(row)]])}</section><section data-workspace-panel="course" class="sales-workspace-panel" hidden>${readonlyRows([['关联课程', row.course]])}${courseReadonlyContent(course)}</section><section data-workspace-panel="display" class="sales-workspace-panel" hidden>${saleUnitDisplayReadonly(row)}</section><section data-workspace-panel="teaching" class="sales-workspace-panel" hidden>${readonlyRows([['班级编号', row.id], ['排课状态', projection.scheduleStatus], ['招生状态', projection.enrollmentStatus], ['教学状态', projection.teachingStatus], ['展示状态', projection.displayStatus], ['名额已满', projection.capacityStatus], ['报名条件', classEnrollmentCondition(row)], ['授课教师', row.teacher], ['校区', row.campus], ['教室', row.classroom], ['上课规则', row.schedule], ['首次上课', row.firstLessonDate || '—'], ['课次时长', `${row.lessonDuration || defaultLessonDuration()} 分钟`], ['已生成课次', sessions.length], ['排班版本', `v${row.scheduleVersion || 0}`]])}<button type="button" class="text-button" data-business-action="schedule-history">查看排班版本历史</button></section><section data-workspace-panel="students" class="sales-workspace-panel" hidden><div class="sales-dialog-summary"><div><span>已报名</span><strong>${row.enrolled || 0}</strong></div><div><span>招生容量</span><strong>${row.capacity || 0}</strong></div><div><span>剩余名额</span><strong>${Math.max(0, Number(row.capacity || 0) - Number(row.enrolled || 0))}</strong></div></div><div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>状态</th></tr></thead><tbody>${roster}</tbody></table></div></section>`;
+  const body = `${workspaceTabs([['overview', '班级与招生'], ['course', '关联课程'], ['display', '展示信息'], ['teaching', '状态与教学'], ['students', '学员与记录']], 'overview')}<section data-workspace-panel="overview" class="sales-workspace-panel">${readonlyRows([['班级名称', row.name], ['所属批次', batchNameForClass(row)], ['招生容量', row.capacity || 0], ['课程定价', `¥${row.price}`], ['是否支持试听', row.trialEnabled || '是'], ['试听是否收费', row.trialFee || '否'], ['试听价格', row.trialFee === '是' ? `¥${row.trialPrice || 0}` : '免费'], ['试听说明', row.trialNote || '—'], ['报名开始时间', row.enrollStart || '—'], ['报名截止时间', row.deadline || '—'], ['班级状态', deriveClassStatus(row)]])}</section><section data-workspace-panel="course" class="sales-workspace-panel" hidden>${readonlyRows([['关联课程', row.course]])}${courseReadonlyContent(course)}</section><section data-workspace-panel="display" class="sales-workspace-panel" hidden>${saleUnitDisplayReadonly(row)}</section><section data-workspace-panel="teaching" class="sales-workspace-panel" hidden>${readonlyRows([['班级编号', row.id], ['排课状态', projection.scheduleStatus], ['招生状态', projection.enrollmentStatus], ['教学状态', projection.teachingStatus], ['展示状态', projection.displayStatus], ['名额已满', projection.capacityStatus], ['报名条件', classEnrollmentCondition(row)], ['授课教师', row.teacher], ['校区', row.campus], ['教室', row.classroom], ['上课规则', row.schedule], ['首次上课', row.firstLessonDate || '—'], ['课次时长', `${row.lessonDuration || defaultLessonDuration()} 分钟`], ['已生成课次', sessions.length], ['排班版本', `v${row.scheduleVersion || 0}`]])}<button type="button" class="text-button" data-business-action="schedule-history">查看排班版本历史</button></section><section data-workspace-panel="students" class="sales-workspace-panel" hidden><div class="sales-dialog-summary"><div><span>已报名</span><strong>${row.enrolled || 0}</strong></div><div><span>招生容量</span><strong>${row.capacity || 0}</strong></div><div><span>剩余名额</span><strong>${Math.max(0, Number(row.capacity || 0) - Number(row.enrolled || 0))}</strong></div></div><div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>状态</th><th>学员档案</th></tr></thead><tbody>${roster}</tbody></table></div></section>`;
   const scheduleAction = projection.scheduleStatus !== '已完成'
     ? `<button type="button" class="button primary" data-class-schedule-mode="create">去排课</button>`
     : `<button type="button" class="button" data-class-schedule-mode="view">排班查看</button>${classScheduleChangeAllowed(row) ? '<button type="button" class="button primary" data-class-schedule-mode="change">排班变更</button>' : ''}`;
@@ -1354,13 +1366,25 @@ function openTrialForm() {
 function openLeadDetail(row) {
   const trials = dataSets.trials.filter((item) => item.leadNo === row.number);
   const order = leadOrderOf(row);
-  const facts = [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course || row.intentCourseName], ['关联班级', row.className || row.intentClassName || '未指定'], ['关联教师', row.teacherName || row.intentTeacherName || '未指定'], ['意向备注', row.intentRemark || '—'], ['来源', row.source], ['线索状态', row.status], ['下次跟进', row.next], ['负责人', row.owner]];
-  const factRows = facts.map(([label, value]) => `<div><span>${label}</span><strong>${label.includes('状态') ? tag(value) : escapeHtml(String(value ?? '—'))}</strong></div>`).join('');
+  const facts = [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course || row.intentCourseName], ['关联班级', row.className || row.intentClassName || '未指定'], ['关联教师', row.teacherName || row.intentTeacherName || '未指定'], ['意向备注', row.intentRemark || '—'], ['来源', row.source], ['线索状态', row.status], ['下次跟进', row.next], ['负责人', row.owner], ['关联学员档案', followupsApi().leadBindingHtml?.(row) || '未建档']];
+  const factRows = facts.map(([label, value]) => `<div><span>${label}</span><strong>${label.includes('状态') ? tag(value) : (label === '关联学员档案' ? value : escapeHtml(String(value ?? '—')))}</strong></div>`).join('');
   const trialRows = trials.length ? trials.map((item) => `<tr><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.className || '未指定')}</td><td>${escapeHtml(item.teacher || '未指定')}</td><td>${escapeHtml(item.campus)}</td><td>${tag(item.status)}</td><td>${escapeHtml(item.owner)}</td></tr>`).join('') : '<tr><td colspan="6">暂无试听记录</td></tr>';
   const followUps = Array.isArray(row.followUps) ? row.followUps : [];
   const followRows = followUps.length ? followUps.map(item => `<tr><td>${escapeHtml(item.at)}</td><td>${escapeHtml(item.method)}</td><td>${escapeHtml(item.content)}</td><td>${escapeHtml(item.next || '—')}</td><td>${escapeHtml(item.owner || '—')}</td></tr>`).join('') : '<tr><td colspan="5">暂无跟进记录</td></tr>';
   const body = `<div class="sales-detail-list">${factRows}<div><span>线索标签</span><strong><span class="crm-lead-tags">${leadTagsDisplay(row)}</span></strong></div></div><section class="course-detail-section wide"><h3>跟进记录</h3><div class="table-wrap"><table><thead><tr><th>时间</th><th>方式</th><th>内容</th><th>下次跟进</th><th>跟进人</th></tr></thead><tbody>${followRows}</tbody></table></div></section><section class="course-detail-section wide"><h3>试听记录</h3><div class="table-wrap"><table><thead><tr><th>试听时间</th><th>试听班级</th><th>试听教师</th><th>校区</th><th>试听状态</th><th>跟进人</th></tr></thead><tbody>${trialRows}</tbody></table></div></section><section class="course-detail-section wide"><h3>报名结果</h3><p>${order ? `已生成面授订单 ${escapeHtml(order.number)}，关联班级：${escapeHtml(order.linked || '—')}，当前订单状态：${escapeHtml(order.status)}` : '暂无报名订单，报名状态为未转化。'}</p></section>`;
-  openBusinessDialog('线索详情', `${row.number} · ${row.student}`, `<div class="course-detail-grid">${body}</div>`, '<button type="button" class="button" data-dialog-close>关闭</button>');
+  const dialog = openBusinessDialog('线索详情', `${row.number} · ${row.student}`, `<div class="course-detail-grid">${body}</div>`, '<button type="button" class="button" data-dialog-close>关闭</button>');
+  // CR-P-001：关联关系只在这里人工确认（写入收口 CRM），学员档案侧只读。
+  dialog.querySelector('[data-lead-bind]')?.addEventListener('click', () => {
+    const select = dialog.querySelector('[data-lead-bind-select]');
+    const result = followupsApi().bindLeadToLearner?.(row.number, select?.value, '当前账号');
+    if (!result?.ok) { showToast(result?.reason || '绑定失败。'); return; }
+    closeBusinessDialog(); openLeadDetail(row); showToast('已人工绑定学员档案，操作已记录审计。');
+  });
+  dialog.querySelectorAll('[data-lead-unbind]').forEach((btn) => btn.addEventListener('click', () => {
+    const result = followupsApi().unbindLeadFromLearner?.(row.number, btn.dataset.leadUnbind, '当前账号');
+    if (!result?.ok) { showToast(result?.reason || '解绑失败。'); return; }
+    closeBusinessDialog(); openLeadDetail(row); showToast('已解绑，操作已记录审计。');
+  }));
 }
 
 function openSimpleForm(title, subtitle, fields, onSubmitMessage, onSubmit) {
@@ -1403,18 +1427,20 @@ function mountClassEnrollmentPanel(dialog, row, shared) {
       : `<a class="sales-rate-link" href="/admin/pages/academic/${page}.html?classId=${encodeURIComponent(row.id)}&className=${encodeURIComponent(row.name || '')}&studentId=${encodeURIComponent(student?.id || item.studentId)}&studentName=${encodeURIComponent(studentName)}">${rate}%</a>`;
     const attendanceRate = records?.studentAttendanceRate && student ? records.studentAttendanceRate(row, student) : null;
     const homeworkRate = records?.studentHomeworkRate && student ? records.studentHomeworkRate(row, student) : null;
-    return `<tr><td>${escapeHtml(student?.name || item.studentId)}</td><td>${escapeHtml(item.enrolledAt || '—')}</td><td>${tag(item.status)}${refundRelation}${transfer}${changeAt}</td><td>${rateCell(attendanceRate, 'attendance')}</td><td>${rateCell(homeworkRate, 'homework')}</td><td>${active ? `<button class="text-button" data-enrollment-change="${escapeHtml(item.id)}">学籍异动</button>` : '—'}</td></tr>`;
-  }).join('') : '<tr><td colspan="6">暂无学员报名</td></tr>';
+    // CR-P-001：班级名册 studentId 与档案 learnerId 不同源，只认人工确认映射，未建档不按姓名猜测。
+    const archiveLink = followupsApi().studentArchiveLinkHtml?.(item.studentId) || '<span class="muted">未建档</span>';
+    return `<tr><td>${escapeHtml(student?.name || item.studentId)}</td><td>${escapeHtml(item.enrolledAt || '—')}</td><td>${tag(item.status)}${refundRelation}${transfer}${changeAt}</td><td>${rateCell(attendanceRate, 'attendance')}</td><td>${rateCell(homeworkRate, 'homework')}</td><td>${active ? `<button class="text-button" data-enrollment-change="${escapeHtml(item.id)}">学籍异动</button>` : '—'}</td><td>${archiveLink}</td></tr>`;
+  }).join('') : '<tr><td colspan="7">暂无学员报名</td></tr>';
   const changes = (shared.enrollmentChanges || []).filter(item => item.classId === row.id)
     .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
-  const changeRows = changes.length ? changes.map(item => `<tr><td>${escapeHtml(item.at || '—')}</td><td>${escapeHtml(item.studentName || item.studentId)}</td><td>${escapeHtml(item.type || '—')}</td><td>${escapeHtml(item.reason || '—')}</td><td>${escapeHtml(item.targetClassName || '—')}</td><td>${item.refundNo ? `${escapeHtml(item.refundNo)}<br><span class="sub-cell">${escapeHtml(item.refundStatus || '退款中')}</span>` : '—'}</td><td>${escapeHtml(item.operator || '—')}</td></tr>`).join('')
+  const changeRows = changes.length ? changes.map(item => `<tr><td>${escapeHtml(item.at || '—')}</td><td>${escapeHtml(item.studentName || item.studentId)}</td><td>${escapeHtml(item.type || '—')}</td><td>${escapeHtml(item.reason || '—')}${item.reasonNote ? `<br><span class="sub-cell">${escapeHtml(item.reasonNote)}</span>` : ''}</td><td>${escapeHtml(item.targetClassName || '—')}</td><td>${item.refundNo ? `${escapeHtml(item.refundNo)}<br><span class="sub-cell">${escapeHtml(item.refundStatus || '退款中')}</span>` : '—'}</td><td>${escapeHtml(item.operator || '—')}</td></tr>`).join('')
     : '<tr><td colspan="7">暂无学籍异动记录</td></tr>';
   const refundTodos = (shared.academicTodos || []).filter(item => item.classId === row.id && item.status === '待处理');
   const todoPanel = refundTodos.length ? `<div class="sales-roster-meta"><strong>教务待办 ${refundTodos.length} 项</strong>${refundTodos.map(item => `<div>${escapeHtml(item.title)}：${escapeHtml(item.detail)}</div>`).join('')}</div>` : '';
   panel.innerHTML = `<div class="sales-dialog-summary"><div><span>在读学员</span><strong>${activeCount}</strong></div><div><span>已退出</span><strong>${exitedCount}</strong></div><div><span>招生容量</span><strong>${Number(row.capacity || 0)}</strong></div><div><span>剩余名额</span><strong>${Math.max(0, Number(row.capacity || 0) - activeCount)}</strong></div></div>
     <p class="sales-roster-meta">学籍异动只改变本班名册：已发布作业保留应交记录，退出学员不再计入作业提交率分母；转班学员在新班级重新起算。登记后班级名册、教师端与后台作业统计立即同源更新。</p>
     <p class="sales-roster-meta">考勤率、作业提交率按本班已上课次聚合，与教师端班级概览、课次详情同口径；点击比率跳转考勤监控／作业批阅监管列表，并按当前班级与学员预填筛选。</p>
-    <div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>学籍状态</th><th>考勤率</th><th>作业提交率</th><th>操作</th></tr></thead><tbody>${roster}</tbody></table></div>
+    <div class="sales-table-wrap"><table><thead><tr><th>学员</th><th>报名时间</th><th>学籍状态</th><th>考勤率</th><th>作业提交率</th><th>操作</th><th>学员档案</th></tr></thead><tbody>${roster}</tbody></table></div>
     ${todoPanel}<div class="sales-table-wrap" style="margin-top:12px"><table><thead><tr><th>异动时间</th><th>学员</th><th>异动类型</th><th>原因</th><th>转入班级</th><th>退款单 / 状态</th><th>操作人</th></tr></thead><tbody>${changeRows}</tbody></table></div>`;
   panel.querySelectorAll('[data-enrollment-change]').forEach(button => button.addEventListener('click', () => {
     const enrollment = enrollments.find(item => item.id === button.dataset.enrollmentChange);
@@ -1435,22 +1461,43 @@ function openEnrollmentChangeForm(row, enrollment) {
   const refundFields = paidOrders.length
     ? `<label class="form-field wide"><span>同步发起退费</span><span class="sales-inline-check"><input type="checkbox" name="withRefund" value="是" checked>本班已支付订单 ${paidOrders.length} 笔，全额退款合计 ${refundTotal} 元（${paidOrders[0].rule}）</span><small class="sub-cell">取消勾选则本次异动不发起退费，可由财务在统一订单管理登记退款。</small></label>`
     : '<p class="sales-roster-meta">本班暂无可退费的已支付订单，本次异动只变更学籍。</p>';
+  // CR-2026-167：异动原因由自由文本改为字典下拉（可在「系统管理 → 数据字典」维护），
+  // 另留选填「补充说明」承载个案细节。自由文本无法归并统计，是流失原因分布做不出来的根因。
+  const churnReasons = dictionaryItems('churn_reason');
+  const transferReasons = dictionaryItems('transfer_reason');
+  const reasonOptions = (items) => `<option value="">请选择</option>${items.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join('')}`;
+  const reasonHint = (transfer) => (transfer
+    ? '字典项由「系统管理 → 数据字典 → 转班原因」维护；转班是机构内在读班级变更，不计入流失。'
+    : '字典项由「系统管理 → 数据字典 → 流失原因」维护；退班／退学计入流失统计。');
   const fields = `<label class="form-field"><span>异动类型 <b class="required-mark">*</b></span><select name="type" required><option value="">请选择</option><option>退班</option><option>转班</option><option>退学</option></select></label>
     <label class="form-field"><span>转入班级</span><select name="targetClassId"><option value="">转班时必填</option>${targetOptions}</select></label>
-    <label class="form-field wide"><span>异动原因 <b class="required-mark">*</b></span><textarea name="reason" maxlength="200" required placeholder="填写退班／转班／退学原因，将写入异动记录"></textarea></label>
+    <label class="form-field wide"><span data-reason-label>流失原因 <b class="required-mark">*</b></span><select name="reason" data-reason-select required>${reasonOptions(churnReasons)}</select><small class="sub-cell" data-reason-hint>${reasonHint(false)}</small></label>
+    <label class="form-field wide"><span>补充说明</span><textarea name="reasonNote" maxlength="100" placeholder="选填，补充具体情况（≤ 100 字），不参与流失原因统计"></textarea></label>
     ${refundFields}`;
   const dialog = openBusinessDialog('学员学籍异动', `${student?.name || enrollment.studentId} · ${row.name}`, `<form id="enrollment-change-form" class="sales-dialog-grid">${fields}</form><p class="sales-roster-meta">登记后：本班名册立即剔除该学员；已发布作业保留其应交记录，但从作业提交率分母中剔除；转班学员在转入班级重新起算。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="enrollment-change-form" class="button primary">确认登记</button>');
+  // 原因下拉随异动类型切换：退班／退学读「流失原因」字典，转班读「转班原因」字典，两套字典互不混用。
+  const reasonSelect = dialog.querySelector('[data-reason-select]');
+  const reasonLabel = dialog.querySelector('[data-reason-label]');
+  const reasonHintNode = dialog.querySelector('[data-reason-hint]');
+  dialog.querySelector('[name="type"]')?.addEventListener('change', (event) => {
+    const transfer = event.target.value === '转班';
+    if (!reasonSelect) return;
+    reasonSelect.innerHTML = reasonOptions(transfer ? transferReasons : churnReasons);
+    if (reasonLabel) reasonLabel.innerHTML = `${transfer ? '转班原因' : '流失原因'} <b class="required-mark">*</b>`;
+    if (reasonHintNode) reasonHintNode.textContent = reasonHint(transfer);
+  });
   dialog.querySelector('#enrollment-change-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const type = String(data.get('type') || '').trim();
     const reason = String(data.get('reason') || '').trim();
+    const reasonNote = String(data.get('reasonNote') || '').trim();
     const targetClassId = String(data.get('targetClassId') || '').trim();
     if (!type) return showToast('请选择异动类型。', 'warning');
-    if (!reason) return showToast('请填写异动原因。', 'warning');
+    if (!reason) return showToast(`请选择${type === '转班' ? '转班' : '流失'}原因。`, 'warning');
     if (type === '转班' && !targetClassId) return showToast('转班需要选择转入班级。', 'warning');
     const withRefund = String(data.get('withRefund') || '') === '是' && type !== '转班';
-    const outcome = applyEnrollmentChange(row, enrollment, { type, reason, targetClassId: type === '转班' ? targetClassId : '', withRefund, refundOrders: withRefund ? paidOrders : [] });
+    const outcome = applyEnrollmentChange(row, enrollment, { type, reason, reasonNote, targetClassId: type === '转班' ? targetClassId : '', withRefund, refundOrders: withRefund ? paidOrders : [] });
     closeBusinessDialog();
     renderClasses();
     if (outcome?.refunds?.length) showToast(`${type}已登记：${student?.name || enrollment.studentId}；已同步发起 ${outcome.refunds.length} 张退款单（退款中）。`);
@@ -1472,7 +1519,7 @@ function enrollmentRefundCandidates(row, studentId) {
     .filter(item => item.refundAmount > 0 && !openRefundForOrder(item.order.id));
 }
 
-function applyEnrollmentChange(row, enrollment, { type, reason, targetClassId, withRefund = false, refundOrders = [] }) {
+function applyEnrollmentChange(row, enrollment, { type, reason, reasonNote = '', targetClassId, withRefund = false, refundOrders = [] }) {
   const shared = readDemoState();
   const now = demoTime();
   const student = (shared.students || []).find(item => item.id === enrollment.studentId);
@@ -1483,6 +1530,7 @@ function applyEnrollmentChange(row, enrollment, { type, reason, targetClassId, w
     status: ENROLLMENT_CHANGE_STATUS[type],
     changeAt: now,
     changeReason: reason,
+    changeReasonNote: reasonNote,
     changeType: type,
     ...(targetClassId ? { transferToClassId: targetClassId } : {})
   });
@@ -1510,7 +1558,7 @@ function applyEnrollmentChange(row, enrollment, { type, reason, targetClassId, w
         origin: REFUND_ORIGIN.ENROLLMENT,
         requestedBy: '教务异动登记',
         amount: item.refundAmount,
-        reason: `${type}退费：${reason}`,
+        reason: `${type}退费：${reason}${reasonNote ? `（${reasonNote}）` : ''}`,
         channel: item.order.payMethod || '原路退回',
         classChangeId: changeId,
         remark: `学籍异动发起：${item.rule}`,
@@ -1528,6 +1576,7 @@ function applyEnrollmentChange(row, enrollment, { type, reason, targetClassId, w
     studentName,
     type,
     reason,
+    reasonNote,
     targetClassId: targetClassId || '',
     targetClassName: targetClassId ? (classPool.find(item => item.id === targetClassId)?.name || targetClassId) : '',
     refundNo: refunds.map(item => item.no).join('、'),

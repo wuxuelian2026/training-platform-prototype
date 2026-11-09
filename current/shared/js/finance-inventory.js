@@ -18,7 +18,8 @@ let salaryActiveTab = 'calculation';
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const statusClass = (value) => ({
-  草稿: 'gray', 核算中: 'amber', 待发布: 'brand', 已发布: 'green', 待发放: 'amber', 发放中: 'brand', 已发放: 'green', 发放失败: 'red', 部分失败: 'red', 已到账: 'green', 待确认: 'amber', 异常: 'red', 退款中: 'brand', 已退款: 'green', 已取消: 'gray',
+  草稿: 'gray', 核算中: 'amber', 待发布: 'brand', 已发布: 'green', 已作废: 'gray',
+ 待发放: 'amber', 发放中: 'brand', 已发放: 'green', 发放失败: 'red', 部分失败: 'red', 已到账: 'green', 待确认: 'amber', 异常: 'red', 退款中: 'brand', 已退款: 'green', 已取消: 'gray',
   正常: 'green', 库存不足: 'amber', 启用: 'green', 停用: 'gray', 待处理: 'amber', 已处理: 'green', 通过: 'green', 拒绝: 'red', '部分成功': 'amber', '全部失败': 'red'
 }[value] || 'gray');
 const tag = (value) => `<span class="tag ${statusClass(value)}">${esc(value)}</span>`;
@@ -46,13 +47,31 @@ function metrics(items) { return `<div class="card-grid compact-metrics">${items
 function renderRows(rows, template, empty = '暂无符合条件的数据。') { const body = opsRoot.querySelector('.table-body'); if (!body) return; body.innerHTML = rows.length ? rows.map((row) => `<tr data-row-id="${esc(row.id)}">${template(row)}</tr>`).join('') : `<tr><td colspan="20"><div class="empty">${empty}</div></td></tr>`; const count = opsRoot.querySelector('.result-count'); if (count) count.textContent = `共 ${rows.length} 条`; }
 function bindFilter(id, source, predicate, template) { document.querySelector(`#${id}`)?.addEventListener('submit', (event) => { event.preventDefault(); renderRows(source.filter(predicate(event.currentTarget)), template); }); document.querySelector(`#${id}`)?.addEventListener('reset', () => setTimeout(() => renderRows(source, template), 0)); }
 
-const salaries = [
-  { id: 'salary-wang', teacher: '王玥', staffNo: 'T2024008', category: '舞蹈类', month: '2026-08', expectedLessons: 18, actualLessons: 16, hours: 32, payable: 5580, systemDeduction: 240, deduction: 240, tax: 36.8, status: '待发布', paymentStatus: '已发布', batchId: '', account: '中国建设银行 尾号 2866', sourceLessons: ['lesson-2026-08-01', 'lesson-2026-08-08'], sourceAttendance: '已完成', sourceTeachingRecords: '已完成', contractRateSnapshot: '合同 CR-2026-046 · ¥180/每课时(45分钟)', differenceStatus: '正常', details: [{ course: '舞蹈基本功', className: '少儿舞蹈基础班', hours: 20, rate: 180 }, { course: '中国舞身韵训练', className: '成人中国舞提高班', hours: 12, rate: 165 }] },
-  { id: 'salary-zhao', teacher: '赵老师', staffNo: 'T2024012', category: '美术类', month: '2026-08', expectedLessons: 14, actualLessons: 14, hours: 28, payable: 5600, systemDeduction: 0, deduction: 0, tax: 78, deductionReason: '', status: '已发布', paymentStatus: '已发布', batchId: '', paidAt: '', account: '中国工商银行 尾号 1138', details: [{ course: '中国画基础', className: '中国画基础班', hours: 20, rate: 200 }, { course: '国画入门工作坊', className: '国画入门工作坊', hours: 8, rate: 200 }] },
-  { id: 'salary-chen', teacher: '陈晨', staffNo: 'T2023016', category: '音乐类', month: '2026-08', expectedLessons: 15, actualLessons: 14, hours: 26, payable: 4940, systemDeduction: 100, deduction: 100, tax: null, status: '核算中', paymentStatus: '已发布', batchId: '', account: '中国建设银行 尾号 9072', sourceLessons: ['lesson-2026-08-03'], sourceAttendance: '缺失 1 条', sourceTeachingRecords: '缺失', contractRateSnapshot: '', differenceStatus: '待处理', details: [{ course: '声乐基础', className: '少儿声乐班', hours: 18, rate: 190 }, { course: '成人声乐班', className: '成人声乐班', hours: 8, rate: 190 }] },
-  { id: 'salary-liu', teacher: '刘慧', staffNo: 'T2023022', category: '音乐类', month: '2026-08', expectedLessons: 12, actualLessons: 12, hours: 24, payable: 4560, systemDeduction: 0, deduction: 0, tax: 46.8, deductionReason: '', status: '已发布', paymentStatus: '已发布', batchId: '', account: '中国银行 尾号 5521', details: [{ course: '钢琴入门', className: '成人钢琴基础班', hours: 24, rate: 190 }] },
-  { id: 'salary-sun', teacher: '孙文', staffNo: 'T2024019', category: '舞蹈类', month: '2026-08', expectedLessons: 10, actualLessons: 10, hours: 20, payable: 3600, systemDeduction: 0, deduction: 0, tax: 18, deductionReason: '', status: '已发布', paymentStatus: '已发布', batchId: '', account: '中国农业银行 尾号 6630', details: [{ course: '现代舞基础', className: '现代舞基础班', hours: 20, rate: 180 }] }
+// CR-2026-170：工资改教务导入——金额 8 字段（年月、课酬标准、课时费、其他、应发、扣税、实发、备注）由教务按月导入，
+// 系统只从排课／考勤自动统计课时与课时日明细（课时 = 有效课次数 × 连上节数，按自然日归集，日明细合计＝月度系统课时）。
+const salaryWorktimeSeed = [
+  { staffNo: 'T2024008', month: '2026-09', hours: 30, dates: ['2026-09-05', '2026-09-06', '2026-09-12', '2026-09-13', '2026-09-19', '2026-09-20', '2026-09-26', '2026-09-27', '2026-09-30'], sessions: [['舞蹈基本功', '少儿舞蹈基础班'], ['中国舞身韵训练', '成人中国舞提高班']] },
+  { staffNo: 'T2023016', month: '2026-09', hours: 28, dates: ['2026-09-03', '2026-09-06', '2026-09-10', '2026-09-13', '2026-09-17', '2026-09-20', '2026-09-24', '2026-09-27'], sessions: [['声乐基础', '少儿声乐班'], ['声乐演唱技巧', '成人声乐班']] },
+  { staffNo: 'T2024012', month: '2026-08', hours: 28, dates: ['2026-08-01', '2026-08-05', '2026-08-08', '2026-08-12', '2026-08-15', '2026-08-19', '2026-08-22'], sessions: [['中国画基础', '中国画基础班']] },
+  { staffNo: 'T2023022', month: '2026-08', hours: 24, dates: ['2026-08-02', '2026-08-06', '2026-08-09', '2026-08-13', '2026-08-16', '2026-08-20'], sessions: [['钢琴入门', '成人钢琴基础班']] },
+  { staffNo: 'T2024019', month: '2026-08', hours: 20, dates: ['2026-08-03', '2026-08-07', '2026-08-10', '2026-08-14', '2026-08-17'], sessions: [['现代舞基础', '现代舞基础班']] },
+  { staffNo: 'T2024008', month: '2026-10', hours: 30, dates: ['2026-10-10', '2026-10-11', '2026-10-17', '2026-10-18', '2026-10-24', '2026-10-25', '2026-10-31', '2026-11-01', '2026-11-07', '2026-11-08'], sessions: [['舞蹈基本功', '少儿舞蹈基础班']] },
+  { staffNo: 'T2023022', month: '2026-10', hours: 24, dates: ['2026-10-09', '2026-10-13', '2026-10-16', '2026-10-20', '2026-10-23', '2026-10-27', '2026-10-30', '2026-11-03'], sessions: [['钢琴入门', '成人钢琴基础班']] }
 ];
+const salaryWorktime = {};
+salaryWorktimeSeed.forEach((seed) => {
+  const base = Math.floor(seed.hours / seed.dates.length);
+  const extra = seed.hours - base * seed.dates.length;
+  salaryWorktime[`${seed.staffNo}:${seed.month}`] = { hours: seed.hours, days: seed.dates.map((date, index) => ({ date, hours: base + (index < extra ? 1 : 0), course: seed.sessions[index % seed.sessions.length][0], className: seed.sessions[index % seed.sessions.length][1] })) };
+});
+const salaries = [
+  { id: 'salary-wang', teacher: '王玥', staffNo: 'T2024008', category: '舞蹈类', month: '2026-09', standard: 180, lessonFee: 5400, other: 0, payable: 5400, tax: 36.8, net: 5363.2, remark: '教务已核对，无偏差。', status: '草稿', batchId: 'IMP20261105002', paymentStatus: '待发放', account: '中国建设银行 尾号 2866', differenceReason: '' },
+  { id: 'salary-chen', teacher: '陈晨', staffNo: 'T2023016', category: '音乐类', month: '2026-09', standard: 190, lessonFee: 5320, other: -100, payable: 5220, tax: 0, net: 5220, remark: '其他为考勤扣款核定，已随批次说明。', status: '草稿', batchId: 'IMP20261105002', paymentStatus: '待发放', account: '中国建设银行 尾号 9072', differenceReason: '' },
+  { id: 'salary-zhao', teacher: '赵老师', staffNo: 'T2024012', category: '美术类', month: '2026-08', standard: 200, lessonFee: 5600, other: 0, payable: 5600, tax: 78, net: 5522, remark: '', status: '已发布', batchId: 'IMP20260901001', paymentStatus: '已发放', paidAt: '2026-09-05', account: '中国工商银行 尾号 1138', differenceReason: '' },
+  { id: 'salary-liu', teacher: '刘慧', staffNo: 'T2023022', category: '音乐类', month: '2026-08', standard: 190, lessonFee: 4560, other: 0, payable: 4560, tax: 46.8, net: 4513.2, remark: '', status: '已发布', batchId: 'IMP20260901001', paymentStatus: '待发放', account: '中国银行 尾号 5521', differenceReason: '' },
+  { id: 'salary-sun', teacher: '孙文', staffNo: 'T2024019', category: '舞蹈类', month: '2026-08', standard: 180, lessonFee: 3600, other: 0, payable: 3600, tax: 18, net: 3582, remark: '', status: '已发布', batchId: 'IMP20260901001', paymentStatus: '待发放', account: '中国农业银行 尾号 6630', differenceReason: '' }
+];
+
 const salaryBatches = [
   { id: 'PAY20260905001', month: '2026-08', salaryIds: ['salary-zhao'], method: '银行代发', createdAt: '2026-09-04 15:20', operator: '周财务', paidAt: '2026-09-05', status: '已发放', success: 1, failed: 0, voucher: 'BANK202609050086' },
   { id: 'PAY20260906002', month: '2026-08', salaryIds: ['salary-liu'], method: '银行代发', createdAt: '2026-09-06 09:10', operator: '周财务', paidAt: '', status: '全部失败', success: 0, failed: 1, voucher: '' }
@@ -211,18 +230,36 @@ if (!inventoryState.materials?.length) materials.forEach((item) => persistInvent
 if (!inventoryState.categories?.length) categories.forEach((item) => persistInventory('categories', item));
 if (!inventoryState.inboundRecords?.length) inboundRecords.forEach((item) => persistInventory('inboundRecords', item));
 if (!inventoryState.outboundRecords?.length) outboundRecords.forEach((item) => persistInventory('outboundRecords', item));
-function salaryPayable(row) { return row.details?.length ? row.details.reduce((sum, d) => sum + (Number(d.hours) || 0) * (Number(d.rate) || 0), 0) : (Number(row.payable) || 0); }
-function salaryTaxIncluded(row) { return Math.max(0, salaryPayable(row) - row.deduction); }
-function salaryTotal(row) { return Math.max(0, salaryTaxIncluded(row) - Number(row.tax || 0)); }
+const salaryImportBatches = [
+  { id: 'IMP20260901001', month: '2026-08', file: '2026年8月教师工资导入.xlsx', operator: '李教务', createdAt: '2026-09-01 10:20', success: 3, failed: 0, overwritten: 0, note: '赵老师、刘慧、孙文 2026-08 工资导入。' },
+  { id: 'IMP20261105002', month: '2026-09', file: '2026年9月教师工资导入.xlsx', operator: '李教务', createdAt: '2026-11-05 15:40', success: 2, failed: 1, overwritten: 0, note: '1 行因系统课时缺失未导入，已提示教务核对排课与考勤。' }
+];
+const SALARY_IMPORT_HEADERS = ['教师工号', '年月', '课酬标准', '课时费', '其他', '应发', '扣税', '实发', '备注'];
+// 演示导入数据：覆盖 正常新增 / 草稿重复覆盖 / 无课时阻断 / 偏差需填原因 四类路径（CR-2026-170）。
+const SALARY_IMPORT_DEMO_ROWS = [
+  ['T2024008', '2026-10', '180.00', '5400.00', '0.00', '5400.00', '36.80', '5363.20', '正常导入演示'],
+  ['T2024008', '2026-09', '180.00', '5280.00', '0.00', '5280.00', '36.80', '5243.20', '重复导入演示（覆盖 2026-09 草稿并留历史版本）'],
+  ['T99999999', '2026-10', '180.00', '3600.00', '0.00', '3600.00', '0.00', '3600.00', '系统无课时统计（阻断演示）'],
+  ['T2023022', '2026-10', '190.00', '4104.00', '0.00', '4104.00', '46.80', '4057.20', '课时费 4104 ÷ 24 课时 = 171/课时，与标准 190 偏差约 10%']
+];
+function salarySystemHours(row) { return salaryWorktime[`${row.staffNo}:${row.month}`]?.hours ?? 0; }
+function salaryDailyDays(row) { return salaryWorktime[`${row.staffNo}:${row.month}`]?.days || []; }
+function salaryDeviation(row) { const hours = salarySystemHours(row); if (!hours || !Number(row.standard)) return null; return (Number(row.lessonFee) / hours - Number(row.standard)) / Number(row.standard); }
+function salaryTotal(row) { return Number(row.net) || 0; }
+function salaryPublishable(item) { const dev = salaryDeviation(item); return item.status === '草稿' && (dev === null || Math.abs(dev) <= 0.05 || Boolean(item.differenceReason)); }
+
 function materialStatus(row) { return row.stock <= row.threshold ? '库存不足' : '正常'; }
 
 function renderSalary() {
   opsData = salaries;
-  pageFrame('教师工资管理', '', '<button class="button primary" data-ops-action="salary-batch-publish">批量发布工资单</button>', metrics([['核算中', salaries.filter((item) => item.status === '核算中').length, '需补全个税或核定扣款'], ['待发布', salaries.filter((item) => item.status === '待发布').length, '核算已完成'], ['已发布', salaries.filter((item) => item.status === '已发布').length, '教师端已可见']]) + filterPanel('salary-filter', select('工资单状态', 'status', ['核算中', '待发布', '已发布']) + `<label class="form-field"><span>工资月份</span><input type="month" name="month" value="2026-08"></label>` + field('教师姓名', 'teacher', 'text', '姓名')) + '<p class="ops-form-help">统计口径（新）：单节课时长固定 45 分钟；课时（学时）= 出勤课次 × 连上节数；应付工资含税 = 课时 × 合同单价（元/每课时45分钟）。</p>' + table('<thead><tr><th>教师 / 工号</th><th>工资月份</th><th>出勤课次</th><th>应付工资含税</th><th>累计扣款</th><th>实发工资含税</th><th>个税</th><th>实际核发</th><th>工资单状态</th><th>操作</th></tr></thead>', 'salary-calculation-table'));
-  const row = (item) => `<td><strong>${item.teacher}</strong><br><span class="muted">${item.staffNo} · ${item.category}</span></td><td>${item.month}</td><td>${item.expectedLessons} / ${item.actualLessons} 课次<br><span class="muted">${item.hours} 课时（学时）</span></td><td>${money(salaryPayable(item))}</td><td>${money(item.deduction)}</td><td>${money(salaryTaxIncluded(item))}</td><td>${item.tax == null ? '<span class="ops-required">待填写</span>' : money(item.tax)}</td><td class="ops-amount">${item.tax == null ? '—' : money(salaryTotal(item))}</td><td>${tag(item.status)}</td><td class="action-cell">${item.status !== '已发布' ? '<button class="text-button" data-ops-action="salary-edit">核算</button>' : ''}${item.status === '待发布' ? '<button class="text-button" data-ops-action="salary-publish">发布</button>' : ''}<button class="text-button" data-ops-action="salary-view">查看详情</button></td>`;
+  const controls = '<button class="button" data-ops-action="salary-import-batches">导入批次</button><button class="button" data-ops-action="salary-batch-publish">批量发布工资单</button><button class="button primary" data-ops-action="salary-import">导入工资单</button>';
+  const totalHours = salaries.filter((item) => item.status !== '已作废').reduce((sum, item) => sum + salarySystemHours(item), 0);
+  pageFrame('教师工资管理', '', controls, metrics([['草稿', salaries.filter((item) => item.status === '草稿').length, '教务已导入，教师端不可见'], ['已发布', salaries.filter((item) => item.status === '已发布').length, '教师端可见，金额已锁定'], ['系统课时合计', `${totalHours} 课时`, '按排课与考勤自动统计']]) + filterPanel('salary-filter', select('工资状态', 'status', ['草稿', '已发布', '已作废']) + `<label class="form-field"><span>工资月份</span><input type="month" name="month" value="2026-09"></label>` + field('教师姓名', 'teacher', 'text', '姓名')) + '<p class="ops-form-help">CR-2026-170 导入口径：课时与课时日明细由系统从排课／考勤自动统计（课时 = 有效课次数 × 连上节数，按自然日归集，次月 1 日锁定上月，补录不追溯已发布工资单）；年月、课酬标准、课时费、其他、应发、扣税、实发、备注 8 项金额由教务按月导入，系统不自动算薪；课程单课时时长仅为排课属性，不参与任何计价。</p>' + table('<thead><tr><th>教师 / 工号</th><th>工资月份</th><th>系统课时</th><th>课酬标准</th><th>课时费</th><th>其他</th><th>应发</th><th>扣税</th><th>实发</th><th>工资状态</th><th>操作</th></tr></thead>', 'salary-calculation-table'));
+  const row = (item) => `<td><strong>${esc(item.teacher)}</strong><br><span class="muted">${esc(item.staffNo)} · ${esc(item.category)}</span></td><td>${item.month}</td><td>${salarySystemHours(item)} 课时<br><span class="muted">${salaryDailyDays(item).length} 个授课日</span></td><td>${money(item.standard)} / 课时</td><td>${money(item.lessonFee)}</td><td>${money(item.other)}</td><td class="ops-amount">${money(item.payable)}</td><td>${money(item.tax)}</td><td class="ops-amount"><strong>${money(item.net)}</strong></td><td>${tag(item.status)}</td><td class="action-cell">${item.status === '草稿' ? '<button class="text-button" data-ops-action="salary-publish">发布</button>' : ''}${item.status === '已发布' ? '<button class="text-button danger-link" data-ops-action="salary-void">作废重发</button>' : ''}<button class="text-button" data-ops-action="salary-view">查看详情</button></td>`;
   renderRows(opsData, row);
   bindFilter('salary-filter', opsData, (form) => { const { status, month, teacher } = form; return (item) => (!status.value || item.status === status.value) && (!month.value || item.month === month.value) && (!teacher.value.trim() || item.teacher.includes(teacher.value.trim())); }, row);
 }
+
 function renderPayments() {
   opsData = payments;
   pageFrame('收款记录', '', '', metrics([['本月收款', money(286420), '按收款日期统计'], ['已到账', payments.filter((p) => p.status === '已到账').length, '支付回调或人工确认'], ['待确认', payments.filter((p) => p.status === '待确认').length, '需核对银行流水'], ['异常', payments.filter((p) => p.status === '异常').length, '需人工处理']]) + filterPanel('payment-filter', select('收款渠道', 'channel', ['微信支付', '支付宝', '银行转账', '现金', '其他']) + select('收款来源', 'source', ['视频课程', '面授课程']) + select('到账状态', 'status', ['待确认', '已到账', '异常', '已撤销']) + field('订单号 / 学员', 'keyword', 'text', '模糊搜索', true)) + table('<thead><tr><th>收款单号</th><th>关联订单</th><th>学员</th><th>课程</th><th>来源 / 渠道</th><th>金额</th><th>收款时间</th><th>到账状态</th><th>操作</th></tr></thead>'));
@@ -295,20 +332,124 @@ function openSimpleForm(title, subtitle, body, onSubmit) { const dialog = openDi
 function detail(title, subtitle, pairs) { openDialog(title, subtitle, `<div class="ops-detail-list">${pairs.map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join('')}</div>`); }
 function salaryBatchAmount(batch) { return batch.salaryIds.map((id) => salaries.find((item) => item.id === id)).filter(Boolean).reduce((sum, item) => sum + salaryTotal(item), 0); }
 function salaryDetailBody(row) {
-  const payable = salaryPayable(row);
-  const detailRows = (row.details && row.details.length) ? row.details.map((d) => `<tr><td>${esc(d.className || d.course)}</td><td>${Number(d.hours) || 0}</td><td>${money(d.rate)}</td><td>${money((Number(d.hours) || 0) * (Number(d.rate) || 0))}</td></tr>`).join('') : '<tr><td colspan="4">无课时明细</td></tr>';
-  return `<div class="ops-salary-detail-summary"><div><span>实际核发</span><strong>${money(salaryTotal(row))}</strong></div><div>${tag(row.status)}${row.status === '已发布' ? tag(row.paymentStatus) : ''}</div></div><div class="ops-detail-list"><div><span>教师 / 工号</span><strong>${esc(row.teacher)} / ${esc(row.staffNo)}</strong></div><div><span>工资月份</span><strong>${row.month}</strong></div><div><span>应付工资含税（新口径）</span><strong>${money(payable)}</strong></div><div><span>累计扣款</span><strong>${money(row.deduction)}</strong></div><div><span>实发工资含税</span><strong>${money(salaryTaxIncluded(row))}</strong></div><div><span>个税</span><strong>${row.tax == null ? '待填写' : money(row.tax)}</strong></div><div><span>实际核发</span><strong>${money(salaryTotal(row))}</strong></div><div><span>扣款核定说明</span><strong>${esc(row.deductionReason || '—')}</strong></div></div><div class="ops-detail-subtable"><table><thead><tr><th>课程 / 班级</th><th>课时（学时）</th><th>单价（元/每课时45分钟）</th><th>小计</th></tr></thead><tbody>${detailRows}</tbody><tfoot><tr><td colspan="3">应付工资含税（Σ 课时 × 单价）</td><td><strong>${money(payable)}</strong></td></tr></tfoot></table></div>`;
+  const days = salaryDailyDays(row);
+  const dailyRows = days.length ? days.map((d) => `<tr><td>${esc(d.date)}</td><td>${d.hours}</td><td>${esc(d.course)}</td><td>${esc(d.className)}</td></tr>`).join('') : '<tr><td colspan="4">无课时日明细</td></tr>';
+  const dev = salaryDeviation(row);
+  const devCopy = dev === null ? '—' : `${(dev * 100).toFixed(1)}%${Math.abs(dev) > 0.05 ? `（已说明：${esc(row.differenceReason || '—')}）` : ''}`;
+  return `<div class="ops-salary-detail-summary"><div><span>实发</span><strong>${money(row.net)}</strong></div><div>${tag(row.status)}${row.status === '已发布' ? tag(row.paymentStatus || '待发放') : ''}</div></div><div class="ops-detail-list"><div><span>教师 / 工号</span><strong>${esc(row.teacher)} / ${esc(row.staffNo)}</strong></div><div><span>工资月份</span><strong>${row.month}</strong></div><div><span>系统课时（自动统计）</span><strong>${salarySystemHours(row)} 课时 · ${days.length} 个授课日</strong></div><div><span>课酬标准（导入）</span><strong>${money(row.standard)} / 课时</strong></div><div><span>课时费（导入）</span><strong>${money(row.lessonFee)}</strong></div><div><span>其他（导入）</span><strong>${money(row.other)}</strong></div><div><span>应发（导入）</span><strong>${money(row.payable)}</strong></div><div><span>扣税（导入）</span><strong>${money(row.tax)}</strong></div><div><span>实发（导入）</span><strong>${money(row.net)}</strong></div><div><span>标准偏差</span><strong>${devCopy}</strong></div><div><span>导入批次</span><strong>${esc(row.batchId || '—')}</strong></div><div><span>备注（导入）</span><strong>${esc(row.remark || '—')}</strong></div></div><div class="ops-detail-subtable"><strong>课时日明细</strong><table><thead><tr><th>日期</th><th>课时</th><th>课程</th><th>班级</th></tr></thead><tbody>${dailyRows}</tbody><tfoot><tr><td>日明细合计</td><td colspan="3"><strong>${days.reduce((sum, d) => sum + d.hours, 0)} 课时（＝月度系统课时）</strong></td></tr></tfoot></table></div><p class="ops-form-help">课时由系统按排课与考勤自动统计并按自然日归集；金额由教务导入核对后发布${row.status === '已发布' ? '，发布后金额锁定' : ''}。</p>`;
 }
-function openSalaryEdit(row) {
-  const payable = salaryPayable(row);
-  const detailRows = (row.details && row.details.length) ? row.details.map((d) => `<tr><td>${esc(d.className || d.course)}</td><td>${Number(d.hours) || 0}</td><td>${money(d.rate)}</td><td>${money((Number(d.hours) || 0) * (Number(d.rate) || 0))}</td></tr>`).join('') : '';
-  const dialog = openDialog('核算教师工资', '课次、课时（学时）与应付工资按新口径由系统计算：单节课固定 45 分钟；课时（学时）= 出勤课次 × 连上节数；应付工资含税 = 课时 × 合同单价（元/每课时45分钟）。财务仅核定累计扣款并填写个税。', `<form id="salary-edit-form" class="ops-dialog-grid"><div class="ops-detail-list wide"><div><span>教师 / 月份</span><strong>${esc(row.teacher)} / ${row.month}</strong></div><div><span>应付工资含税（新口径）</span><strong>${money(payable)}</strong></div><div><span>系统考勤扣款</span><strong>${money(row.systemDeduction)}</strong></div></div>${detailRows ? `<div class="ops-detail-subtable wide"><table><thead><tr><th>课程 / 班级</th><th>课时（学时）</th><th>单价（元/每课时45分钟）</th><th>小计</th></tr></thead><tbody>${detailRows}</tbody></table></div>` : ''}<label class="form-field"><span>累计扣款 *</span><input type="number" name="deduction" min="0" max="${payable}" step="0.01" value="${row.deduction}" required></label><label class="form-field"><span>个税 *</span><input type="number" name="tax" min="0" step="0.01" value="${row.tax ?? ''}" required placeholder="请填写个税"></label><label class="form-field wide"><span>扣款核定说明</span><textarea name="deductionReason" placeholder="累计扣款与系统考勤扣款不一致时必填">${esc(row.deductionReason || '')}</textarea></label><div class="ops-salary-formula wide"><span>实际核发</span><output data-salary-output>${money(salaryTotal(row))}</output><small>应付工资含税 - 累计扣款 - 个税</small></div></form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="salary-edit-form" class="button primary">保存核算</button>');
-  const form = dialog.querySelector('#salary-edit-form');
-  const updateOutput = () => { const deduction = Number(form.elements.deduction.value || 0); const tax = Number(form.elements.tax.value || 0); form.querySelector('[data-salary-output]').textContent = money(Math.max(0, payable - deduction - tax)); };
-  form.addEventListener('input', updateOutput);
-  form.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(form); const deduction = Number(data.get('deduction')); const tax = Number(data.get('tax')); const reason = String(data.get('deductionReason') || '').trim(); if (deduction < 0 || deduction > payable) return showToast('累计扣款必须在0元至应付工资之间。', 'warning'); if (tax < 0 || deduction + tax > payable) return showToast('个税不能小于0，且实际核发不能为负数。', 'warning'); if (deduction !== row.systemDeduction && !reason) return showToast('累计扣款与系统考勤扣款不一致时，必须填写核定说明。', 'warning'); row.deduction = deduction; row.tax = tax; row.deductionReason = reason; row.status = '待发布'; closeDialog(); renderSalary(); showToast('工资核算已保存，可发布工资单。'); });
+function salaryImportTemplate() {
+  const workbook = writeXlsxSheetRows([SALARY_IMPORT_HEADERS, ['T2024008', '2026-10', '180.00', '5400.00', '0.00', '5400.00', '36.80', '5363.20', '示例行，导入前请删除']]);
+  const link = document.createElement('a'); link.href = URL.createObjectURL(workbook); link.download = '教师工资导入模板.xlsx'; link.click(); URL.revokeObjectURL(link.href); showToast('导入模板已下载：教师工号 + 8 项金额字段，无课时列（由系统带出）。');
+}
+function salaryImportDemo() { closeDialog(); return openSalaryImportPreview(SALARY_IMPORT_DEMO_ROWS.map((cells, index) => ({ line: index + 1, cells })), '演示导入数据.xlsx'); }
+function salaryImportSheetRows(rows) {
+  const table = rows.map((row) => ({ line: row.rowNumber, cells: row.cells.map((cell) => String(cell ?? '').trim()) }));
+  const header = table.findIndex((row) => row.cells.some((cell) => cell.includes('教师工号')));
+  return (header >= 0 ? table.slice(header + 1) : table).filter((row) => row.cells.some(Boolean) && !row.cells[0].startsWith('填写说明'));
+}
+function validateSalaryImportRows(rows) {
+  const imported = []; const failures = [];
+  rows.forEach(({ line, cells }) => {
+    const [staffNo, month, standard, lessonFee, other, payable, tax, net, remark] = cells;
+    const fail = (reason) => failures.push({ line, staffNo: staffNo || '—', reason });
+    if (!staffNo) return fail('缺少教师工号');
+    if (!/^\d{4}-\d{2}$/.test(month || '')) return fail('年月格式须为 YYYY-MM');
+    if (!salaryWorktime[`${staffNo}:${month}`]) return fail('系统无该教师当月课时统计，请先核对排课与考勤');
+    if (!/^\d+(\.\d{1,2})?$/.test(standard || '')) return fail('课酬标准须为非负数值，最多 2 位小数');
+    if (!/^\d+(\.\d{1,2})?$/.test(lessonFee || '')) return fail('课时费须为非负数值，最多 2 位小数');
+    if (!/^-?\d+(\.\d{1,2})?$/.test(other || '0')) return fail('其他须为数值（可为负），最多 2 位小数');
+    if (!/^\d+(\.\d{1,2})?$/.test(payable || '')) return fail('应发须为非负数值，最多 2 位小数');
+    if (!/^\d+(\.\d{1,2})?$/.test(tax || '0')) return fail('扣税须为非负数值，最多 2 位小数');
+    if (!/^\d+(\.\d{1,2})?$/.test(net || '')) return fail('实发须为非负数值，最多 2 位小数');
+    imported.push({ line, staffNo, month, standard: Number(standard), lessonFee: Number(lessonFee), other: Number(other || 0), payable: Number(payable), tax: Number(tax || 0), net: Number(net), remark: remark || '' });
+  });
+  return { imported, failures };
+}
+function openSalaryImportPreview(rows, sourceName) {
+  const { imported, failures } = validateSalaryImportRows(rows);
+  const blocking = failures.map((item) => ({ ...item }));
+  const blocks = imported.map((row) => {
+    const worktime = salaryWorktime[`${row.staffNo}:${row.month}`];
+    const teacherName = salaries.find((item) => item.staffNo === row.staffNo)?.teacher || `教师 ${row.staffNo}`;
+    const existing = salaries.find((item) => item.staffNo === row.staffNo && item.month === row.month);
+    const dev = row.standard ? (row.lessonFee / worktime.hours - row.standard) / row.standard : 0;
+    const needReason = Math.abs(dev) > 0.05;
+    const publishedBlock = existing?.status === '已发布';
+    const dupeDraft = existing?.status === '草稿';
+    if (publishedBlock) blocking.push({ line: row.line, staffNo: row.staffNo, reason: '已发布工资单不可覆盖，请先作废重发' });
+    return { row, teacherName, worktime, dev, needReason, dupeDraft, publishedBlock, reason: '', overwrite: false };
+  });
+  const fieldKey = (block) => `reason-${block.row.staffNo}-${block.row.month}`;
+  // CR-2026-170：阻断为行级口径——失败行与命中已发布的行跳过不落库，有效行照常导入草稿。
+  const importable = blocks.filter((block) => !block.publishedBlock);
+  const failedCount = blocking.length;
+  const body = `<div class="table-wrap ops-table wide"><table><thead><tr><th>行号</th><th>教师 / 工号</th><th>年月</th><th>课酬标准</th><th>课时费</th><th>其他</th><th>应发</th><th>扣税</th><th>实发</th><th>系统课时（勾稽）</th><th>偏差 / 处理</th></tr></thead><tbody>${blocks.map((block) => `<tr><td>${block.row.line}</td><td><strong>${esc(block.teacherName)}</strong><br><span class="muted">${esc(block.row.staffNo)}</span></td><td>${block.row.month}</td><td>${money(block.row.standard)}</td><td>${money(block.row.lessonFee)}</td><td>${money(block.row.other)}</td><td>${money(block.row.payable)}</td><td>${money(block.row.tax)}</td><td>${money(block.row.net)}</td><td>${block.worktime.hours} 课时<br><span class="muted">${block.worktime.days.length} 个授课日合计</span></td><td>${block.publishedBlock ? '<span class="tag red">阻断：已发布不可覆盖</span>' : ''}${block.dupeDraft ? '<label class="ops-table-switch"><input type="checkbox" name="overwrite"><span aria-hidden="true"></span><em>覆盖草稿</em></label>' : ''}${block.needReason ? `<label class="form-field"><span>偏差 ${(block.dev * 100).toFixed(1)}%，原因必填</span><input type="text" name="${fieldKey(block)}" placeholder="如：合同调价过渡月"></label>` : ''}${!block.dupeDraft && !block.needReason && !block.publishedBlock ? '<span class="tag green">可导入</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="11">无有效数据行</td></tr>'}</tbody></table></div>${failures.length ? `<div class="table-wrap ops-table wide"><table><thead><tr><th>行号</th><th>教师工号</th><th>失败原因</th></tr></thead><tbody>${failures.map((item) => `<tr><td>${item.line}</td><td>${esc(item.staffNo)}</td><td><span class="tag red">${esc(item.reason)}</span></td></tr>`).join('')}</tbody></table></div>` : ''}<p class="ops-form-help wide">导入成功行落为草稿（教师端不可见）；唯一键（教师工号 × 年月）重复且为草稿的行须勾选覆盖，系统保留被覆盖行历史版本并随批次留痕；偏差 &gt;5% 的行必须填写原因后放行。</p>`;
+  const dialog = openDialog(`导入预览 · ${esc(sourceName)}`, `有效 ${importable.length} 行，阻断 ${failedCount} 行（阻断行跳过、不落库）；课时由系统带出，金额以导入为准。`, `<form id="salary-import-confirm-form" class="ops-dialog-grid">${body}</form>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="salary-import-confirm-form" class="button primary" ' + (!importable.length ? 'disabled title="无有效行，无法导入"' : '') + '>确认导入</button>');
+  // CR-2026-170：11 列勾稽表格需横向铺开，单独加宽预览弹窗（内联，不改全局 CSS）
+  dialog.style.width = 'min(1180px, calc(100vw - 32px))';
+  dialog.querySelector('#salary-import-confirm-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (!importable.length) return showToast('无有效行，无法导入；请先修正阻断行。', 'warning');
+    const form = event.currentTarget;
+    for (const block of importable) {
+      if (block.dupeDraft && !form.querySelector('input[name="overwrite"]')?.checked) return showToast('重复导入的草稿行须勾选「覆盖草稿」后才能导入。', 'warning');
+      if (block.needReason && !String(form.querySelector(`[name="${fieldKey(block)}"]`)?.value || '').trim()) return showToast('课酬偏差超过 5% 的行必须填写偏差原因。', 'warning');
+    }
+    applySalaryImport(importable.map((block) => ({ ...block, reason: block.needReason ? String(form.querySelector(`[name="${fieldKey(block)}"]`).value).trim() : '', overwrite: block.dupeDraft })), sourceName, failedCount);
+  });
   return dialog;
 }
+function applySalaryImport(blocks, sourceName, failedCount = 0) {
+  const history = [];
+  const batchId = `IMP${demoDateTime(DEMO_TODAY).toISOString().slice(0, 10).replaceAll('-', '')}${String(Date.now()).slice(-3)}`;
+  blocks.forEach((block) => {
+    const { row, teacherName, worktime } = block;
+    const existing = salaries.find((item) => item.staffNo === row.staffNo && item.month === row.month);
+    if (existing) history.push({ ...existing });
+    const record = { id: existing?.id || `salary-import-${Date.now()}-${block.row.line}`, teacher: teacherName, staffNo: row.staffNo, category: existing?.category || '未分类', month: row.month, standard: row.standard, lessonFee: row.lessonFee, other: row.other, payable: row.payable, tax: row.tax, net: row.net, remark: row.remark, differenceReason: block.reason, status: '草稿', batchId, paymentStatus: existing?.status === '草稿' ? (existing.paymentStatus || '待发放') : '待发放', account: existing?.account || '', hoursSnapshot: worktime.hours, voidedReason: '', voidedAt: '' };
+    const index = existing ? salaries.findIndex((item) => item.id === existing.id) : -1;
+    if (index >= 0) salaries[index] = record; else salaries.unshift(record);
+  });
+  const overwritten = history.length;
+  const batch = { id: batchId, month: blocks[0]?.row.month || '', file: sourceName, operator: operatorName(), createdAt: demoDateTime(DEMO_TODAY).toISOString().slice(0, 16).replace('T', ' '), success: blocks.length, failed: failedCount, overwritten, note: overwritten ? `覆盖 ${overwritten} 行草稿，历史版本已随批次留存。` : '', overwrittenRows: history };
+  salaryImportBatches.unshift(batch);
+  closeDialog(); renderSalary();
+  openDialog(`导入结果 · ${esc(sourceName)}`, `批次 ${batchId} 已留存（导入人 ${esc(batch.operator)} · ${batch.createdAt}）。`, `<div class="ops-detail-list"><div><span>成功导入</span><strong>${batch.success} 行（已落草稿，教师端不可见）</strong></div><div><span>覆盖草稿</span><strong>${overwritten} 行（历史版本已留存）</strong></div><div><span>失败 / 阻断</span><strong>${failedCount} 行（行级阻断，未落库）</strong></div><div><span>课时快照</span><strong>已按导入当时系统课时留存，日明细合计＝月度系统课时</strong></div></div>`);
+  showToast(`工资导入完成：成功 ${batch.success} 行落草稿，阻断 ${failedCount} 行跳过，可在发布前核对。`);
+}
+function openSalaryImportBatches() {
+  const rows = salaryImportBatches.map((batch) => `<tr><td>${esc(batch.id)}</td><td>${esc(batch.month)}</td><td>${esc(batch.file)}</td><td>${esc(batch.operator)}</td><td>${esc(batch.createdAt)}</td><td>${batch.success} / ${batch.failed}</td><td>${batch.overwritten || 0}</td><td>${esc(batch.note || '—')}</td></tr>`).join('');
+  return openDialog('导入批次留痕', '每次导入生成批次记录：批次号、月份、文件、操作人、时间、成功/失败条数与覆盖历史版本；用于工资更正追溯。', `<div class="table-wrap ops-table"><table><thead><tr><th>批次号</th><th>工资月份</th><th>文件</th><th>操作人</th><th>导入时间</th><th>成功 / 失败</th><th>覆盖行</th><th>备注</th></tr></thead><tbody>${rows || '<tr><td colspan="8">暂无导入批次</td></tr>'}</tbody></table></div>`);
+}
+function openSalaryVoid(row) {
+  return openSimpleForm('作废重发工资单', '作废后工资单不可恢复为已发布；重新导入将生成新草稿，全量留痕。', field('作废原因', 'reason', 'text', '请填写作废原因（如金额导入有误）', true), (form) => {
+    const reason = String(form.get('reason') || '').trim();
+    if (!reason) return showToast('作废原因必填。', 'warning');
+    row.status = '已作废'; row.voidedReason = reason; row.voidedAt = demoDateTime(DEMO_TODAY).toISOString().slice(0, 10);
+    recordFinanceAudit('工资作废重发', row, `${row.teacher} ${row.month} 工资单作废：${reason}`);
+    closeDialog(); renderSalary(); showToast('工资单已作废并留痕，可重新导入更正后的金额。', 'warning');
+  });
+}
+function openSalaryImport() {
+  const body = `<form id="salary-import-form" class="ops-dialog-grid"><label class="form-field wide"><span>导入 Excel 文件（仅支持 .xlsx）</span><input name="file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required /></label><div class="ops-actions wide"><button type="button" class="button" data-ops-action="salary-import-template">下载导入模板</button><button type="button" class="button" data-ops-action="salary-import-demo">载入演示导入数据</button></div><p class="ops-form-help wide">模板 9 列：教师工号 + 年月、课酬标准、课时费、其他、应发、扣税、实发、备注；不含课时列（系统自动带出并按自然日归集日明细）。唯一键为教师工号 × 年月；草稿重复导入须确认覆盖并留历史版本，已发布工资单不可覆盖（须先作废重发）。</p></form>`;
+  const dialog = openDialog('导入教师工资', '金额由教务按月导入，系统带出课时并做勾稽校验；导入后为草稿，发布后教师端可见。', body, '<button type="button" class="button" data-dialog-close>取消</button>');
+  dialog.querySelector('#salary-import-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const file = event.currentTarget.querySelector('[name=file]')?.files?.[0];
+    if (!file) return showToast('请选择 .xlsx 格式的 Excel 文件。', 'warning');
+    if (!/\.xlsx$/i.test(file.name)) return showToast('仅支持 .xlsx 格式的 Excel 文件。', 'error');
+    let rows = null;
+    try { rows = await readXlsxSheetRows(await file.arrayBuffer()); } catch { rows = null; }
+    if (!rows) return showToast(`${file.name} 无法解析，请使用标准 .xlsx 文件。`, 'error');
+    const parsed = salaryImportSheetRows(rows);
+    if (!parsed.length) return showToast('未解析到数据行，请使用标准导入模板。', 'warning');
+    closeDialog();
+    openSalaryImportPreview(parsed, file.name);
+  });
+  return dialog;
+}
+
 function openSalaryBatchCreate() {
   const candidates = salaries.filter((item) => item.status === '已发布' && item.paymentStatus === '待发放');
   if (!candidates.length) return showToast('当前没有可加入历史批次记录的工资单。', 'warning');
@@ -370,14 +511,15 @@ function exportMaterials() {
   const link = document.createElement('a'); link.href = URL.createObjectURL(workbook); link.download = `物资台账-${new Date().toISOString().slice(0, 10)}.xlsx`; link.click(); URL.revokeObjectURL(link.href); showToast(`已导出 ${rows.length} 条物资台账。`);
 }
 function handleAction(action, row) {
-  if (action === 'salary-view') return openDialog(`${row.teacher} · 工资详情`, '工资金额与课次明细在发布后锁定。', salaryDetailBody(row));
-  if (action === 'salary-edit') return openSalaryEdit(row);
-  if (action === 'salary-publish') { if (row.differenceStatus === '待处理' || !row.contractRateSnapshot || row.sourceAttendance !== '已完成' || row.sourceTeachingRecords !== '已完成') return showToast('请先补齐考勤、教学记录、合同费率并处理工资差异。', 'warning'); return confirmPublishSalary(row); }
-  if (action === 'salary-batch-publish') { const ready = salaries.filter((item) => item.status === '待发布' && item.tax != null && item.differenceStatus !== '待处理' && item.contractRateSnapshot && item.sourceAttendance === '已完成' && item.sourceTeachingRecords === '已完成'); if (!ready.length) return showToast('没有可发布工资单：需先补齐考勤、教学记录、合同费率和工资差异。', 'warning'); const dialog = openDialog('批量发布工资单', '发布后教师端可见，但不代表资金已发放。', `<p>确认发布 ${ready.length} 条工资单？发布后教师端可见。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-confirm-action="salary-batch-publish">确认发布</button>'); dialog.dataset.rowId = '__batch__'; return dialog; }
-  if (action === 'salary-batch-create') return openSalaryBatchCreate();
-  if (action === 'salary-batch-view') { const records = row.salaryIds.map((id) => salaries.find((item) => item.id === id)).filter(Boolean); return openDialog(`${row.id} · 历史批次记录`, '查看批次金额、教师明细和发放结果。', `<div class="ops-detail-list"><div><span>工资月份</span><strong>${row.month}</strong></div><div><span>发放方式</span><strong>${row.method}</strong></div><div><span>发放总额</span><strong>${money(salaryBatchAmount(row))}</strong></div><div><span>批次状态</span><strong>${tag(row.status)}</strong></div><div><span>实际线下转账日期</span><strong>${row.paidAt || '—'}</strong></div><div><span>银行流水 / 凭证</span><strong>${row.voucher || '—'}</strong></div></div><div class="ops-detail-subtable"><table><thead><tr><th>教师</th><th>收款账户</th><th>实际核发</th><th>发放结果</th></tr></thead><tbody>${records.map((item) => `<tr><td>${esc(item.teacher)}</td><td>${esc(item.account)}</td><td>${money(salaryTotal(item))}</td><td>${tag(item.paymentStatus)}${item.failureReason ? `<br><span class="ops-required">${esc(item.failureReason)}</span>` : ''}</td></tr>`).join('')}</tbody></table></div>`); }
-  if (action === 'salary-batch-result') return openSalaryBatchResult(row);
-  if (action === 'salary-batch-retry') { if (!['部分成功', '全部失败'].includes(row.status)) return showToast('当前批次不可重复重试。', 'warning'); row.status = '发放中'; row.failed = 0; row.salaryIds.forEach((id) => { const salary = salaries.find((item) => item.id === id); if (salary && salary.paymentStatus !== '已发放') { salary.paymentStatus = '发放中'; salary.failureReason = ''; } }); renderSalary(); return showToast('仅未成功工资单重新进入发放中，已成功记录不会重复发放。'); }
+  if (action === 'salary-view') return openDialog(`${row.teacher} · 工资详情`, '金额由教务导入，发布后锁定；课时与日明细由系统统计。', salaryDetailBody(row));
+  if (action === 'salary-import') return openSalaryImport();
+  if (action === 'salary-import-template') return salaryImportTemplate();
+  if (action === 'salary-import-demo') return salaryImportDemo();
+  if (action === 'salary-import-batches') return openSalaryImportBatches();
+  if (action === 'salary-publish') { if (!salaryPublishable(row)) return showToast('该工资单存在未说明的课酬偏差，请先重新导入并填写偏差原因。', 'warning'); return confirmPublishSalary(row); }
+  if (action === 'salary-void') return openSalaryVoid(row);
+  if (action === 'salary-batch-publish') { const ready = salaries.filter(salaryPublishable); if (!ready.length) return showToast('没有可发布的工资单：草稿须完成导入且课酬偏差已说明。', 'warning'); const total = ready.reduce((sum, item) => sum + salaryTotal(item), 0); const exceptions = ready.filter((item) => item.differenceReason).length; const dialog = openDialog('批量发布工资单', '发布后教师端可见，金额锁定；发布不代表资金已发放。', `<div class="ops-detail-list"><div><span>发布人数</span><strong>${ready.length} 人</strong></div><div><span>实发金额合计</span><strong class="ops-amount">${money(total)}</strong></div><div><span>异常提示</span><strong>${exceptions ? `${exceptions} 条存在偏差说明，请确认无误` : '无'}</strong></div></div><p class="ops-warning">发布后金额锁定，更正须作废重发并留痕。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-confirm-action="salary-batch-publish">确认发布</button>'); dialog.dataset.rowId = '__batch__'; return dialog; }
+
   if (action === 'payment-view') return detail('收款详情', '展示收款渠道、关联订单、业务幂等键和到账处理记录。', [['收款单号', row.receiptNo], ['关联订单', row.orderNo], ['学员 / 课程', `${row.student} / ${row.course}`], ['收款来源', row.source], ['收款渠道', row.channel], ['收款金额', money(row.amount)], ['收款时间', row.time], ['业务键', row.businessKey || '系统生成'], ['到账状态', tag(row.status)], ['核对结果', row.auditStatus || '待核对'], ['异常原因', row.exceptionReason || '—']]);
   if (action === 'payment-confirm') { if (row.status !== '待确认') return showToast('该收款记录已处理，不能重复确认。', 'warning'); row.status = '已到账'; row.auditStatus = '已核对'; row.confirmedAt = demoDateTime(DEMO_TODAY).toISOString().slice(0, 16).replace('T', ' '); upsertDemoRecord('paymentRecords', row); recordFinanceAudit('收款确认到账', row, `订单 ${row.orderNo} 收款已核对`); renderPayments(); return showToast('已确认到账，收款记录、订单状态和审计结果已同步。'); }
   if (action === 'payment-exception') return openSimpleForm('登记收款异常', '异常原因必填；订单保持待确认，不能进入退款或履约完成状态。', field('异常原因', 'reason', 'text', '请输入金额、流水或凭证异常原因', true), (form) => { const reason = String(form.get('reason') || '').trim(); if (!reason) return showToast('异常原因必填。', 'warning'); row.status = '异常'; row.auditStatus = '待处理'; row.exceptionReason = reason; upsertDemoRecord('paymentRecords', row); recordFinanceAudit('收款登记异常', row, reason); closeDialog(); renderPayments(); showToast('收款异常已登记，订单不会被重复确认。', 'warning'); });
@@ -423,16 +565,17 @@ function handleAction(action, row) {
   if (action === 'material-delete') { if (row.stock > 0) return openDialog('无法删除物资', '删除前需要校验当前库存。', `<p class="ops-danger">该物资尚有 ${row.stock} 件库存，请先出库清零后再删除。</p>`); if (materialHasReferences(row)) return openDialog('无法删除物资', '删除前需要校验历史流水和业务引用。', '<p class="ops-danger">该物资已有历史出入库流水或业务引用，只能停用，不能物理删除。</p>'); const dialog = openDialog('确认删除物资', '仅允许删除库存为0且没有任何流水或业务引用的物资。', `<p>确认删除“${esc(row.name)}”？</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button danger-button" data-confirm-action="material-delete">确认删除</button>'); dialog.dataset.rowId = row.id; return dialog; }
 }
 function confirmPublishSalary(row) {
-  if (row.tax == null) return showToast('请先完成核算并填写个税。', 'warning');
-  const dialog = openDialog('确认发布工资单', '发布后教师端可查看工资明细，实际转账由财务在线下流程完成。', `<div class="ops-detail-list"><div><span>教师 / 月份</span><strong>${esc(row.teacher)} / ${row.month}</strong></div><div><span>实际核发</span><strong class="ops-amount">${money(salaryTotal(row))}</strong></div></div><p class="ops-warning">发布工资单不代表资金已发放。平台不登记线下转账结果。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-confirm-action="salary-publish">确认发布</button>');
+  const dev = salaryDeviation(row);
+  const dialog = openDialog('确认发布工资单', '发布后教师端可见，金额锁定；实际转账由线下流程完成。', `<div class="ops-detail-list"><div><span>教师 / 月份</span><strong>${esc(row.teacher)} / ${row.month}</strong></div><div><span>系统课时</span><strong>${salarySystemHours(row)} 课时（${salaryDailyDays(row).length} 个授课日）</strong></div><div><span>实发</span><strong class="ops-amount">${money(row.net)}</strong></div><div><span>异常提示</span><strong>${dev !== null && Math.abs(dev) > 0.05 ? `课酬偏差 ${(dev * 100).toFixed(1)}%（原因：${esc(row.differenceReason || '—')}）` : '无'}</strong></div></div><p class="ops-warning">发布后金额锁定，更正须作废重发并留痕。</p>`, '<button type="button" class="button" data-dialog-close>取消</button><button type="button" class="button primary" data-confirm-action="salary-publish">确认发布</button>');
   dialog.dataset.rowId = row.id;
   return dialog;
 }
+
 document.addEventListener('click', (event) => {
   if (!opsRoot) return;
   if (event.target.closest('[data-dialog-close]')) { closeDialog(); return; }
   const confirm = event.target.closest('[data-confirm-action]');
-  if (confirm) { const dialog = confirm.closest('dialog'); const action = confirm.dataset.confirmAction; const id = dialog?.dataset.rowId; const row = id && id !== '__batch__' ? salaries.find((item) => item.id === id) || opsData.find((item) => item.id === id) : null; if (action === 'salary-batch-publish') { const ready = salaries.filter((item) => item.status === '待发布' && item.tax != null); ready.forEach((item) => { item.status = '已发布'; item.paymentStatus = '已发布'; item.batchId = ''; item.paidAt = ''; item.failureReason = ''; }); closeDialog(); renderSalary(); showToast(`已发布${ready.length}条工资单，实际转账由财务在线下流程完成。`); } if (action === 'salary-publish' && row) { if (row.tax == null) { closeDialog(); showToast('请先完成核算并填写个税。', 'warning'); return; } row.status = '已发布'; row.paymentStatus = '已发布'; row.batchId = ''; row.paidAt = ''; row.failureReason = ''; closeDialog(); renderSalary(); showToast('工资单已发布，教师端可见，工资单已发布。'); } if (action === 'refund-complete' && row) { const outcome = settleRefund(row.id, '完成', { name: operatorName(), remark: '渠道退款已完成，报名资格已取消。' }); if (!outcome.ok) { closeDialog(); showToast(outcome.reason === 'REFUND_ALREADY_SETTLED' ? '该退款单已完成，不能重复操作。' : '退款完成操作失败，请稍后重试。', 'warning'); return; } closeDialog(); renderRefunds(); if (outcome.refund?.orderType === '视频课程' || row.orderType === '视频课程') showToast('退款已完成，订单转为已退款，学习权限已回收。'); else showToast(outcome.seatReleased ? '退款已完成，学籍转为已退班并释放名额。' : '退款已完成；学籍此前已退出，本次未重复释放名额。'); } if (action === 'category-delete' && row) { if (categoryHasReferences(row)) { closeDialog(); showToast('该分类已有引用，不能删除。', 'warning'); return; } categories.splice(categories.findIndex((item) => item.id === row.id), 1); removeDemoRecord('categories', row.id); closeDialog(); renderCategories(); showToast('分类已删除。'); } if (action === 'material-delete' && row) { if (row.stock !== 0 || materialHasReferences(row)) { closeDialog(); showToast('该物资存在库存或引用，不能删除。', 'warning'); return; } materials.splice(materials.findIndex((item) => item.id === row.id), 1); removeDemoRecord('materials', row.id); closeDialog(); renderMaterials(); showToast('物资已删除。'); } return; }
+  if (confirm) { const dialog = confirm.closest('dialog'); const action = confirm.dataset.confirmAction; const id = dialog?.dataset.rowId; const row = id && id !== '__batch__' ? salaries.find((item) => item.id === id) || opsData.find((item) => item.id === id) : null; if (action === 'salary-batch-publish') { const ready = salaries.filter(salaryPublishable); ready.forEach((item) => { item.status = '已发布'; item.paymentStatus = '已发布'; item.publishedAt = demoDateTime(DEMO_TODAY).toISOString().slice(0, 10); item.publishedBy = operatorName(); }); closeDialog(); renderSalary(); showToast(`已发布 ${ready.length} 条工资单，金额已锁定，教师端可见。`); } if (action === 'salary-publish' && row) { row.status = '已发布'; row.paymentStatus = '已发布'; row.publishedAt = demoDateTime(DEMO_TODAY).toISOString().slice(0, 10); row.publishedBy = operatorName(); closeDialog(); renderSalary(); showToast('工资单已发布，金额已锁定，教师端可见。'); }if (action === 'refund-complete' && row) { const outcome = settleRefund(row.id, '完成', { name: operatorName(), remark: '渠道退款已完成，报名资格已取消。' }); if (!outcome.ok) { closeDialog(); showToast(outcome.reason === 'REFUND_ALREADY_SETTLED' ? '该退款单已完成，不能重复操作。' : '退款完成操作失败，请稍后重试。', 'warning'); return; } closeDialog(); renderRefunds(); if (outcome.refund?.orderType === '视频课程' || row.orderType === '视频课程') showToast('退款已完成，订单转为已退款，学习权限已回收。'); else showToast(outcome.seatReleased ? '退款已完成，学籍转为已退班并释放名额。' : '退款已完成；学籍此前已退出，本次未重复释放名额。'); } if (action === 'category-delete' && row) { if (categoryHasReferences(row)) { closeDialog(); showToast('该分类已有引用，不能删除。', 'warning'); return; } categories.splice(categories.findIndex((item) => item.id === row.id), 1); removeDemoRecord('categories', row.id); closeDialog(); renderCategories(); showToast('分类已删除。'); } if (action === 'material-delete' && row) { if (row.stock !== 0 || materialHasReferences(row)) { closeDialog(); showToast('该物资存在库存或引用，不能删除。', 'warning'); return; } materials.splice(materials.findIndex((item) => item.id === row.id), 1); removeDemoRecord('materials', row.id); closeDialog(); renderMaterials(); showToast('物资已删除。'); } return; }
   const button = event.target.closest('[data-ops-action]'); if (!button) return;
   const action = button.dataset.opsAction;
   if (action === 'refund-tab') { const url = new URL(location.href); url.searchParams.set('tab', button.dataset.tab); history.replaceState({}, '', url); renderRefunds(); return; }

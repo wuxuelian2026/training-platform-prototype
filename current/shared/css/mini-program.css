@@ -1926,6 +1926,7 @@ body:has(.is-schedule-share) .page-help-trigger { display: none; }
 /* I1-CLASS-DETAIL-05/10：小程序页说明按钮补到 44px；底部有常驻操作条时上移，避免压住内容与操作条。 */
 body:has([data-mobile-shell]) .page-help-trigger { width: 44px; height: 44px; }
 body:has([data-mobile-shell]):has(.mp-bottom-actions) .page-help-trigger { bottom: calc(142px + env(safe-area-inset-bottom)); }
+body:has([data-mobile-shell]):has(.hs-dock) .page-help-trigger { bottom: calc(142px + env(safe-area-inset-bottom)); }
 /* I1-TEACHER-CLASS-01：教师端班级详情——课次行内含教师考勤（开始／结束上课时间、教学记录文本）。 */
 .teacher-class-session { margin-top: 10px; padding: 12px 13px; border: 1px solid #eee7e0; border-radius: 8px; background: #fff; }
 .teacher-class-session.is-done { background: #fdfcfb; }
@@ -2145,15 +2146,15 @@ body:has([data-mobile-shell]):has(.mp-bottom-actions) .page-help-trigger { botto
 .hs-composer-hint { margin: 5px 0 0; color: #8a91a0; font-size: 11px; line-height: 1.5; }
 .hs-quick-chips { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 6px; }
 .hs-quick-chip { flex: 0 0 auto; padding: 5px 10px; border: 1px solid #e3e0da; border-radius: 14px; background: #fff; color: #595959; font-size: 12px; white-space: nowrap; }
-.hs-preview-layer { margin-top: 8px; padding: 10px; border: 1px dashed #d9d3cc; border-radius: 8px; background: #faf9f7; }
-.hs-preview-layer strong { font-size: 13px; }
-.hs-preview-layer p { margin: 6px 0; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
-.hs-preview-actions { display: flex; gap: 8px; margin-top: 8px; }
-.hs-preview-actions .mp-button { min-height: 36px; }
 
 /* 班级详情底部操作条：家校沟通入口与评价按钮同排，仅按钮 + 未读数字 */
 .hs-entry-button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 96px; }
 .hs-entry-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; background: #d97706; color: #fff; font-size: 11px; line-height: 1; }
+/* 教师端班级详情：家校沟通吸底固定条，复用 .mp-bottom-actions 定位范式，避开 62px 底部导航。 */
+.hs-dock { position: fixed; right: 0; bottom: calc(62px + env(safe-area-inset-bottom)); left: 0; z-index: 11; display: flex; width: min(100%, 520px); margin: 0 auto; padding: 10px 14px; border-top: 1px solid #e9e4df; background: rgba(255,255,255,.98); box-shadow: 0 -4px 16px rgba(31,31,31,.05); }
+.hs-dock-button { display: inline-flex; flex: 1 1 auto; align-items: center; justify-content: center; min-height: 44px; }
+body:has(.hs-dock) .mobile-main { padding-bottom: 96px; }
+
 
 /* CR-2026-166：兴趣专业字段与默认值回落提示 */
 .mp-interest-notice { margin: 0 0 10px; padding: 9px 12px; border: 1px solid #f5dfae; border-radius: 8px; background: #fff7e8; color: #8a5b13; font-size: 12px; line-height: 1.6; }
@@ -2182,3 +2183,7 @@ body:has([data-mobile-shell]):has(.mp-bottom-actions) .page-help-trigger { botto
 .mp-interest-tag.is-disabled { opacity: .45; cursor: not-allowed; }
 .mp-interest-tag.is-disabled:focus-within { outline: none; }
 .mp-form-error[data-interest-overflow] { display: block; margin-top: 4px; }
+
+/* 家校互动 v1.1 修订（2026-11-06）：教师端班级模块顶部入口收敛为「家校沟通 + 数字徽标」 */
+.hs-class-top-entry { display: inline-flex; align-items: center; margin: 0 0 12px; padding: 7px 14px; border: 1px solid #d9d3cc; border-radius: 999px; background: #fff; color: #595959; font-size: 13px; font-weight: 600; text-decoration: none; }
+.hs-class-top-entry:hover { border-color: var(--brand); color: var(--brand); }

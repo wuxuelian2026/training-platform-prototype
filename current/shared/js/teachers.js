@@ -1336,7 +1336,6 @@ function initContracts() {
       text('contract-detail-campus', data.campus);
       text('contract-detail-term', noFixedTerm ? '长期有效' : data.term);
       text('contract-detail-term-status', termStatusOf(row));
-      text('contract-detail-rate', `¥${Number(data.rate || 0).toFixed(2)} / 每次课（含税）`);
       const contractFile = finalContractFileName(data);
       text('contract-detail-id-card', teacherArchiveIdCardMask(data.idCard || ''));
       text('contract-detail-file', contractFile);
@@ -1356,7 +1355,6 @@ function initContracts() {
         campus: data.campus,
         startAt: noFixedTerm ? '' : termStart,
         endAt: noFixedTerm ? '长期有效' : termEnd,
-        rate: data.rate,
         finalFile: contractFile,
         partyB: data.teacher
       });
@@ -1385,7 +1383,6 @@ function initContracts() {
         '#contract-campus': row.dataset.campus?.split(' · ')[0] || '',
         '#contract-start': row.dataset.term?.split('至')[0]?.trim() || '',
         '#contract-end': row.dataset.term?.split('至')[1]?.trim() || '',
-        '#contract-rate': row.dataset.rate || '',
         '#contract-number': String(row.dataset.number || 'CT0000000000').replace(/^CT(\d{4})/, (_, year) => `CT${Number(year) + 1}`)
       };
       Object.entries(fields).forEach(([selector, value]) => {
@@ -1438,7 +1435,6 @@ function initContracts() {
     const startAt = formElement.querySelector('#contract-start')?.value || CONTRACT_DEMO_TODAY;
     const noFixedTerm = Boolean(formElement.querySelector('#contract-long-term')?.checked);
     const endAt = noFixedTerm ? '' : formElement.querySelector('#contract-end')?.value || '';
-    const rate = formElement.querySelector('#contract-rate')?.value || '0';
     const note = formElement.querySelector('#contract-note')?.value || '';
     const term = noFixedTerm ? `${startAt} 起（无固定期限）` : `${startAt} 至 ${endAt}`;
     const row = document.createElement('tr');
@@ -1448,7 +1444,6 @@ function initContracts() {
     row.dataset.type = type;
     row.dataset.status = '已签署';
     row.dataset.term = term;
-    row.dataset.rate = rate;
     row.dataset.signDate = CONTRACT_DEMO_TODAY;
     row.dataset.uploadedAt = CONTRACT_DEMO_TODAY;
     row.dataset.contractFile = file.name;

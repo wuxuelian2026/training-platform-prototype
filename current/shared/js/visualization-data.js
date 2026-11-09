@@ -208,7 +208,7 @@ export function aggregateDashboard(facts, startYear, now = new Date()) {
     if (convertedIds.has(row.id)) group.converted++;
   });
   const sourceRanking = [...sourceGroups.values()].map(row => ({ ...row, rate: row.converted / row.leads }))
-    .sort((a, b) => b.converted - a.converted || b.leads - a.leads || a.id.localeCompare(b.id, 'zh-CN')).slice(0, 5);
+    .sort((a, b) => b.converted - a.converted || b.leads - a.leads || a.id.localeCompare(b.id, 'zh-CN')).slice(0, 10);
   const refunds = uniqueBy(facts.refunds, 'id').filter(row => occurred(row.completedOn));
   const refunded = new Map();
   refunds.forEach(row => refunded.set(row.orderId, (refunded.get(row.orderId) || 0) + row.amountCents));
