@@ -32,36 +32,25 @@ export function shanghaiDate(now = new Date()) {
   return parts.year + '-' + parts.month + '-' + parts.day;
 }
 
+// 历史函数名沿用（改动面最小化），语义已按评审口径改为自然年度：
+// 顶部所选年份即统计年度，区间 1 月 1 日—12 月 31 日，不再按学年 9 月 1 日切分。
 export function academicYearStart(now = new Date()) {
-  const today = shanghaiDate(now);
-  return Number(today.slice(0, 4)) - (Number(today.slice(5, 7)) < 9 ? 1 : 0);
+  return Number(shanghaiDate(now).slice(0, 4));
 }
 
 export function academicPeriod(startYear, now = new Date()) {
   const today = shanghaiDate(now);
-  const startDate = startYear + '-09-01';
-  const endDate = (startYear + 1) + '-08-31';
-  const cutoffDate = today < endDate ? today : endDate;
-  const months = Array.from({ length: 12 }, (_, index) => {
-    const month = (index + 8) % 12 + 1;
-    const year = startYear + (index >= 4 ? 1 : 0);
-    const key = year + '-' + String(month).padStart(2, '0');
-    return { key, year, month, label: month + '月', future: key > cutoffDate.slice(0, 7) };
-  });
-  return { startYear, startDate, endDate, cutoffDate, label: startYear + '-' + (startYear + 1), months };
-}
-
-function calendarPeriod(year, now = new Date()) {
-  const today = shanghaiDate(now);
+  const year = Number(startYear);
   const startDate = year + '-01-01';
   const endDate = year + '-12-31';
-  const cutoffDate = today < endDate ? today : endDate;
+  const cutoffDate = today < startDate ? startDate : (today < endDate ? today : endDate);
   const months = Array.from({ length: 12 }, (_, index) => {
     const month = index + 1;
     const key = year + '-' + String(month).padStart(2, '0');
     return { key, year, month, label: month + '月', future: key > cutoffDate.slice(0, 7) };
   });
-  return { year, startDate, endDate, cutoffDate, months };
+  // year 与 startYear 同源，供收入图 aria-label 等展示位沿用历史字段名。
+  return { startYear: year, year, startDate, endDate, cutoffDate, label: String(year), months };
 }
 
 // 展示样例独立于三端业务存储；同时保留支付、退款、学籍和班级事实，避免用静态总数拼榜单。
@@ -74,7 +63,9 @@ export function createDemoFacts(startYear) {
     return value.toISOString().slice(0, 10);
   };
   const date = (year, month, day) => year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-  for (const year of [startYear - 1, startYear, startYear + 1]) {
+  // 自然年度口径下，上一年 1—8 月开课的班级来自更早的学年批次；
+  // 多铺一个学年，保证同比基准（上一年同期）四批次完整、不虚高。
+  for (const year of [startYear - 2, startYear - 1, startYear, startYear + 1]) {
     BATCHES.forEach((batch, batchIndex) => {
       const calendarYear = year + (batchIndex > 0 ? 1 : 0);
       const firstMonth = [9, 1, 3, 6][batchIndex];
@@ -151,8 +142,10 @@ export function compareAcademicYears(facts, startYear, now = new Date()) {
     growth: previous.totals[metric.key] > 0
       ? (current.totals[metric.key] - previous.totals[metric.key]) / previous.totals[metric.key] : null }));
   const batchComparisons = BATCHES.map(name => {
-    const batch = facts.batches.find(row => row.academicYear === startYear && row.name === name);
-    const prior = facts.batches.find(row => row.academicYear === startYear - 1 && row.name === name);
+    const batch = facts.batches.find(row =>
+      Number(datePart(row.startsOn).slice(0, 4)) === Number(startYear) && row.name === name);
+    const prior = facts.batches.find(row =>
+      Number(datePart(row.startsOn).slice(0, 4)) === Number(startYear) - 1 && row.name === name);
     const ready = batch?.enrollmentStartsOn && batch?.enrollmentEndsOn;
     const future = ready && cutoff < batch.enrollmentStartsOn;
     const complete = ready && cutoff >= batch.enrollmentEndsOn;
@@ -160,7 +153,8 @@ export function compareAcademicYears(facts, startYear, now = new Date()) {
     const priorDate = prior?.enrollmentStartsOn ? new Date(Date.parse(prior.enrollmentStartsOn + 'T00:00:00Z') + days(cutoff, batch?.enrollmentStartsOn || cutoff) * 86400000).toISOString().slice(0, 10) : null;
     const priorCutoff = complete ? previousCutoff : priorDate;
     const snapshot = (year, date) => {
-      const rows = facts.classes.filter(row => row.academicYear === year && row.batch === name && !row.cancelled);
+      const rows = facts.classes.filter(row =>
+        Number(datePart(row.openedOn).slice(0, 4)) === Number(year) && row.batch === name && !row.cancelled);
       const ids = new Set(rows.map(row => row.id));
       const at = aggregateDashboard(facts, year, new Date(date + 'T23:59:59+08:00'));
       const orders = uniqueBy(facts.orders, 'id').filter(row => row.kind === 'offline' && ids.has(row.classId) && row.paidOn && datePart(row.paidOn) <= date);
@@ -180,7 +174,7 @@ export function compareAcademicYears(facts, startYear, now = new Date()) {
 
 export function aggregateDashboard(facts, startYear, now = new Date()) {
   const period = academicPeriod(startYear, now);
-  const incomePeriod = calendarPeriod(startYear, now);
+  const incomePeriod = period;
   const inPeriod = value => {
     const date = datePart(value);
     return date >= period.startDate && date <= period.cutoffDate;
@@ -215,7 +209,9 @@ export function aggregateDashboard(facts, startYear, now = new Date()) {
   const hasPaidBalance = order => order && occurred(order.paidOn) && order.amountCents > (refunded.get(order.id) || 0);
   const courses = new Map(facts.courses.map(row => [row.id, row]));
   const teachers = new Map(facts.teachers.map(row => [row.id, row]));
-  const classes = uniqueBy(facts.classes, 'id').filter(row => row.academicYear === startYear && !row.cancelled);
+  // 自然年度口径：班级按实际开课年份归属，不再按演示数据的学年标签。
+  const classes = uniqueBy(facts.classes, 'id').filter(row =>
+    Number(datePart(row.openedOn).slice(0, 4)) === Number(startYear) && !row.cancelled);
   const classById = new Map(classes.map(row => [row.id, row]));
   const opened = classes.filter(row => occurred(row.openedOn));
   const validEnrollments = facts.enrollments.filter(row => {
@@ -285,11 +281,13 @@ export function aggregateDashboard(facts, startYear, now = new Date()) {
   });
 
   const batches = BATCHES.map(name => {
-    const batch = facts.batches.find(row => row.academicYear === startYear && row.name === name);
+    const batch = facts.batches.find(row =>
+      Number(datePart(row.startsOn).slice(0, 4)) === Number(startYear) && row.name === name);
     const selected = enrollments.filter(row => classById.get(row.classId).batch === name);
     const classCount = opened.filter(row => row.batch === name).length;
-    return { name, calendarYear: startYear + (name === '秋季' ? 0 : 1), classes: classCount, enrolled: selected.length,
-      future: Boolean(batch?.startsOn && !occurred(batch.startsOn) && !selected.length && !classCount) };
+    // 自然年度口径：四批次都归属所选年度；本年内没有批次事实或尚未开课且无业绩，均不计「已发生」。
+    return { name, calendarYear: Number(startYear), classes: classCount, enrolled: selected.length,
+      future: !selected.length && !classCount && (!batch || !occurred(batch.startsOn)) };
   });
   const ranking = (keyOfClass, nameOf, classRows = classes) => {
     const groups = new Map();

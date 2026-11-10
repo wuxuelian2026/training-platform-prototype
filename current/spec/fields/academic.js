@@ -158,6 +158,35 @@ const ACADEMIC_FIELD_SPEC = {
         { id: 'FD-ACADEMIC-084', label: '课次状态', type: '下拉', length: '待上课 / 上课中 / 已完成', required: '否', note: '取 SM-LESSON 三态', constraints: { options: ['待上课', '上课中', '已完成'] } },
         { id: 'FD-ACADEMIC-085', label: '排课提示', type: '状态（只读）', length: '无冲突 / 冲突提示', required: '系统派生', note: '汇总教师、教室、学员时间、转场和容量风险', constraints: { readOnly: true, derived: true } }
       ] }], notes: ['时间轴固定为 08:00–21:00，每 15 分钟一个刻度，共 52 格，不作为系统参数配置。']
+    },
+
+    'academic/home-school': {
+      groups: [
+        { heading: '会话监管列表字段', fields: [
+          { id: 'FD-ACADEMIC-114', label: '会话编号', type: '文本（只读）', length: '系统生成', required: '系统派生', note: '会话全局唯一标识', constraints: { readOnly: true, system: true } },
+          { id: 'FD-ACADEMIC-115', label: '班级 / 学员 / 教师', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '会话所属班级、学员与授课教师快照', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-ACADEMIC-116', label: '会话状态', type: '状态（只读）', length: '待回复 / 已回复 / 只读（结课或下架）', required: '系统派生', note: '结课或下架的会话进入只读', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-ACADEMIC-117', label: '最后消息时间', type: '时间（只读）', length: 'YYYY-MM-DD HH:mm', required: '系统派生', note: '最近一条消息的时间', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD HH:mm' } },
+          { id: 'FD-ACADEMIC-118', label: '只读原因', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '结课或下架导致只读时记录原因', constraints: { readOnly: true, derived: true } }
+        ] },
+        { heading: '内容安全与触达配置字段', fields: [
+          { id: 'FD-ACADEMIC-119', label: '启用规则', type: '开关', length: '开 / 关', required: '否', note: '开启后留言与教师回复经服务端事前拦截' },
+          { id: 'FD-ACADEMIC-120', label: '家长已授权订阅消息', type: '开关', length: '开 / 关', required: '否', note: '未授权时降级为站内未读红点，不阻塞沟通闭环' },
+          { id: 'FD-ACADEMIC-121', label: '违规关键词', type: '多行文本', length: '≤ 200 字', required: '否', note: '逗号分隔的示例规则，命中即拦截不入库', constraints: { maxLength: 200 } }
+        ] },
+        { heading: '沟通关系绑定字段', fields: [
+          { id: 'FD-ACADEMIC-122', label: '班级编号', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '绑定三元组中的班级标识', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-ACADEMIC-123', label: '班级名称', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '绑定班级快照', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-ACADEMIC-124', label: '学员', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '绑定学员快照', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-ACADEMIC-125', label: '授课教师', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '绑定教师快照', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-ACADEMIC-126', label: '关系状态', type: '单选', length: '在读 / 已结课', required: '系统派生', note: '停用或已结课班级不显示联系入口', constraints: { readOnly: true, derived: true } }
+        ] }
+      ],
+      notes: [
+        '后台只做配置、监管与审计，不代家长或教师发消息；漏放内容在本页人工复核队列内下架，不设独立举报工单。',
+        '沟通关系以教务主数据为准，绑定「班级 × 学员 × 授课教师」三元组；停用或已结课班级不生成孤立会话。',
+        '可按班级、教师、学员独立筛选各列表；会话监管与沟通关系绑定的筛选状态互不干扰。'
+      ]
     }
   }
 };

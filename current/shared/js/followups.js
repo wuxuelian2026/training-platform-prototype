@@ -121,7 +121,7 @@
   function learnerFollowUpsHtml(learner) {
     const links = linksForLearner(learner?.id);
     if (!links.length) {
-      return `<div class="empty">该学员暂未关联线索，跟进记录以 CRM 线索为准。</div><p class="muted">请先在 CRM 线索详情中人工确认绑定；<a class="text-button" href="${LEADS_URL}">前往线索跟进 ›</a></p>`;
+      return `<div class="empty">该学员暂未关联线索，跟进记录以 CRM 线索为准。</div><p class="muted">请先在 CRM 编辑线索表单中人工确认绑定；<a class="text-button" href="${LEADS_URL}">前往线索跟进 ›</a></p>`;
     }
     const sourceNote = `<p class="muted">数据来源：CRM 线索跟进记录（只读） · 已关联 ${links.length} 条线索 · 按时间倒序；新增或编辑跟进请前往线索详情。</p>`;
     const rows = learnerFollowUps(learner.id);

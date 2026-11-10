@@ -122,6 +122,11 @@ const navGroups = [
     ]
   },
   {
+    icon: '服', label: '客服知识库', items: [
+      ['库', '常见问题库', '/admin/pages/service/index.html', 'service']
+    ]
+  },
+  {
     icon: '设', label: '系统管理', items: [
       ['用', '后台用户管理', '/admin/pages/system/users.html', 'system'],
       ['权', '角色权限管理', '/admin/pages/system/roles.html', 'system'],

@@ -38,7 +38,7 @@ const SYSTEM_FIELD_SPEC = {
       ],
       notes: [
         '保存前校验数值范围：作业截止 24–720 小时、出勤率与作业提交率 0–100%、最多观看课时 0–999、转场最小间隔 1–120 分钟、跨校区额外预留 0–120 分钟、支付时限 1–1440 分钟、退款申请窗口 0–365 天（0 表示不限）、文件规格为正整数、重试次数 1–5 且至少一个重试间隔。',
-        '业务枚举（难度等级、适合年龄、课时类型、课时时长）不在本页维护，统一在「系统管理 → 数据字典」页维护，本页不得出现这些枚举的增删入口。',
+        '业务枚举（难度等级、适合年龄、课时类型、课时时长、流失原因、转班原因）不在本页维护，统一在「系统管理 → 数据字典」页维护，本页不得出现这些枚举的增删入口。',
         '任一参数超出范围时整体不保存，并提示需要修正的取值区间。',
         '固定规则不提供配置：课表时间轴（每天 08:00–21:00、15 分钟 1 刻度、共 52 格）是本页唯一的固定规则，页面只做只读说明；调整需走变更单。',
         '待支付支付时限、视频退款申请窗口、文件上传规格与消息重试策略都在本页配置：学员端支付页、统一订单管理、退款资格校验、合同与教学资源上传读取同一份配置，页面不得写死数值。',
@@ -57,7 +57,7 @@ const SYSTEM_FIELD_SPEC = {
       ],
       notes: [
         '本页只维护业务枚举，平台参数、业务开关与排课策略参数在「参数配置」页维护。',
-        '字典类型由产品口径固定为难度等级、适合年龄、课时类型、课时时长；新增或删除字典类型须走变更单，不提供页面自助新增。',
+        '字典类型由产品口径固定为难度等级、适合年龄、课时类型、课时时长、流失原因、转班原因六类；新增或删除字典类型须走变更单，不提供页面自助新增。',
         '字典维护即时生效并写入审计日志；课时时长字典已冻结为 45 分钟（CR-2026-155 C2），新建与已有课次均按 45 分钟计算，不保留历史多档时长。',
         '字典项重复或留空时按去重与过滤处理，不静默产生第二条同名字典项。'
       ]
@@ -151,6 +151,72 @@ const SYSTEM_FIELD_SPEC = {
         '仅展示当前后台账号作为接收人的业务消息；消息模板与推送记录不在本页重复维护。',
         '消息用于知会和留痕，不承载审批、确认、发布等处理动作；需要处理的事项统一进入“我的待办”。',
         '消息接收范围按通知事件生成时冻结的接收人快照确定，当前账号不在接收范围时不展示。'
+      ]
+    },
+
+    'system/student-archive': {
+      groups: [
+        { heading: '学员档案列表字段', fields: [
+          { id: 'FD-SYSTEM-063', label: '学员', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '关联学员姓名，点击进入档案详情', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-064', label: '账号昵称', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '所属家长登录账号昵称', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-065', label: '关系', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '学员与账号的关系（如 子女）', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-066', label: '性别', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '学员性别', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-067', label: '出生日期', type: '日期（只读）', length: 'YYYY-MM-DD', required: '系统派生', note: '学员出生日期', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD' } },
+          { id: 'FD-SYSTEM-068', label: '手机号', type: '文本（只读）', length: '11 位数字', required: '系统派生', note: '按角色脱敏展示', constraints: { readOnly: true, derived: true, maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
+          { id: 'FD-SYSTEM-069', label: '学员状态', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '学员当前状态', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-070', label: '当前学员', type: '状态（只读）', length: '当前学员 / —', required: '系统派生', note: '是否当前在读学员', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-071', label: '关联时间', type: '时间（只读）', length: '系统派生', required: '系统派生', note: '学员与账号建立关联的时间', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-072', label: '在读班级', type: '整数（只读）', length: '非负整数', required: '系统派生', note: '该学员在读班级数量', constraints: { readOnly: true, derived: true, integer: true } },
+          { id: 'FD-SYSTEM-073', label: '已报名课程', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '已报名课程名称聚合', constraints: { readOnly: true, derived: true } }
+        ] },
+        { heading: '筛选字段', fields: [
+          { id: 'FD-SYSTEM-074', label: '关键词', type: '文本', length: '≤ 30 字', required: '否', note: '覆盖学员姓名、家长姓名与手机号', constraints: { maxLength: 30 } }
+        ] }
+      ],
+      notes: [
+        '列表聚合全部账号下关联学员，支持按账号（?accountId=）下钻只看该账号学员。',
+        '关键词搜索同时命中学员姓名、家长姓名与手机号（学员与家长手机号均匹配）。',
+        '本页字段均为关联学员快照的只读投影，不在此新增或编辑学员资料。'
+      ]
+    },
+    'system/student-profile': {
+      groups: [
+        { heading: '基础档案字段', fields: [
+          { id: 'FD-SYSTEM-075', label: '学员姓名', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '学员真实姓名', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-076', label: '与账号关系', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '学员与登录账号的关系', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-077', label: '性别 / 年龄', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '学员性别与年龄', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-078', label: '出生日期', type: '日期（只读）', length: 'YYYY-MM-DD', required: '系统派生', note: '学员出生日期', constraints: { readOnly: true, derived: true, format: 'YYYY-MM-DD' } },
+          { id: 'FD-SYSTEM-079', label: '手机号', type: '文本（只读）', length: '11 位数字', required: '系统派生', note: '按角色脱敏展示', constraints: { readOnly: true, derived: true, maxLength: 11, pattern: '^1[3-9]\\d{9}$' } },
+          { id: 'FD-SYSTEM-080', label: '来源渠道', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '学员来源渠道', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-081', label: '监护人', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '学员监护人姓名', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-082', label: '紧急联系人', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '学员紧急联系人', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-083', label: '关联账号', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '跳转学员用户详情', constraints: { readOnly: true, derived: true } }
+        ] },
+        { heading: '报名与订单字段', fields: [
+          { id: 'FD-SYSTEM-084', label: '课程', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '订单关联课程', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-085', label: '班级', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '订单关联班级', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-086', label: '金额', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '订单金额', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-087', label: '订单状态', type: '状态（只读）', length: '系统派生', required: '系统派生', note: '订单支付状态', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-088', label: '支付时间', type: '时间（只读）', length: '系统派生', required: '系统派生', note: '订单支付成功时间', constraints: { readOnly: true, derived: true } }
+        ] },
+        { heading: '学习轨迹字段', fields: [
+          { id: 'FD-SYSTEM-089', label: '班级名称', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '学习轨迹按班级聚合', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-090', label: '课程名称', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '班级所属课程', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-091', label: '授课教师', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '班级授课教师', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-092', label: '总课时', type: '整数（只读）', length: '非负整数', required: '系统派生', note: '班级总课时数', constraints: { readOnly: true, derived: true, integer: true } },
+          { id: 'FD-SYSTEM-093', label: '入学-结业时间', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '入学日期至结业日期', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-094', label: '出勤率', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '班级出勤率', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-095', label: '作业完成率', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '班级作业完成率', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-096', label: '教师评语', type: '文本（只读）', length: '系统派生', required: '系统派生', note: '教师评语汇总', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-097', label: '结业状态', type: '状态（只读）', length: '在读 / 已结业', required: '系统派生', note: '班级结业状态', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-098', label: '学习报告状态', type: '状态（只读）', length: '已生成 / 未生成', required: '系统派生', note: '结业后报告生成状态', constraints: { readOnly: true, derived: true } },
+          { id: 'FD-SYSTEM-099', label: '证书状态', type: '状态（只读）', length: '已发放 / 暂无', required: '系统派生', note: '结业证书发放状态', constraints: { readOnly: true, derived: true } }
+        ] }
+      ],
+      notes: [
+        '档案概览展示基础档案与报名订单，字段均为只读快照，不提供编辑入口。',
+        '学习轨迹按班级聚合，入学日期倒序展示；出勤率、作业完成率与评语取自该班级记录。',
+        '跟进记录页签只读投影 CRM 线索的跟进记录，档案侧不写入、不引用家校互动数据。'
       ]
     }
   }

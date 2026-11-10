@@ -15,6 +15,7 @@ const { ACADEMIC_FIELD_SPEC } = __classicRequire("spec/fields/academic.js");
 const { TEACHER_APP_FIELD_SPEC } = __classicRequire("spec/fields/teacher.js");
 const { LEARNER_APP_FIELD_SPEC } = __classicRequire("spec/fields/learner.js");
 const { ADMIN_FIELD_SPEC } = __classicRequire("spec/fields/admin.js");
+const { SERVICE_FIELD_SPEC } = __classicRequire("spec/fields/service.js");
 const { pageTypeOf } = __classicRequire("spec/pages/page-types.js");
 const FIELD_MODULES = [
   TEACHER_FIELD_SPEC,
@@ -27,7 +28,8 @@ const FIELD_MODULES = [
   ACADEMIC_FIELD_SPEC,
   TEACHER_APP_FIELD_SPEC,
   LEARNER_APP_FIELD_SPEC,
-  ADMIN_FIELD_SPEC
+  ADMIN_FIELD_SPEC,
+  SERVICE_FIELD_SPEC
 ];
 const PAGE_FIELD_SPECS = Object.fromEntries(
   FIELD_MODULES.flatMap((module) => Object.entries(module.pages))

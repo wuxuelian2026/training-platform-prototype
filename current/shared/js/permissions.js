@@ -21,6 +21,12 @@ const MANAGE = ['all', 'campus', 'major', 'self'];
 const TEACHING = ['all', 'campus', 'major'];
 const SYSTEM = ['all'];
 const PERMISSION_POINTS = [
+  { id: 'PERM-SERVICE-001', module: '客服知识库', object: '常见问题库条目', action: '查看', scopes: VIEW, note: 'CR-2026-172：查看常见问题库、未命中问题与客服留言列表' },
+  { id: 'PERM-SERVICE-002', module: '客服知识库', object: '常见问题库条目', action: '维护与上下架', scopes: MANAGE, note: 'CR-2026-172：新增、编辑、删除条目与上下架；下架条目不参与匹配' },
+  { id: 'PERM-SERVICE-003', module: '客服知识库', object: '批量导入导出', action: '导入/导出', scopes: SYSTEM, note: 'CR-2026-172：.xlsx 模板下载、批量导入与导出；导出仅知识库 5 字段' },
+  { id: 'PERM-SERVICE-004', module: '客服知识库', object: '未命中问题', action: '查看与处置', scopes: MANAGE, note: 'CR-2026-172：转为知识条目、忽略；已忽略不回退' },
+  { id: 'PERM-SERVICE-005', module: '客服知识库', object: '客服留言', action: '查看与回复', scopes: MANAGE, note: 'CR-2026-172：逐条文本回复，写入 consultations[].reply' },
+
   { id: 'PERM-WORKBENCH-001', module: '工作台', object: '我的待办', action: '查看', scopes: ['all', 'self'], note: '查看本人待办（迭代2工作台承接全部待办类型）' },
   { id: 'PERM-TEACHER-001', module: '师资中心', object: '教师', action: '查看', scopes: VIEW, note: '查看教师列表、详情、证书与合同摘要' },
   { id: 'PERM-TEACHER-002', module: '师资中心', object: '教师档案', action: '档案维护', scopes: MANAGE, note: '新增、编辑教师档案；保存草稿与完成建档' },
@@ -118,6 +124,7 @@ const roleHasPermission = (roleKey, permissionId) => permissionsOfRole(roleKey).
 
 // 页面 → 访问所需权限点：缺失时由后台壳层渲染统一的「暂无权限」空态。
 const ADMIN_PAGE_PERMISSIONS = {
+  '/admin/pages/service/index.html': ['PERM-SERVICE-001'],
   '/admin/pages/teachers/list.html': ['PERM-TEACHER-001'],
   '/admin/pages/teachers/create.html': ['PERM-TEACHER-002'],
   '/admin/pages/teachers/profile.html': ['PERM-TEACHER-001'],

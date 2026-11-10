@@ -308,15 +308,38 @@ function renderStudentArchive() {
   if (!studentUserCanView()) { pageFrame('学员档案', '', '', '<section class="card system-state-card system-state-error" role="alert"><strong>暂无权限访问</strong><p>当前角色无权查看学员档案。</p><a class="button" href="/admin/index.html">返回工作台</a></section>'); return; }
   const accountId = new URLSearchParams(window.location.search).get('accountId');
   const account = accountId ? studentUserAccounts.find((item) => item.id === accountId) : null;
-  const learners = account ? account.learners : studentUserAccounts.reduce((list, item) => list.concat(item.learners), []);
-  systemData = learners;
+  // 聚合时保留所属家长账号，便于按「家长姓名 / 家长手机号」检索；id 取自学员以保证行标识稳定。
+  const pairs = account
+    ? account.learners.map((learner) => ({ id: learner.id, learner, account }))
+    : studentUserAccounts.reduce((list, acc) => list.concat(acc.learners.map((learner) => ({ id: learner.id, learner, account: acc }))), []);
+  systemData = pairs.map((p) => p.learner);
   const controls = account ? `<a class="button" href="/admin/pages/system/student-archive.html">查看全部学员档案</a>` : '';
   const description = account
     ? `当前仅显示账号「${escapeHtml(account.name)}」下关联的 ${account.learners.length} 名学员。`
-    : `汇总全部账号下关联的 ${learners.length} 名学员。`;
-  const rows = learners.map((learner) => `<tr><td><a class="text-button" href="/admin/pages/system/student-profile.html?learnerId=${encodeURIComponent(learner.id)}">${escapeHtml(learner.name)}</a></td><td>${escapeHtml(learner.relation)}</td><td>${escapeHtml(learner.gender)}</td><td>${escapeHtml(learner.birthday)}</td><td>${escapeHtml(learner.phone)}</td><td>${escapeHtml(learner.status)}</td><td>${learner.current ? '<span class="tag brand">当前学员</span>' : '—'}</td><td>${escapeHtml(learner.linkedAt)}</td><td>${(learner.classes || []).length}</td><td>${learner.courses}</td></tr>`).join('');
-  const body = rows || '<tr><td colspan="10"><div class="empty">暂无关联学员。</div></td></tr>';
-  pageFrame('学员档案', description, controls, `<div class="table-wrap student-subtable-wrap"><table class="student-subtable"><thead><tr><th>学员</th><th>关系</th><th>性别</th><th>出生日期</th><th>手机号</th><th>学员状态</th><th>当前学员</th><th>关联时间</th><th>在读班级</th><th>已报名课程</th></tr></thead><tbody>${body}</tbody></table></div>`);
+    : `汇总全部账号下关联的 ${pairs.length} 名学员。`;
+  if (!pairs.length) {
+    pageFrame('学员档案', description, controls, '<div class="empty">暂无关联学员。</div>');
+    return;
+  }
+  // 关键词搜索：覆盖学员姓名、家长姓名、手机号（学员与家长手机号均命中）。
+  const filters = filterPanel('student-archive-filter',
+    field('关键词', 'keyword', 'text', '学员姓名 / 家长姓名 / 手机号', true)
+  );
+  const row = (pair) => {
+    const learner = pair.learner;
+    return `<td><a class="text-button" href="/admin/pages/system/student-profile.html?learnerId=${encodeURIComponent(learner.id)}">${escapeHtml(learner.name)}</a></td><td>${escapeHtml(pair.account.name)}</td><td>${escapeHtml(learner.relation)}</td><td>${escapeHtml(learner.gender)}</td><td>${escapeHtml(learner.birthday)}</td><td>${escapeHtml(learner.phone)}</td><td>${escapeHtml(learner.status)}</td><td>${learner.current ? '<span class="tag brand">当前学员</span>' : '—'}</td><td>${escapeHtml(learner.linkedAt)}</td><td>${(learner.classes || []).length}</td><td>${learner.courses}</td>`;
+  };
+  const head = '<thead><tr><th>学员</th><th>账号昵称</th><th>关系</th><th>性别</th><th>出生日期</th><th>手机号</th><th>学员状态</th><th>当前学员</th><th>关联时间</th><th>在读班级</th><th>已报名课程</th></tr></thead>';
+  pageFrame('学员档案', description, controls, filters + table(head));
+  renderRows(pairs, row);
+  bindFilter('student-archive-filter', pairs, (form) => {
+    const keyword = form.keyword.value.trim();
+    return (pair) => {
+      if (!keyword) return true;
+      const hay = `${pair.learner.name}${pair.account.name}${pair.learner.phone}${pair.account.phone}`;
+      return hay.includes(keyword);
+    };
+  }, row);
 }
 function renderStudentUserDetail(account) {
   if (!studentUserCanView()) { renderStudentUsers(); return; }

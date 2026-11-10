@@ -5,7 +5,7 @@
   const { relativePath } = __classicRequire('shared/js/paths.js');
   const HS = __classicRequire('shared/js/home-school-store.js');
 
-  // 家校留言 v1.1：纯人工异步留言 + 通知。零 AI、无举报、无翻译、无 IM。
+  // 家校留言：人工异步留言 + 通知；不提供自动回复、自动翻译、举报入口与即时通讯。
   // 呈现层采用通用会话式界面（会话列表 + 消息气泡 + 底部输入栏），仅借鉴通用交互范式，
   // 配色/间距/文案均使用项目自有规范；不引入长连接、在线状态、已读回执、输入中、消息撤回。
   const main = document.querySelector('.mobile-main');

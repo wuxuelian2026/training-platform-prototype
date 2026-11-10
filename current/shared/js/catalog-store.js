@@ -48,10 +48,12 @@ function readCatalog() {
 }
 
 function persistCatalog() {
-  const state = readDemoState() || {};
-  state.catalog = clone(readCatalog());
-  writeDemoState(state);
-  return state.catalog;
+  const catalog = readCatalog();
+  writeDemoState(next => {
+    next.catalog = clone(catalog);
+    return next;
+  });
+  return catalog;
 }
 
 // 门类 → 分类 → [专业名] 的派生视图，供后台级联选择使用（不再自持目录常量）。

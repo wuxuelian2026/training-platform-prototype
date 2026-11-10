@@ -12,21 +12,25 @@ function check(label, run) {
   console.log('PASS ' + label);
 }
 const now = new Date('2026-10-13T14:00:00+08:00');
-check('上海时区学年在9月1日零点切换', () => {
-  assert.equal(academicYearStart(new Date('2026-08-31T23:59:59+08:00')), 2025);
-  assert.equal(academicYearStart(new Date('2026-09-01T00:00:00+08:00')), 2026);
-  assert.equal(academicYearStart(new Date('2027-08-31T23:59:59+08:00')), 2026);
+check('上海时区自然年度在1月1日零点切换，9月1日不再切分', () => {
+  assert.equal(academicYearStart(new Date('2025-12-31T23:59:59+08:00')), 2025);
+  assert.equal(academicYearStart(new Date('2026-01-01T00:00:00+08:00')), 2026);
+  assert.equal(academicYearStart(new Date('2027-08-31T23:59:59+08:00')), 2027);
   assert.equal(academicYearStart(new Date('2027-09-01T00:00:00+08:00')), 2027);
+  assert.equal(academicYearStart(new Date('2027-12-31T23:59:59+08:00')), 2027);
+  assert.equal(academicYearStart(new Date('2028-01-01T00:00:00+08:00')), 2028);
 });
-check('学年范围和12个月按跨年顺序排列', () => {
+check('自然年度范围和12个月按1—12月顺序排列', () => {
   const period = academicPeriod(2026, now);
-  assert.equal(period.startDate, '2026-09-01');
-  assert.equal(period.endDate, '2027-08-31');
+  assert.equal(period.startDate, '2026-01-01');
+  assert.equal(period.endDate, '2026-12-31');
   assert.equal(period.cutoffDate, '2026-10-13');
-  assert.deepEqual(period.months.map(row => row.key), ['2026-09', '2026-10', '2026-11', '2026-12',
-    '2027-01', '2027-02', '2027-03', '2027-04', '2027-05', '2027-06', '2027-07', '2027-08']);
-  assert.equal(period.months.filter(row => row.future).length, 10);
-  assert.equal(academicPeriod(2025, now).cutoffDate, '2026-08-31');
+  assert.equal(period.label, '2026');
+  assert.equal(period.year, 2026);
+  assert.deepEqual(period.months.map(row => row.key), ['2026-01', '2026-02', '2026-03', '2026-04',
+    '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12']);
+  assert.equal(period.months.filter(row => row.future).length, 2);
+  assert.equal(academicPeriod(2025, now).cutoffDate, '2025-12-31');
   assert.equal(academicPeriod(2025, now).months.some(row => row.future), false);
 });
 
@@ -34,44 +38,44 @@ const facts = {
   courses: [{ id: 'offline', name: '面授课程', major: '中国舞' }, { id: 'video', name: '视频课程' }],
   teachers: [{ id: 'teacher', name: '主授教师' }],
   batches: ['秋季', '寒假', '春季', '暑假'].map((name, index) => ({ academicYear: 2026, name,
-    startsOn: ['2026-09-08', '2027-01-08', '2027-03-08', '2027-06-08'][index] })),
+    startsOn: ['2026-01-08', '2027-01-08', '2027-03-08', '2027-06-08'][index] })),
   classes: [
-    { id: 'open', academicYear: 2026, batch: '秋季', courseId: 'offline', primaryTeacherId: 'teacher', openedOn: '2026-09-08' },
+    { id: 'open', academicYear: 2026, batch: '秋季', courseId: 'offline', primaryTeacherId: 'teacher', openedOn: '2026-01-08' },
     { id: 'future', academicYear: 2026, batch: '秋季', courseId: 'offline', primaryTeacherId: 'teacher', openedOn: '2026-10-20' },
-    { id: 'cancelled', academicYear: 2026, batch: '秋季', courseId: 'offline', primaryTeacherId: 'teacher', openedOn: '2026-09-08', cancelled: true },
-    { id: 'old', academicYear: 2025, batch: '暑假', courseId: 'offline', primaryTeacherId: 'teacher', openedOn: '2026-08-08' }
+    { id: 'cancelled', academicYear: 2026, batch: '秋季', courseId: 'offline', primaryTeacherId: 'teacher', openedOn: '2026-01-08', cancelled: true },
+    { id: 'old', academicYear: 2025, batch: '暑假', courseId: 'offline', primaryTeacherId: 'teacher', openedOn: '2025-12-08' }
   ],
   orders: [
-    { id: 'prepaid', kind: 'offline', classId: 'open', courseId: 'offline', learnerId: 'a', paidOn: '2026-08-25', amountCents: 20000 },
-    { id: 'enrolling', kind: 'offline', classId: 'future', courseId: 'offline', learnerId: 'a', paidOn: '2026-09-01', amountCents: 15000 },
-    { id: 'withdrawn', kind: 'offline', classId: 'open', courseId: 'offline', learnerId: 'b', paidOn: '2026-09-01', amountCents: 10000 },
-    { id: 'old-order', kind: 'offline', classId: 'old', courseId: 'offline', learnerId: 'c', paidOn: '2026-08-01', amountCents: 10000 },
-    { id: 'video-valid', kind: 'video', courseId: 'video', paidOn: '2026-09-01', amountCents: 5000 },
-    { id: 'video-full', kind: 'video', courseId: 'video', paidOn: '2026-09-01', amountCents: 5000 },
+    { id: 'prepaid', kind: 'offline', classId: 'open', courseId: 'offline', learnerId: 'a', paidOn: '2025-12-25', amountCents: 20000 },
+    { id: 'enrolling', kind: 'offline', classId: 'future', courseId: 'offline', learnerId: 'a', paidOn: '2026-01-01', amountCents: 15000 },
+    { id: 'withdrawn', kind: 'offline', classId: 'open', courseId: 'offline', learnerId: 'b', paidOn: '2026-01-01', amountCents: 10000 },
+    { id: 'old-order', kind: 'offline', classId: 'old', courseId: 'offline', learnerId: 'c', paidOn: '2025-12-01', amountCents: 10000 },
+    { id: 'video-valid', kind: 'video', courseId: 'video', paidOn: '2026-01-01', amountCents: 5000 },
+    { id: 'video-full', kind: 'video', courseId: 'video', paidOn: '2026-01-01', amountCents: 5000 },
     { id: 'video-part', kind: 'video', courseId: 'video', paidOn: '2026-10-13', amountCents: 5000 },
     { id: 'video-after-today', kind: 'video', courseId: 'video', paidOn: '2026-10-14', amountCents: 5000 },
     { id: 'unpaid', kind: 'video', courseId: 'video', paidOn: '', amountCents: 5000 },
     { id: 'outside', kind: 'video', courseId: 'video', paidOn: '2027-09-01', amountCents: 5000 }
   ],
   enrollments: [
-    { id: 'e1', classId: 'open', learnerId: 'a', orderId: 'prepaid', enrolledOn: '2026-08-25' },
-    { id: 'e1-duplicate', classId: 'open', learnerId: 'a', orderId: 'prepaid', enrolledOn: '2026-08-25' },
-    { id: 'e2', classId: 'future', learnerId: 'a', orderId: 'enrolling', enrolledOn: '2026-09-01' },
-    { id: 'e3', classId: 'open', learnerId: 'b', orderId: 'withdrawn', enrolledOn: '2026-09-01', withdrawnOn: '2026-09-10' },
-    { id: 'e4', classId: 'cancelled', learnerId: 'a', orderId: 'prepaid', enrolledOn: '2026-08-25' },
-    { id: 'e5', classId: 'old', learnerId: 'c', orderId: 'old-order', enrolledOn: '2026-08-01' }
+    { id: 'e1', classId: 'open', learnerId: 'a', orderId: 'prepaid', enrolledOn: '2025-12-25' },
+    { id: 'e1-duplicate', classId: 'open', learnerId: 'a', orderId: 'prepaid', enrolledOn: '2025-12-25' },
+    { id: 'e2', classId: 'future', learnerId: 'a', orderId: 'enrolling', enrolledOn: '2026-01-01' },
+    { id: 'e3', classId: 'open', learnerId: 'b', orderId: 'withdrawn', enrolledOn: '2026-01-01', withdrawnOn: '2026-01-10' },
+    { id: 'e4', classId: 'cancelled', learnerId: 'a', orderId: 'prepaid', enrolledOn: '2025-12-25' },
+    { id: 'e5', classId: 'old', learnerId: 'c', orderId: 'old-order', enrolledOn: '2025-12-01' }
   ],
   refunds: [
-    { id: 'r1', orderId: 'withdrawn', completedOn: '2026-09-10', amountCents: 10000 },
-    { id: 'r2', orderId: 'old-order', completedOn: '2026-09-05', amountCents: 10000 },
-    { id: 'r3', orderId: 'video-full', completedOn: '2026-09-05', amountCents: 5000 },
+    { id: 'r1', orderId: 'withdrawn', completedOn: '2026-01-10', amountCents: 10000 },
+    { id: 'r2', orderId: 'old-order', completedOn: '2026-01-05', amountCents: 10000 },
+    { id: 'r3', orderId: 'video-full', completedOn: '2026-01-05', amountCents: 5000 },
     { id: 'r4', orderId: 'video-part', completedOn: '2026-10-13', amountCents: 500 },
     { id: 'r5', orderId: 'video-valid', completedOn: '2026-10-14', amountCents: 5000 },
     { id: 'pending', orderId: 'prepaid', completedOn: '', amountCents: 20000 }
   ]
 };
 const data = aggregateDashboard(facts, 2026, now);
-check('开班数排除未开课、取消和其他学年班级', () => assert.equal(data.totals.openedClasses, 1));
+check('开班数排除未开课、取消和其他年度班级', () => assert.equal(data.totals.openedClasses, 1));
 check('报名按学员×班级去重，排除退班，保留提前支付报名', () => {
   assert.equal(data.totals.enrolled, 2);
   assert.equal(data.totals.students, 1);
@@ -81,7 +85,7 @@ check('视频付费订单不含未支付、未来支付和全额退款，部分�
   assert.equal(data.totals.refundedVideoOrders, 1);
   assert.equal(data.rankings.videos[0].orders, 2);
 });
-check('收入按实际支付/退款日期，含上学年订单在本学年的退款', () => {
+check('收入按实际支付/退款日期，含上年度订单在本年度的退款', () => {
   assert.equal(data.totals.grossCents, 40000);
   assert.equal(data.totals.refundCents, 25500);
   assert.equal(data.totals.netCents, 14500);
@@ -89,11 +93,17 @@ check('收入按实际支付/退款日期，含上学年订单在本学年的退
   assert.equal(data.totals.videoNetCents, 9500);
   assert.equal(data.monthly.reduce((total, row) => total + row.offlineCents + row.videoCents, 0), data.totals.netCents);
 });
-check('四批次固定顺序、年份归属正确，未来批次无演示业绩', () => {
-  assert.deepEqual(data.batches.map(row => [row.name, row.calendarYear]), [['秋季', 2026], ['寒假', 2027], ['春季', 2027], ['暑假', 2027]]);
+check('四批次固定顺序、归属所选自然年度，未来批次无演示业绩', () => {
+  assert.deepEqual(data.batches.map(row => [row.name, row.calendarYear]),
+    [['秋季', 2026], ['寒假', 2026], ['春季', 2026], ['暑假', 2026]]);
   assert.equal(data.batches[0].classes, 1);
   assert.equal(data.batches[0].enrolled, 2);
   assert.equal(data.batches.slice(1).every(row => row.future && row.classes === 0 && row.enrolled === 0), true);
+  // 自然年度早期只有已开课批次有业绩，其余三批次仍为未来（用真实演示事实复核）。
+  const early = aggregateDashboard(createDemoFacts(2026), 2026, new Date('2026-02-01T12:00:00+08:00'));
+  assert.deepEqual(early.batches.map(row => [row.name, row.future]),
+    [['秋季', true], ['寒假', false], ['春季', true], ['暑假', true]]);
+  assert.equal(early.batches.filter(row => row.future).every(row => row.classes === 0 && row.enrolled === 0), true);
 });
 check('专业/课程/教师榜从同一学籍汇总，教师只按主授归属', () => {
   for (const key of ['majors', 'courses', 'teachers']) {
@@ -128,12 +138,12 @@ check('历年演示榜单均为Top10且正确降序，未来月份金额为0', (
 });
 const admissionsFacts = structuredClone(facts);
 admissionsFacts.classes = admissionsFacts.classes.map(row => ({ ...row,
-  enrollmentEndsOn: row.id === 'future' ? '2026-10-13' : '2026-09-30', capacity: row.id === 'open' ? 2 : 1 }));
+  enrollmentEndsOn: row.id === 'future' ? '2026-10-13' : '2026-01-30', capacity: row.id === 'open' ? 2 : 1 }));
 admissionsFacts.classes.push(
   { ...admissionsFacts.classes[0], id: 'still-enrolling', enrollmentEndsOn: '2026-10-14', capacity: 100 },
   { ...admissionsFacts.classes[0], id: 'missing-deadline', enrollmentEndsOn: '', capacity: 100 }
 );
-check('招生效能只含本学年招生结束非取消班级，不以开课日期替代招生截止', () => {
+check('招生效能只含本年度招生结束非取消班级，不以开课日期替代招生截止', () => {
   const stats = aggregateDashboard(admissionsFacts, 2026, now).admissionsEfficiency;
   assert.equal(stats.eligibleClasses, 2);
   assert.equal(stats.enrolled, 2);
@@ -189,7 +199,9 @@ check('历年演示招生效能与对应班级事实、有效报名统计一致'
   for (const year of [2026, 2025, 2024]) {
     const demoFacts = createDemoFacts(year);
     const demo = aggregateDashboard(demoFacts, year, now);
-    const eligible = demoFacts.classes.filter(row => row.academicYear === year && !row.cancelled && row.enrollmentEndsOn <= demo.period.cutoffDate);
+    const eligible = demoFacts.classes.filter(row =>
+      Number(String(row.openedOn).slice(0, 4)) === year && !row.cancelled
+      && row.enrollmentEndsOn <= demo.period.cutoffDate);
     const stats = demo.admissionsEfficiency;
     assert.equal(stats.eligibleClasses, eligible.length);
     assert.equal(stats.capacity, eligible.reduce((total, row) => total + row.capacity, 0));
@@ -200,14 +212,14 @@ check('历年演示招生效能与对应班级事实、有效报名统计一致'
     if (year < 2026) assert.equal(stats.enrolled, demo.totals.enrolled);
   }
 });
-check('招生转化限定同学年新增线索，去重并校验面授已支付订单绑定', () => {
+check('招生转化限定同年度新增线索，去重并校验面授已支付订单绑定', () => {
   const leadFacts = { ...facts, leads: [
-    { id: 'ok', createdOn: '2026-09-01', convertedOn: '2026-09-02', orderId: 'enrolling', source: '推荐' },
-    { id: 'ok', createdOn: '2026-09-01', convertedOn: '2026-09-02', orderId: 'enrolling', source: '推荐' },
-    { id: 'old', createdOn: '2026-08-31', convertedOn: '2026-09-02', orderId: 'enrolling' },
-    { id: 'video', createdOn: '2026-09-01', convertedOn: '2026-09-02', orderId: 'video-valid' },
-    { id: 'future', createdOn: '2026-09-01', convertedOn: '2026-10-14', orderId: 'enrolling' },
-    { id: 'missing', createdOn: '2026-09-01' }
+    { id: 'ok', createdOn: '2026-01-01', convertedOn: '2026-01-02', orderId: 'enrolling', source: '推荐' },
+    { id: 'ok', createdOn: '2026-01-01', convertedOn: '2026-01-02', orderId: 'enrolling', source: '推荐' },
+    { id: 'old', createdOn: '2025-12-31', convertedOn: '2026-01-02', orderId: 'enrolling' },
+    { id: 'video', createdOn: '2026-01-01', convertedOn: '2026-01-02', orderId: 'video-valid' },
+    { id: 'future', createdOn: '2026-01-01', convertedOn: '2026-10-14', orderId: 'enrolling' },
+    { id: 'missing', createdOn: '2026-01-01' }
   ] };
   const result = aggregateDashboard(leadFacts, 2026, now);
   assert.deepEqual(result.admissionsConversion, { leads: 4, converted: 1, rate: .25 });
@@ -215,16 +227,16 @@ check('招生转化限定同学年新增线索，去重并校验面授已支付�
   assert.equal(result.sourceRanking.find(row => row.name === '未记录').leads, 3);
   assert.deepEqual(aggregateDashboard(facts, 2026, now).admissionsConversion, { leads: 0, converted: 0, rate: null });
 });
-check('报名趋势按实际报名月份统计，排除退班和提前在上学年报名', () => {
+check('报名趋势按实际报名月份统计，排除退班和提前在上年度报名', () => {
   const result = aggregateDashboard(facts, 2026, now);
   assert.equal(result.enrollmentMonthly[0].enrolled, 1);
   assert.equal(result.enrollmentMonthly.reduce((total, row) => total + row.enrolled, 0), 1);
   assert.ok(result.enrollmentMonthly.filter(row => row.future).every(row => row.enrolled === 0));
 });
-check('同比对齐上学年同月同日，历史学年对齐全年，闰日截到2月28日', () => {
+check('同比对齐上年度同月同日，历史年度对齐全年，闰日截到2月28日', () => {
   assert.equal(compareAcademicYears(facts, 2026, now).previous.period.cutoffDate, '2025-10-13');
-  assert.equal(compareAcademicYears(facts, 2025, now).previous.period.cutoffDate, '2025-08-31');
-  assert.equal(compareAcademicYears(facts, 2027, new Date('2028-02-29T12:00:00+08:00')).previous.period.cutoffDate, '2027-02-28');
+  assert.equal(compareAcademicYears(facts, 2025, now).previous.period.cutoffDate, '2024-12-31');
+  assert.equal(compareAcademicYears(facts, 2028, new Date('2028-02-29T12:00:00+08:00')).previous.period.cutoffDate, '2027-02-28');
   assert.equal(compareAcademicYears(facts, 2027, new Date('2027-09-01T00:00:00+08:00')).previous.period.cutoffDate, '2026-09-01');
 });
 check('上期按当时事实统计，不计未来开班、支付、退款或退班，视频不混入面授同比', () => {
@@ -250,29 +262,32 @@ check('上期按当时事实统计，不计未来开班、支付、退款或退�
 check('上期为零或净收为负时无虚假百分比，无NaN或Infinity', () => {
   const empty = compareAcademicYears(facts, 2026, now);
   assert.ok(empty.metrics.every(row => row.previous === 0 && row.growth === null));
-  const negative = { ...facts, orders: [{ id: 'prior-old', kind: 'offline', paidOn: '2025-08-01', amountCents: 1000 }],
+  // 自然年度口径：支付发生在 2024 年、退款发生在 2025 年，2025 年度净收才为负。
+  const negative = { ...facts, orders: [{ id: 'prior-old', kind: 'offline', paidOn: '2024-12-01', amountCents: 1000 }],
     refunds: [{ id: 'prior-refund', orderId: 'prior-old', completedOn: '2025-09-01', amountCents: 1000 }] };
   const row = compareAcademicYears(negative, 2026, now).metrics.find(row => row.key === 'offlineNetCents');
   assert.equal(row.previous, -1000);
   assert.equal(row.growth, null);
 });
-check('历年演示同比同源，两期均按各自截止日计算而非上学年全年', () => {
+check('历年演示同比同源，两期均按各自截止日计算而非上年度全年', () => {
   for (const year of [2026, 2025, 2024]) {
     const fixture = createDemoFacts(year);
     const result = compareAcademicYears(fixture, year, now);
-    assert.equal(result.current.period.label, year + '-' + (year + 1));
-    assert.equal(result.previous.period.label, (year - 1) + '-' + year);
+    assert.equal(result.current.period.label, String(year));
+    assert.equal(result.previous.period.label, String(year - 1));
     assert.ok(result.metrics.every(row => row.growth === null || Number.isFinite(row.growth)));
     if (year === 2026) assert.ok(result.previous.totals.openedClasses < 64);
   }
 });
 check('收入折线只包含已发生月份，不将未来月份连到零', () => {
   const model = incomeChartModel(data.monthly);
+  const occurred = data.monthly.filter(row => !row.future).length;
+  assert.equal(occurred, 10, '自然年度 1—10 月为已发生月份');
   assert.equal(model.series.length, 2);
-  assert.ok(model.series.every(series => series.points.length === 2));
-  assert.deepEqual(model.series[0].points.map(point => point.index), [0, 1]);
+  assert.ok(model.series.every(series => series.points.length === occurred));
+  assert.deepEqual(model.series[0].points.map(point => point.index), Array.from({ length: occurred }, (_, index) => index));
   assert.equal(model.series[0].points[0].x, .5 / 12 * 100);
-  assert.equal(model.series[0].points[1].x, 1.5 / 12 * 100);
+  assert.equal(model.series[0].points[occurred - 1].x, (occurred - .5) / 12 * 100);
 });
 check('收入折线保留负净收且正确跨零基线', () => {
   const model = incomeChartModel([{ offlineCents: -1000000, videoCents: 2000000, future: false }]);
@@ -292,7 +307,7 @@ check('无数据收入折线不产生NaN；已发生的零值仍有数据点', (
   const model = incomeChartModel([{ offlineCents: 0, videoCents: 0, future: false }]);
   assert.ok(model.series.every(series => series.points.length === 1 && series.points[0].y === 100));
 });
-check('历史学年收入折线包含完整12个月且点位在绘图区内', () => {
+check('历史年度收入折线包含完整12个月且点位在绘图区内', () => {
   const historical = aggregateDashboard(createDemoFacts(2025), 2025, now);
   const model = incomeChartModel(historical.monthly);
   assert.ok(model.series.every(series => series.points.length === 12));
@@ -300,16 +315,25 @@ check('历史学年收入折线包含完整12个月且点位在绘图区内', ()
 });
 check('批次同比使用招生相同天数，未来批次不显示同比，历史批次完整比较', () => {
   const facts = createDemoFacts(2026);
-  facts.batches.find(row => row.academicYear === 2025 && row.name === '秋季').enrollmentStartsOn = '2025-08-01';
-  const comparison = compareAcademicYears(facts, 2026, new Date('2026-09-15T12:00:00+08:00'));
-  assert.equal(comparison.batchComparisons[0].status, '同期');
-  assert.equal(comparison.batchComparisons[0].previousCutoff, '2025-08-28');
-  assert.ok(comparison.batchComparisons.slice(1).every(row => row.status === '未开始' && row.current === null && row.previous === null));
-  const historical = compareAcademicYears(facts, 2025, now);
-  assert.ok(historical.batchComparisons.every(row => row.status === '完整'));
+  // 自然年度年初（2 月）只有寒假批次处于招生期，其余三批次尚未开始招生。
+  const comparison = compareAcademicYears(facts, 2026, new Date('2026-02-15T12:00:00+08:00'));
+  const inProgress = comparison.batchComparisons.filter(row => row.status === '同期');
+  const future = comparison.batchComparisons.filter(row => row.status === '未开始');
+  assert.equal(inProgress.length, 1);
+  assert.equal(inProgress[0].name, '寒假');
+  assert.equal(future.length, 3);
+  assert.ok(future.every(row => row.current === null && row.previous === null));
+  const days = (a, b) => Math.round((Date.parse(a + 'T00:00:00Z') - Date.parse(b + 'T00:00:00Z')) / 86400000);
+  const currentBatch = facts.batches.find(row => Number(String(row.startsOn).slice(0, 4)) === 2026 && row.name === inProgress[0].name);
+  const priorBatch = facts.batches.find(row => Number(String(row.startsOn).slice(0, 4)) === 2025 && row.name === inProgress[0].name);
+  assert.equal(days(inProgress[0].previousCutoff, priorBatch.enrollmentStartsOn),
+    days(inProgress[0].cutoff, currentBatch.enrollmentStartsOn), '上期截止日应与本期招生天数相同');
+  const historicalFacts = createDemoFacts(2025);
+  const historical = compareAcademicYears(historicalFacts, 2025, now);
+  assert.ok(historical.batchComparisons.every(row => row.status === '完整' && row.current && row.previous));
   const total = historical.batchComparisons.reduce((value, row) => value + row.current.netCents, 0);
-  facts.orders.push({ id: 'video-excluded', kind: 'video', paidOn: '2026-01-01', amountCents: 1000000 });
-  assert.equal(compareAcademicYears(facts, 2025, now).batchComparisons.reduce((value, row) => value + row.current.netCents, 0), total);
+  historicalFacts.orders.push({ id: 'video-excluded', kind: 'video', paidOn: '2026-01-01', amountCents: 1000000 });
+  assert.equal(compareAcademicYears(historicalFacts, 2025, now).batchComparisons.reduce((value, row) => value + row.current.netCents, 0), total);
 });
 // —— 学情分析（CR-2026-168）——
 const learningNow = new Date('2026-11-06T19:00:00+08:00');
@@ -329,7 +353,7 @@ check('已退班报名保留为流失事实，经营口径的在读人数不受�
   const facts = createDemoFacts(2025);
   const learning = createLearningFacts(facts, 2025, learningNow);
   const data = aggregateLearning(learning);
-  assert.ok(data.churn.count > 0, '2025 学年演示数据必须能看到流失，否则面板恒为空');
+  assert.ok(data.churn.count > 0, '2025 年度演示数据必须能看到流失，否则面板恒为空');
   assert.equal(data.churn.base, learning.enrollments.length);
   assert.ok(data.churn.base > data.capacity, '流失人次应计在在册基数内但不占在读');
   assert.ok(data.totals.enrollments === data.capacity);
@@ -374,7 +398,7 @@ check('流失原因分布：字典原值分组、不出「其他原因合计」�
   assert.ok(data.churn.reasons.every(row => Math.abs(row.share - Math.round(row.count / data.churn.count * 1000) / 10) < 0.05));
   assert.ok(data.churn.topCourses.every(row => row.rate !== null && row.count <= row.base));
 });
-check('学情进度口径：进度率 = 已上课次 ÷ 计划课次，历史学年接近完整', () => {
+check('学情进度口径：进度率 = 已上课次 ÷ 计划课次，历史年度接近完整', () => {
   for (const year of [2026, 2025, 2024]) {
     const learning = createLearningFacts(createDemoFacts(year), year, learningNow);
     const data = aggregateLearning(learning);
@@ -443,7 +467,7 @@ check('CR-2026-169：流失高发课程与原因分布同源，口径可复算',
   for (const year of [2026, 2025]) {
     const data = aggregateLearning(createLearningFacts(createDemoFacts(year), year, learningNow));
     const rows = data.churn.topCourses;
-    assert.ok(rows.length > 0 && rows.length <= 10, `${year} 学年应有 Top10 课程`);
+    assert.ok(rows.length > 0 && rows.length <= 10, `${year} 年度应有 Top10 课程`);
     assert.ok(rows.every(row => row.count > 0 && row.base >= row.count && row.name));
     assert.ok(rows.every(row => row.rate === Math.round(row.count / row.base * 1000) / 10), '流失率可复算');
     assert.ok(rows.every((row, i) => !i || rows[i - 1].count >= row.count), '按流失人次降序');
@@ -477,7 +501,7 @@ check('CR-2026-169：所有 TOP 排行统一 Top10 且列表可滚动', () => {
   assert.ok(factsSrc.includes("a.id.localeCompare(b.id, 'zh-CN')).slice(0, 10)"), '招生来源榜上限未改 10');
   for (const year of [2026, 2025]) {
     const data = aggregateLearning(createLearningFacts(createDemoFacts(year), year, learningNow));
-    assert.equal(data.watchlist.length, 10, `${year} 学年需关注学员应取满 10 条`);
+    assert.equal(data.watchlist.length, 10, `${year} 年度需关注学员应取满 10 条`);
     assert.ok(data.courses.length <= 10 && data.teachers.length <= 10);
     assert.ok(data.churn.reasons.length <= 10 && data.churn.topCourses.length <= 10);
     assert.ok(data.review.low.length <= 10);
@@ -513,5 +537,18 @@ check('CR-2026-171：三面板两指标隐藏但代码可恢复，栅格收敛�
   const data = aggregateLearning(createLearningFacts(createDemoFacts(2026), 2026, learningNow));
   assert.ok(data.churn.reasons.length > 0 && data.churn.topCourses.length > 0 && data.review.low.length <= 10,
     '流失与低分评价聚合保留供恢复使用');
+});
+check('CR-2026-174：两页签顶栏与页面说明统一为自然年度口径', () => {
+  const read = file => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8');
+  const sources = ['../visualization/index.html', '../visualization/learning.html',
+    '../shared/js/visualization-help.js', '../shared/js/visualization.js', '../spec/pages/page-types.js'].map(read);
+  const help = sources[2];
+  assert.ok(help.includes('1月1日') && help.includes('12月31日') && help.includes('统计年度'),
+    '页面说明须写明自然年度区间与统计年度');
+  assert.ok(sources.every(source => !source.includes('学年')), '大屏相关源码不应残留学年口径表述');
+  assert.ok(read('../shared/js/visualization-data.js').includes("const startDate = year + '-01-01'")
+    && read('../shared/js/visualization-data.js').includes("const endDate = year + '-12-31'"));
+  assert.equal(academicPeriod(2025, now).label, '2025');
+  assert.equal(academicPeriod(2025, now).startDate, '2025-01-01');
 });
 console.log('驾驶舱回归通过：' + checks + ' 项。');

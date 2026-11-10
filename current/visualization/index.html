@@ -27,17 +27,17 @@
       </div>
     </header>
 
-    <section class="overview-stats" aria-label="学年经营概览">
+    <section class="overview-stats" aria-label="年度经营概览">
       <div class="overview-metric">
-        <h2 title="统计期内实际收款减实际完成退款，按发生日期统计">学年净收金额</h2>
+        <h2 title="统计期内实际收款减实际完成退款，按发生日期统计">年度净收金额</h2>
         <div class="metric" id="total-net"></div><div class="metric-meta income-split" id="total-net-meta"></div>
       </div>
       <div class="overview-metric">
-        <h2 title="所属学年内已实际开课的非取消班级，包含已结课班级">面授开班数</h2>
+        <h2 title="所属年度内已实际开课的非取消班级，包含已结课班级">面授开班数</h2>
         <div class="metric" id="offline-classes"></div><div class="metric-meta" id="offline-classes-meta"></div>
       </div>
       <div class="overview-metric">
-        <h2 title="所属学年的有效付费报名，按学员与班级去重，已退班不计">面授报名人次</h2>
+        <h2 title="所属年度的有效付费报名，按学员与班级去重，已退班不计">面授报名人次</h2>
         <div class="metric" id="offline-enrolled"></div><div class="metric-meta" id="offline-enrolled-meta"></div>
       </div>
       <div class="overview-metric">
@@ -54,7 +54,7 @@
       <article class="analysis-panel comparison-panel">
         <div class="panel-heading"><h2>面授批次同比</h2><span class="panel-period">报名人次</span></div>
         <table class="data-table comparison-table">
-          <caption class="sr-only" id="comparison-caption">面授学年同期对比</caption>
+          <caption class="sr-only" id="comparison-caption">面授年度同期对比</caption>
           <thead><tr><th scope="col">批次</th><th scope="col">本期</th><th scope="col">上期</th><th scope="col">同比</th></tr></thead>
           <tbody id="year-comparison"></tbody>
         </table>
@@ -62,7 +62,7 @@
       </article>
 
       <article class="analysis-panel efficiency-panel">
-        <div class="panel-heading"><h2 title="本学年截至统计日，招生已结束且未取消的班级；有效付费报名按学员与班级去重，已退班不计">面授招生质量</h2><span class="panel-period" id="efficiency-scope"></span></div>
+        <div class="panel-heading"><h2 title="本年度截至统计日，招生已结束且未取消的班级；有效付费报名按学员与班级去重，已退班不计">面授招生质量</h2><span class="panel-period" id="efficiency-scope"></span></div>
         <dl class="efficiency-stats">
           <div class="efficiency-primary">
             <dt title="招生结束班级的有效报名人次合计 ÷ 招生名额合计">招生名额使用率</dt>

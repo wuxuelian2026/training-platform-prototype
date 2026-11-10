@@ -845,7 +845,7 @@ function detailActions(item) {
       ? '<button class="mp-button mp-course-detail-primary" type="button" disabled>暂不可购买</button>'
       : button(item.type === 'video' ? '立即购买' : '立即报名', `data-action="buy" data-course-id="${item.id}"`, 'mp-course-detail-primary');
   return `<div class="mp-bottom-actions mp-course-detail-actions">
-    <button class="mp-button secondary mp-icon-action" type="button" data-action="consult"><span class="mp-linear-icon mp-linear-icon-consult" aria-hidden="true"></span><span>咨询</span></button>
+    ${SERVICE_ACTION_BUTTON}
     <button class="mp-button secondary mp-icon-action" type="button" data-action="share"><span class="mp-linear-icon mp-linear-icon-share" aria-hidden="true"></span><span>分享</span></button>
     ${buyButton}
   </div>`;
@@ -912,7 +912,7 @@ function renderOfflineCourseDetail(item) {
     courseTeacherSection(item),
     courseDetailContent(item, detailTab),
     `<div class="mp-bottom-actions mp-course-detail-actions">
-      <button class="mp-button secondary mp-icon-action" type="button" data-action="consult"><span class="mp-linear-icon mp-linear-icon-consult" aria-hidden="true"></span><span>咨询</span></button>
+      ${SERVICE_ACTION_BUTTON}
       <button class="mp-button secondary mp-icon-action" type="button" data-action="share"><span class="mp-linear-icon mp-linear-icon-share" aria-hidden="true"></span><span>分享</span></button>
       <a class="mp-button mp-course-detail-primary" href="/learner/pages/fast-registration.html?courseId=${encodeURIComponent(item.id)}">去报名</a>
     </div>`
@@ -1211,7 +1211,7 @@ function renderFastRegistrationDetail(item) {
   else if (paidOrder) primaryAction = `<a class="mp-button mp-course-detail-primary" href="/learner/pages/class-detail.html?courseId=${encodeURIComponent(item.id)}">已报名，查看班级</a>`;
   else if (pendingOrder) primaryAction = `<a class="mp-button mp-course-detail-primary" href="/learner/pages/payment.html?classId=${encodeURIComponent(item.id)}&orderId=${encodeURIComponent(pendingOrder.id)}">继续支付</a>`;
   else if (available) primaryAction = `<a class="mp-button mp-course-detail-primary" href="/learner/pages/payment.html?classId=${encodeURIComponent(item.id)}">立即报名</a>`;
-  const action = `<div class="mp-bottom-actions mp-course-detail-actions"><button class="mp-button secondary mp-icon-action" type="button" data-action="consult"><span class="mp-linear-icon mp-linear-icon-consult" aria-hidden="true"></span><span>咨询</span></button><button class="mp-button secondary mp-icon-action" type="button" data-action="share"><span class="mp-linear-icon mp-linear-icon-share" aria-hidden="true"></span><span>分享</span></button>${primaryAction}</div>`;
+  const action = `<div class="mp-bottom-actions mp-course-detail-actions">${SERVICE_ACTION_BUTTON}<button class="mp-button secondary mp-icon-action" type="button" data-action="share"><span class="mp-linear-icon mp-linear-icon-share" aria-hidden="true"></span><span>分享</span></button>${primaryAction}</div>`;
   layout(stack(
     `<section class="mp-fast-detail-hero"><div class="mp-fast-detail-cover class-cover" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${pill('快速报名', 'light')}${pill(status, statusTone)}</div></div><div class="mp-fast-detail-summary"><h2>${esc(item.className || item.name)}</h2><p>${esc(item.courseName || item.name)} · ${esc(item.professional || item.category)}</p><strong class="mp-fast-detail-price">${money2(item.price)}</strong></div></section>`,
     card(`<div class="mp-section-head"><h3>报名信息</h3>${pill(status, statusTone)}</div><dl class="mp-fast-detail-facts"><div><dt>授课教师</dt><dd>${esc(item.teacher)}老师</dd></div><div><dt>首课日期</dt><dd>${esc(item.firstLessonDate || '待定')}</dd></div><div class="wide"><dt>上课教室</dt><dd>${esc(roomText(item, '待定'))}</dd></div><div class="wide"><dt>上课时间</dt><dd>${esc(item.schedule || '以开课通知为准')}</dd></div><div><dt>总课次</dt><dd>${esc(item.hours)}课次</dd></div><div><dt>剩余名额</dt><dd>${esc(item.remainingSeats)} / ${esc(item.capacity)}</dd></div><div><dt>报名截止</dt><dd>${esc(item.deadline || '以招生通知为准')}</dd></div></dl>${item.unavailableReason ? `<p class="mp-notice">${esc(item.unavailableReason)}</p>` : ''}`, 'mp-fast-detail-section'),
@@ -2554,7 +2554,7 @@ function renderConsultationDetail() {
   const row = state.consultations.find(item => item.id === params.get('consultationId') && !item.anonymous);
   if (!row) { layout(stack(`<section class="mp-locked"><span class="mp-avatar" aria-hidden="true">咨</span><strong>咨询记录不存在</strong><p>该咨询可能尚未关联到当前账号。</p><a class="mp-button secondary" href="/learner/pages/consultation.html">返回我的咨询</a></section>`)); return; }
   const item = course(row.courseId);
-  layout(stack(card(`<div class="mp-section-head"><h2>咨询详情</h2>${pill(row.status, consultationStatusTone(row.status))}</div><p>${esc(item.name)} · ${esc(item.teacher)}老师</p><div class="mp-divider"></div><dl class="mp-consultation-detail-facts"><div><dt>提交时间</dt><dd>${esc(row.submittedAt || '待补充')}</dd></div><div><dt>当前进度</dt><dd>${esc(row.progress || '待跟进')}</dd></div></dl>`), card(`<h3>咨询内容</h3><p class="mp-consultation-question">${esc(row.text)}</p>`), card(`<h3>课程顾问回复</h3>${row.reply ? `<p class="mp-consultation-reply">${esc(row.reply)}</p><small class="mp-muted">回复时间：${esc(row.replyAt || '待补充')}</small>` : '<div class="mp-notice">课程顾问尚未回复，请耐心等待。</div>'}`), `<a class="mp-button secondary full" href="/learner/pages/consultation.html">返回我的咨询</a>`));
+  layout(stack(card(`<div class="mp-section-head"><h2>咨询详情</h2>${pill(row.status, consultationStatusTone(row.status))}</div><p>${esc(row.source === 'service' || !row.courseId ? '在线客服咨询' : (String(item.name || '') + ' · ' + String(item.teacher || '') + '老师'))}</p><div class="mp-divider"></div><dl class="mp-consultation-detail-facts"><div><dt>提交时间</dt><dd>${esc(row.submittedAt || '待补充')}</dd></div><div><dt>当前进度</dt><dd>${esc(row.progress || '待跟进')}</dd></div></dl>`), card(`<h3>咨询内容</h3><p class="mp-consultation-question">${esc(row.text)}</p>`), card(`<h3>课程顾问回复</h3>${row.reply ? `<p class="mp-consultation-reply">${esc(row.reply)}</p><small class="mp-muted">回复时间：${esc(row.replyAt || '待补充')}</small>` : '<div class="mp-notice">课程顾问尚未回复，请耐心等待。</div>'}`), `<a class="mp-button secondary full" href="/learner/pages/consultation.html">返回我的咨询</a>`));
 }
 function renderMessages() {
   const messages = learnerMessageFeed();
@@ -2565,6 +2565,61 @@ function renderMessageDetail() {
   mountMobileMessageDetail({ container: main, messages, loggedIn: isLoggedIn(), link: relativePath, detailPath: '/learner/pages/message-detail.html', listPath: '/learner/pages/messages.html', loginUrl: `/login.html?redirect=${encodeURIComponent('/learner/pages/messages.html')}`, lockedCopy: '登录后可查看支付、上课、作业和学习成果等消息。', save: saveLearnerMessageFeed, toast });
 }
 function profileMetric(label, value, tone = '') { return `<span class="mp-profile-metric ${tone}"><strong>${value}</strong><small>${label}</small></span>`; }
+// CR-2026-172 在线客服：单轮纯文字问答，去 AI 化文案，无上下文／图片／语音。
+const SERVICE_NOTICE = '以下为常见问题自助答复，仅供参考，具体以官方通知为准';
+const SERVICE_PROFILE_ENTRY = '<a class="mp-profile-entry mp-profile-service-entry" href="/learner/pages/service.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">客</span><strong>在线客服</strong><span class="mp-link">›</span></div></a>';
+// CR-2026-172（2026-11-10 客户反馈）：在线客服入口置于「我的」页「家校沟通」下方。
+// 家校沟通入口由 mobile-home-school.js 异步注入列表末尾，故用 MutationObserver 等待其出现后再插入其后，超时兜底追加末尾。
+function mountServiceProfileEntry() {
+  const list = document.querySelector('.mp-profile-entry-list');
+  if (!list || list.querySelector('.mp-profile-service-entry')) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = SERVICE_PROFILE_ENTRY;
+  const node = wrap.firstElementChild;
+  if (!node) return;
+  const place = () => {
+    if (list.querySelector('.mp-profile-service-entry')) return true;
+    const hs = [...list.children].find(c => /家校沟通/.test(c.innerText));
+    if (hs) { hs.after(node); return true; }
+    return false;
+  };
+  if (place()) return;
+  const obs = new MutationObserver(() => { if (place()) obs.disconnect(); });
+  obs.observe(list, { childList: true });
+  setTimeout(() => { obs.disconnect(); if (!list.querySelector('.mp-profile-service-entry')) list.appendChild(node); }, 2000);
+}
+const SERVICE_ACTION_BUTTON = '<button class="mp-button secondary mp-icon-action" type="button" data-action="service"><span aria-hidden="true">客</span><span>在线客服</span></button>';
+function renderServiceChat() {
+  const thread = [];
+  const leaveLink = (question) => '<button class="mp-link" type="button" data-action="service-leave" data-question="' + esc(question) + '">没解决？留言咨询</button>';
+  const entryHtml = (row) => {
+    const answer = row.result.status === 'hit'
+      ? '<section class="mp-service-answer"><div class="mp-section-head"><h3>常见问题</h3><span class="mp-muted">' + esc(row.result.item.category) + '</span></div><h4>' + esc(row.result.item.question) + '</h4><p>' + esc(row.result.item.answer) + '</p>' + leaveLink(row.question) + '</section>'
+      : '<section class="mp-service-answer"><p>' + esc(row.result.message) + '</p>' + leaveLink(row.question) + '</section>';
+    return '<div class="mp-service-question">' + esc(row.question) + '</div>' + answer;
+  };
+  const threadHtml = () => thread.length ? thread.map(entryHtml).join('') : '<p class="mp-muted">输入问题，查询常见问题答复。</p>';
+  layout(stack(
+    card('<div class="mp-section-head"><h2>在线客服</h2><span class="mp-muted">常见问题自助查询</span></div><p class="mp-notice">' + SERVICE_NOTICE + '</p>'),
+    '<section class="mp-service-thread" id="service-thread">' + threadHtml() + '</section>',
+    card('<form id="service-ask-form" class="mp-form"><div class="mp-field"><label for="service-question">请输入问题</label><input id="service-question" type="text" maxlength="200" placeholder="例如：怎么报名" autocomplete="off" /></div><div class="mp-actions"><button class="mp-button" type="submit">发送</button></div></form><p class="mp-muted">每次提问独立，仅支持文字；答案仅供参考。</p>')
+  ));
+  const form = document.querySelector('#service-ask-form');
+  if (!form) return;
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    const input = form.querySelector('#service-question');
+    const question = String(input.value || '').trim();
+    const service = globalThis.HbyxService;
+    if (!service) { toast('问答服务未就绪'); return; }
+    const result = service.ask(question);
+    if (result.status === 'invalid') { toast(result.message); return; }
+    thread.push({ question, result });
+    input.value = '';
+    const box = document.querySelector('#service-thread');
+    if (box) box.innerHTML = threadHtml();
+  });
+}
 function renderProfile() {
   const referralActivity = readActivity();
   const referralStatus = referralActivity.status;
@@ -2582,6 +2637,7 @@ function renderProfile() {
       `<a class="mp-profile-entry mp-profile-teacher-entry" href="/login.html?role=teacher"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">师</span><div><strong>教师工作台</strong><small>使用教师身份登录</small></div><span class="mp-link">进入 ›</span></div></a>`,
       `<a class="mp-profile-entry mp-profile-settings-entry" href="/learner/pages/settings.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">设</span><div><strong>设置</strong><small>账号设置、协议与关于我们</small></div><span class="mp-link">›</span></div></a>`
     ));
+    setTimeout(mountServiceProfileEntry, 0);
     return;
   }
   const linkedConsultations = state.consultations.filter(row => !row.anonymous);
@@ -2593,8 +2649,9 @@ function renderProfile() {
     card(`<div class="mp-profile-student-head"><h2>学员管理</h2></div><div class="mp-student-row is-current mp-current-student"><span class="mp-student-avatar" aria-hidden="true">${esc(currentStudent().name.slice(0, 1))}</span><div class="mp-student-copy"><strong>${esc(currentStudent().name)}</strong><small>${esc(currentStudent().relation)}</small></div><a class="mp-button secondary mp-student-switch" href="/learner/pages/student-management.html">学员管理</a></div>`),
     `<section class="mp-profile-entry-list" aria-label="个人中心功能"><a class="mp-profile-entry" href="/learner/pages/orders.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">单</span><strong>我的订单</strong><span class="mp-link">查看全部 ›</span></div><div class="mp-profile-metrics">${profileMetric('待支付', orderCount('待支付'), 'amber')}${profileMetric('已支付', orderCount('已支付'), 'green')}${profileMetric('退款售后', orderCount('已退款'))}</div></a>${referralBanner('/learner/pages/referral.html')}<a class="mp-profile-entry" href="/learner/pages/consultation.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">咨</span><strong>我的咨询</strong><span class="mp-link">查看记录 ›</span></div><div class="mp-profile-metrics mp-profile-consultation-metrics">${profileMetric('待回复', consultationCount('待回复'), 'amber')}${profileMetric('已回复', consultationCount('已回复'), 'green')}${profileMetric('已试听', consultationCount('已试听'))}${profileMetric('已报名', consultationCount('已报名'))}</div></a><a class="mp-profile-entry mp-profile-message-entry" href="/learner/pages/messages.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">信</span><strong>消息通知</strong>${unreadMessageCount ? `<span class="mp-profile-unread"><i aria-hidden="true"></i>${unreadMessageCount}条未读</span>` : '<span class="mp-muted">已读</span>'}<span class="mp-link">›</span></div></a></section>`,
     `<a class="mp-profile-entry mp-profile-teacher-entry" href="/login.html?role=teacher"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">师</span><div><strong>教师工作台</strong><small>课表、班级与教学执行</small></div><span class="mp-link">进入 ›</span></div></a>`,
-    `<a class="mp-profile-entry mp-profile-settings-entry" href="/learner/pages/settings.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">设</span><strong>设置</strong><span class="mp-link">›</span></div></a>`
+      `<a class="mp-profile-entry mp-profile-settings-entry" href="/learner/pages/settings.html"><div class="mp-profile-entry-head"><span class="mp-profile-entry-icon" aria-hidden="true">设</span><strong>设置</strong><span class="mp-link">›</span></div></a>`
   ));
+  setTimeout(mountServiceProfileEntry, 0);
 }
 // CR-2026-164 分享有礼：活动页、分享卡片与「我的邀请」独立页。
 function maskReferralName(name) {
@@ -2871,10 +2928,18 @@ function renderSettings() {
     toast
   });
 }
-function showConsultDialog() {
+// CR-2026-172：复用既有「提交课程咨询」弹窗承载客服留言；按入口切换文案，不复制第二份表单。
+function showConsultDialog(prefillQuestion) {
+  const fromService = Boolean(prefillQuestion);
+  // 演示环境本人手机号可能已脱敏，预填值为虚构示例且允许用户修改。
+  const phone = /^1[3-9]\d{9}$/.test(String(state.phone || '')) ? state.phone : '13800002026';
   const dialog = document.createElement('dialog');
   dialog.className = 'mp-dialog';
-  dialog.innerHTML = `<div class="mp-dialog-card"><h2>提交课程咨询</h2><p>无需登录，填写联系方式后课程顾问会主动联系。</p><form class="mp-form"><div class="mp-field"><label for="consult-name">联系人</label><input id="consult-name" required placeholder="请输入联系人姓名"></div><div class="mp-field"><label for="consult-phone">手机号</label><input id="consult-phone" required pattern="1[3-9]\\d{9}" placeholder="请输入手机号"></div><div class="mp-field"><label for="consult-text">咨询内容</label><textarea id="consult-text" required placeholder="想了解哪门课程？"></textarea></div><div class="mp-actions"><button class="mp-button secondary" type="button" data-dialog-close>取消</button><button class="mp-button" type="submit">提交咨询</button></div></form></div>`;
+  dialog.innerHTML = '<div class="mp-dialog-card"><h2>' + (fromService ? '留言咨询' : '提交课程咨询') + '</h2><p>'
+    + (fromService ? '填写问题与联系方式，客服会在工作日回复。' : '无需登录，填写联系方式后课程顾问会主动联系。')
+    + '</p><form class="mp-form"><div class="mp-field"><label for="consult-text">问题</label><textarea id="consult-text" required maxlength="500" placeholder="请描述你的问题">'
+    + esc(prefillQuestion || '') + '</textarea></div><div class="mp-field"><label for="consult-phone">联系方式</label><input id="consult-phone" type="tel" required pattern="1[3-9]\\d{9}" value="'
+    + esc(phone) + '" placeholder="请输入手机号" /></div><div class="mp-actions"><button class="mp-button secondary" type="button" data-dialog-close>取消</button><button class="mp-button" type="submit">提交</button></div></form></div>';
   document.body.appendChild(dialog);
   dialog.showModal();
   dialog.querySelector('[data-dialog-close]').addEventListener('click', () => dialog.close());
@@ -2882,10 +2947,32 @@ function showConsultDialog() {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
-    state.consultations.unshift({ id: `C${Date.now()}`, courseId: params.get('courseId') || 'COURSE-CR-2026-0002', status: '待回复', text: '已提交 · 等待课程顾问联系。', submittedAt: toLocalDateTimeString(), reply: '', replyAt: '', progress: '待跟进', anonymous: !isLoggedIn() });
+    const text = String(form.querySelector('#consult-text').value || '').trim();
+    const contact = String(form.querySelector('#consult-phone').value || '').trim();
+    state.phone = contact;
+    const record = {
+      id: 'C' + Date.now(),
+      courseId: fromService ? '' : (params.get('courseId') || 'COURSE-CR-2026-0002'),
+      source: fromService ? 'service' : 'course',
+      status: '待回复',
+      text,
+      submittedAt: toLocalDateTimeString(),
+      reply: '',
+      replyAt: '',
+      progress: '待跟进',
+      anonymous: false
+    };
+    // CR-2026-172 修复：后台 serviceLeaves() 从 localStorage(hbyx-iteration1-demo-v1) 读取留言，
+    // 而 saveState 仅写 sessionStorage(hbyx-mini-learner-demo)，导致「客服留言」页签恒为空。
+    // 此处同步写入共享 localStorage，使后台可读取；sessionStorage 副本保留给学员端「我的咨询」视图。
+    state.consultations.unshift(record);
     saveState();
+    writeDemoState(next => {
+      const list = Array.isArray(next.consultations) ? next.consultations : (next.consultations = []);
+      list.unshift(record);
+    });
     dialog.close();
-    toast('咨询已提交，课程顾问会主动联系');
+    toast(fromService ? '已收到，工作日 48 小时内回复' : '咨询已提交，课程顾问会主动联系');
   });
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
 }
@@ -2904,6 +2991,12 @@ document.addEventListener('click', event => {
   }
   if (action === 'courses') go('/learner/pages/courses.html');
   if (action === 'consult') showConsultDialog();
+  if (action === 'service') go('/learner/pages/service.html');
+  if (action === 'service-leave') {
+    const question = event.target.closest('[data-action]')?.dataset.question || '';
+    if (!isLoggedIn()) { toast('请先登录后提交留言'); go('/login.html?redirect=' + encodeURIComponent('/learner/pages/service.html')); return; }
+    showConsultDialog(question);
+  }
   if (action === 'share') toast('课程分享卡片已生成');
   if (action === 'buy') {
     const item = course(event.target.closest('[data-course-id]').dataset.courseId);
@@ -2986,6 +3079,7 @@ else if (path.endsWith('/messages.html')) renderMessages();
 else if (path.endsWith('/message-detail.html')) renderMessageDetail();
 else if (path.endsWith('/referral.html')) renderReferral();
 else if (path.endsWith('/referral-invites.html')) renderReferralInvites();
+else if (path.endsWith('/service.html')) renderServiceChat();
 else if (path.endsWith('/profile.html')) renderProfile();
 else if (path.endsWith('/student-management.html')) renderStudentManagement();
 else if (path.endsWith('/student-edit.html')) renderStudentEdit();

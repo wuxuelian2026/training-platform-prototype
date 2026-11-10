@@ -74,8 +74,10 @@ export function createLearningFacts(facts, startYear, now = new Date()) {
   const cutoff = period.cutoffDate;
   const occurred = value => Boolean(value) && datePart(value) <= cutoff;
 
+  // 与经营侧一致：自然年度口径按实际开课年份归属班级。
   const classes = new Map(facts.classes
-    .filter(row => row.academicYear === startYear && !row.cancelled && occurred(row.openedOn))
+    .filter(row => Number(datePart(row.openedOn).slice(0, 4)) === Number(startYear)
+      && !row.cancelled && occurred(row.openedOn))
     .map(row => [row.id, row]));
   const courses = new Map(facts.courses.map(row => [row.id, row]));
   const teachers = new Map(facts.teachers.map(row => [row.id, row]));

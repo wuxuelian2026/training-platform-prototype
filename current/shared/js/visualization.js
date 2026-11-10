@@ -57,7 +57,7 @@ function renderYearComparison(comparison) {
       '</td><td>' + value(previous) + '</td><td class="' + (rate > 0 ? 'growth-up' : rate < 0 ? 'growth-down' : '') + '" title="' + (rate === null ? '无可比基数' : '同批次同比') + '">' + growth + '</td></tr>';
   }).join('');
   byId('comparison-range').textContent = '已结束比完整结果 · 进行中比同期';
-  byId('comparison-caption').textContent = comparison.current.period.label + '与' + comparison.previous.period.label + '同批次比较';
+  byId('comparison-caption').textContent = comparison.current.period.label + '年度与' + comparison.previous.period.label + '年度同批次比较';
 }
 
 function renderRanking(id, rows, video = false) {
@@ -284,7 +284,7 @@ function renderDashboard() {
   document.querySelectorAll('.learning-grid .lp-cell:not([hidden]) .rank-scroll').forEach(node => { node.scrollTop = 0; });
   byId('academic-range').textContent = period.startDate.replaceAll('-', '.') + ' - ' + period.endDate.replaceAll('-', '.');
   byId('as-of').textContent = '截至 ' + period.cutoffDate.replaceAll('-', '.');
-  byId('scope').textContent = '演示数据 · ' + period.label + '学年 · 全部校区';
+  byId('scope').textContent = '演示数据 · ' + period.label + '年度 · 全部校区';
   byId('updated').textContent = '更新于 ' + new Intl.DateTimeFormat('zh-CN', { timeZone: TIME_ZONE, timeStyle: 'medium' }).format(now);
   document.querySelectorAll('[data-page]').forEach(link => {
     link.href = './' + link.dataset.page + '?year=' + year;

@@ -366,13 +366,43 @@ function leadConversionSection(lead) {
   return `<section class="sales-dialog-section wide"><h4>线索处理</h4><div class="sales-dialog-grid"><label class="form-field"><span>线索处理<b class="required-mark">*</b></span><select name="result"><option value="保持当前状态">保持当前状态</option><option value="保持已跟进">保持已跟进</option><option value="已转化" ${lead.status === '已转化' ? 'selected' : ''}>已转化</option><option value="标记为已流失">标记为已流失</option></select></label><label class="form-field wide"><span>已支付订单号<b class="required-mark">*</b></span><select name="conversionOrderId"><option value="">请选择已支付面授订单</option>${options}</select></label><label class="form-field"><span>流失原因</span><input name="lostReason" maxlength="100" placeholder="选择标记为已流失时必填"></label></div></section>`;
 }
 
+// CR-P-001：关联学员档案的人工绑定／解绑入口统一收口到「编辑线索」表单，紧随「已支付订单号」之后；
+// 绑定后仅就地刷新本分区，不重开整窗，避免丢失表单其余未保存的编辑。
+function leadBindingSection(lead) {
+  return `<section class="sales-dialog-section wide" data-lead-binding-section><h4>关联学员档案</h4>${followupsApi().leadBindingHtml?.(lead) || ''}</section>`;
+}
+function refreshLeadBindingSection(dialog, lead) {
+  const section = dialog.querySelector('[data-lead-binding-section]');
+  if (!section) return;
+  section.innerHTML = `<h4>关联学员档案</h4>${followupsApi().leadBindingHtml?.(lead) || ''}`;
+  attachLeadBindListeners(dialog, lead);
+}
+function attachLeadBindListeners(dialog, lead) {
+  const bindBtn = dialog.querySelector('[data-lead-bind]');
+  bindBtn?.addEventListener('click', () => {
+    const select = dialog.querySelector('[data-lead-bind-select]');
+    const result = followupsApi().bindLeadToLearner?.(lead.number, select?.value, '当前账号');
+    if (!result?.ok) { showToast(result?.reason || '绑定失败。'); return; }
+    refreshLeadBindingSection(dialog, lead);
+    showToast('已人工绑定学员档案，操作已记录审计。');
+  });
+  dialog.querySelectorAll('[data-lead-unbind]').forEach((btn) => btn.addEventListener('click', () => {
+    const result = followupsApi().unbindLeadFromLearner?.(lead.number, btn.dataset.leadUnbind, '当前账号');
+    if (!result?.ok) { showToast(result?.reason || '解绑失败。'); return; }
+    refreshLeadBindingSection(dialog, lead);
+    showToast('已解绑，操作已记录审计。');
+  }));
+}
+
 // CR-2026-153：原「变更意向」「标记流失」「编辑标签」三个入口合并为一个「编辑线索」表单。
 // 意向课程变更才需要变更原因；标记流失需要 PERM-CRM-007 且原因为必填；标签沿用固定枚举，最多 5 个。
 function openLeadEditForm(lead) {
   const canLose = Boolean(window.hbyxPermissions?.can('PERM-CRM-007'));
   const resultSection = canLose ? leadConversionSection(lead) : '';
-  const dialog = openBusinessDialog('编辑线索', `线索编号 ${lead.number}；字段与新增线索一致，来源类型只读。`, leadFormFields(lead, 'edit', resultSection), '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保</button>');
+  const bindingSection = leadBindingSection(lead);
+  const dialog = openBusinessDialog('编辑线索', `线索编号 ${lead.number}；字段与新增线索一致，来源类型只读。`, leadFormFields(lead, 'edit', resultSection + bindingSection), '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保</button>');
   bindLeadClassSync(dialog, { courseId: lead.intentCourseId || '', classId: lead.intentClassId || lead.classId || '' });
+  attachLeadBindListeners(dialog, lead);
   dialog.querySelector('#business-dialog-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const values = collectLeadForm(event.currentTarget, 'edit', lead);
@@ -1366,25 +1396,14 @@ function openTrialForm() {
 function openLeadDetail(row) {
   const trials = dataSets.trials.filter((item) => item.leadNo === row.number);
   const order = leadOrderOf(row);
-  const facts = [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course || row.intentCourseName], ['关联班级', row.className || row.intentClassName || '未指定'], ['关联教师', row.teacherName || row.intentTeacherName || '未指定'], ['意向备注', row.intentRemark || '—'], ['来源', row.source], ['线索状态', row.status], ['下次跟进', row.next], ['负责人', row.owner], ['关联学员档案', followupsApi().leadBindingHtml?.(row) || '未建档']];
+  const facts = [['线索编号', row.number], ['联系人', row.student], ['手机号', row.phone], ['意向课程', row.course || row.intentCourseName], ['关联班级', row.className || row.intentClassName || '未指定'], ['关联教师', row.teacherName || row.intentTeacherName || '未指定'], ['意向备注', row.intentRemark || '—'], ['来源', row.source], ['线索状态', row.status], ['下次跟进', row.next], ['负责人', row.owner], ['关联学员档案', followupsApi().learnerProfileLinkHtml?.(row) || '未建档']];
   const factRows = facts.map(([label, value]) => `<div><span>${label}</span><strong>${label.includes('状态') ? tag(value) : (label === '关联学员档案' ? value : escapeHtml(String(value ?? '—')))}</strong></div>`).join('');
   const trialRows = trials.length ? trials.map((item) => `<tr><td>${escapeHtml(item.time)}</td><td>${escapeHtml(item.className || '未指定')}</td><td>${escapeHtml(item.teacher || '未指定')}</td><td>${escapeHtml(item.campus)}</td><td>${tag(item.status)}</td><td>${escapeHtml(item.owner)}</td></tr>`).join('') : '<tr><td colspan="6">暂无试听记录</td></tr>';
   const followUps = Array.isArray(row.followUps) ? row.followUps : [];
   const followRows = followUps.length ? followUps.map(item => `<tr><td>${escapeHtml(item.at)}</td><td>${escapeHtml(item.method)}</td><td>${escapeHtml(item.content)}</td><td>${escapeHtml(item.next || '—')}</td><td>${escapeHtml(item.owner || '—')}</td></tr>`).join('') : '<tr><td colspan="5">暂无跟进记录</td></tr>';
   const body = `<div class="sales-detail-list">${factRows}<div><span>线索标签</span><strong><span class="crm-lead-tags">${leadTagsDisplay(row)}</span></strong></div></div><section class="course-detail-section wide"><h3>跟进记录</h3><div class="table-wrap"><table><thead><tr><th>时间</th><th>方式</th><th>内容</th><th>下次跟进</th><th>跟进人</th></tr></thead><tbody>${followRows}</tbody></table></div></section><section class="course-detail-section wide"><h3>试听记录</h3><div class="table-wrap"><table><thead><tr><th>试听时间</th><th>试听班级</th><th>试听教师</th><th>校区</th><th>试听状态</th><th>跟进人</th></tr></thead><tbody>${trialRows}</tbody></table></div></section><section class="course-detail-section wide"><h3>报名结果</h3><p>${order ? `已生成面授订单 ${escapeHtml(order.number)}，关联班级：${escapeHtml(order.linked || '—')}，当前订单状态：${escapeHtml(order.status)}` : '暂无报名订单，报名状态为未转化。'}</p></section>`;
   const dialog = openBusinessDialog('线索详情', `${row.number} · ${row.student}`, `<div class="course-detail-grid">${body}</div>`, '<button type="button" class="button" data-dialog-close>关闭</button>');
-  // CR-P-001：关联关系只在这里人工确认（写入收口 CRM），学员档案侧只读。
-  dialog.querySelector('[data-lead-bind]')?.addEventListener('click', () => {
-    const select = dialog.querySelector('[data-lead-bind-select]');
-    const result = followupsApi().bindLeadToLearner?.(row.number, select?.value, '当前账号');
-    if (!result?.ok) { showToast(result?.reason || '绑定失败。'); return; }
-    closeBusinessDialog(); openLeadDetail(row); showToast('已人工绑定学员档案，操作已记录审计。');
-  });
-  dialog.querySelectorAll('[data-lead-unbind]').forEach((btn) => btn.addEventListener('click', () => {
-    const result = followupsApi().unbindLeadFromLearner?.(row.number, btn.dataset.leadUnbind, '当前账号');
-    if (!result?.ok) { showToast(result?.reason || '解绑失败。'); return; }
-    closeBusinessDialog(); openLeadDetail(row); showToast('已解绑，操作已记录审计。');
-  }));
+  // CR-P-001：线索详情仅只读展示关联学员档案（人工绑定入口已统一收口到「编辑线索」表单，紧随「已支付订单号」之后）。
 }
 
 function openSimpleForm(title, subtitle, fields, onSubmitMessage, onSubmit) {

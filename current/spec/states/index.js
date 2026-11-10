@@ -17,6 +17,7 @@ const { STATE_MACHINES: CRM_STATES } = __classicRequire("spec/states/crm.js");
 const { STATE_MACHINES: LEARNER_STATES } = __classicRequire("spec/states/learner.js");
 const { STATE_MACHINES: FINANCE_STATES } = __classicRequire("spec/states/finance.js");
 const { STATE_MACHINES: ACADEMIC_STATES } = __classicRequire("spec/states/academic.js");
+const { STATE_MACHINES: SERVICE_STATES } = __classicRequire("spec/states/service.js");
 const STATE_MACHINE_MODULES = [
   { module: 'system', machines: SYSTEM_STATES },
   { module: 'teachers', machines: TEACHER_STATES },
@@ -26,7 +27,8 @@ const STATE_MACHINE_MODULES = [
   { module: 'crm', machines: CRM_STATES },
   { module: 'learner', machines: LEARNER_STATES },
   { module: 'finance', machines: FINANCE_STATES },
-  { module: 'academic', machines: ACADEMIC_STATES }
+  { module: 'academic', machines: ACADEMIC_STATES },
+  { module: 'service', machines: SERVICE_STATES }
 ];
 const STATE_MACHINES = STATE_MACHINE_MODULES.flatMap((entry) => entry.machines);
 const machineById = (id) => STATE_MACHINES.find((machine) => machine.id === id) || null;

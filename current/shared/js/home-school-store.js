@@ -2,7 +2,7 @@
   const __classicModules = global.__hbyxClassicModules || (global.__hbyxClassicModules = Object.create(null));
   const __classicExports = {};
 
-  // 家校留言（方案 v1.1）：纯人工异步留言 + 通知闭环。零 AI、无举报、无翻译、无 IM。
+  // 家校留言：人工异步留言 + 通知闭环；不提供自动回复、自动翻译、举报入口与即时通讯。
   // 原型以 localStorage 模拟服务端持久化与三端共享；生产实现须以服务端接口 + 权限校验替换。
   const STORAGE_KEY = 'hbyx-home-school-demo-v1';
   const MAX_TEXT = 300;
@@ -53,7 +53,6 @@
       rules: {
         enabled: true,
         keywords: ['傻子', '骗子', '加一下微信', '私聊', '线下交易', '把手机号发我'],
-        notifyTemplate: '教师已回复您的家校留言，点击查看详情。',
         subscriptionAuthorized: true,
         scanCount: 2,
         blockCount: 0
@@ -264,7 +263,7 @@
     return { ok: true, hint: scan.hint };
   }
 
-  // LT-04：教师人工回复；页面点「发送」即调用本函数，不做 AI 自动生成或自动发送。
+  // LT-04：教师人工回复；页面点「发送」即调用本函数，不自动生成或自动发送。
   function replyThread(payload) {
     if (currentRole() !== ROLE.TEACHER) return { ok: false, reason: '仅授课教师可回复' };
     const duplicate = findDuplicate(payload.clientRequestId);
