@@ -12,9 +12,11 @@ const LOGIN_KEY = 'hbyx-mini-logged-in';
 const ROLE_KEY = 'hbyx-mini-role';
 
 // 学员端公开页（发现类内容，不含个人数据）；其余学员端页面与教师端全部页面需要登录。
+// CR-2026-172：在线客服（常见问题自助查询 + 匿名留言咨询）面向未登录访客开放，无需登录即可访问。
+// 编号说明：本处属在线客服模块迭代，不是 CR-2026-174（大屏自然年度口径）。
 const LEARNER_PUBLIC_PAGES = new Set([
   'index', 'courses', 'course-detail', 'teachers', 'teacher-detail',
-  'fast-registration', 'fast-registration-detail', 'login', 'profile'
+  'fast-registration', 'fast-registration-detail', 'login', 'profile', 'service'
 ]);
 const isMiniLoggedIn = () => sessionStorage.getItem(LOGIN_KEY) === '1';
 const isMiniRole = (role) => sessionStorage.getItem(ROLE_KEY) === role;

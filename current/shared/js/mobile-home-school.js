@@ -32,12 +32,19 @@
   const card = content => `<section class="mp-card">${content}</section>`;
   const requestId = () => `hs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   let newFormOpen = false;
+  // CR-2026-176（口径修订）：联系人与发起沟通均为独立页面，不在会话列表内展开面板。
+  const contactsUrl = role === HS.ROLE.TEACHER ? '/teacher/pages/home-school-contacts.html' : '';
+  const composeUrl = role === HS.ROLE.TEACHER ? '/teacher/pages/home-school-compose.html' : '';
+  const isContacts = path.endsWith('/home-school-contacts.html');
+  const isCompose = path.endsWith('/home-school-compose.html');
 
   // ---------- 列表页：通用会话列表（LP-02 / LT-02）----------
   // 「已关闭」是系统侧只读终态，展示时按来源区分，避免用户误以为会话被谁结束了。
   function statusLabel(thread) {
-    if (thread.status !== HS.STATUS.CLOSED) return thread.status;
-    return thread.closedBy === '教务下架' ? '已下架' : '已结课 · 只读';
+    if (thread.status === HS.STATUS.CLOSED) return thread.closedBy === '教务下架' ? '已下架' : '已结课 · 只读';
+    // CR-2026-176：教师主动发起且家长尚未回看时，避免误显示成「教师已回复」。
+    if (thread.initiatedBy === HS.ROLE.TEACHER && thread.status === HS.STATUS.REPLIED) return '已发起 · 待家长查看';
+    return thread.status;
   }
 
   function threadRow(thread) {
@@ -70,16 +77,65 @@
     </section>`;
   }
 
+  // CR-2026-176 LT-05：教师端「联系人」为独立页面（非列表内展开面板）。按班级分组，一行一名在读学员；
+  // 已有会话直接进沟通详情，无会话进独立「发起沟通」页（带 classId + studentId + className）。
+  // 数据权限由 HS.listContacts() 保证（bindings.teacherId === 当前教师且 active），此处不二次拼装名单。
+  function contactHref(item) {
+    if (item.hasThread) return link(`${detailUrl}?threadId=${encodeURIComponent(item.threadId)}`);
+    return link(`${composeUrl}?classId=${encodeURIComponent(item.classId)}&studentId=${encodeURIComponent(item.studentId)}&className=${encodeURIComponent(item.className)}`);
+  }
+
+  function renderContacts() {
+    const back = `<a class="hs-chat-back" href="${esc(link(listUrl))}" aria-label="返回家校沟通">‹</a>`;
+    const head = `<header class="hs-chat-topbar">${back}
+      <div class="hs-chat-topbar-main"><strong>选择联系人</strong><span>仅本人授课班级的在读学员</span></div>
+    </header>`;
+    if (role !== HS.ROLE.TEACHER) {
+      main.innerHTML = `<div class="hs-chat-page is-list">${head}<div class="hs-chat-empty">无权访问联系人。</div></div>`;
+      return;
+    }
+    const contacts = HS.listContacts().filter(item => !item.closed);
+    if (!contacts.length) {
+      main.innerHTML = `<div class="hs-chat-page is-list">${head}<div class="hs-chat-empty">当前没有可沟通的在读学员，请联系教务确认班级绑定。</div></div>`;
+      return;
+    }
+    const groups = [];
+    const byClass = new Map();
+    contacts.forEach(item => {
+      if (!byClass.has(item.classId)) {
+        const group = { className: item.className, items: [] };
+        byClass.set(item.classId, group);
+        groups.push(group);
+      }
+      byClass.get(item.classId).items.push(item);
+    });
+    const groupHtml = groups.map(group => `<div class="hs-contact-group">
+      <h3>${esc(group.className)}<span>${group.items.length} 人</span></h3>
+      ${group.items.map(item => `<a class="hs-contact-row" href="${esc(contactHref(item))}" data-hs-contact="${esc(item.classId + '|' + item.studentId)}">
+        <span class="hs-avatar" aria-hidden="true">${esc(item.studentName.slice(0, 1))}</span>
+        <span class="hs-contact-copy"><strong>${esc(item.studentName)}</strong><small>${item.hasThread ? esc(statusLabel({ status: item.threadStatus, initiatedBy: item.initiatedBy, closedBy: '' })) : '尚未沟通 · 可发起首条留言'}</small></span>
+        <span class="hs-contact-action">${item.hasThread ? '进入 ›' : '发起 ›'}</span>
+      </a>`).join('')}
+    </div>`).join('');
+    main.innerHTML = `<div class="hs-chat-page is-list">${head}
+      <section class="mp-card hs-contacts" id="hs-contacts">
+        <p class="mp-muted hs-contacts-hint">选择一位学员后进入对应班级的长期会话；尚未沟通时可发出第一条留言，家长端会收到通知。</p>
+        ${groupHtml}
+      </section></div>`;
+  }
+
   function renderList() {
     const threads = HS.listThreads();
     const pending = threads.filter(item => item.status === HS.STATUS.PENDING).length;
     const head = `<header class="hs-chat-topbar">
-      <div class="hs-chat-topbar-main"><strong>${role === HS.ROLE.TEACHER ? '家校沟通' : '我的家校留言'}</strong><span>${pending ? `${pending} 条待回复` : '异步留言 · 教师课间或课后回复'}</span></div>
-      ${role === HS.ROLE.PARENT ? '<button class="hs-chat-icon-btn" type="button" id="hs-toggle-new" aria-label="发起留言" aria-expanded="' + String(newFormOpen) + '">＋</button>' : ''}
+      <div class="hs-chat-topbar-main"><strong>${role === HS.ROLE.TEACHER ? '家校沟通' : '我的家校留言'}</strong><span>${pending ? `${pending} 条待回复` : (role === HS.ROLE.TEACHER ? '异步留言 · 可从联系人主动发起' : '异步留言 · 教师课间或课后回复')}</span></div>
+      ${role === HS.ROLE.TEACHER
+        ? '<a class="hs-chat-icon-btn is-text hs-contact-entry" href="' + esc(link(contactsUrl)) + '" aria-label="选择联系人">联系人</a>'
+        : '<button class="hs-chat-icon-btn" type="button" id="hs-toggle-new" aria-label="发起留言" aria-expanded="' + String(newFormOpen) + '">＋</button>'}
     </header>`;
     const list = threads.length
       ? `<section class="hs-chat-list" aria-label="会话列表">${threads.map(threadRow).join('')}</section>`
-      : '<div class="hs-chat-empty">暂无家校留言，点击右上角 ＋ 发起第一条留言。</div>';
+      : `<div class="hs-chat-empty">${role === HS.ROLE.TEACHER ? '暂无家校留言，点击右上角「联系人」选择学员发起沟通。' : '暂无家校留言，点击右上角 ＋ 发起第一条留言。'}</div>`;
     main.innerHTML = `<div class="hs-chat-page is-list">${head}${role === HS.ROLE.PARENT && newFormOpen ? newThreadForm() : ''}${list}</div>`;
 
     document.querySelector('#hs-toggle-new')?.addEventListener('click', () => {
@@ -194,12 +250,59 @@
     });
   }
 
+  // CR-2026-176 LT-06：独立「发起沟通」页。教师从联系人页选中尚无会话的学员后进入，
+  // 不预建空会话——发送成功才创建；取消、内容安全拦截或越权均不产生任何写入。
+  function renderCompose() {
+    const classRef = params.get('classId') || '';
+    const studentId = params.get('studentId') || '';
+    const back = `<a class="hs-chat-back" href="${esc(link(contactsUrl))}" aria-label="返回联系人">‹</a>`;
+    const head = (title, sub) => `<header class="hs-chat-topbar">${back}<div class="hs-chat-topbar-main"><strong>${esc(title)}</strong><span>${esc(sub)}</span></div></header>`;
+    const contact = role === HS.ROLE.TEACHER
+      ? HS.listContacts().find(item => item.classId === classRef && item.studentId === studentId && !item.closed)
+      : null;
+    if (!contact) {
+      main.innerHTML = `<div class="hs-chat-page is-list">${head('无法发起沟通', '请先选择联系人')}<div class="hs-chat-empty">该学员不在你负责的班级，或会话已结束。</div><a class="mp-button secondary full" href="${esc(link(contactsUrl))}">返回联系人</a></div>`;
+      return;
+    }
+    main.innerHTML = `<div class="hs-chat-page" data-hs-compose="1">${head(contact.className, contact.studentName + ' · 主动发起沟通')}
+      <div class="hs-chat-bubbles" aria-label="沟通记录"><div class="hs-chat-empty">还没有留言。发出第一条消息后，这个班级的沟通会一直留在这里，家长端会收到通知。</div></div>
+      <div class="hs-composer-bar" id="hs-composer">
+        <div class="hs-composer-row">
+          <textarea id="hs-reply" rows="1" maxlength="${HS.MAX_TEXT}" placeholder="输入消息…" aria-label="输入消息"></textarea>
+          <button class="mp-button" type="button" id="hs-send">发送</button>
+        </div>
+        <p class="hs-composer-hint" id="hs-reply-hint">发送后不可修改</p>
+      </div></div>`;
+    document.querySelector('#hs-send')?.addEventListener('click', () => {
+      const text = String(document.querySelector('#hs-reply')?.value || '').trim();
+      const hint = document.querySelector('#hs-reply-hint');
+      // 内容安全扫描与 PII 提示由 startThreadByTeacher 统一执行，此处不重复扫描。
+      const result = HS.startThreadByTeacher({ classId: classRef, studentId, text, clientRequestId: requestId() });
+      if (!result.ok) {
+        if (hint) hint.textContent = `${result.reason}${result.hint ? ` · ${result.hint}` : ''}`;
+        toast(result.reason);
+        return;
+      }
+      toast(result.delivery && result.delivery.status === '已送达' ? '留言已发送，通知已送达家长' : '留言已发送，未授权订阅消息，已降级站内红点');
+      global.location.href = link(`${detailUrl}?threadId=${encodeURIComponent(result.threadId)}`);
+    });
+  }
+
   function renderDetail() {
     const threadId = params.get('threadId');
     const classRef = params.get('classId');
+    const studentId = params.get('studentId') || '';
     let thread = HS.getThread(threadId);
-    if (!thread && classRef) thread = HS.findThreadByClass(classRef);
+    if (!thread && classRef) thread = HS.findThreadByClass(classRef, studentId ? { studentId } : undefined);
     if (!thread && classRef && role === HS.ROLE.PARENT) { renderNewThread(classRef); return; }
+    // 兼容早期 teacherStart=1 直达链接：统一重定向到独立「发起沟通」页，避免两处渲染同一内容。
+    if (!thread && classRef && role === HS.ROLE.TEACHER && params.get('teacherStart') === '1') {
+      const next = new URLSearchParams({ classId: classRef, studentId });
+      const className = params.get('className');
+      if (className) next.set('className', className);
+      global.location.replace(link(`${composeUrl}?${next}`));
+      return;
+    }
     if (!thread) {
       main.innerHTML = `<div class="hs-chat-page is-list"><header class="hs-chat-topbar"><div class="hs-chat-topbar-main"><strong>沟通详情</strong><span>会话不存在或无权访问</span></div></header><div class="hs-chat-empty">请从家校沟通列表重新进入。</div><a class="mp-button secondary full" href="${esc(link(listUrl))}">返回家校沟通</a></div>`;
       return;
@@ -324,7 +427,7 @@
   }
 
   function injectEntry() {
-    if (isList || isDetail) return;
+    if (isList || isDetail || isContacts || isCompose) return;
     // 家校互动 v1.1 修订（2026-11-06 客户反馈）：消息通知页顶部的家校沟通入口去掉。
     // 两端 messages.html 均不再注入入口；家校沟通仍可从「我的」页、班级详情操作条按钮
     // 或教师端班级详情吸底条进入，会话列表与详情页本身不受影响。
@@ -353,10 +456,16 @@
     holder.insertAdjacentHTML('afterbegin', entryHtml(false));
   }
 
-  if (isList) renderList();
+  if (isContacts) renderContacts();
+  else if (isCompose) renderCompose();
+  else if (isList) renderList();
   else if (isDetail) renderDetail();
   else injectEntry();
 
-  __classicExports['renderHomeSchool'] = () => (isList ? renderList() : renderDetail());
+  __classicExports['renderHomeSchool'] = () => {
+    if (isContacts) return renderContacts();
+    if (isCompose) return renderCompose();
+    return isList ? renderList() : renderDetail();
+  };
   __classicModules['shared/js/mobile-home-school.js'] = __classicExports;
 })(globalThis);

@@ -4,7 +4,8 @@
   const __classicRequire = (id) => __classicModules[id];
 // CR-2026-172 在线客服与常见问题库 · 静态 mock 数据层（单一事实源）
 // 去 AI 化：本模块为关键词规则检索，不涉及模型、语义相似度或多轮上下文。
-// 知识条目/未命中归并组/导入批次存 hbyx-service-demo-v1；客服留言复用 demo-store 的 consultations。
+// 知识条目 / 未命中归并组存 hbyx-service-demo-v1；客服留言复用 demo-store 的 consultations。
+// CR-2026-177：导入批次概念已去掉，不再保存批次号、文件与操作人等批次留痕。
 const KEY = 'hbyx-service-demo-v1';
 const SERVICE_CATEGORIES = ['报名缴费', '课程学习', '考务考级', '证书', '其他'];
 const SERVICE_STATUSES = ['上架', '下架'];
@@ -50,15 +51,15 @@ const seedState = () => ({
     status: row[4],
     createdAt: '2026-09-01 09:' + String(index).padStart(2, '0')
   })),
-  misses: [],
-  batches: []
+  misses: []
 });
 
 function readServiceState() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (!raw || !Array.isArray(raw.kb)) return seedState();
-    return { kb: raw.kb, misses: Array.isArray(raw.misses) ? raw.misses : [], batches: Array.isArray(raw.batches) ? raw.batches : [] };
+    // 旧演示数据可能残留 batches 字段，读取时忽略即可，无需迁移或回填。
+    return { kb: raw.kb, misses: Array.isArray(raw.misses) ? raw.misses : [] };
   } catch { return seedState(); }
 }
 function writeServiceState(mutator) {
@@ -207,11 +208,7 @@ function applyImportRows(checked, filename) {
       else next.kb.push(Object.assign({ id: 'KB' + Date.now() + Math.floor(Math.random() * 1000) + success, createdAt: nowText() }, record));
       success += 1;
     });
-    next.batches.unshift({
-      id: 'IMP' + Date.now(), file: filename || '未命名.xlsx', operator: '李教务',
-      createdAt: nowText(), success, failed, overwritten,
-      note: failed ? `${failed} 行因校验未通过被跳过，其余行已入库。` : '全部行已入库。'
-    });
+    // CR-2026-177：不再写批次留痕；结果由 success / failed / overwritten 返回给提示条展示。
   });
   return { success, failed, overwritten, state };
 }

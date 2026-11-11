@@ -36,8 +36,9 @@
   const tag = (value) => '<span class="tag">' + esc(value) + '</span>';
   const card = (title, body) => '<section class="card" style="margin:0 0 14px;padding:16px"><h2 style="margin:0 0 12px;font-size:15px">' + esc(title) + '</h2>' + body + '</section>';
 
+  // CR-2026-177：去掉「导入批次」页签，导入结果由 toast 反馈，不再单独维护批次列表。
   const tabs = [
-    ['kb', '常见问题库'], ['followups', '学员待跟进'], ['batches', '导入批次']
+    ['kb', '常见问题库'], ['followups', '学员待跟进']
   ];
   const tabBar = () => '<div class="ops-tabs" style="display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap">' + tabs.map(([key, label]) =>
     '<button type="button" class="button' + (tab === key ? ' primary' : '') + '" data-service-tab="' + key + '">' + esc(label) + '</button>').join('') + '</div>';
@@ -141,17 +142,8 @@
       table(['问题', '未命中', '转人工', '首次 / 最近', '状态', '操作'], rows, '暂无学员待跟进。学员在在线客服提问未命中、或提交留言后在此显示。'));
   }
 
-  function renderBatches() {
-    const rows = S.readServiceState().batches.map(b => [
-      esc(b.id), esc(b.file), esc(b.operator), esc(b.createdAt),
-      String(b.success), String(b.failed), String(b.overwritten), esc(b.note || '—')
-    ]);
-    return card('导入批次留痕（只读）',
-      table(['批次号', '文件名', '操作人', '时间', '成功', '失败', '覆盖', '说明'], rows, '暂无导入批次。'));
-  }
-
   function render() {
-    const content = tab === 'kb' ? renderKb() : tab === 'followups' ? renderFollowups() : renderBatches();
+    const content = tab === 'followups' ? renderFollowups() : renderKb();
     root.innerHTML = '<div class="ops-page"><div class="page-head"><div><h1>常见问题库</h1><p>维护在线客服的常见问题、导入导出、未命中问题与人工回复。</p></div></div>' +
       tabBar() + content + '<div class="toast" data-ops-toast role="status" aria-live="polite" hidden></div></div>';
   }
@@ -215,7 +207,8 @@
     dlg.querySelector('[data-service-action=import-confirm]').addEventListener('click', () => {
       const result = S.applyImportRows(checked, filename);
       global.__serviceImportResult = result;
-      closeDialog(); tab = 'batches'; render();
+      // CR-2026-177：导入完成后回到常见问题库查看结果，成功/阻断/覆盖条数由 toast 反馈。
+      closeDialog(); tab = 'kb'; render();
       showToast('成功导入 ' + result.success + ' 行，阻断 ' + result.failed + ' 行，覆盖 ' + result.overwritten + ' 行');
     });
   }

@@ -551,4 +551,23 @@ check('CR-2026-174：两页签顶栏与页面说明统一为自然年度口径',
   assert.equal(academicPeriod(2025, now).label, '2025');
   assert.equal(academicPeriod(2025, now).startDate, '2025-01-01');
 });
+check('CR-2026-175：两个页签均有导出报告入口并共用打印行为', () => {
+  const read = file => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8');
+  const headers = ['../visualization/index.html', '../visualization/learning.html'].map(path => {
+    const html = read(path);
+    return html.slice(html.indexOf('<header class="dashboard-header">'), html.indexOf('</header>'));
+  });
+  for (const header of headers) {
+    assert.ok(header.includes('id="export-report"') && header.includes('导出报告'), '两个页签顶栏都应有导出报告按钮');
+    assert.ok(header.indexOf('id="export-report"') < header.indexOf('id="dashboard-help"'), '导出按钮应排在页面说明之前');
+  }
+  const render = read('../shared/js/visualization.js');
+  assert.ok(render.includes("const exportButton = byId('export-report')") && render.includes('if (exportButton)'),
+    '导出绑定应按按钮存在性判断，两个页签共用，不再限于学情页');
+  assert.ok(!render.includes('// 顶部「导出报告」走浏览器打印'), '不应残留只在学情页绑定导出的旧实现');
+  assert.ok(render.includes('window.print()'), '导出仍走浏览器打印，不引入服务端导出');
+  const help = read('../shared/js/visualization-help.js');
+  assert.equal((help.match(/导出报告、页面说明/g) || []).length, 2, '两个页签的页面说明都应写明导出行为');
+  assert.ok(help.includes('保留 4 个顶部指标与 7 个分析面板'), '经营总览说明应与实际指标与面板数一致');
+});
 console.log('驾驶舱回归通过：' + checks + ' 项。');

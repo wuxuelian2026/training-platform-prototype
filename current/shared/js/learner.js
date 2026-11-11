@@ -2591,23 +2591,26 @@ function mountServiceProfileEntry() {
 const SERVICE_ACTION_BUTTON = '<button class="mp-button secondary mp-icon-action" type="button" data-action="service"><span aria-hidden="true">客</span><span>在线客服</span></button>';
 function renderServiceChat() {
   const thread = [];
-  const leaveLink = (question) => '<button class="mp-link" type="button" data-action="service-leave" data-question="' + esc(question) + '">没解决？留言咨询</button>';
-  const entryHtml = (row) => {
-    const answer = row.result.status === 'hit'
-      ? '<section class="mp-service-answer"><div class="mp-section-head"><h3>常见问题</h3><span class="mp-muted">' + esc(row.result.item.category) + '</span></div><h4>' + esc(row.result.item.question) + '</h4><p>' + esc(row.result.item.answer) + '</p>' + leaveLink(row.question) + '</section>'
-      : '<section class="mp-service-answer"><p>' + esc(row.result.message) + '</p>' + leaveLink(row.question) + '</section>';
-    return '<div class="mp-service-question">' + esc(row.question) + '</div>' + answer;
+  const SERVICE_SUGGESTIONS = ['怎么报名', '退款怎么操作', '上课时间怎么查', '如何联系课程顾问'];
+  const leaveLink = (question) => '<button class="mp-link" type="button" data-action="service-leave" data-question="' + esc(question) + '">没解决？留言咨询 ›</button>';
+  const answerHtml = (row) => {
+    const body = row.result.status === 'hit'
+      ? '<div class="mp-section-head"><h3>常见问题</h3><span class="mp-muted">' + esc(row.result.item.category) + '</span></div><h4>' + esc(row.result.item.question) + '</h4><p>' + esc(row.result.item.answer) + '</p>' + leaveLink(row.question)
+      : '<p>' + esc(row.result.message) + '</p>' + leaveLink(row.question);
+    return '<div class="mp-service-answer"><div class="mp-service-answer-body">' + body + '</div></div>';
   };
-  const threadHtml = () => thread.length ? thread.map(entryHtml).join('') : '<p class="mp-muted">输入问题，查询常见问题答复。</p>';
+  const threadHtml = () => thread.length
+    ? thread.map((row) => '<div class="mp-service-question">' + esc(row.question) + '</div>' + answerHtml(row)).join('')
+    : '<div class="mp-service-empty">你好，我是智能客服助手。输入你的问题，我会从常见问题库里帮你查找答案；没找到也可以留言，工作日由人工回复。</div>'
+      + '<div class="mp-service-suggest">' + SERVICE_SUGGESTIONS.map((s) => '<button type="button" data-service-suggest="' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div>';
   layout(stack(
     card('<div class="mp-section-head"><h2>在线客服</h2><span class="mp-muted">常见问题自助查询</span></div><p class="mp-notice">' + SERVICE_NOTICE + '</p>'),
     '<section class="mp-service-thread" id="service-thread">' + threadHtml() + '</section>',
-    card('<form id="service-ask-form" class="mp-form"><div class="mp-field"><label for="service-question">请输入问题</label><input id="service-question" type="text" maxlength="200" placeholder="例如：怎么报名" autocomplete="off" /></div><div class="mp-actions"><button class="mp-button" type="submit">发送</button></div></form><p class="mp-muted">每次提问独立，仅支持文字；答案仅供参考。</p>')
+    '<div class="mp-service-composer-wrap">' + card('<form id="service-ask-form" class="mp-service-composer"><input id="service-question" type="text" maxlength="200" placeholder="输入你的问题，如：怎么报名" autocomplete="off" /><button class="mp-button" type="submit">发送</button></form><p class="mp-muted mp-service-tip">每次提问独立，仅支持文字；答案仅供参考。</p>') + '</div>'
   ));
   const form = document.querySelector('#service-ask-form');
   if (!form) return;
-  form.addEventListener('submit', event => {
-    event.preventDefault();
+  const ask = () => {
     const input = form.querySelector('#service-question');
     const question = String(input.value || '').trim();
     const service = globalThis.HbyxService;
@@ -2618,6 +2621,14 @@ function renderServiceChat() {
     input.value = '';
     const box = document.querySelector('#service-thread');
     if (box) box.innerHTML = threadHtml();
+  };
+  form.addEventListener('submit', event => { event.preventDefault(); ask(); });
+  document.querySelectorAll('[data-service-suggest]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = document.querySelector('#service-question');
+      if (input) input.value = btn.getAttribute('data-service-suggest') || '';
+      ask();
+    });
   });
 }
 function renderProfile() {
@@ -2960,7 +2971,7 @@ function showConsultDialog(prefillQuestion) {
       reply: '',
       replyAt: '',
       progress: '待跟进',
-      anonymous: false
+      anonymous: !isLoggedIn()
     };
     // CR-2026-172 修复：后台 serviceLeaves() 从 localStorage(hbyx-iteration1-demo-v1) 读取留言，
     // 而 saveState 仅写 sessionStorage(hbyx-mini-learner-demo)，导致「客服留言」页签恒为空。
@@ -2994,7 +3005,7 @@ document.addEventListener('click', event => {
   if (action === 'service') go('/learner/pages/service.html');
   if (action === 'service-leave') {
     const question = event.target.closest('[data-action]')?.dataset.question || '';
-    if (!isLoggedIn()) { toast('请先登录后提交留言'); go('/login.html?redirect=' + encodeURIComponent('/learner/pages/service.html')); return; }
+    // CR-2026-174：客服留言向未登录访客开放，不再强制登录；匿名提交标记为 anonymous。
     showConsultDialog(question);
   }
   if (action === 'share') toast('课程分享卡片已生成');

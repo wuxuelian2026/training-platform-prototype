@@ -17,6 +17,8 @@
   // 筛选状态：会话监管与沟通关系绑定各自独立，切换页签不互相影响。
   let threadFilters = { classId: '', teacher: '', student: '' };
   let bindingFilters = { classId: '', teacher: '', student: '' };
+  // 沟通关系绑定批量启停的勾选状态（按班级 classId 维度，与 setBindingActive 粒度一致）。
+  let bindingSelection = new Set();
 
   // 从数据中提取去重后的班级 / 教师 / 学员选项（按 id 去重，取展示名）。
   function hsUniqueOptions(list, keyFn) {
@@ -133,19 +135,38 @@
         `<p style="font-size:13px;line-height:1.8;margin:0">审计：所有发送、回复、下架、配置变更均写入审计日志，日志不含个人信息原文；本页不单独展示，由后续「操作审计」页统一承载。</p>`);
   }
 
+  function filteredBindings() {
+    return hsApplyFilters(HS.listBindings(), bindingFilters);
+  }
+
   function bindingsTab() {
     const all = HS.listBindings();
+    const filtered = filteredBindings();
     const classOpts = hsUniqueOptions(all, i => ({ id: i.classId, label: i.className }));
     const teacherOpts = hsUniqueOptions(all, i => ({ id: i.teacherName, label: i.teacherName }));
     const studentOpts = hsUniqueOptions(all, i => ({ id: i.studentName, label: i.studentName }));
-    const rows = hsApplyFilters(all, bindingFilters).map(item => row([
+    const filteredClassIds = [...new Set(filtered.map(i => i.classId))];
+    const selectedIds = filteredClassIds.filter(id => bindingSelection.has(id));
+    const allSelected = filteredClassIds.length > 0 && filteredClassIds.every(id => bindingSelection.has(id));
+    const rows = filtered.map(item => row([
+      `<input type="checkbox" data-hs-binding-select data-hs-id="${esc(item.classId)}" ${bindingSelection.has(item.classId) ? 'checked' : ''}>`,
       esc(item.classId), esc(item.className), esc(item.studentName), esc(item.teacherName),
       badge(item.active ? '在读' : '已结课', item.active ? '#e8f7ee' : '#f1f2f4'),
       `<button class="button" type="button" data-hs-action="toggle-binding" data-hs-id="${esc(item.classId)}" data-hs-active="${item.active ? '1' : ''}" style="padding:4px 10px;font-size:12px">${item.active ? '停用' : '启用'}</button>`
     ]));
     const filterBar = hsFilterBar('bindings', bindingFilters, classOpts, teacherOpts, studentOpts) + hsFilterSummary('bindings', bindingFilters, all.length, rows.length);
-    return panel('沟通关系绑定', '以教务主数据为准，绑定「班级 × 学员 × 授课教师」三元组。停用或已结课班级不显示「联系教师」入口，不生成孤立会话。可按班级 / 教师 / 学员筛选。',
-      filterBar + table(['班级编号', '班级名称', '学员', '授课教师', '状态', '操作'], rows));
+    const toolbar = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <button class="button" type="button" data-hs-action="batch-enable" style="padding:6px 14px;font-size:13px">批量启用</button>
+      <button class="button" type="button" data-hs-action="batch-disable" style="padding:6px 14px;font-size:13px;background:#fff1f0;border-color:#ffccc7">批量停用</button>
+      <span style="font-size:12px;color:#6b7280">已选 ${selectedIds.length} 个班级</span>
+    </div>`;
+    const columns = ['班级编号', '班级名称', '学员', '授课教师', '状态', '操作'];
+    const headCells = `<th style="${cellStyle()};background:#f5f6f8;white-space:nowrap;width:36px;text-align:center"><input type="checkbox" data-hs-binding-select-all ${allSelected ? 'checked' : ''}></th>` + columns.map(label => `<th style="${cellStyle()};background:#f5f6f8;white-space:nowrap">${esc(label)}</th>`).join('');
+    const body = rows.length
+      ? `<div style="overflow-x:auto"><table style="${tableStyle()}"><thead><tr>${headCells}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`
+      : '<div style="padding:18px;color:#6b7280;background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px">暂无记录</div>';
+    return panel('沟通关系绑定', '以教务主数据为准，绑定「班级 × 学员 × 授课教师」三元组。停用或已结课班级不显示「联系教师」入口，不生成孤立会话。可按班级 / 教师 / 学员筛选，并支持勾选后批量启用 / 停用。',
+      filterBar + toolbar + body);
   }
 
   function render() {
@@ -192,6 +213,19 @@
       render();
       return;
     }
+    if (action === 'batch-enable' || action === 'batch-disable') {
+      const ids = [...new Set(filteredBindings().map(i => i.classId).filter(id => bindingSelection.has(id)))];
+      if (!ids.length) {
+        flash = `请先勾选需要${action === 'batch-enable' ? '启用' : '停用'}的班级`;
+        render();
+        return;
+      }
+      ids.forEach(target => HS.setBindingActive(target, action === 'batch-enable'));
+      bindingSelection.clear();
+      flash = `已批量${action === 'batch-enable' ? '启用' : '停用'} ${ids.length} 个班级的沟通关系绑定`;
+      render();
+      return;
+    }
     if (action === 'save-rules') {
       const keywords = String(document.querySelector('[data-hs-rule="keywords"]')?.value || '')
         .split(/[,，、\n]/).map(word => word.trim()).filter(Boolean);
@@ -208,6 +242,21 @@
 
   // 筛选下拉变更：解析 prefix:key，更新对应页签筛选状态后重渲染；改筛选时清空会话详情。
   document.addEventListener('change', event => {
+    const rowCb = event.target.closest('[data-hs-binding-select]');
+    if (rowCb) {
+      const id = rowCb.dataset.hsId;
+      if (rowCb.checked) bindingSelection.add(id); else bindingSelection.delete(id);
+      render();
+      return;
+    }
+    const allCb = event.target.closest('[data-hs-binding-select-all]');
+    if (allCb) {
+      const ids = [...new Set(filteredBindings().map(i => i.classId))];
+      if (allCb.checked) ids.forEach(id => bindingSelection.add(id));
+      else ids.forEach(id => bindingSelection.delete(id));
+      render();
+      return;
+    }
     const sel = event.target.closest('[data-hs-filter]');
     if (!sel) return;
     const [prefix, key] = String(sel.dataset.hsFilter).split(':');

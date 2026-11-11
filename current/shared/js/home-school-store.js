@@ -19,10 +19,19 @@
   function uid(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
 
   function seed() {
+    // CR-2026-176：家校关系绑定扩充为「多班级 × 每班多学员」，供教师端「联系人」按班级分组选择。
+    // 每条绑定即一个「班级 × 学员 × 授课教师 × 家长」沟通对象；active=false 表示已结课，不进联系人列表。
+    // parentAccountId 为演示简化值（统一家长账号），生产实现须按学员家长账号绑定替换。
     const bindings = [
-      { classId: 'CLASS-HS-01', className: '少儿中国舞启蒙 1 班', studentId: 'STU-001', studentName: '林知夏', teacherId: 'teacher-default', teacherName: '周老师', active: true },
-      { classId: 'CLASS-HS-02', className: '少儿创意绘画 A 班', studentId: 'STU-001', studentName: '林知夏', teacherId: 'teacher-default', teacherName: '周老师', active: true },
-      { classId: 'CLASS-HS-03', className: '少儿国画基础班（已结课）', studentId: 'STU-002', studentName: '林知远', teacherId: 'teacher-default', teacherName: '周老师', active: false }
+      { classId: 'CLASS-HS-01', className: '少儿中国舞启蒙 1 班', studentId: 'STU-001', studentName: '林知夏', teacherId: 'teacher-default', teacherName: '周老师', parentAccountId: 'parent-default', active: true },
+      { classId: 'CLASS-HS-01', className: '少儿中国舞启蒙 1 班', studentId: 'STU-003', studentName: '周予安', teacherId: 'teacher-default', teacherName: '周老师', parentAccountId: 'parent-default', active: true },
+      { classId: 'CLASS-HS-01', className: '少儿中国舞启蒙 1 班', studentId: 'STU-004', studentName: '陈一诺', teacherId: 'teacher-default', teacherName: '周老师', parentAccountId: 'parent-default', active: true },
+      { classId: 'CLASS-HS-02', className: '少儿创意绘画 A 班', studentId: 'STU-001', studentName: '林知夏', teacherId: 'teacher-default', teacherName: '周老师', parentAccountId: 'parent-default', active: true },
+      { classId: 'CLASS-HS-02', className: '少儿创意绘画 A 班', studentId: 'STU-005', studentName: '赵明月', teacherId: 'teacher-default', teacherName: '周老师', parentAccountId: 'parent-default', active: true },
+      { classId: 'CLASS-HS-03', className: '少儿国画基础班（已结课）', studentId: 'STU-002', studentName: '林知远', teacherId: 'teacher-default', teacherName: '周老师', parentAccountId: 'parent-default', active: false },
+      { classId: 'CLASS-HS-04', className: '少儿街舞基础班', studentId: 'STU-006', studentName: '许星辰', teacherId: 'teacher-default', teacherName: '周老师', parentAccountId: 'parent-default', active: true },
+      { classId: 'CLASS-HS-04', className: '少儿街舞基础班', studentId: 'STU-007', studentName: '刘思源', teacherId: 'teacher-default', teacherName: '周老师', parentAccountId: 'parent-default', active: true },
+      { classId: 'CLASS-HS-05', className: '少儿书法入门班', studentId: 'STU-008', studentName: '孙艺涵', teacherId: 'teacher-default', teacherName: '周老师', parentAccountId: 'parent-default', active: true }
     ];
     const threads = [
       { threadId: 'HS-T-001', classId: 'CLASS-HS-01', className: '少儿中国舞启蒙 1 班', studentId: 'STU-001', studentName: '林知夏', teacherId: 'teacher-default', teacherName: '周老师', parentAccountId: 'parent-default', status: STATUS.PENDING, createdAt: '2026-11-03 18:42', lastMessageAt: '2026-11-05 09:20', closedAt: '', closedBy: '', unreadByParent: false, unreadByTeacher: true },
@@ -109,12 +118,17 @@
       .sort((a, b) => String(b.lastMessageAt).localeCompare(String(a.lastMessageAt)));
   }
   // 一个「班级 × 学员 × 授课教师 × 家长」长期只有一条会话，按 classRef 查，不每次新建。
+  // CR-2026-176：一个班级可有多名学员，传入 options.studentId 时按「班级 × 学员」精确匹配，
+  // 避免同班不同学员误落到同一条会话；不传时保持按班级取最新一条（兼容家长端班级详情直达）。
   function findThreadByClass(classRef, options) {
     if (!classRef) return null;
     const role = (options && options.role) || currentRole();
     const actorId = (options && options.actorId) || currentActorId();
+    const studentId = options && options.studentId;
     return read().threads
-      .filter(thread => thread.classId === classRef && canAccess(thread, role, actorId))
+      .filter(thread => thread.classId === classRef
+        && (!studentId || thread.studentId === studentId)
+        && canAccess(thread, role, actorId))
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
   }
 
@@ -215,7 +229,7 @@
     if (scan.blocked) return { ok: false, reason: scan.reason, hint: scan.hint };
     const binding = resolveBindingFor(payload.classId, payload.className);
     if (!binding) return { ok: false, reason: '当前学员没有在读班级，无法发起留言' };
-    const existing = findThreadByClass(binding.classId);
+    const existing = findThreadByClass(binding.classId, { studentId: binding.studentId });
     if (existing && existing.status === STATUS.CLOSED) {
       return { ok: false, reason: '该班级会话已结课或下架，如有疑问请联系客服或教务' };
     }
@@ -254,6 +268,8 @@
     mutate(data => {
       const row = data.threads.find(item => item.threadId === payload.threadId);
       row.status = STATUS.PENDING;
+      // CR-2026-176：家长一旦追问，会话回到常规「教师待回复 / 已回复」语义，清掉教师主动发起标记。
+      row.initiatedBy = '';
       row.lastMessageAt = nowText();
       row.unreadByTeacher = true;
       row.unreadByParent = false;
@@ -292,6 +308,77 @@
       pushAudit(data, { actor: roleLabel(ROLE.TEACHER), action: '回复留言', target: payload.threadId, result: '通过', detail: `人工编辑后发送；触达=${delivery.channel}` });
     });
     return { ok: true, hint: scan.hint, delivery };
+  }
+
+  // CR-2026-176 LT-05：教师端「联系人」——只列本人授课班级的在读学员，按「班级 × 学员」精确关联会话。
+  // 数据权限以 bindings 的 teacherId 为准，不按班级名/学员名猜测；active=false（已结课）不入列。
+  function listContacts(options) {
+    const role = (options && options.role) || currentRole();
+    const actorId = (options && options.actorId) || currentActorId();
+    if (role !== ROLE.TEACHER) return [];
+    const data = read();
+    return data.bindings
+      .filter(item => item.active && item.teacherId === actorId)
+      .map(item => {
+        const thread = data.threads
+          .filter(row => row.classId === item.classId && row.studentId === item.studentId && row.teacherId === actorId)
+          .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
+        return {
+          classId: item.classId, className: item.className,
+          studentId: item.studentId, studentName: item.studentName,
+          teacherId: item.teacherId, teacherName: item.teacherName,
+          parentAccountId: item.parentAccountId || 'parent-default',
+          active: item.active, hasThread: Boolean(thread),
+          threadId: thread ? thread.threadId : '',
+          threadStatus: thread ? thread.status : '',
+          initiatedBy: thread ? (thread.initiatedBy || '') : '',
+          closed: Boolean(thread && thread.status === STATUS.CLOSED)
+        };
+      });
+  }
+
+  // CR-2026-176 LT-06：教师主动发起沟通。
+  // 规则变更：此前仅家长可发起；现在教师可从联系人入口对「本人授课班级 × 学员」发出首条留言。
+  // 已有会话复用同一条长期会话（走 replyThread），无会话才创建；终态会话与越权对象一律拒绝。
+  function startThreadByTeacher(payload) {
+    if (currentRole() !== ROLE.TEACHER) return { ok: false, reason: '仅授课教师可发起沟通' };
+    const duplicate = findDuplicate(payload.clientRequestId);
+    if (duplicate) return { ok: true, threadId: duplicate.threadId, duplicated: true };
+    const contact = listContacts().find(item =>
+      item.classId === payload.classId && item.studentId === payload.studentId && !item.closed);
+    if (!contact) return { ok: false, reason: '该学员不在你负责的班级，或会话已结束' };
+    const text = String(payload.text || '').trim();
+    const existing = findThreadByClass(contact.classId, { studentId: contact.studentId });
+    if (existing) {
+      const result = replyThread({ threadId: existing.threadId, text, clientRequestId: payload.clientRequestId });
+      return result.ok
+        ? { ok: true, threadId: existing.threadId, reused: true, hint: result.hint, delivery: result.delivery }
+        : result;
+    }
+    const scan = scanText(text);
+    if (scan.blocked) return { ok: false, reason: scan.reason, hint: scan.hint };
+    let created = null;
+    let delivery = null;
+    mutate(data => {
+      const threadId = uid('HS-T');
+      data.threads.unshift({
+        threadId, classId: contact.classId, className: contact.className,
+        studentId: contact.studentId, studentName: contact.studentName,
+        teacherId: contact.teacherId, teacherName: contact.teacherName,
+        parentAccountId: contact.parentAccountId,
+        status: STATUS.REPLIED, initiatedBy: ROLE.TEACHER,
+        createdAt: nowText(), lastMessageAt: nowText(), closedAt: '', closedBy: '',
+        unreadByParent: true, unreadByTeacher: false
+      });
+      addMessage(data, { threadId, senderRole: ROLE.TEACHER, senderLabel: roleLabel(ROLE.TEACHER), text, clientRequestId: payload.clientRequestId });
+      const authorized = data.rules.subscriptionAuthorized;
+      // 通知只提示「有新的家校沟通」，不携带留言正文、学情或评价内容。
+      delivery = { threadId, title: '教师发起了家校沟通', channel: authorized ? '订阅消息' : '站内未读红点', status: authorized ? '已送达' : '未授权降级' };
+      pushDelivery(data, delivery);
+      pushAudit(data, { actor: roleLabel(ROLE.TEACHER), action: '主动发起沟通', target: threadId, result: '通过', detail: `班级 ${contact.classId} · 学员 ${contact.studentId}；仅记录 ID，不含留言原文` });
+      created = threadId;
+    });
+    return { ok: true, threadId: created, hint: scan.hint, delivery };
   }
 
   function markRead(threadId) {
@@ -340,8 +427,9 @@
   }
   function setBindingActive(classId, active) {
     mutate(data => {
-      const row = data.bindings.find(item => item.classId === classId);
-      if (row) row.active = Boolean(active);
+      data.bindings.forEach(item => {
+        if (item.classId === classId) item.active = Boolean(active);
+      });
       pushAudit(data, { actor: '教务管理员', action: '维护沟通关系绑定', target: classId, result: active ? '启用' : '停用', detail: '班级 × 学员 × 授课教师绑定' });
     });
     return listBindings();
@@ -390,6 +478,7 @@
     currentRole, currentActorId, roleLabel,
     listThreads, getThread, listMessages, lastMessage, unreadCount, pendingCount,
     scanText, createThread, findThreadByClass, appendParentMessage, replyThread, markRead, closeThread, takeDown,
+    listContacts, startThreadByTeacher,
     listAudit, listDeliveries, listBindings, getRules, saveRules, setBindingActive,
     stats, resetDemo, maskPhone
   });

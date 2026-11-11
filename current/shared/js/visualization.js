@@ -348,9 +348,11 @@ function mountAutoScroll() {
 }
 
 mountDashboardHelp(view);
-if (learningView) {
-  // 顶部「导出报告」走浏览器打印，配合 CSS 打印样式输出一页报告；口径说明复用「页面说明」按钮，不引入服务端导出依赖。
-  byId('export-report').addEventListener('click', () => window.print());
+// CR-2026-175：两个页签顶栏均有「导出报告」，按按钮存在性绑定，不再只在学情页生效。
+// 导出=浏览器打印当前页，配合 CSS 打印样式；口径说明复用「页面说明」按钮，不引入服务端导出依赖。
+const exportButton = byId('export-report');
+if (exportButton) {
+  exportButton.addEventListener('click', () => window.print());
 }
 renderDashboard();
 mountAutoScroll();

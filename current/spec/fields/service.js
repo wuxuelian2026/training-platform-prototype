@@ -10,7 +10,7 @@ const SERVICE_FIELD_SPEC = {
     'service/index': {
       groups: [
         { heading: '常见问题库条目字段（5 字段）', fields: [
-          { id: 'FD-SERVICE-001', label: '标准问题', type: '文本', length: '≤ 100 字', required: '是', note: '规范化后作为唯一键；重复导入覆盖并留痕', constraints: { maxLength: 100 } },
+          { id: 'FD-SERVICE-001', label: '标准问题', type: '文本', length: '≤ 100 字', required: '是', note: '规范化后作为唯一键；重复导入覆盖', constraints: { maxLength: 100 } },
           { id: 'FD-SERVICE-002', label: '同义问法', type: '文本', length: '多个逗号分隔', required: '否', note: '中文/英文逗号分隔，导入时切分为数组' },
           { id: 'FD-SERVICE-003', label: '答案', type: '纯文本', length: '≤ 500 字', required: '是', note: '原样返回，禁止富文本与外链', constraints: { maxLength: 500 } },
           { id: 'FD-SERVICE-004', label: '分类', type: '下拉', length: '报名缴费 / 课程学习 / 考务考级 / 证书 / 其他', required: '是', note: 'CR-2026-172：本期固定 5 类，不做后台字典维护页' },
@@ -18,8 +18,7 @@ const SERVICE_FIELD_SPEC = {
         ] },
         { heading: '筛选与导入字段', fields: [
           { id: 'FD-SERVICE-006', label: '关键词', type: '文本', length: '≤ 50 字', required: '否', note: '匹配标准问题与同义问法', constraints: { maxLength: 50 } },
-          { id: 'FD-SERVICE-007', label: '导入文件', type: '文件', length: '仅 .xlsx', required: '是', note: '模板 5 列：标准问题｜同义问法｜答案｜分类｜状态' },
-          { id: 'FD-SERVICE-008', label: '导入批次号', type: '只读文本', length: 'IMP+日期+序号', required: '系统', note: '批次留痕：批次号、文件名、操作人、时间、成功/失败/覆盖数', constraints: { readOnly: true, system: true } }
+          { id: 'FD-SERVICE-007', label: '导入文件', type: '文件', length: '仅 .xlsx', required: '是', note: '模板 5 列：标准问题｜同义问法｜答案｜分类｜状态' }
         ] },
         { heading: '未命中问题归并字段（只读）', fields: [
           { id: 'FD-SERVICE-009', label: '问题原话', type: '只读文本', length: '首次出现原话', required: '系统', note: '规范化后完全相同才归并；语义相似本期不做', constraints: { readOnly: true, system: true } },
@@ -35,6 +34,7 @@ const SERVICE_FIELD_SPEC = {
       ],
       notes: [
         'CR-2026-172：本期仅做静态 mock 原型，不做真实后端、NLP 与实时会话。',
+        'CR-2026-177：去掉导入批次号字段与批次列表页签；导入结果由顶部提示反馈，后续如需审计留痕由服务端操作日志统一承接。',
         '去 AI 化：界面文案与模块命名不出现 AI／智能／机器人／助手等字眼；顶部固定声明为「以下为常见问题自助答复，仅供参考，具体以官方通知为准」。',
         '多条命中按 createdAt 升序取第一个已上架条目，不做权重排序；下架条目不参与匹配。',
         '导出范围限于当前筛选结果；客服留言不提供导出（PII 不出库）。',
