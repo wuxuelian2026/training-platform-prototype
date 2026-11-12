@@ -710,10 +710,11 @@ function openProductForm(row = null, options = {}) {
   const displayUnit = row || {};
   const displayEdit = Boolean(options.editDisplay) || !courseDisplayConfigured(displayUnit);
   // CR-2026-034 §4.1.2：已停用课程不再作为新的发布候选；编辑既有商品时仍可读回原课程。
-  const videoCourses = courseCatalog.filter(item => item.type === '视频课程' && item.status === '已完成' && (!item.disabledAt || item.id === row?.courseId));
+  // 直播课按「视频课程式在线交付」，与视频课程共用发布商品入口；订单类型仍归视频课程口径。
+  const onlineCourses = courseCatalog.filter(item => ['视频课程', '直播课'].includes(item.type) && item.status === '已完成' && (!item.disabledAt || item.id === row?.courseId));
   const courseField = course
-    ? `${courseSummary(course, '仅允许已完成的视频课程发布商品')}<input type="hidden" name="courseId" value="${escapeHtml(course.id)}">`
-    : requiredSelect('关联课程', 'courseId', videoCourses.map(item => item.name));
+    ? `${courseSummary(course, '仅允许已完成的视频课程／直播课发布商品')}<input type="hidden" name="courseId" value="${escapeHtml(course.id)}">`
+    : requiredSelect('关联课程', 'courseId', onlineCourses.map(item => item.name));
   const body = `<form id="business-dialog-form" class="sales-workspace-form">${workspaceTabs([['course', '关联课程', 1], ['sale', '销售设置', 2], ['display', '展示信息', 3]], 'course')}<section data-workspace-panel="course" class="sales-workspace-panel"><div class="sales-section-head"><div><span>01</span><h3>关联课程</h3></div><p>商品保存课程编号，课程基本信息和大纲只读引用；历史订单继续读取下单快照。</p></div><div class="sales-dialog-grid">${courseField}</div>${courseReadonlyContent(course)}</section><section data-workspace-panel="sale" class="sales-workspace-panel" hidden><div class="sales-section-head"><div><span>02</span><h3>销售设置</h3></div><p>定价和试看策略属于商品，不回写课程；保存后从列表手动上架。</p></div><div class="sales-dialog-grid">${requiredInput('商品名称', 'name', row?.name || course?.name || '', 'text', '请输入商品名称')}${requiredInput('售卖价格', 'price', row?.price || '', 'number', '请输入售价')}<label class="form-field"><span>试看策略<b class="required-mark">*</b></span><select name="preview" id="preview-policy" required><option ${row?.preview !== '允许试看' ? 'selected' : ''}>不允许试看</option><option ${row?.preview === '允许试看' ? 'selected' : ''}>允许试看</option></select></label><label class="form-field"><span>试看课时</span><select name="previewHours" id="preview-hours" ${row?.preview !== '允许试看' ? 'disabled' : ''}><option ${row?.previewHours === '第1课时' ? 'selected' : ''}>第1课时</option></select></label><label class="form-field"><span>商品状态</span><input value="${escapeHtml(row?.status || '草稿')}" readonly class="readonly-field" /></label></div></section><section data-workspace-panel="display" class="sales-workspace-panel" hidden><div class="sales-section-head"><div><span>03</span><h3>展示信息</h3></div><p>仅影响本商品在学员端的展示。</p></div>${course ? courseDisplaySection(course, displayUnit, { editDisplay: displayEdit, unitLabel: '本商品' }) : courseDisplayPlaceholder('本商品')}</section></form>`;
   const dialog = openBusinessDialog(row ? '编辑商品' : '发布商品', '商品 = 课程引用 + 销售设置 + 展示信息。', body, '<button type="button" class="button" data-dialog-close>取消</button><button type="submit" form="business-dialog-form" class="button primary">保存商品</button>', { workspace: true });
   initWorkspace(dialog);
@@ -723,7 +724,7 @@ function openProductForm(row = null, options = {}) {
   dialog.querySelector('[data-display-edit]')?.addEventListener('click', () => { closeBusinessDialog(); openProductForm(row, { editDisplay: true }); });
   // 未从课程库带入课程时，选择关联课程后重建表单，展示信息才能挂到所选课程档案上。
   dialog.querySelector('[name="courseId"]')?.addEventListener('change', (event) => {
-    const selected = businessCourse(event.target.value) || videoCourses.find(item => item.name === event.target.value);
+    const selected = businessCourse(event.target.value) || onlineCourses.find(item => item.name === event.target.value);
     if (!selected) return;
     closeBusinessDialog();
     openProductForm(null, { courseId: selected.id });
@@ -732,8 +733,8 @@ function openProductForm(row = null, options = {}) {
   preview?.addEventListener('change', () => { previewHours.disabled = preview.value !== '允许试看'; if (previewHours.disabled) previewHours.value = ''; else previewHours.value = '第1课时'; });
   dialog.querySelector('#business-dialog-form')?.addEventListener('submit', event => {
     event.preventDefault(); if (!checkBusinessForm(event.currentTarget)) return;
-    const data = new FormData(event.currentTarget); const selected = businessCourse(data.get('courseId')) || videoCourses.find(item => item.name === data.get('courseId'));
-    if (!selected || selected.type !== '视频课程' || selected.status !== '已完成') { showToast('只能从已完成的视频课程发布商品', 'error'); return; }
+    const data = new FormData(event.currentTarget); const selected = businessCourse(data.get('courseId')) || onlineCourses.find(item => item.name === data.get('courseId'));
+    if (!selected || !['视频课程', '直播课'].includes(selected.type) || selected.status !== '已完成') { showToast('只能从已完成的视频课程或直播课发布商品', 'error'); return; }
     // I1-DEC-26 / RM-F-06: one course keeps exactly one product subject — reuse it instead of adding a second.
     const duplicate = dataSets.products.find(item => item.courseId === selected.id && item.id !== row?.id);
     if (duplicate) {
@@ -883,9 +884,9 @@ function renderProducts() {
     ['已上架', dataSets.products.filter(row => row.status === '已上架').length, '学员端可购买'],
     ['草稿', dataSets.products.filter(row => row.status === '草稿').length, '待完善售卖信息'],
     ['已下架', dataSets.products.filter(row => row.status === '已下架').length, '历史订单不受影响'],
-    ['累计销售', salesTotal, '视频商品成交件数', Math.min(Math.round((salesTotal / 180) * 100), 100)]
+    ['累计销售', salesTotal, '在线课程商品成交件数', Math.min(Math.round((salesTotal / 180) * 100), 100)]
   ]);
-  pageFrame('视频课程商品', '', '<button class="button" data-business-action="demo-reset">恢复初始数据</button><button class="button primary" data-business-action="product-create">发布商品</button>', metrics + filterPanel('product-filter', selectField('商品状态', 'status', ['草稿', '已上架', '已下架']) + inputField('关键词', 'keyword', '商品名称 / 关联课程', true)) + table('<thead><tr><th>商品名称</th><th>关联课程</th><th>售价</th><th>销售数量</th><th>商品状态</th><th>是否推荐</th><th>上架时间</th><th>操作</th></tr></thead>'));
+  pageFrame('在线课程商品', '', '<button class="button" data-business-action="demo-reset">恢复初始数据</button><button class="button primary" data-business-action="product-create">发布商品</button>', metrics + filterPanel('product-filter', selectField('商品状态', 'status', ['草稿', '已上架', '已下架']) + inputField('关键词', 'keyword', '商品名称 / 关联课程', true)) + table('<thead><tr><th>商品名称</th><th>关联课程</th><th>售价</th><th>销售数量</th><th>商品状态</th><th>是否推荐</th><th>上架时间</th><th>操作</th></tr></thead>'));
   renderRows(businessData, productCells, () => true);
   document.querySelector('#product-filter')?.addEventListener('submit', (event) => { event.preventDefault(); const status = event.currentTarget.status.value; const keyword = event.currentTarget.keyword.value.trim(); renderRows(businessData, productCells, (row) => (!status || row.status === status) && (!keyword || `${row.name}${row.course}`.includes(keyword))); });
 }
@@ -1634,7 +1635,7 @@ function handleBusinessAction(action, row) {
     if (index >= 0) dataSets.products.splice(index, 1);
     removeDemoRecord('products', row.id);
     renderProducts();
-    showToast('视频课程商品已删除，关联课程不受影响。');
+    showToast('在线课程商品已删除，关联课程不受影响。');
     return;
   }
   if (action === 'product-recommend-toggle') {
@@ -1732,7 +1733,7 @@ document.addEventListener('click', (event) => {
       ? `确认上架商品“${row.name}”？确认后小程序端可见，未购买账号可按商品价格购买。`
       : action === 'product-unpublish'
         ? `确认下架商品“${row.name}”？下架后小程序端不再展示，历史订单和已购账号授权不受影响。`
-        : `确认删除视频课程商品“${row.name}”？删除后商品不可恢复，关联课程不受影响。`;
+        : `确认删除在线课程商品“${row.name}”？删除后商品不可恢复，关联课程不受影响。`;
     const confirmButton = action === 'product-publish'
       ? `<button type="button" class="button primary" data-confirm-action="${action}">确认上架</button>`
       : `<button type="button" class="button danger-button" data-confirm-action="${action}">${action === 'product-delete' ? '确认删除' : '确认'}</button>`;

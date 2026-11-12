@@ -130,15 +130,26 @@ body { background: #f7f7f5; }
 .mp-course-detail-lessons { margin: 0 0 8px 37px; border-left: 1px solid #eee9e3; }
 .mp-course-detail-lesson { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 50px; padding: 7px 8px 7px 12px; border-bottom: 1px solid #f0ece8; color: var(--ink); text-decoration: none; }
 .mp-course-detail-lesson:last-child { border-bottom: 0; }
-.mp-course-detail-lesson > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
+/* 课时行改为「序号 + 主链接/文本 + 右侧操作区」三段；主区域承载名称与副信息，右侧操作区容纳直播入口与播放箭头。 */
+.mp-course-detail-lesson > span:nth-child(2), .mp-course-detail-lesson-main, .mp-course-detail-lesson-copy { display: grid; min-width: 0; gap: 2px; }
+.mp-course-detail-lesson-main { color: inherit; text-decoration: none; }
 .mp-course-detail-lesson strong, .mp-course-detail-lesson small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-course-detail-lesson strong { font-size: 13px; line-height: 1.4; }
 .mp-course-detail-lesson small { color: var(--muted); font-size: 11px; }
 .mp-course-detail-lesson-index { color: #a07d70; font-size: 11px; font-weight: 700; }
 .mp-course-detail-lesson.is-playable:hover { background: #fcf7f5; }
-.mp-course-detail-lesson.is-playable:focus-visible { outline: 3px solid rgba(139,2,2,.2); outline-offset: -3px; }
+.mp-course-detail-lesson.is-playable:focus-within { outline: 3px solid rgba(139,2,2,.2); outline-offset: -3px; }
 .mp-course-detail-lesson.is-locked { background: #fbfaf9; color: #958c86; }
 .mp-course-detail-play { color: var(--brand); font-size: 20px; line-height: 1; }
+/* CR-2026-179：直播入口移到课时行右侧、播放箭头之前；操作区用 flex 横向排列，直播按钮在箭头前。 */
+.mp-course-detail-lesson-tail { display: inline-flex; align-items: center; gap: 8px; justify-self: end; }
+.mp-course-detail-lesson-live { position: relative; z-index: 1; display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 14px; background: #e8f0ff; color: #1f5fd6; font-size: 11px; text-decoration: none; white-space: nowrap; }
+.mp-course-detail-lesson-live:hover { background: #d6e4ff; }
+.mp-course-detail-lesson-qr { position: relative; z-index: 1; display: inline-flex; width: 28px; height: 28px; border: 1px solid #eee9e3; border-radius: 6px; overflow: hidden; }
+.mp-course-detail-lesson-qr img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 可播放课时：主链接用 ::after 铺满整行，保留「点整行播放」的既有交互；直播入口 z-index 更高，优先响应。 */
+.mp-course-detail-lesson.is-playable { position: relative; }
+.mp-course-detail-lesson.is-playable .mp-course-detail-lesson-main::after { content: ''; position: absolute; inset: 0; }
 .mp-video-preview-note { margin: 0 0 10px; padding: 9px 10px; border-radius: 5px; background: #f6f3f0; color: #756c66; font-size: 11px; line-height: 1.5; }
 .mp-fast-filter-chips, .mp-course-filter-row { display: flex; min-width: 0; gap: 7px; overflow-x: auto; padding: 1px 0 5px; scrollbar-width: none; scroll-snap-type: x proximity; }
 .mp-fast-filter-chips { margin-top: 14px; }
@@ -967,6 +978,16 @@ body { background: #f7f7f5; }
 .teacher-class-next-lesson.is-empty > p { margin: 13px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 /* CR-2026-133：未开始课次提示、结业申请入口与判定依据。 */
 .teacher-class-session-hint { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
+.teacher-class-live-panel { min-width: 0; margin-top: 10px; padding: 0 14px 14px; border: 1px solid #e9e4df; border-radius: 8px; background: #fff; }
+.teacher-class-live-list { list-style: none; margin: 0; padding: 0; }
+.teacher-class-live-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f0ece8; }
+.teacher-class-live-item:last-child { border-bottom: 0; }
+.teacher-class-live-item > strong { font-size: 13px; }
+.teacher-class-live-link { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 14px; background: #e8f0ff; color: #1f5fd6; font-size: 12px; text-decoration: none; }
+.teacher-class-live-url { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.teacher-class-live-qr { display: inline-flex; width: 40px; height: 40px; border: 1px solid #eee9e3; border-radius: 6px; overflow: hidden; }
+.teacher-class-live-qr img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.teacher-class-live-note { margin: 9px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .teacher-class-graduation-facts { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
 .teacher-class-graduation-apply { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #eee7e0; }
 .teacher-class-graduation-apply p, .teacher-class-graduation-note { margin: 0 0 10px; color: var(--muted); font-size: 11px; line-height: 1.6; }
@@ -2317,3 +2338,7 @@ body:has(.hs-dock) .mobile-main { padding-bottom: 96px; }
 /* 家校互动 v1.1 修订（2026-11-06）：教师端班级模块顶部入口收敛为「家校沟通 + 数字徽标」 */
 .hs-class-top-entry { display: inline-flex; align-items: center; margin: 0 0 12px; padding: 7px 14px; border: 1px solid #d9d3cc; border-radius: 999px; background: #fff; color: #595959; font-size: 13px; font-weight: 600; text-decoration: none; }
 .hs-class-top-entry:hover { border-color: var(--brand); color: var(--brand); }
+
+/* CR-2026-180：直播课计划开播时间（只读展示，不推算开播状态）；CR-2026-181：课程详情直播汇总板块已移除，仅保留课时行时间样式 */
+.mp-course-detail-lesson-live-time { display: inline-block; margin-top: 2px; color: #a05a12; font-size: 11px; line-height: 1.4; }
+.mp-course-detail-lesson-live-time.is-pending { color: #8c8c8c; }

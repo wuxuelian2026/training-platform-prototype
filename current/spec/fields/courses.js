@@ -115,13 +115,13 @@ const COURSE_FIELD_SPEC = {
 
     'courses/library': {
       groups: [
-        { heading: '后台新增面授课程基本信息', fields: [
+        { heading: '后台新增课程基本信息', fields: [
           { id: 'FD-COURSE-055', label: '课程编号', type: '文本', length: '≤ 30 字', required: '是', note: '课程唯一编号，创建后只读且不可重复', constraints: { maxLength: 30, unique: true } },
-          { id: 'FD-COURSE-016', label: '课程名称', type: '文本', length: '2–30 字', required: '是', note: '面授课程名称', constraints: { minLength: 2, maxLength: 30 } },
+          { id: 'FD-COURSE-016', label: '课程名称', type: '文本', length: '2–30 字', required: '是', note: '课程名称，视频课程／面授课程／直播课通用', constraints: { minLength: 2, maxLength: 30 } },
           { id: 'FD-COURSE-017', label: '所属专业', type: '下拉', length: '专业目录', required: '是', note: '按专业目录引用' },
-          { id: 'FD-COURSE-018', label: '课程类型', type: '文本（只读）', length: '面授课程', required: '系统固定', note: '后台新增入口固定创建面授课程', constraints: { system: true, readOnly: true } },
+          { id: 'FD-COURSE-018', label: '课程类型', type: '下拉', length: '视频课程 / 面授课程 / 直播课', required: '是', note: '默认面授课程；直播课按视频课程式在线交付，不建班、不排课、不结业', constraints: { options: ['视频课程', '面授课程', '直播课'], default: '面授课程' } },
           { id: 'FD-COURSE-056', label: '申报教师', type: '下拉', length: '教师档案', required: '是', note: '引用已建档教师' },
-          { id: 'FD-COURSE-019', label: '总课时', type: '数字', length: '≥ 1 的整数', required: '是', note: '单位：课次数' },
+          { id: 'FD-COURSE-019', label: '总课时', type: '数字', length: '≥ 1 的整数', required: '面授课程必填', note: '单位：课次数；视频课程与直播课由编排结果派生，创建时不填' },
           { id: 'FD-COURSE-053', label: '难度等级', type: '下拉', length: '启蒙 / 初级 / 中级 / 高级 / 考级冲刺', required: '是', note: '作为课程教学属性' },
           { id: 'FD-COURSE-054', label: '适合年龄', type: '多选', length: '全年龄段 / 少儿 / 青少年 / 成人', required: '是', note: '至少选择一项' }
         ] },
@@ -154,20 +154,26 @@ const COURSE_FIELD_SPEC = {
           { id: 'FD-COURSE-040', label: '课时时长（分钟）', type: '下拉', length: '45 / 60 / 90 / 120 分钟', required: '是', note: '课程库编排工作台可选 45/60/90/120 分钟（本需求变更，仅限课程库，不改动数据字典冻结与排课 45 基线模型）；一个课时对应一个课次', constraints: { options: [45, 60, 90, 120] } },
           { id: 'FD-COURSE-041', label: '课时类型', type: '下拉', length: '理论 / 示范 / 练习 / 综合', required: '是', note: '决定课时的教学形式', constraints: { options: ['理论', '示范', '练习', '综合'] } },
           { id: 'FD-COURSE-042', label: '内容描述', type: '多行文本', length: '≤ 500 字', required: '否', note: '填写教学内容和执行提示', constraints: { maxLength: 500 } },
-          { id: 'FD-COURSE-043', label: '引用资源', type: '资源选择器', length: '至少 1 个资源', required: '视频课程必填', note: '视频课程所有课时必须关联至少一个视频资源才能完成编排；面授课程可选', constraints: { minItems: 1, requiredWhen: 'courseType=video' } }
+          { id: 'FD-COURSE-043', label: '引用资源', type: '资源选择器', length: '至少 1 个资源', required: '视频课程必填', note: '视频课程所有课时必须关联至少一个视频资源才能完成编排；直播课与面授课程可选，直播课课时可配置直播间链接或二维码', constraints: { minItems: 1, requiredWhen: 'courseType=video' } },
+          { id: 'FD-COURSE-081', label: '计划开播时间', type: '日期时间', length: 'YYYY-MM-DD HH:mm', required: '直播课配置直播入口时必填', note: '北京时间（GMT+8）；仅表示计划开播，不代表第三方平台实际开播；视频课程与面授课程不校验', constraints: { format: 'YYYY-MM-DD HH:mm', requiredWhen: 'courseType=live && hasLiveEntry' } },
+          { id: 'FD-COURSE-082', label: '直播间链接', type: '文本（URL）', length: '≤ 500 字', required: '否', note: '与二维码二选一，均不强制；三类课程的课时均可配置', constraints: { maxLength: 500 } },
+          { id: 'FD-COURSE-083', label: '直播间二维码', type: '文件上传', length: 'JPG / PNG / WebP，≤2MB', required: '否', note: '原型阶段以 dataURL 暂存；与链接二选一' }
         ] }
       ],
       notes: [
-        '“新增面授课程”仅维护 8 项基本信息，保存后生成待编排课程，入口仅放在内容编排视图。',
+        '“新增课程”维护课程类型与基本信息，保存后生成待编排课程，入口仅放在内容编排视图；课程类型可选视频课程／面授课程／直播课，默认面授课程。',
         '编排工作台按“章节 → 课时”两层结构维护，章节可增删改并拖拽排序，课时挂在章节下。',
         '教师申报通过与后台新增课程均进入待编排；完成编排后进入全部课程。',
-        '视频课程完成编排前强制校验每个课时都关联了视频资源；面授课程的资源关联为可选。',
-        '面授课程完成编排时校验课时总数等于申报总课时，不一致时阻止完成并提示补齐或删除。',
+        '视频课程完成编排前强制校验每个课时都关联了视频资源；直播课与面授课程的资源关联为可选，直播课课时可配置直播间链接或二维码。',
+        '面授课程完成编排时校验课时总数等于申报总课时；视频课程与直播课总课时由编排结果派生，不做该校验。',
         '全部课程的查看与编辑均分为基本信息、课程大纲两个页签；查看全部只读，编辑可修改基本字段及章节课时。',
         '课程被业务使用后不再原地编辑；需要调整时复制新建课程，复制基本信息、章节与课时，原课程及业务关联保持不变。',
         '课程展示信息在视频商品或面授班级上维护，不写入课程基本信息或课程大纲。',
         'CR-2026-034：课程档案用停用日期表达“能否再发布”，不新增课程生命周期状态；停用只拦新的发布动作，不自动下架在售商品、不关停已发布班级、不回收已购学习权限、不改写历史订单与计薪。',
-        'CR-2026-034：仅“后台新增”来源且未被任何售卖单元引用的课程可物理删除；教师申报课程有来源追溯要求，只能停用。'
+        'CR-2026-034：仅“后台新增”来源且未被任何售卖单元引用的课程可物理删除；教师申报课程有来源追溯要求，只能停用。',
+        '直播课按「视频课程式在线交付」：上架商品、按账号开通学习权限，不建班、不排课、不结业；直播入口挂在课时上，由学员端课程大纲与教师端班级详情只读展示。',
+        '直播课课时配置了直播入口时必须填写计划开播时间（YYYY-MM-DD HH:mm，北京时间），否则不得完成编排；时间格式不合法同样阻断。视频课程与面授课程挂直播入口时不校验时间。',
+        '计划开播时间在学员端课程大纲课时行与「我的学习」只读展示；课程详情页不展示「直播安排」汇总板块（CR-2026-181）；系统不推算直播中、已结束、在线人数等状态，直播由第三方平台提供。'
       ]
     },
     'courses/applications': {

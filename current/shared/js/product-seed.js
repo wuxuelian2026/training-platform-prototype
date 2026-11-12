@@ -33,6 +33,14 @@ const productSeed = [
     price: '520.00', sales: '0', status: '已上架', updated: '2026-09-20', preview: '允许试看', previewHours: '第1课时',
     recommend: '从零开始学习琵琶基础指法。', recommended: false, cover: '已配置', coverFile: '琵琶基础入门-封面.png',
     displayDetail: '围绕琵琶基础指法与简单乐曲设计的分段视频课程。', tags: ['民乐', '视频课程'], shelfAt: '2026-09-20 10:00', priceChanges: [], courseVersion: 1
+  },
+  // CR-2026-179：直播课演示商品。直播课按「视频课程式在线交付」上架商品、按账号开通学习权限；
+  // 直播入口挂在课程大纲课时上（直播间链接 / 二维码），商品本身不承载直播地址。
+  {
+    id: 'product-live-demo-001', courseId: 'COURSE-LIVE-DEMO-001', name: '声乐名师直播精讲', course: '声乐名师直播精讲',
+    price: '398.00', sales: '0', status: '已上架', updated: '2026-11-11', preview: '不允许试看', previewHours: '',
+    recommend: '名师直播带练，实时答疑，课后可回看。', recommended: false, cover: '已配置', coverFile: '声乐名师直播精讲-封面.png',
+    displayDetail: '跟随名师直播学习气息与作品处理，支持举手连麦与课后回看。', tags: ['声乐', '直播课'], shelfAt: '2026-11-11 10:00', priceChanges: [], courseVersion: 1
   }
 ];
 function cloneProductSeed() {

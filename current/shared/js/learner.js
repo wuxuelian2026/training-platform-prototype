@@ -24,7 +24,7 @@ const { enabledMajorOptions, groupKeywordOf, isMajorEnabled, majorPathOf } = __c
 const { REFUND_ORIGIN, classRefundSuggestion, createRefundRequest, openRefundForOrder, refundsForOrder } = __classicRequire("shared/js/refund-store.js");
 const { syncNotificationReads } = __classicRequire("shared/js/notification-store.js");
 const { allProducts, productForCourse } = __classicRequire("shared/js/product-seed.js");
-const { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseArchiveSeed, courseArchiveVersionFor, saleUnitDisplay, VIDEO_DEMO_COURSES } = __classicRequire("shared/js/course-display.js");
+const { COURSE_DISPLAY_UNSET, classRecordFor, courseAgesText, courseArchiveFor, courseArchiveSeed, courseArchiveVersionFor, formatLiveStart, saleUnitDisplay, VIDEO_DEMO_COURSES } = __classicRequire("shared/js/course-display.js");
 const { TEACHER_PUBLIC_PROFILE_KEYS, teacherPublicProfileById } = __classicRequire("shared/js/teacher-facts.js");
 const { isRichMarkup, richTextToHtml, sanitizeRichText } = __classicRequire("shared/js/rich-editor.js");
 const { classLessonProgress, classSalesProjection, classTeachingStatus, lessonStatusOf, sessionsInScheduleOrder } = __classicRequire("shared/js/class-lifecycle.js");
@@ -191,7 +191,9 @@ function sharedLearnerCatalog(shared) {
   const courseRows = [...archiveCourses, ...storedCourses.filter(item => !representedIds.has(toCanonicalCourseId(item.id)))]
     .filter(item => item.status === '已完成' && !item.disabledAt && (!legacyInProgressCourseIds.has(toCanonicalCourseId(item.id)) || storedCourses.some(row => toCanonicalCourseId(row.id) === toCanonicalCourseId(item.id) && row.status === '已完成')))
     .map(item => ({
-      id: toCanonicalCourseId(item.id), type: item.type === '视频课程' ? 'video' : 'class', objectType: 'course', name: item.name, courseName: item.name, teacher: item.teacher, category: item.major, discipline: item.discipline || item.major, field: item.field || item.major, professional: item.professional || item.major, level: item.level || item.difficulty || '初级', age: item.age || (Array.isArray(item.ages) ? item.ages.join('、') : '') || '全年龄', hours: Number(item.hours) || 0, lessons: Number(item.hours) || 0, progress: 0, status: '待售', price: 0, intro: item.intro || '', detailHtml: item.detailHtml || '', updatedAt: item.updatedAt || '', chapters: item.chapters || [], outline: (item.chapters || []).map(chapter => ({ title: chapter.name, note: `${chapter.lessons?.length || 0}课时` }))
+      // CR-2026-179：直播课按「视频课程式在线交付」派生为在线课程（type='video'），
+      // 购买 / 大纲 / 播放链路与视频课程一致；courseKind 保留档案原始类型，供顶部页签与标签分类。
+      id: toCanonicalCourseId(item.id), type: (item.type === '视频课程' || item.type === '直播课') ? 'video' : 'class', courseKind: item.type, objectType: 'course', name: item.name, courseName: item.name, teacher: item.teacher, category: item.major, discipline: item.discipline || item.major, field: item.field || item.major, professional: item.professional || item.major, level: item.level || item.difficulty || '初级', age: item.age || (Array.isArray(item.ages) ? item.ages.join('、') : '') || '全年龄', hours: Number(item.hours) || 0, lessons: Number(item.hours) || 0, progress: 0, status: '待售', price: 0, intro: item.intro || '', detailHtml: item.detailHtml || '', updatedAt: item.updatedAt || '', chapters: item.chapters || [], outline: (item.chapters || []).map(chapter => ({ title: chapter.name, note: `${chapter.lessons?.length || 0}课时` }))
     }));
   const products = allProducts(shared).filter(item => item.status === '已上架');
   const videos = courseRows.filter(item => item.type === 'video' && products.some(product => toCanonicalCourseId(product.courseId) === item.id)).map(item => {
@@ -449,7 +451,8 @@ function button(text, attrs = '', cls = '') { return `<button class="mp-button $
 function card(content, cls = '') { return `<section class="mp-card ${cls}">${content}</section>`; }
 function stack(...content) { return `<div class="mp-stack">${content.join('')}</div>`; }
 function toast(message) { const node = document.createElement('div'); node.className = 'mp-toast'; node.textContent = message; document.body.appendChild(node); setTimeout(() => node.remove(), 2200); }
-function courseMeta(item) { if (item.objectType === 'class') { const tail = item.category || item.professional || item.courseName || ''; return `面授班级 · ${item.teacher}老师${tail ? ` · ${tail}` : ''}`; } return `${item.type === 'video' ? '视频课程' : '面授课程'} · ${item.professional || item.category}`; }
+function courseMeta(item) { if (item.objectType === 'class') { const tail = item.category || item.professional || item.courseName || ''; return `面授班级 · ${item.teacher}老师${tail ? ` · ${tail}` : ''}`; } // CR-2026-179：直播课在课程列表元信息里标注「直播课程」，避免显示为视频课程。
+  const kind = item.courseKind === '直播课' ? '直播课程' : item.type === 'video' ? '视频课程' : '面授课程'; return `${kind} · ${item.professional || item.category}`; }
 function courseLink(item) { return item.objectType === 'class' ? `/learner/pages/class-detail.html?courseId=${item.id}` : `/learner/pages/course-detail.html?courseId=${item.id}`; }
 function offlineCourseCoverImage(item) {
   return item.coverImage ? `<img class="mp-archive-cover-image" src="${esc(item.coverImage)}" alt="${esc(item.name)}课程封面" />` : '';
@@ -478,7 +481,9 @@ function courseCard(item) {
   const statusTag = status ? `<span class="mp-course-status">${pill(status, status.includes('满') ? 'gray' : 'green')}</span>` : '';
   // CR-2026-012：卡片读取课程档案的课程标签。
   const archiveTags = (item.tags || []).slice(0, 2).map(value => pill(value, 'gray')).join('');
-  return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${item.id}"><div class="mp-course-cover video-cover" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>视频课程</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">${money2(item.price)}</strong></div><div class="mp-course-tags">${professionalTag}${detailTags}${archiveTags}${statusTag}</div><div class="mp-course-teacher-row"><div class="mp-course-teacher"><span class="mp-avatar mp-course-avatar" aria-hidden="true">${esc(teacherName.slice(0, 1))}</span><span class="mp-course-teacher-name">${esc(teacherName)}</span></div><span class="mp-course-hours">共${esc(item.hours)}课时</span></div></div></a>`;
+  // CR-2026-179：封面角标按课程类型区分，直播课显示「直播课程」。
+  const coverKindLabel = item.courseKind === '直播课' ? '直播课程' : '视频课程';
+  return `<a class="mp-course-card" href="/learner/pages/course-detail.html?courseId=${item.id}"><div class="mp-course-cover video-cover" data-cover-mark="${esc(coverMark)}" aria-hidden="true"><span>${coverKindLabel}</span></div><div class="mp-course-body"><div class="mp-course-title-row"><h3>${esc(item.name)}</h3><strong class="mp-course-price">${money2(item.price)}</strong></div><div class="mp-course-tags">${professionalTag}${detailTags}${archiveTags}${statusTag}</div><div class="mp-course-teacher-row"><div class="mp-course-teacher"><span class="mp-avatar mp-course-avatar" aria-hidden="true">${esc(teacherName.slice(0, 1))}</span><span class="mp-course-teacher-name">${esc(teacherName)}</span></div><span class="mp-course-hours">共${esc(item.hours)}课时</span></div></div></a>`;
 }
 function teacherLink(item) { return `/learner/pages/teacher-detail.html?teacherId=${item.id}`; }
 function isLoggedIn() { return sessionStorage.getItem('hbyx-mini-logged-in') === '1'; }
@@ -615,7 +620,8 @@ function renderCourses() {
   const initialProfessional = params.get('professional') || (state.courses.some(item => item.professional === requestedCategory) ? requestedCategory : '');
   const levels = ['启蒙', '初级', '中级', '高级'];
   const ages = ['少儿', '青少年', '成人'];
-  const initialCourseTab = params.get('type') === 'video' ? 'video' : 'class';
+  // CR-2026-179：顶部页签新增「直播课程」(live)，URL ?type=live 可直达该页签。
+  const initialCourseTab = ['class', 'video', 'live'].includes(params.get('type')) ? params.get('type') : 'class';
   const optionList = (options, selected, emptyText) => `<option value="">${emptyText}</option>${options.map(option => `<option value="${esc(option)}" ${option === selected ? 'selected' : ''}>${esc(option)}</option>`).join('')}`;
   const initialMatch = state.courses.find(item => (initialProfessional && item.professional === initialProfessional) || (initialField && item.field === initialField));
   const initialSelectedMajor = {
@@ -631,10 +637,10 @@ function renderCourses() {
     }))
   }));
   // CR-2026-166 v1.2：多兴趣全部预置为已选路径（OR）；URL 显式参数优先，沿用该单路径。
-  const preset = interestPresetFor('courses', professionalTree, state.courses.filter((item) => item.type === initialCourseTab));
+  const preset = interestPresetFor('courses', professionalTree, state.courses.filter((item) => learnerCourseTab(item) === initialCourseTab));
   const urlPath = [initialSelectedMajor.discipline, initialSelectedMajor.field, initialSelectedMajor.professional].some(Boolean) ? [initialSelectedMajor] : [];
   const selectedPaths = preset?.paths?.length ? [...preset.paths] : (preset ? [] : urlPath);
-  layout(stack(interestNoticeHtml(preset?.notice), `<form id="course-search-form" class="mp-course-search" role="search"><input id="course-search" aria-label="搜索课程或专业" placeholder="搜索课程或专业" value="${esc(params.get('q') || '')}"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form>`, `<section class="mp-course-browser" aria-label="课程浏览"><div class="mp-tabs mp-course-type-tabs" role="tablist"><button class="mp-tab ${initialCourseTab === 'class' ? 'active' : ''}" type="button" data-course-tab="class" role="tab" aria-selected="${initialCourseTab === 'class'}">面授课程</button><button class="mp-tab ${initialCourseTab === 'video' ? 'active' : ''}" type="button" data-course-tab="video" role="tab" aria-selected="${initialCourseTab === 'video'}">视频课程</button></div><div class="mp-course-filter-row" aria-label="课程筛选条件"><button id="course-profession-trigger" class="mp-course-filter-chip" type="button" aria-haspopup="dialog" aria-controls="course-profession-dialog" aria-expanded="false"><span id="course-profession-value">专业</span><i aria-hidden="true">⌄</i></button><button id="course-level-trigger" class="mp-course-filter-chip" type="button"><span>难度</span><i aria-hidden="true">⌄</i></button><button id="course-age-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>适合年龄</span><i aria-hidden="true">⌄</i></button></div></section>`, `<section class="mp-course-list-section"><div class="mp-course-list-head"><div class="mp-list-summary"><h2>课程列表</h2><span id="course-result-count" class="mp-muted"></span></div><div class="mp-sort-switch" role="group" aria-label="课程排序"><button class="active" type="button" data-course-sort="latest" aria-pressed="true">最新</button><button type="button" data-course-sort="sales" aria-pressed="false">销量</button></div></div><div id="course-list" class="mp-list"></div></section>`, `<dialog id="course-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="course-cascade-title"><header class="mp-cascade-head"><div><h2 id="course-cascade-title">选择专业</h2><p id="course-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="course-cascade-path" class="mp-cascade-path"></div><div id="course-cascade-options" class="mp-cascade-options" role="listbox"></div><div id="course-cascade-selected" class="mp-cascade-selected" aria-label="已选专业"></div><footer class="mp-cascade-actions"><button id="course-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="course-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`, `<dialog id="course-choice-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-choice-title"><header class="mp-cascade-head"><div><h2 id="course-choice-title">选择筛选条件</h2><p>点击选项后立即生效</p></div><button class="mp-cascade-close" type="button" data-choice-close aria-label="关闭筛选">×</button></header><div id="course-choice-options" class="mp-cascade-options" role="listbox"></div></section></dialog>`));
+  layout(stack(interestNoticeHtml(preset?.notice), `<form id="course-search-form" class="mp-course-search" role="search"><input id="course-search" aria-label="搜索课程或专业" placeholder="搜索课程或专业" value="${esc(params.get('q') || '')}"><button type="submit" aria-label="搜索课程"><span aria-hidden="true">⌕</span></button></form>`, `<section class="mp-course-browser" aria-label="课程浏览"><div class="mp-tabs mp-course-type-tabs" role="tablist"><button class="mp-tab ${initialCourseTab === 'class' ? 'active' : ''}" type="button" data-course-tab="class" role="tab" aria-selected="${initialCourseTab === 'class'}">面授课程</button><button class="mp-tab ${initialCourseTab === 'video' ? 'active' : ''}" type="button" data-course-tab="video" role="tab" aria-selected="${initialCourseTab === 'video'}">视频课程</button><button class="mp-tab ${initialCourseTab === 'live' ? 'active' : ''}" type="button" data-course-tab="live" role="tab" aria-selected="${initialCourseTab === 'live'}">直播课程</button></div><div class="mp-course-filter-row" aria-label="课程筛选条件"><button id="course-profession-trigger" class="mp-course-filter-chip" type="button" aria-haspopup="dialog" aria-controls="course-profession-dialog" aria-expanded="false"><span id="course-profession-value">专业</span><i aria-hidden="true">⌄</i></button><button id="course-level-trigger" class="mp-course-filter-chip" type="button"><span>难度</span><i aria-hidden="true">⌄</i></button><button id="course-age-trigger" class="mp-course-filter-chip" type="button" data-course-class-filter><span>适合年龄</span><i aria-hidden="true">⌄</i></button></div></section>`, `<section class="mp-course-list-section"><div class="mp-course-list-head"><div class="mp-list-summary"><h2>课程列表</h2><span id="course-result-count" class="mp-muted"></span></div><div class="mp-sort-switch" role="group" aria-label="课程排序"><button class="active" type="button" data-course-sort="latest" aria-pressed="true">最新</button><button type="button" data-course-sort="sales" aria-pressed="false">销量</button></div></div><div id="course-list" class="mp-list"></div></section>`, `<dialog id="course-profession-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet" aria-labelledby="course-cascade-title"><header class="mp-cascade-head"><div><h2 id="course-cascade-title">选择专业</h2><p id="course-cascade-caption">请选择专业门类</p></div><button class="mp-cascade-close" type="button" aria-label="关闭专业选择">×</button></header><div id="course-cascade-path" class="mp-cascade-path"></div><div id="course-cascade-options" class="mp-cascade-options" role="listbox"></div><div id="course-cascade-selected" class="mp-cascade-selected" aria-label="已选专业"></div><footer class="mp-cascade-actions"><button id="course-cascade-clear" class="mp-button secondary" type="button">全部专业</button><button id="course-cascade-confirm" class="mp-button" type="button">确定</button></footer></section></dialog>`, `<dialog id="course-choice-dialog" class="mp-cascade-dialog"><section class="mp-cascade-sheet mp-course-choice-sheet" aria-labelledby="course-choice-title"><header class="mp-cascade-head"><div><h2 id="course-choice-title">选择筛选条件</h2><p>点击选项后立即生效</p></div><button class="mp-cascade-close" type="button" data-choice-close aria-label="关闭筛选">×</button></header><div id="course-choice-options" class="mp-cascade-options" role="listbox"></div></section></dialog>`));
   const professionTrigger = document.querySelector('#course-profession-trigger');
   const professionValue = document.querySelector('#course-profession-value');
   const cascadeDialog = document.querySelector('#course-profession-dialog');
@@ -734,7 +740,7 @@ function renderCourses() {
     const items = sortedLearnerItems(state.courses.filter(item => {
       const searchable = `${item.name}${item.type === 'video' ? item.teacher : ''}${item.category}${item.discipline || ''}${item.field || ''}${item.professional || ''}`.toLowerCase();
       const categoryMatch = !categoryFilter || [item.discipline, item.field, item.professional, item.category].filter(Boolean).some(value => value.includes(categoryFilter));
-      return item.type === activeCourseTab && categoryMatch && majorMatch(item) && (!level || item.level === level) && (item.type !== 'class' || !age || String(item.age).includes(age)) && searchable.includes(keyword);
+      return learnerCourseTab(item) === activeCourseTab && categoryMatch && majorMatch(item) && (!level || item.level === level) && (item.type !== 'class' || !age || String(item.age).includes(age)) && searchable.includes(keyword);
     }), activeSort);
     document.querySelector('#course-list').innerHTML = items.length ? items.map(item => courseCard(item)).join('') : `<div class="mp-empty">暂无符合条件的课程</div>`;
     document.querySelector('#course-result-count').textContent = `${items.length}门课程`;
@@ -818,7 +824,7 @@ function renderCourses() {
   levelTrigger.addEventListener('click', () => openChoiceDialog('选择难度', levels, level, value => { level = value; }));
   ageTrigger.addEventListener('click', () => openChoiceDialog('选择适合年龄', ages, age, value => { age = value; }));
   document.querySelector('[data-choice-close]').addEventListener('click', () => choiceDialog.close());
-  document.querySelectorAll('[data-course-tab]').forEach(tab => tab.addEventListener('click', () => { activeCourseTab = tab.dataset.courseTab; if (activeCourseTab === 'video') age = ''; const url = new URL(window.location.href); url.searchParams.set('type', activeCourseTab); window.history.replaceState({}, '', url); document.querySelectorAll('[data-course-tab]').forEach(item => { const active = item === tab; item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active)); }); updateFilterControls(); draw(); }));
+  document.querySelectorAll('[data-course-tab]').forEach(tab => tab.addEventListener('click', () => { activeCourseTab = tab.dataset.courseTab; if (activeCourseTab !== 'class') age = ''; const url = new URL(window.location.href); url.searchParams.set('type', activeCourseTab); window.history.replaceState({}, '', url); document.querySelectorAll('[data-course-tab]').forEach(item => { const active = item === tab; item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active)); }); updateFilterControls(); draw(); }));
   document.querySelector('#course-search-form').addEventListener('submit', event => { event.preventDefault(); draw(); });
   document.querySelector('#course-search').addEventListener('input', draw);
   document.querySelectorAll('[data-course-sort]').forEach(control => control.addEventListener('click', () => {
@@ -867,6 +873,44 @@ function videoLessonsOf(item) {
   });
   return lessons;
 }
+// 直播课最小实现：课时可挂直播间链接或二维码（外部平台，不对接），学员端课程大纲展示入口。
+// CR-2026-179：「进入直播间」按钮与二维码改到课时行右侧、播放箭头之前，与课时同一行；
+// 课时行用「主链接 + 右侧操作区」结构承载，避免可播放课时行出现 <a> 嵌套 <a>。
+function lessonLiveEntry(lesson) {
+  const url = lesson && String(lesson.liveUrl || '').trim();
+  const qr = lesson && String(lesson.liveQr || '').trim();
+  if (!url && !qr) return '';
+  const hint = '直播由第三方平台提供，点击后将在新窗口打开';
+  const link = url ? `<a class="mp-course-detail-lesson-live" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${hint}">进入直播间</a>` : '';
+  const qrImg = qr ? `<a class="mp-course-detail-lesson-qr" href="${esc(qr)}" target="_blank" rel="noopener noreferrer" aria-label="查看直播间二维码" title="查看直播间二维码"><img src="${esc(qr)}" alt="直播间二维码" loading="lazy" /></a>` : '';
+  return `${qrImg}${link}`;
+}
+// 学员端课程库顶部页签分类：面授课程(class) / 视频课程(video) / 直播课程(live)。
+// 直播课按「视频课程式在线交付」派生为在线课程（type='video'，购买/大纲/播放链路零改动），
+// 仅以 courseKind 区分第三类，驱动页签、卡片标签与详情页文案。
+function learnerCourseTab(item) {
+  if (item.type === 'class') return 'class';
+  return item.courseKind === '直播课' ? 'live' : 'video';
+}
+// CR-2026-180：直播课计划开播时间只读展示。时间取课时 liveStartAt，按共用格式口径解析；
+// 不推算「直播中 / 已结束」等系统并未掌握的状态（第三方平台不回传开播数据）。
+function lessonLiveTimeMarkup(lesson) {
+  if (!lesson || !(lesson.liveUrl || lesson.liveQr)) return '';
+  const text = formatLiveStart(lesson.liveStartAt);
+  return text ? `<span class="mp-course-detail-lesson-live-time">计划开播 ${esc(text)}</span>` : '<span class="mp-course-detail-lesson-live-time is-pending">开播时间待公布</span>';
+}
+// CR-2026-181：课程详情的直播汇总板块已移除；本函数仅用于「我的学习」卡片取首场计划开播时间。
+function liveScheduleRows(item) {
+  if (item?.courseKind !== '直播课') return [];
+  const chapters = Array.isArray(item.chapters) && item.chapters.length ? item.chapters : (item.outline || []);
+  const rows = [];
+  chapters.forEach((chapter) => (Array.isArray(chapter.lessons) ? chapter.lessons : []).forEach((lesson) => {
+    if (!lesson || !(lesson.liveUrl || lesson.liveQr || lesson.liveStartAt)) return;
+    const text = formatLiveStart(lesson.liveStartAt);
+    rows.push({ name: lesson.name || '未命名课时', sortKey: String(lesson.liveStartAt || '9999-12-31 23:59').trim(), label: text ? `计划开播 ${text}` : '开播时间待公布' });
+  }));
+  return rows.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+}
 function courseOutlineMarkup(item, { playable = false, purchased = false } = {}) {
   const chapters = Array.isArray(item?.chapters) && item.chapters.length ? item.chapters : (item?.outline || []);
   if (!chapters.length) return '<div class="mp-empty mp-course-detail-empty">课程大纲暂未维护</div>';
@@ -879,8 +923,12 @@ function courseOutlineMarkup(item, { playable = false, purchased = false } = {})
       const lessonIndexGlobal = chapterStart + lessonIndex;
       const preview = playable && item.preview === '允许试看' && lessonIndexGlobal === 0 && !purchased;
       const available = playable && (purchased || preview);
-      const content = `<span class="mp-course-detail-lesson-index">${String(lessonIndex + 1).padStart(2, '0')}</span><span><strong>${esc(lesson.name || `第${lessonIndex + 1}课时`)}</strong><small>${esc(lesson.kind || '')}${lesson.duration ? ` · ${lesson.duration}分钟` : ''}</small></span>${available ? (preview ? pill('免费试听', 'green') : '<span class="mp-course-detail-play" aria-hidden="true">›</span>') : playable ? pill('购买后学习', 'gray') : ''}`;
-      return available ? `<a class="mp-course-detail-lesson is-playable" href="${videoLessonLink(item, lessonIndexGlobal, preview)}">${content}</a>` : `<div class="mp-course-detail-lesson${playable ? ' is-locked' : ''}">${content}</div>`;
+      const copy = `<strong>${esc(lesson.name || `第${lessonIndex + 1}课时`)}</strong><small>${esc(lesson.kind || '')}${lesson.duration ? ` · ${lesson.duration}分钟` : ''}</small>${lessonLiveTimeMarkup(lesson)}`;
+      const statusTail = available ? (preview ? pill('免费试听', 'green') : '<span class="mp-course-detail-play" aria-hidden="true">›</span>') : playable ? pill('购买后学习', 'gray') : '';
+      const tail = `<span class="mp-course-detail-lesson-tail">${lessonLiveEntry(lesson)}${statusTail}</span>`;
+      const index = `<span class="mp-course-detail-lesson-index">${String(lessonIndex + 1).padStart(2, '0')}</span>`;
+      if (available) return `<div class="mp-course-detail-lesson is-playable">${index}<a class="mp-course-detail-lesson-main" href="${videoLessonLink(item, lessonIndexGlobal, preview)}">${copy}</a>${tail}</div>`;
+      return `<div class="mp-course-detail-lesson${playable ? ' is-locked' : ''}">${index}<span class="mp-course-detail-lesson-copy">${copy}</span>${tail}</div>`;
     }).join('')}</div>` : '';
     return `<details class="mp-course-detail-chapter-group" ${chapterIndex === 0 ? 'open' : ''}><summary><span class="mp-course-detail-index">${String(chapterIndex + 1).padStart(2, '0')}</span><span class="mp-course-detail-chapter-copy"><strong>${esc(chapter.title || chapter.name)}</strong><small>${esc(chapter.note || chapter.desc || (lessons.length ? `${lessons.length}课时` : ''))}</small></span><span aria-hidden="true">⌄</span></summary>${chapterBody}</details>`;
   }).join('')}</div>`;
@@ -932,7 +980,7 @@ function renderCourseDetail(item) {
   const recommendation = item.recommendation ? `<p class="mp-course-detail-subtitle">${esc(item.recommendation)}</p>` : '';
 
   layout(stack(
-    `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${courseCoverTags(item, isClass ? '面授课程' : '精品视频', status, statusTone)}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">${isClass ? '面授课程' : '精品课程'}</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2><strong>${money2(item.price)}</strong></div>${recommendation}<dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div>${ageFact}<div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div></dl></div></section>`,
+    `<section class="mp-course-detail-hero"><div class="mp-course-detail-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}"><div class="mp-course-detail-cover-tags">${courseCoverTags(item, isClass ? '面授课程' : (item.courseKind === '直播课' ? '直播课程' : '精品视频'), status, statusTone)}</div><span class="mp-course-detail-cover-label">${esc(item.professional || item.category)}</span></div><div class="mp-course-detail-summary"><span class="mp-course-detail-kicker">${isClass ? '面授课程' : (item.courseKind === '直播课' ? '直播课程' : '精品课程')}</span><div class="mp-course-detail-title"><h2>${esc(item.name)}</h2><strong>${money2(item.price)}</strong></div>${recommendation}<dl class="mp-course-detail-facts"><div><dt>难度</dt><dd>${esc(item.level)}</dd></div>${ageFact}<div><dt>总课时</dt><dd>${esc(item.hours)}课时</dd></div></dl></div></section>`,
     courseTeacherSection(item),
     courseDetailContent(item, detailTab, { playable: !isClass, purchased }),
     detailActions(item)
@@ -2414,7 +2462,8 @@ function learningTasks() {
 }
 function learningCourseCard(item) {
   const isClass = item.type === 'class';
-  const typeLabel = isClass ? '面授课程' : '视频课程';
+  // CR-2026-179：已购直播课在「我的学习」里标注「直播课程」。
+  const typeLabel = isClass ? '面授课程' : (item.courseKind === '直播课' ? '直播课程' : '视频课程');
   const statusLabels = { ongoing: '进行中', upcoming: '待开课', ended: '已结束' };
   const statusTones = { ongoing: 'green', upcoming: 'amber', ended: 'gray' };
   const coverMark = (item.professional || item.discipline || item.name).slice(0, 1);
@@ -2427,7 +2476,8 @@ function learningCourseCard(item) {
   const classInfo = item.lessonStatus
     ? `<div class="mp-learning-lesson-row"><span>第${esc(item.lessonNo)}/${esc(totalLessons)}课</span>${pill(item.lessonStatus, lessonTone)}${homeworkInfo}</div><p class="mp-learning-schedule">${esc(item.lessonNote || item.nextLesson)} · ${esc(item.classroom)}</p>`
     : `<p class="mp-learning-schedule">${item.status === 'upcoming' ? `首次上课：${esc(item.nextLesson)}` : item.status === 'ended' ? '课程已结束' : esc(item.nextLesson)} · ${esc(item.classroom)}</p>`;
-  const videoInfo = `<p class="mp-learning-resume">上次学习：${esc(item.lastPosition)}</p>`;
+  const firstLiveSession = item.courseKind === '直播课' ? liveScheduleRows(item)[0] : null;
+  const videoInfo = (firstLiveSession ? `<p class="mp-learning-resume">${esc(firstLiveSession.label)}</p>` : '') + `<p class="mp-learning-resume">上次学习：${esc(item.lastPosition)}</p>`;
   const progressLabel = isClass ? `已完成 ${completedLessons}/${totalLessons} 课次` : '学习进度';
   const actionLabel = item.accessRevoked ? '查看订单' : item.status === 'ended' ? '查看成果' : isClass ? '进入班级' : '继续学习';
   return `<article class="mp-learning-course-card ${isClass ? 'is-class' : 'is-video'}"><div class="mp-learning-course-main"><div class="mp-learning-cover ${isClass ? 'class-cover' : 'video-cover'}" data-cover-mark="${esc(coverMark)}"><span>${typeLabel}</span></div><div class="mp-learning-course-copy"><div class="mp-learning-title-row"><h3>${esc(item.name)}</h3>${courseStatus}</div>${isClass ? `<p class="mp-learning-class-name">${esc(item.className)}</p>${classInfo}` : videoInfo}</div></div><div class="mp-learning-progress"><div><span>${progressLabel}</span><strong>${item.progress}%</strong></div><div class="mp-progress"><span style="width:${item.progress}%"></span></div></div><footer class="mp-learning-course-footer">${item.status === 'ended' ? `<span class="mp-learning-completion">当前学员：${esc(item.completionStatus)}</span>` : '<span></span>'}<a class="mp-button secondary" href="${item.href}">${actionLabel}</a></footer></article>`;

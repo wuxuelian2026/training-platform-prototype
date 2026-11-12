@@ -74,8 +74,8 @@ const TEACHER_APP_FIELD_SPEC = {
         { heading: '课程申报字段', fields: [
           { id: 'FD-TAPP-014', label: '课程名称', type: '文本', length: '≤ 100 字', required: '是', note: '课程对外名称，申报通过后进入课程库', constraints: { maxLength: 100 } },
           { id: 'FD-TAPP-015', label: '所属专业', type: '三级级联', length: '必选 1 个', required: '是', note: '按门类 → 分类 → 专业逐级选择，需属于本人授课专业', constraints: { dictionary: '专业目录' } },
-          { id: 'FD-TAPP-016', label: '课程类型', type: '单选', length: '视频课程 / 面授课程', required: '是', note: '决定后续编排与发布路径', constraints: { options: ['视频课程', '面授课程'] } },
-          { id: 'FD-TAPP-017', label: '总课时', type: '数字', length: '≥ 1 的整数', required: '面授课程必填', note: '面授课程用于生成课次和工资统计；视频课程不按课时数校验', constraints: { min: 1, integer: true, requiredWhen: 'courseType=offline' } },
+          { id: 'FD-TAPP-016', label: '课程类型', type: '单选', length: '视频课程 / 面授课程 / 直播课', required: '是', note: '决定后续编排与发布路径；直播课按视频课程式在线交付，不建班、不排课、不结业', constraints: { options: ['视频课程', '面授课程', '直播课'] } },
+          { id: 'FD-TAPP-017', label: '总课时', type: '数字', length: '≥ 1 的整数', required: '面授课程必填', note: '面授课程用于生成课次和工资统计；视频课程与直播课不按课时数校验', constraints: { min: 1, integer: true, requiredWhen: 'courseType=offline' } },
           { id: 'FD-TAPP-018', label: '课程简介', type: '多行文本', length: '≤ 500 字', required: '否', note: '补充课程目标、教学内容和适合人群', constraints: { maxLength: 500 } },
           { id: 'FD-TAPP-029', label: '附加材料', type: '图片上传', length: '单个 JPG／JPEG／PNG／WebP', required: '否', note: '仅支持 JPG、JPEG、PNG、WebP 图片，单张上限读取后台「图片上传上限」参数；选择后回显文件名，原型阶段不上传真实文件', constraints: { maxFiles: 1, imageOnly: true, extensions: ['jpg', 'jpeg', 'png', 'webp'], sizeParam: 'imageMb' } }
         ] },
@@ -87,7 +87,7 @@ const TEACHER_APP_FIELD_SPEC = {
         '所属专业只能从本人已配置的授课专业中选择；提交时校验资料已建档、离职日期为空、账号正常且申报专业属于本人授课专业，不校验证书和合同。',
         '难度等级与适合年龄在申报时必填，作为教学属性写入课程档案，后台审核页、编排页、课程库与学员端读取同一份值。',
         'CR-2026-051／CR-2026-158：附加材料可选且仅支持图片；未选择不影响提交，选择后随申报记录保存文件名。',
-        'CR-2026-051：视频课程总课时由后台编排结果派生，申报阶段不填报。'
+        'CR-2026-051：视频课程与直播课总课时由后台编排结果派生，申报阶段不填报；直播课按视频课程式在线交付，不建班、不排课、不结业。'
       ]
     },
     // 发布作业入口在教师端课次详情页（上课结束后填写教学记录时可发布课后作业）。

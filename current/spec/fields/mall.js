@@ -54,7 +54,7 @@ const MALL_FIELD_SPEC = {
     'mall/orders': {
       groups: [
         { heading: '列表筛选字段', fields: [
-          { id: 'FD-MALL-041', label: '订单类型', type: '下拉', length: '视频课程 / 面授课程', required: '否', note: '区分视频订单与面授订单', constraints: { options: ['视频课程', '面授课程'] } },
+          { id: 'FD-MALL-041', label: '订单类型', type: '下拉', length: '视频课程 / 面授课程', required: '否', note: '区分视频订单与面授订单；直播课按视频课程式在线交付，订单类型归入视频课程', constraints: { options: ['视频课程', '面授课程'] } },
           { id: 'FD-MALL-042', label: '支付状态', type: '下拉', length: '待支付 / 已支付 / 已取消', required: '否', note: '只表示支付事实；退款中与已退款不改变已支付状态', constraints: { options: ['待支付', '已支付', '已取消'] } },
           { id: 'FD-MALL-051', label: '退款状态', type: '下拉', length: '无退款 / 退款中 / 已取消 / 已退款', required: '否', note: '独立于支付状态；无退款表示订单没有有效退款单；退款由后台发起后直接进入退款中，不设待审批状态（CR-2026-155 C9）；退款中可被取消为「已取消」，此时订单回「已支付」且可重新发起退款（CR-2026-157）；「已退款」含全额与部分退款两种结果，部分退款须在列表与详情并列展示「已退金额 / 订单金额」', constraints: { options: ['无退款', '退款中', '已取消', '已退款'] } },
           { id: 'FD-MALL-043', label: '下单时间起', type: '日期', length: 'YYYY-MM-DD', required: '否', note: '按下单时间范围筛选，含当天' },
@@ -77,7 +77,7 @@ const MALL_FIELD_SPEC = {
     'mall/products': {
       groups: [
         { heading: '发布商品字段', fields: [
-          { id: 'FD-MALL-001', label: '关联课程', type: '下拉', length: '必选 1 门', required: '是', note: '只能选择课程库中已完成编排的视频课程' },
+          { id: 'FD-MALL-001', label: '关联课程', type: '下拉', length: '必选 1 门', required: '是', note: '只能选择课程库中已完成编排的视频课程或直播课' },
           { id: 'FD-MALL-057', label: '课程停用提示', type: '只读提示', length: '—', required: '关联课程停用时展示', note: '提示关联课程已停用，请恢复课程或下架商品；不自动修改商品状态', constraints: { readOnly: true, derived: true } },
           { id: 'FD-MALL-052', label: '课程基本信息', type: '只读信息组', length: '8 项', required: '系统继承', note: '课程编号、名称、类型、专业、申报教师、总课时、难度、适合年龄', constraints: { readOnly: true, derived: true } },
           { id: 'FD-MALL-053', label: '课程大纲', type: '只读结构', length: '章节 + 课时', required: '系统继承', note: '展示关联版本的章节和课时，商品页不可修改', constraints: { readOnly: true, derived: true } },
@@ -96,7 +96,7 @@ const MALL_FIELD_SPEC = {
         ] }
       ],
       notes: [
-        '一个视频课程只允许一个有效商品，历史下架商品保留，不允许同时多价售卖。',
+        '一个视频课程或直播课只允许一个有效商品，历史下架商品保留，不允许同时多价售卖。',
         '已上架商品改价只影响生效后的新订单，已支付订单保留成交金额；每次价格或售卖配置变更都会写入调价记录。',
         '历史下架商品重新售卖时复用原商品，并保留调价记录。',
         '价格、试看与上下架以商品配置为准，课程档案不得覆盖售卖字段与售卖单元的展示素材。',

@@ -8,7 +8,7 @@ const { readCatalog, persistCatalog, professionalTreeOf } = __classicRequire("sh
 const { demoId, demoTime, dictionaryDefault, dictionaryItems, fileSpecSettings, readDemoState, removeDemoRecord, updateDemoRecord, upsertDemoRecord } = __classicRequire("shared/js/demo-store.js");
 const { applicationSeed, courseIdForApplication, courseMockSeed, teacherAccounts, toCanonicalCourseId } = __classicRequire("shared/js/course-seed.js");
 const { courseArchiveKey, courseEditLock, courseEditLockLabel } = __classicRequire("shared/js/course-version.js");
-const { courseAgesText, courseArchiveFor, persistCourseTeaching } = __classicRequire("shared/js/course-display.js");
+const { courseAgesText, courseArchiveFor, persistCourseTeaching, isValidLiveStart, normalizeLiveStart, liveStartInputValue, formatLiveStart } = __classicRequire("shared/js/course-display.js");
 const { courseArchiveSeed } = __classicRequire("shared/js/course-display.js");
 // CR-2026-155 C2：单节课时长固定 45 分钟，课程编排不再读取可配置字典。
 const { FIXED_LESSON_DURATION } = __classicRequire("shared/js/timetable-settings.js");
@@ -196,7 +196,7 @@ const statusClass = status => ({ '待审核': 'brand', '已通过': 'green', '�
 const tag = status => `<span class="tag ${statusClass(status)}">${escapeHtml(status)}</span>`;
 const majorOptions = () => catalog.majors.map(item => option(item.name)).join('');
 const groupOptions = () => Object.keys(professionalTree).map(option).join('');
-const typeOptions = () => ['视频课程', '面授课程'].map(option).join('');
+const typeOptions = () => ['视频课程', '面授课程', '直播课'].map(option).join('');
 const showToast = (message, kind = 'success') => {
   document.querySelectorAll('.course-toast').forEach(item => item.remove());
   const toast = document.createElement('div');
@@ -300,7 +300,7 @@ function renderApplications(page) {
 
 function renderContent(page) {
   const filtered = contentCourses.filter(item => item.status !== '已完成').filter(item => !state.contentFilters.status || item.status === state.contentFilters.status).filter(item => !state.contentFilters.type || item.type === state.contentFilters.type).filter(item => !state.contentFilters.major || item.major === state.contentFilters.major).filter(item => !state.contentFilters.keyword || `${item.name}${item.teacher}`.includes(state.contentFilters.keyword));
-  page.innerHTML = `<div class="course-page">${pageShell('课程内容编排', '', '<button class="button primary" type="button" data-action="new-direct-course">新增面授课程</button>')}<section class="course-surface"><form class="course-filter" data-form="content-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('编排状态', selectWithValues('status', ['待编排', '编排中'], state.contentFilters.status || '', '全部状态'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.contentFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.contentFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.contentFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>内容编排中的课程</strong><span> 共 ${filtered.length} 条，按最近编辑时间排序</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程名称</th><th>课程来源</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>编排状态</th><th>上次编辑时间</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${item.id}</span></td><td>${escapeHtml(item.source || (item.applicationId ? '教师申报' : '后台新增'))}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${hoursText(item.hours, item.status === '已完成')}</td><td>${tag(item.status)}</td><td>${escapeHtml(item.updatedAt)}</td><td><div class="course-actions">${button(item.status === '待编排' ? '开始编排' : '继续编排', 'content-workbench', `data-id="${item.id}"`)}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无内容编排中的课程</strong><span>教师申报通过或后台新增的面授课程会进入此处。</span></div>'}</div>${pagination(filtered.length, '门课程')}</section></div>`;
+  page.innerHTML = `<div class="course-page">${pageShell('课程内容编排', '', '<button class="button primary" type="button" data-action="new-direct-course">新增课程</button>')}<section class="course-surface"><form class="course-filter" data-form="content-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('编排状态', selectWithValues('status', ['待编排', '编排中'], state.contentFilters.status || '', '全部状态'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程', '直播课'], state.contentFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.contentFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.contentFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>内容编排中的课程</strong><span> 共 ${filtered.length} 条，按最近编辑时间排序</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程名称</th><th>课程来源</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>编排状态</th><th>上次编辑时间</th><th>操作</th></tr></thead><tbody>${filtered.map(item => `<tr><td><span class="primary-cell">${escapeHtml(item.name)}</span><span class="sub-cell">${item.id}</span></td><td>${escapeHtml(item.source || (item.applicationId ? '教师申报' : '后台新增'))}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.major)}</td><td>${escapeHtml(item.teacher)}</td><td>${hoursText(item.hours, item.status === '已完成')}</td><td>${tag(item.status)}</td><td>${escapeHtml(item.updatedAt)}</td><td><div class="course-actions">${button(item.status === '待编排' ? '开始编排' : '继续编排', 'content-workbench', `data-id="${item.id}"`)}</div></td></tr>`).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无内容编排中的课程</strong><span>教师申报通过或后台新增的面授课程会进入此处。</span></div>'}</div>${pagination(filtered.length, '门课程')}</section></div>`;
   const queryId = new URLSearchParams(window.location.search).get('courseId');
   if (queryId && !currentModal()) openWorkbench(queryId);
 }
@@ -372,7 +372,7 @@ function libraryRow(item) {
     usage.locked && item.type === '面授课程' ? button('编辑', 'library-edit', `data-id="${item.id}"`) : '',
     button(disabled ? '启用' : '停用', 'library-toggle-enabled', `data-id="${item.id}"`, disabled ? '' : 'danger-link'),
     deletable ? button('删除', 'library-delete', `data-id="${item.id}"`, 'danger-link') : '',
-    item.type === '视频课程' && item.status === '已完成' && !disabled ? button('发布商品', 'publish-product', `data-id="${item.id}"`) : '',
+    ['视频课程', '直播课'].includes(item.type) && item.status === '已完成' && !disabled ? button('发布商品', 'publish-product', `data-id="${item.id}"`) : '',
     item.type === '面授课程' && !disabled ? button('发布班级', 'publish-class', `data-id="${item.id}"`) : '',
   ].join('');
   const statusCell = disabled
@@ -390,7 +390,7 @@ function renderLibraryAllView(page) {
   // CR-2026-034 §4.1.3：启用状态筛选取值 全部／启用／已停用，默认全部。
   const enabledFilter = state.libraryFilters.enabled || '';
   const filtered = completed.filter(item => !state.libraryFilters.source || (item.source || '教师申报') === state.libraryFilters.source).filter(item => !state.libraryFilters.type || item.type === state.libraryFilters.type).filter(item => !state.libraryFilters.major || item.major === state.libraryFilters.major).filter(item => !state.libraryFilters.keyword || `${item.name}${item.teacher}`.includes(state.libraryFilters.keyword)).filter((item) => !enabledFilter || (enabledFilter === '已停用' ? Boolean(item.disabledAt) : !item.disabledAt));
-  page.innerHTML = `<div class="course-page">${pageShell('课程库', '', '')}<section class="course-surface"><form class="course-filter" data-form="library-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('课程来源', selectWithValues('source', ['教师申报', '后台新增'], state.libraryFilters.source || '', '全部来源'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程'], state.libraryFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.libraryFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.libraryFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>已完成课程</strong><span> 当前显示 ${filtered.length} 条</span></div><div class="course-legend"><span class="course-legend-item success">未投入业务可直接编辑</span><span class="course-legend-item warning">投入业务后复制新建</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程编号</th><th>课程名称</th><th>课程来源</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>启用状态</th><th>编辑状态</th><th>操作</th></tr></thead><tbody>${filtered.map(libraryRow).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无已完成课程</strong><span>课程完成编排后会进入全部课程。</span></div>'}</div>${pagination(filtered.length, '门课程')}</section></div>`;
+  page.innerHTML = `<div class="course-page">${pageShell('课程库', '', '')}<section class="course-surface"><form class="course-filter" data-form="library-filter"><div class="course-filter-head"><strong>筛选条件</strong></div><div class="course-filter-grid">${filterField('课程来源', selectWithValues('source', ['教师申报', '后台新增'], state.libraryFilters.source || '', '全部来源'))}${filterField('课程类型', selectWithValues('type', ['视频课程', '面授课程', '直播课'], state.libraryFilters.type || '', '全部类型'))}${filterField('所属专业', professionalFilter('major', state.libraryFilters.major))}${filterField('关键词', `<input name="keyword" value="${escapeHtml(state.libraryFilters.keyword || '')}" placeholder="课程名称或教师姓名" />`)}</div><div class="course-filter-actions"><button class="button" type="reset">重置</button><button class="button primary" type="submit">查询</button></div></form><div class="course-table-head"><div><strong>已完成课程</strong><span> 当前显示 ${filtered.length} 条</span></div><div class="course-legend"><span class="course-legend-item success">未投入业务可直接编辑</span><span class="course-legend-item warning">投入业务后复制新建</span></div></div><div class="course-table-wrap">${filtered.length ? `<table><thead><tr><th>课程编号</th><th>课程名称</th><th>课程来源</th><th>课程类型</th><th>所属专业</th><th>申报教师</th><th>总课时</th><th>启用状态</th><th>编辑状态</th><th>操作</th></tr></thead><tbody>${filtered.map(libraryRow).join('')}</tbody></table>` : '<div class="course-empty"><strong>暂无已完成课程</strong><span>课程完成编排后会进入全部课程。</span></div>'}</div>${pagination(filtered.length, '门课程')}</section></div>`;
 }
 
 // CR-2026-021：课程内容编排并入课程库，一个页面两个视图（内容编排 / 全部课程），视图状态进 URL。
@@ -503,6 +503,57 @@ function courseCoverEditor(source) {
   return { draft, markup, bind, ready };
 }
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+// CR-2026-178：直播间二维码改用真实文件上传控件（校验口径与课程封面一致：JPG／PNG／WebP、≤2MB），
+// 上传后以 dataURL 暂存于课时记录，学员端直接展示图片（原型阶段不对接真实图床）。
+function liveQrFieldMarkup(liveQr, liveQrFile) {
+  const preview = liveQr
+    ? `<img class="course-archive-cover-preview" src="${escapeHtml(liveQr)}" alt="直播间二维码预览" /><small>${escapeHtml(liveQrFile || '')}</small>`
+    : '<p class="course-hint">未上传二维码</p>';
+  return `<div class="course-field wide"><label>直播间二维码 <span class="sub-cell">选填 · 与链接二选一</span></label><input data-live-qr-file type="file" accept="image/jpeg,image/png,image/webp" /><small>JPG、PNG、WebP，≤2MB；上传后学员端展示二维码</small><div data-live-qr-preview>${preview}</div><input type="hidden" name="liveQr" data-live-qr-value value="${escapeHtml(liveQr || '')}" /><input type="hidden" name="liveQrFile" data-live-qr-name value="${escapeHtml(liveQrFile || '')}" /><button class="button" type="button" data-live-qr-remove>移除二维码</button></div>`;
+}
+// 文件上传控件绑定到弹窗（含编排工作台内联表单与独立课时弹窗）：选择文件后写入隐藏域与预览，
+// 并提供 onChange 回调把结果同步到外层草稿（lessonDraft / current），避免重绘丢值。
+function bindLiveQrUpload(dialog, onChange) {
+  if (dialog.__liveQrBound) return;
+  dialog.__liveQrBound = true;
+  const apply = (dataUrl, name) => {
+    const hidden = dialog.querySelector('[data-live-qr-value]');
+    const nameHidden = dialog.querySelector('[data-live-qr-name]');
+    const preview = dialog.querySelector('[data-live-qr-preview]');
+    if (hidden) hidden.value = dataUrl || '';
+    if (nameHidden) nameHidden.value = name || '';
+    if (preview) preview.innerHTML = dataUrl
+      ? `<img class="course-archive-cover-preview" src="${escapeHtml(dataUrl)}" alt="直播间二维码预览" /><small>${escapeHtml(name || '')}</small>`
+      : '<p class="course-hint">未上传二维码</p>';
+    if (onChange) onChange(dataUrl, name);
+  };
+  dialog.addEventListener('change', async (event) => {
+    const input = event.target.closest('[data-live-qr-file]');
+    if (!input) return;
+    const file = input.files && input.files[0];
+    if (!file) { apply('', ''); return; }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+      input.value = ''; showToast('请选择不超过 2MB 的 JPG、PNG 或 WebP 图片', 'error'); apply('', ''); return;
+    }
+    try { apply(await fileToDataUrl(file), file.name); }
+    catch { showToast('图片读取失败，请选择有效图片', 'error'); apply('', ''); }
+  });
+  dialog.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-live-qr-remove]')) return;
+    const input = dialog.querySelector('[data-live-qr-file]');
+    if (input) input.value = '';
+    apply('', '');
+  });
+}
+
 function saveCourseCover(course, cover) {
   const current = courseArchiveFor(course) || library.find(row => courseArchiveKey(row) === toCanonicalCourseId(course.id));
   if (!current) return;
@@ -580,7 +631,7 @@ function openCourseArchiveForm(id) {
   };
   const tabs = () => `<div class="course-tabs"><button type="button" class="course-tab${activeTab === 'basic' ? ' active' : ''}" data-course-edit-tab="basic">基本信息</button><button type="button" class="course-tab${activeTab === 'outline' ? ' active' : ''}" data-course-edit-tab="outline">课程大纲</button></div>`;
   const basic = () => `<form data-course-edit-basic><div class="course-detail-grid"><div class="course-field"><label>课程编号</label><input class="readonly-field" value="${escapeHtml(key)}" readonly /></div><div class="course-field"><label>课程来源</label><input class="readonly-field" value="${escapeHtml(item.source || '教师申报')}" readonly /></div><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required maxlength="30" value="${escapeHtml(draft.name)}" /></div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="${escapeHtml(draft.type)}" readonly /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major', draft.major)}</div><div class="course-field"><label>申报教师 <span class="sub-cell">必填</span></label><select name="teacher">${teacherNames.map(name => option(name, name === draft.teacher)).join('')}</select></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="${draft.hours}" /></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', courseDifficultyOptions(), draft.difficulty, '')}</div><div class="course-field wide"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" ${draft.ages.includes(value) ? 'checked' : ''} />${value}</label>`).join('')}</div></div></div>${item.type === '面授课程' ? coverEditor.markup() : ''}</form>`;
-  const outline = () => { const chapter = draft.chapters[activeChapter]; return `<div class="course-workbench"><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>章节结构</h3><p>${draft.chapters.length} 个章节</p></div><button class="button" type="button" data-course-edit="add-chapter">添加章节</button></div><div class="chapter-list">${draft.chapters.map((entry, index) => `<div class="chapter-item${index === activeChapter ? ' active' : ''}" data-course-edit="select-chapter" data-index="${index}"><div><strong>${escapeHtml(entry.name)}</strong><small>${entry.lessons.length} 个课时 · ${escapeHtml(entry.desc || '暂无章节描述')}</small></div><div class="chapter-item-actions"><button type="button" data-course-edit="edit-chapter" data-index="${index}">编辑</button><button type="button" data-course-edit="delete-chapter" data-index="${index}">删</button></div></div>`).join('') || '<div class="course-empty"><strong>暂无章节</strong></div>'}</div></section><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>${chapter ? escapeHtml(chapter.name) : '课时数据'}</h3><p>${chapter ? escapeHtml(chapter.desc || '维护该章节的课时') : '请选择左侧章节'}</p></div>${chapter ? '<button class="button" type="button" data-course-edit="add-lesson">添加课时</button>' : ''}</div><div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target)}</p></div><div class="chapter-item-actions"><button type="button" data-course-edit="edit-lesson" data-index="${index}">编辑</button><button type="button" data-course-edit="delete-lesson" data-index="${index}">删</button></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${(lesson.resources || []).length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span><button class="button" type="button" data-course-edit="resource" data-index="${index}">引用资源</button></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section></div>`; };
+  const outline = () => { const chapter = draft.chapters[activeChapter]; return `<div class="course-workbench"><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>章节结构</h3><p>${draft.chapters.length} 个章节</p></div><button class="button" type="button" data-course-edit="add-chapter">添加章节</button></div><div class="chapter-list">${draft.chapters.map((entry, index) => `<div class="chapter-item${index === activeChapter ? ' active' : ''}" data-course-edit="select-chapter" data-index="${index}"><div><strong>${escapeHtml(entry.name)}</strong><small>${entry.lessons.length} 个课时 · ${escapeHtml(entry.desc || '暂无章节描述')}</small></div><div class="chapter-item-actions"><button type="button" data-course-edit="edit-chapter" data-index="${index}">编辑</button><button type="button" data-course-edit="delete-chapter" data-index="${index}">删</button></div></div>`).join('') || '<div class="course-empty"><strong>暂无章节</strong></div>'}</div></section><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>${chapter ? escapeHtml(chapter.name) : '课时数据'}</h3><p>${chapter ? escapeHtml(chapter.desc || '维护该章节的课时') : '请选择左侧章节'}</p></div>${chapter ? '<button class="button" type="button" data-course-edit="add-lesson">添加课时</button>' : ''}</div><div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target)}</p></div><div class="chapter-item-actions"><button type="button" data-course-edit="edit-lesson" data-index="${index}">编辑</button><button type="button" data-course-edit="delete-lesson" data-index="${index}">删</button></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span>${(lesson.liveUrl || lesson.liveQr) ? '<span class="tag live-tag">直播</span>' : ''}<span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${(lesson.resources || []).length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span><button class="button" type="button" data-course-edit="resource" data-index="${index}">引用资源</button></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section></div>`; };
   const render = () => { holder.innerHTML = `${tabs()}${activeTab === 'basic' ? basic() : coverOnly ? courseOutlineView(draft.chapters) : outline()}<p class="course-hint">${coverOnly ? '教学内容已锁定，仅允许修改课程封面。' : '保存后更新课程基本信息、封面与课程大纲。'}</p><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="button" data-course-edit="save">保存</button></div>`; if (coverOnly) holder.querySelectorAll('[data-course-edit-basic] input:not([type="file"]), [data-course-edit-basic] select').forEach(input => { input.disabled = true; }); };
   dialog.addEventListener('click', event => {
     const tab = event.target.closest('[data-course-edit-tab]')?.dataset.courseEditTab;
@@ -803,6 +854,7 @@ function openWorkbench(id) {
   const teachingPanel = () => '<section class="course-workbench-teaching"><div class="course-pane-head"><div><h3>课程基本信息</h3><p>默认读取教师申报值，可在编排阶段调整；保存后写入课程档案</p></div></div><div class="course-teaching-grid"><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label><select id="workbench-difficulty" aria-label="难度等级"><option value="">请选择难度等级</option>' + courseDifficultyOptions().map(value => `<option ${teaching.difficulty === value ? 'selected' : ''}>${value}</option>`).join('') + '</select></div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">' + ['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="workbench-age" value="${value}" ${teaching.ages.includes(value) ? 'checked' : ''} />${value}</label>`).join('') + '</div></div></div>' + (item.type === '面授课程' ? coverEditor.markup() : '') + '</section>';
   const dialog = modal(`${item.status === '已完成' ? '查看课程编排' : item.status === '待编排' ? '开始课程编排' : '继续课程编排'}`, `${item.name} · ${item.type} · ${item.major}`, '<div id="workbench-content"></div>', { large: true });
   coverEditor.bind(dialog);
+  bindLiveQrUpload(dialog, (value, name) => { if (lessonDraft) { lessonDraft.liveQr = value; lessonDraft.liveQrFile = name; } });
   const renderWorkbench = () => {
     // 章节切换会整体重绘面板，先取回教学属性的当前输入，避免编辑丢失。
     readTeachingFromDom();
@@ -810,7 +862,7 @@ function openWorkbench(id) {
     const lessonCount = item.chapters.reduce((sum, current) => sum + current.lessons.length, 0);
     if (readOnly) {
       const basicInfo = `<section class="course-detail-section wide"><h3>课程基本信息</h3><dl class="course-detail-list"><div><dt>课程编号</dt><dd>${escapeHtml(item.id)}</dd></div><div><dt>课程名称</dt><dd>${escapeHtml(item.name)}</dd></div><div><dt>课程类型</dt><dd>${escapeHtml(item.type)}</dd></div><div><dt>所属专业</dt><dd>${escapeHtml(item.major)}</dd></div><div><dt>申报教师</dt><dd>${escapeHtml(item.teacher)}</dd></div><div><dt>总课时</dt><dd>${hoursText(item.hours)}</dd></div><div><dt>难度等级</dt><dd>${escapeHtml(teaching.difficulty || '未填写')}</dd></div><div><dt>适合年龄</dt><dd>${escapeHtml(teaching.ages.join('、') || '未填写')}</dd></div></dl></section>`;
-      const chapters = `<div class="course-workbench"><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>章节结构</h3><p>${item.chapters.length} 个章节 · ${lessonCount} 个课时</p></div></div><div class="chapter-list">${item.chapters.map((current, index) => `<button type="button" class="chapter-item${index === activeChapter ? ' active' : ''}" data-workbench="select-chapter" data-index="${index}"><span><strong>${escapeHtml(current.name)}</strong><small>${current.lessons.length} 个课时 · ${escapeHtml(current.desc || '暂无章节描述')}</small></span></button>`).join('') || '<div class="course-empty"><strong>暂无章节</strong></div>'}</div></section><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>${chapter ? escapeHtml(chapter.name) : '课时数据'}</h3><p>${chapter ? escapeHtml(chapter.desc || '暂无章节描述') : '请选择左侧章节'}</p></div></div><div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>第 ${index + 1} 课时 · ${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target || '未填写教学目标')}</p></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${lesson.resources.length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section></div>`;
+      const chapters = `<div class="course-workbench"><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>章节结构</h3><p>${item.chapters.length} 个章节 · ${lessonCount} 个课时</p></div></div><div class="chapter-list">${item.chapters.map((current, index) => `<button type="button" class="chapter-item${index === activeChapter ? ' active' : ''}" data-workbench="select-chapter" data-index="${index}"><span><strong>${escapeHtml(current.name)}</strong><small>${current.lessons.length} 个课时 · ${escapeHtml(current.desc || '暂无章节描述')}</small></span></button>`).join('') || '<div class="course-empty"><strong>暂无章节</strong></div>'}</div></section><section class="course-workbench-pane"><div class="course-pane-head"><div><h3>${chapter ? escapeHtml(chapter.name) : '课时数据'}</h3><p>${chapter ? escapeHtml(chapter.desc || '暂无章节描述') : '请选择左侧章节'}</p></div></div><div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item"><div class="lesson-item-head"><div><h4>第 ${index + 1} 课时 · ${escapeHtml(lesson.name)}</h4><p>${escapeHtml(lesson.target || '未填写教学目标')}</p></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span>${(lesson.liveUrl || lesson.liveQr) ? '<span class="tag live-tag">直播</span>' : ''}<span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span>${lesson.resources.length ? lesson.resources.map(resourceId => resources.find(resource => resource.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : '未关联资源'}</span></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong></div>'}</div></section></div>`;
       dialog.querySelector('#workbench-content').innerHTML = `${basicInfo}${chapters}<div class="course-workbench-footer"><div><span class="tag green">编排已完成 · 只读</span></div><div class="toolbar-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div></div>`;
       return;
     }
@@ -834,9 +886,12 @@ function openWorkbench(id) {
       current.lessons.forEach((lesson, lessonIndex) => {
         if (!lesson.name || !lesson.target || !lesson.duration) list.push({ chapterIndex, lessonIndex, text: `第 ${lessonIndex + 1} 课时缺少必填信息` });
         else if (item.type === '视频课程' && !lesson.resources.some((id) => resources.find((row) => row.id === id)?.type === '教学视频')) list.push({ chapterIndex, lessonIndex, text: `第 ${lessonIndex + 1} 课时未关联教学视频` });
+        else if (lesson.liveStartAt && !isValidLiveStart(lesson.liveStartAt)) list.push({ chapterIndex, lessonIndex, text: `第 ${lessonIndex + 1} 课时计划开播时间格式不正确` });
+        else if (item.type === '直播课' && (lesson.liveUrl || lesson.liveQr) && !isValidLiveStart(lesson.liveStartAt)) list.push({ chapterIndex, lessonIndex, text: `第 ${lessonIndex + 1} 课时配置了直播入口，需填写计划开播时间` });
       });
     });
-    if (item.type !== '视频课程') {
+    // 直播课按「视频课程式在线交付」：总课时由编排结果派生，不校验与申报总课时一致。
+    if (!['视频课程', '直播课'].includes(item.type)) {
       const lessons = item.chapters.flatMap((current) => current.lessons);
       if (targetHours && lessons.length !== targetHours) list.push({ chapterIndex: null, lessonIndex: null, text: `课时数需等于申报总课时 ${hoursText(targetHours)}，当前 ${lessons.length} 课时` });
     }
@@ -850,13 +905,13 @@ function openWorkbench(id) {
   };
   const errorLine = () => (paneError ? `<p class="course-error" data-inline-error>${escapeHtml(paneError)}</p>` : '');
   const chapterFormMarkup = () => (chapterDraft ? `<form class="course-inline-form" data-course-inline="chapter"><div class="course-field"><label>章节名称 <span class="sub-cell">必填</span></label><input name="name" value="${escapeHtml(chapterDraft.name)}" placeholder="如：第一章：身韵元素训练" /></div><div class="course-field"><label>排序</label><input name="sort" type="number" min="1" value="${chapterDraft.sort}" /></div><div class="course-field"><label>章节描述</label><textarea name="desc" placeholder="填写章节的教学重点">${escapeHtml(chapterDraft.desc || '')}</textarea></div>${errorLine()}<div class="course-inline-actions"><button type="button" class="button" data-workbench="cancel-chapter">取消</button><button type="submit" class="button primary">保存章节</button></div></form>` : '');
-  const lessonFormMarkup = () => (lessonDraft ? `<form class="course-inline-form" data-course-inline="lesson"><div class="course-detail-grid"><div class="course-field"><label>课时名称 <span class="sub-cell">必填</span></label><input name="name" value="${escapeHtml(lessonDraft.name)}" placeholder="如：站姿与脚位" /></div><div class="course-field"><label>课时序号 <span class="sub-cell">必填</span></label><input name="order" type="number" min="1" value="${lessonDraft.order}" /></div><div class="course-field"><label>课时目标 <span class="sub-cell">必填</span></label><input name="target" value="${escapeHtml(lessonDraft.target)}" placeholder="填写本课时可达成的目标" /></div><div class="course-field"><label>课时时长（分钟）<span class="sub-cell">可选 45/60/90/120</span></label>${courseLessonDurationOptions(lessonDraft.duration)}</div><div class="course-field"><label>课时类型 <span class="sub-cell">必填</span></label>${selectWithValues('kind', ['理论', '示范', '练习', '综合'], lessonDraft.kind, '')}</div><div class="course-field wide"><label>内容描述</label><textarea name="description" placeholder="填写教学内容和执行提示">${escapeHtml(lessonDraft.description || '')}</textarea></div></div>${errorLine()}</form>` : '');
+  const lessonFormMarkup = () => (lessonDraft ? `<form class="course-inline-form" data-course-inline="lesson"><div class="course-detail-grid"><div class="course-field"><label>课时名称 <span class="sub-cell">必填</span></label><input name="name" value="${escapeHtml(lessonDraft.name)}" placeholder="如：站姿与脚位" /></div><div class="course-field"><label>课时序号 <span class="sub-cell">必填</span></label><input name="order" type="number" min="1" value="${lessonDraft.order}" /></div><div class="course-field"><label>课时目标 <span class="sub-cell">必填</span></label><input name="target" value="${escapeHtml(lessonDraft.target)}" placeholder="填写本课时可达成的目标" /></div><div class="course-field"><label>课时时长（分钟）<span class="sub-cell">可选 45/60/90/120</span></label>${courseLessonDurationOptions(lessonDraft.duration)}</div><div class="course-field"><label>课时类型 <span class="sub-cell">必填</span></label>${selectWithValues('kind', ['理论', '示范', '练习', '综合'], lessonDraft.kind, '')}</div><div class="course-field wide"><label>内容描述</label><textarea name="description" placeholder="填写教学内容和执行提示">${escapeHtml(lessonDraft.description || '')}</textarea></div><div class="course-field wide"><label>直播间链接 <span class="sub-cell">选填 · 与二维码二选一</span></label><input name="liveUrl" value="${escapeHtml(lessonDraft.liveUrl || '')}" placeholder="粘贴直播间 URL，如 https://live.example.com/room/123" /></div>${liveQrFieldMarkup(lessonDraft.liveQr, lessonDraft.liveQrFile)}<div class="course-field wide"><label>计划开播时间 <span class="sub-cell">直播课配置直播入口时必填</span></label><input name="liveStartAt" type="datetime-local" value="${escapeHtml(liveStartInputValue(lessonDraft.liveStartAt))}" /><small>北京时间（GMT+8）；仅表示计划开播，不代表实际开播</small></div></div>${errorLine()}</form>` : '');
   const resourceMarkup = () => {
     const lesson = resourceTarget ? item.chapters[resourceTarget.chapterIndex]?.lessons[resourceTarget.lessonIndex] : null;
     if (!lesson) return '<div class="course-empty"><strong>请先选择课时</strong></div>';
-    return `<div class="course-list-select">${resources.map((row) => `<label class="course-list-select-item"><input type="checkbox" data-workbench="toggle-resource" value="${row.id}"${lesson.resources.includes(row.id) ? ' checked' : ''} /><span><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.type)} · ${escapeHtml(row.major)} · 已引用 ${row.references} 次</small></span></label>`).join('')}</div><p class="course-hint">勾选即保存，无需再次确认；视频课程的每个课时至少需要一个教学视频。</p>`;
+    return `<div class="course-list-select">${resources.map((row) => `<label class="course-list-select-item"><input type="checkbox" data-workbench="toggle-resource" value="${row.id}"${lesson.resources.includes(row.id) ? ' checked' : ''} /><span><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.type)} · ${escapeHtml(row.major)} · 已引用 ${row.references} 次</small></span></label>`).join('')}</div><p class="course-hint">勾选即保存，无需再次确认；视频课程的每个课时至少需要一个教学视频；直播课不要求教学视频，可在课时上配置直播间链接或二维码。</p>`;
   };
-  const lessonListView = (chapter) => `<div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item${lessonMarks.has(`${activeChapter}-${index}`) ? ' is-invalid' : ''}"><div class="lesson-item-head"><div><h4>${escapeHtml(lesson.name || `第 ${index + 1} 课时`)}</h4><p>${escapeHtml(lesson.target || '未填写教学目标')}</p></div><div class="chapter-item-actions"><button type="button" data-workbench="edit-lesson" data-chapter="${activeChapter}" data-index="${index}">编辑</button><button type="button" data-workbench="delete-lesson" data-chapter="${activeChapter}" data-index="${index}">删</button></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span><span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span class="${item.type === '视频课程' && !lesson.resources.some((resourceId) => resources.find((row) => row.id === resourceId)?.type === '教学视频') ? 'missing' : ''}">${lesson.resources.length ? lesson.resources.map((resourceId) => resources.find((row) => row.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : item.type === '视频课程' ? '未关联视频资源' : '未关联资源（可选）'}</span><button class="button" type="button" data-workbench="resource" data-index="${index}">引用资源</button></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong><span>请添加至少一个课时并完成教学目标。</span></div>'}</div>`;
+  const lessonListView = (chapter) => `<div class="lesson-list">${chapter?.lessons.map((lesson, index) => `<article class="lesson-item${lessonMarks.has(`${activeChapter}-${index}`) ? ' is-invalid' : ''}"><div class="lesson-item-head"><div><h4>${escapeHtml(lesson.name || `第 ${index + 1} 课时`)}</h4><p>${escapeHtml(lesson.target || '未填写教学目标')}</p></div><div class="chapter-item-actions"><button type="button" data-workbench="edit-lesson" data-chapter="${activeChapter}" data-index="${index}">编辑</button><button type="button" data-workbench="delete-lesson" data-chapter="${activeChapter}" data-index="${index}">删</button></div></div><div class="lesson-meta"><span>${lesson.duration} 分钟</span><span>${escapeHtml(lesson.kind)}</span>${(lesson.liveUrl || lesson.liveQr) ? '<span class="tag live-tag">直播</span>' : ''}${formatLiveStart(lesson.liveStartAt) ? `<span class="tag">计划开播 ${escapeHtml(formatLiveStart(lesson.liveStartAt))}</span>` : ''}<span>${escapeHtml(lesson.description || '暂无内容描述')}</span></div><div class="lesson-resource"><span class="${item.type === '视频课程' && !lesson.resources.some((resourceId) => resources.find((row) => row.id === resourceId)?.type === '教学视频') ? 'missing' : ''}">${lesson.resources.length ? lesson.resources.map((resourceId) => resources.find((row) => row.id === resourceId)?.name).filter(Boolean).map(escapeHtml).join('、') : item.type === '视频课程' ? '未关联视频资源' : '未关联资源（可选）'}</span><button class="button" type="button" data-workbench="resource" data-index="${index}">引用资源</button></div></article>`).join('') || '<div class="course-empty"><strong>暂无课时</strong><span>请添加至少一个课时并完成教学目标。</span></div>'}</div>`;
   const saveChapterDraft = (form) => {
     const data = new FormData(form);
     const name = String(data.get('name') || '').trim();
@@ -882,10 +937,12 @@ function openWorkbench(id) {
     const target = String(data.get('target') || '').trim();
     const duration = Number(data.get('duration'));
     if (!name || !target || !(duration > 0)) { paneError = '课时名称、课时目标与课时时长必填'; renderWorkbench(); return; }
+    const liveStartRaw = String(data.get('liveStartAt') || '').trim();
+    if (liveStartRaw && !normalizeLiveStart(liveStartRaw)) { paneError = '计划开播时间格式不正确，请填写完整日期与时间'; renderWorkbench(); return; }
     paneError = '';
     const lessons = item.chapters[activeChapter].lessons;
     const current = lessonDraft.index === null ? { resources: [] } : lessons[lessonDraft.index];
-    const lesson = { name, target, duration, kind: data.get('kind'), description: String(data.get('description') || '').trim(), resources: [...(current.resources || [])] };
+    const lesson = { name, target, duration, kind: data.get('kind'), description: String(data.get('description') || '').trim(), resources: [...(current.resources || [])], liveStartAt: normalizeLiveStart(data.get('liveStartAt')), liveUrl: String(data.get('liveUrl') || '').trim(), liveQr: String(data.get('liveQr') || '').trim(), liveQrFile: String(data.get('liveQrFile') || '').trim() };
     const fallback = lessonDraft.index === null ? lessons.length + 1 : lessonDraft.index + 1;
     const order = Math.max(1, Math.min(lessons.length + (lessonDraft.index === null ? 1 : 0), Number(data.get('order')) || fallback));
     if (lessonDraft.index !== null) lessons.splice(lessonDraft.index, 1);
@@ -924,8 +981,8 @@ function openWorkbench(id) {
         onConfirm: () => { item.chapters.splice(chapterIndex, 1); activeChapter = Math.max(0, Math.min(activeChapter, item.chapters.length - 1)); persistCourse(item); renderWorkbench(); showToast('章节已删除'); }
       });
     }
-    if (action === 'add-lesson') { paneView = 'lesson'; paneError = ''; lessonDraft = { index: null, name: '', order: (item.chapters[activeChapter]?.lessons.length || 0) + 1, target: '', duration: FIXED_LESSON_DURATION, kind: '理论', description: '' }; renderWorkbench(); }
-    if (action === 'edit-lesson') { const lessonIndex = Number(target.dataset.index); const lesson = item.chapters[activeChapter].lessons[lessonIndex]; paneView = 'lesson'; paneError = ''; lessonDraft = { index: lessonIndex, name: lesson.name, order: lessonIndex + 1, target: lesson.target, duration: lesson.duration, kind: lesson.kind, description: lesson.description || '' }; renderWorkbench(); }
+    if (action === 'add-lesson') { paneView = 'lesson'; paneError = ''; lessonDraft = { index: null, name: '', order: (item.chapters[activeChapter]?.lessons.length || 0) + 1, target: '', duration: FIXED_LESSON_DURATION, kind: '理论', description: '', liveStartAt: '', liveUrl: '', liveQr: '', liveQrFile: '' }; renderWorkbench(); }
+    if (action === 'edit-lesson') { const lessonIndex = Number(target.dataset.index); const lesson = item.chapters[activeChapter].lessons[lessonIndex]; paneView = 'lesson'; paneError = ''; lessonDraft = { index: lessonIndex, name: lesson.name, order: lessonIndex + 1, target: lesson.target, duration: lesson.duration, kind: lesson.kind, description: lesson.description || '', liveStartAt: lesson.liveStartAt || '', liveUrl: lesson.liveUrl || '', liveQr: lesson.liveQr || '', liveQrFile: lesson.liveQrFile || '' }; renderWorkbench(); }
     if (action === 'cancel-lesson') { paneView = 'list'; lessonDraft = null; paneError = ''; renderWorkbench(); }
     if (action === 'save-lesson') saveLessonDraft();
     if (action === 'delete-lesson') {
@@ -947,7 +1004,7 @@ function openWorkbench(id) {
       if (blockers.length) { blockersVisible = true; renderWorkbench(); showToast(`完成编排前还需处理 ${blockers.length} 项，已在面板内标出`, 'error'); return; }
       blockersVisible = false;
       item.status = '已完成';
-      // CR-2026-051 §4.1：视频课程总课时由编排结果回写；面授课程此前已校验课时数与申报总课时一致。
+      // CR-2026-051 §4.1：视频课程与直播课总课时由编排结果回写；面授课程此前已校验课时数与申报总课时一致。
       item.hours = item.chapters.reduce((sum, current) => sum + ((current.lessons || []).length), 0);
       item.updatedAt = demoTime();
       persistCourse(item);
@@ -998,15 +1055,18 @@ function openChapterForm(course, index, onDone) {
 }
 
 function openLessonForm(course, chapterIndex, lessonIndex, onDone) {
-  const current = lessonIndex === null ? { name: '', target: '', duration: FIXED_LESSON_DURATION, kind: '理论', description: '', resources: [] } : course.chapters[chapterIndex].lessons[lessonIndex];
+  const current = lessonIndex === null ? { name: '', target: '', duration: FIXED_LESSON_DURATION, kind: '理论', description: '', resources: [], liveStartAt: '', liveUrl: '', liveQr: '', liveQrFile: '' } : course.chapters[chapterIndex].lessons[lessonIndex];
   const lessonCount = course.chapters[chapterIndex].lessons.length;
   const defaultOrder = lessonIndex === null ? lessonCount + 1 : lessonIndex + 1;
-  const dialog = modal(lessonIndex === null ? '添加课时' : '编辑课时', '课时名称、课时目标和课时时长为必填项', `<form data-form="lesson-form"><div class="course-detail-grid"><div class="course-field"><label>课时名称 <span class="sub-cell">必填</span></label><input name="name" required value="${escapeHtml(current.name)}" placeholder="如：站姿与脚位" /></div><div class="course-field"><label>课时序号 <span class="sub-cell">必填</span></label><input name="order" required type="number" min="1" value="${defaultOrder}" /></div><div class="course-field"><label>课时目标 <span class="sub-cell">必填</span></label><input name="target" required value="${escapeHtml(current.target)}" placeholder="填写本课时可达成的目标" /></div><div class="course-field"><label>课时时长（分钟）<span class="sub-cell">可选 45/60/90/120</span></label>${courseLessonDurationOptions(current.duration)}</div><div class="course-field"><label>课时类型 <span class="sub-cell">必填</span></label>${selectWithValues('kind', ['理论', '示范', '练习', '综合'], current.kind, '')}</div><div class="course-field wide"><label>内容描述</label><textarea name="description" placeholder="填写教学内容和执行提示">${escapeHtml(current.description || '')}</textarea></div></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存课时</button></div></form>`);
+  const dialog = modal(lessonIndex === null ? '添加课时' : '编辑课时', '课时名称、课时目标和课时时长为必填项', `<form data-form="lesson-form"><div class="course-detail-grid"><div class="course-field"><label>课时名称 <span class="sub-cell">必填</span></label><input name="name" required value="${escapeHtml(current.name)}" placeholder="如：站姿与脚位" /></div><div class="course-field"><label>课时序号 <span class="sub-cell">必填</span></label><input name="order" required type="number" min="1" value="${defaultOrder}" /></div><div class="course-field"><label>课时目标 <span class="sub-cell">必填</span></label><input name="target" required value="${escapeHtml(current.target)}" placeholder="填写本课时可达成的目标" /></div><div class="course-field"><label>课时时长（分钟）<span class="sub-cell">可选 45/60/90/120</span></label>${courseLessonDurationOptions(current.duration)}</div><div class="course-field"><label>课时类型 <span class="sub-cell">必填</span></label>${selectWithValues('kind', ['理论', '示范', '练习', '综合'], current.kind, '')}</div><div class="course-field wide"><label>内容描述</label><textarea name="description" placeholder="填写教学内容和执行提示">${escapeHtml(current.description || '')}</textarea></div><div class="course-field wide"><label>直播间链接 <span class="sub-cell">选填 · 与二维码二选一</span></label><input name="liveUrl" value="${escapeHtml(current.liveUrl || '')}" placeholder="粘贴直播间 URL，如 https://live.example.com/room/123" /></div>${liveQrFieldMarkup(current.liveQr, current.liveQrFile)}<div class="course-field wide"><label>计划开播时间 <span class="sub-cell">直播课配置直播入口时必填</span></label><input name="liveStartAt" type="datetime-local" value="${escapeHtml(liveStartInputValue(current.liveStartAt))}" /><small>北京时间（GMT+8）；仅表示计划开播，不代表实际开播</small></div></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存课时</button></div></form>`);
+  bindLiveQrUpload(dialog, (value, name) => { current.liveQr = value; current.liveQrFile = name; });
   dialog.querySelector('form').addEventListener('submit', event => {
     event.preventDefault();
     const data = new FormData(event.target);
     if (!data.get('name').trim() || !data.get('target').trim() || Number(data.get('duration')) <= 0) return;
-    const lesson = { name: data.get('name').trim(), target: data.get('target').trim(), duration: Number(data.get('duration')), kind: data.get('kind'), description: data.get('description').trim(), resources: current.resources || [] };
+    const liveStartRaw = String(data.get('liveStartAt') || '').trim();
+    if (liveStartRaw && !normalizeLiveStart(liveStartRaw)) return;
+    const lesson = { name: data.get('name').trim(), target: data.get('target').trim(), duration: Number(data.get('duration')), kind: data.get('kind'), description: data.get('description').trim(), resources: current.resources || [], liveStartAt: normalizeLiveStart(data.get('liveStartAt')), liveUrl: (data.get('liveUrl') || '').trim(), liveQr: (data.get('liveQr') || '').trim(), liveQrFile: (data.get('liveQrFile') || '').trim() };
     const lessons = course.chapters[chapterIndex].lessons;
     // I1-C-09: lessons keep an explicit order instead of always appending to the end.
     const fallback = lessonIndex === null ? lessons.length + 1 : lessonIndex + 1;
@@ -1021,7 +1081,7 @@ function openLessonForm(course, chapterIndex, lessonIndex, onDone) {
 
 function openResourcePicker(course, chapterIndex, lessonIndex, onDone) {
   const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
-  const dialog = modal('引用教学资源', '可引用视频、课件或其他教学附件；视频课程至少需要一个视频资源', `<form data-form="resource-picker"><div class="course-list-select">${resources.map(item => `<label class="course-list-select-item"><input type="checkbox" name="resource" value="${item.id}"${lesson.resources.includes(item.id) ? ' checked' : ''} /><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.type)} · ${escapeHtml(item.major)} · 已引用 ${item.references} 次</small></span></label>`).join('')}</div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存引用</button></div></form>`);
+  const dialog = modal('引用教学资源', '可引用视频、课件或其他教学附件；视频课程的课时至少需要一个视频资源，直播课与面授课程可选', `<form data-form="resource-picker"><div class="course-list-select">${resources.map(item => `<label class="course-list-select-item"><input type="checkbox" name="resource" value="${item.id}"${lesson.resources.includes(item.id) ? ' checked' : ''} /><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.type)} · ${escapeHtml(item.major)} · 已引用 ${item.references} 次</small></span></label>`).join('')}</div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存引用</button></div></form>`);
   dialog.querySelector('form').addEventListener('submit', event => { event.preventDefault(); lesson.resources = [...dialog.querySelectorAll('[name=resource]:checked')].map(input => input.value); closeModal(); onDone(); showToast('资源引用已更新'); });
 }
 
@@ -1042,18 +1102,30 @@ function openResourcePreview(id) {
   modal('资源预览', `${item.name} · ${item.type}`, `<div class="course-preview${documentPreview ? ' document' : ''}"><div><strong>${documentPreview ? '文档预览' : item.ext === 'video' ? '视频预览' : item.ext === 'audio' ? '音频预览' : '图片预览'}</strong><small>${escapeHtml(item.name)}<br />文件预览暂不可用。</small></div></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">关闭</button></div>`);
 }
 
-// 后台新增面授课程只建立基本信息，保存后统一进入待编排。
+// 后台新增课程只建立基本信息（课程类型可选视频课程／面授课程／直播课），保存后统一进入待编排。
 function openDirectCourseForm() {
   const teacherNames = [...new Set(teacherAccounts.map(teacher => teacher.name).filter(Boolean))];
   const generatedId = `COURSE-${String(Date.now()).slice(-8)}`;
-  const dialog = modal('新增面授课程', '保存基本信息后进入内容编排', `<form data-form="direct-course"><div class="course-detail-grid"><div class="course-field"><label>课程编号 <span class="sub-cell">必填</span></label><input name="courseNumber" required maxlength="30" value="${generatedId}" /></div><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required maxlength="30" placeholder="填写课程名称" /></div><div class="course-field"><label>课程类型</label><input class="readonly-field" value="面授课程" readonly /></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major')}</div><div class="course-field"><label>申报教师 <span class="sub-cell">必填</span></label><select name="teacher" required><option value="">请选择</option>${teacherNames.map(name => option(name, false)).join('')}</select></div><div class="course-field"><label>总课时 <span class="sub-cell">必填</span></label><input name="hours" type="number" min="1" required value="1" /></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', courseDifficultyOptions(), courseDefaultDifficulty(), '')}</div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" />${value}</label>`).join('')}</div></div></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存并进入待编排</button></div></form>`, { large: true });
+  const dialog = modal('新增课程', '选择课程类型并保存基本信息后进入内容编排', `<form data-form="direct-course"><div class="course-detail-grid"><div class="course-field"><label>课程编号 <span class="sub-cell">必填</span></label><input name="courseNumber" required maxlength="30" value="${generatedId}" /></div><div class="course-field"><label>课程名称 <span class="sub-cell">必填</span></label><input name="name" required maxlength="30" placeholder="填写课程名称" /></div><div class="course-field"><label>课程类型 <span class="sub-cell">必填</span></label><select name="type">${['面授课程', '视频课程', '直播课'].map(value => option(value, value === '面授课程')).join('')}</select></div><div class="course-field"><label>所属专业 <span class="sub-cell">必填</span></label>${professionalFilter('major')}</div><div class="course-field"><label>申报教师 <span class="sub-cell">必填</span></label><select name="teacher" required><option value="">请选择</option>${teacherNames.map(name => option(name, false)).join('')}</select></div><div class="course-field" data-hours-field><label>总课时 <span class="sub-cell">面授课程必填</span></label><input name="hours" type="number" min="1" required value="1" /></div><div class="course-field"><label>难度等级 <span class="sub-cell">必填</span></label>${selectWithValues('difficulty', courseDifficultyOptions(), courseDefaultDifficulty(), '')}</div><div class="course-field"><label>适合年龄 <span class="sub-cell">必填</span></label><div class="choice-group">${['全年龄段', '少儿', '青少年', '成人'].map(value => `<label class="choice"><input type="checkbox" name="ages" value="${value}" />${value}</label>`).join('')}</div></div></div><div class="course-modal-actions"><button class="button" type="button" data-action="close-modal">取消</button><button class="button primary" type="submit">保存并进入待编排</button></div></form>`, { large: true });
+  const typeSelect = dialog.querySelector('[name="type"]');
+  const syncHoursField = () => {
+    const isClass = typeSelect?.value === '面授课程';
+    const field = dialog.querySelector('[data-hours-field]');
+    const input = dialog.querySelector('[name="hours"]');
+    if (field) field.hidden = !isClass;
+    if (input) { input.disabled = !isClass; input.required = isClass; }
+  };
+  typeSelect?.addEventListener('change', syncHoursField);
+  syncHoursField();
   dialog.querySelector('form').addEventListener('submit', event => {
     event.preventDefault();
     const data = new FormData(event.target);
     const courseNumber = String(data.get('courseNumber') || '').trim();
     const name = String(data.get('name') || '').trim();
     const ages = data.getAll('ages');
-    if (!courseNumber || !name || !data.get('major') || !data.get('teacher') || Number(data.get('hours')) <= 0 || !data.get('difficulty') || !ages.length) {
+    const type = String(data.get('type') || '面授课程');
+    const isClass = type === '面授课程';
+    if (!courseNumber || !name || !data.get('major') || !data.get('teacher') || !data.get('difficulty') || !ages.length || (isClass && !(Number(data.get('hours')) > 0))) {
       showToast('请补齐课程基本信息', 'error');
       return;
     }
@@ -1061,7 +1133,7 @@ function openDirectCourseForm() {
       showToast(`课程编号 ${courseNumber} 已存在，请更换`, 'error');
       return;
     }
-    const course = { id: courseNumber, source: '后台新增', name, type: '面授课程', major: data.get('major'), teacher: data.get('teacher'), hours: Number(data.get('hours')), difficulty: data.get('difficulty'), ages, status: '待编排', updatedAt: demoTime(), chapters: [] };
+    const course = { id: courseNumber, source: '后台新增', name, type, major: data.get('major'), teacher: data.get('teacher'), hours: isClass ? Number(data.get('hours')) : 0, difficulty: data.get('difficulty'), ages, status: '待编排', updatedAt: demoTime(), chapters: [] };
     contentCourses.unshift(course);
     persistCourse(course);
     closeModal();
@@ -1070,7 +1142,7 @@ function openDirectCourseForm() {
     url.searchParams.set('tab', 'arrange');
     history.replaceState(null, '', url);
     renderLibrary(root());
-    showToast('面授课程已创建，状态为待编排');
+    showToast(`${type}已创建，状态为待编排`);
   });
 }
 
@@ -1231,7 +1303,7 @@ function applyApplicationReview(item, result, opinion) {
   const targetId = item.courseId || courseIdForApplication(item.id);
   const existing = contentCourses.find(record => record.applicationId === item.id || record.id === targetId);
   const course = existing || courseFromApplication(item);
-  if (existing) Object.assign(course, { applicationId: item.id, name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: item.type === '视频课程' ? 0 : Number(item.hours) || course.hours });
+  if (existing) Object.assign(course, { applicationId: item.id, name: item.name, type: item.type, major: item.major, teacher: item.teacher, hours: ['视频课程', '直播课'].includes(item.type) ? 0 : Number(item.hours) || course.hours });
   else contentCourses.unshift(course);
   persistCourse(course);
   return item;

@@ -20,7 +20,7 @@ const archiveVersion = (version, at, operator, changes, snapshot) => ({ version,
 // CR-2026-055：课程库中已完成课程必须有可查看的章节与课时数据；课程大纲同时写入当前档案和历史版本快照。
 const COURSE_OUTLINES = {
   '声乐演唱技巧': [
-    { name: '第一章：演唱基础', desc: '建立气息、发声与共鸣的基础方法。', lessons: [{ name: '气息支持', target: '理解并完成腹式呼吸练习', duration: 36, kind: '理论', description: '建立气息支撑的基本概念。', resources: ['res-001'] }, { name: '共鸣位置', target: '找到自然共鸣位置', duration: 42, kind: '示范', description: '通过示范建立共鸣感受。', resources: ['res-003'] }] },
+    { name: '第一章：演唱基础', desc: '建立气息、发声与共鸣的基础方法。', lessons: [{ name: '气息支持', target: '理解并完成腹式呼吸练习', duration: 36, kind: '理论', description: '建立气息支撑的基本概念。', resources: ['res-001'], liveUrl: 'https://live.example.com/room/vocal-001' }, { name: '共鸣位置', target: '找到自然共鸣位置', duration: 42, kind: '示范', description: '通过示范建立共鸣感受。', resources: ['res-003'] }] },
     { name: '第二章：作品处理', desc: '将咬字、吐字与表达方法应用到作品中。', lessons: [{ name: '咬字与吐字', target: '完成作品咬字练习', duration: 40, kind: '练习', description: '围绕歌词完成清晰咬字。', resources: ['res-004'] }] }
   ],
   '少儿国画入门': [
@@ -55,6 +55,32 @@ const VIDEO_DEMO_COURSES = [
   { id: 'COURSE-VIDEO-DEMO-003', name: '少儿水彩画入门', major: '少儿绘画', teacher: '李青', hours: 6, difficulty: '启蒙', ages: ['少儿'], price: '368.00', outline: [{ name: '第一章：色彩体验', desc: '认识水彩工具和基础色彩。', lessons: [{ name: '工具与用水', target: '正确使用水彩工具', duration: 30, kind: '示范', description: '认识画笔、颜料和用水方法。', resources: [] }, { name: '三原色练习', target: '完成三原色调色练习', duration: 35, kind: '练习', description: '通过调色认识色彩变化。', resources: [] }] }, { name: '第二章：主题创作', desc: '综合运用色彩完成主题画。', lessons: [{ name: '我的小花园', target: '完成一幅水彩主题画', duration: 55, kind: '创作', description: '从构图到上色完成小幅创作。', resources: [] }] }] },
   { id: 'COURSE-VIDEO-DEMO-004', name: '朗诵表达进阶', major: '朗诵与主持', teacher: '邓琪', hours: 8, difficulty: '高级', ages: ['青少年', '成人'], price: '598.00', outline: [{ name: '第一章：文本分析', desc: '掌握停连、重音与情绪分析。', lessons: [{ name: '停连与重音', target: '完成文本标注', duration: 42, kind: '理论', description: '分析文本节奏和重音位置。', resources: [] }, { name: '情绪推进', target: '完成一段情绪递进朗诵', duration: 46, kind: '示范', description: '通过示范理解情绪层次。', resources: [] }] }, { name: '第二章：完整表达', desc: '完成作品的整体表达。', lessons: [{ name: '作品朗诵', target: '独立完成指定作品朗诵', duration: 52, kind: '综合', description: '综合运用发声、节奏和情绪表达。', resources: [] }] }] },
   { id: 'COURSE-VIDEO-DEMO-005', name: '古筝经典小曲演奏', major: '古筝', teacher: '周宁', hours: 9, difficulty: '中级', ages: ['青少年', '成人'], price: '768.00', outline: [{ name: '第一章：演奏准备', desc: '巩固指法和节拍基础。', lessons: [{ name: '指法组合', target: '完成勾托抹基础组合', duration: 40, kind: '练习', description: '巩固常用指法的连续转换。', resources: [] }, { name: '节拍控制', target: '保持稳定节拍演奏', duration: 44, kind: '示范', description: '练习节拍器配合和速度控制。', resources: [] }] }, { name: '第二章：乐曲演奏', desc: '完成经典小曲的分段与连贯演奏。', lessons: [{ name: '分段练习', target: '完成乐曲重点段落', duration: 48, kind: '练习', description: '按乐句拆解并完成重点练习。', resources: [] }] }] }
+];
+
+// CR-2026-179：直播课演示数据。直播课按「视频课程式在线交付」——上架商品、按账号开通学习权限，
+// 不建班 / 不排课 / 不结业；直播由课时挂的直播间链接或二维码承载（第三方平台，不对接）。
+// 示例链接均为虚构占位域名，仅用于原型演示；二维码不预置，由后台课时表单的文件上传控件录入。
+// CR-2026-180：直播课「计划开播时间」统一口径。时间以字符串存储（北京时间 GMT+8），
+// 避免各端用 Date 解析产生时区漂移；仅表示计划开播，不代表第三方平台实际开播。
+const LIVE_START_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
+function isValidLiveStart(value) { return LIVE_START_PATTERN.test(String(value || '').trim()); }
+function normalizeLiveStart(value) { const raw = String(value || '').trim().replace('T', ' '); return LIVE_START_PATTERN.test(raw) ? raw : ''; }
+function liveStartInputValue(value) { return String(value || '').trim().replace(' ', 'T'); }
+function formatLiveStart(value) {
+  const raw = normalizeLiveStart(value);
+  const parts = raw && raw.match(/^\d{4}-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/);
+  return parts ? `${Number(parts[1])}月${Number(parts[2])}日 ${parts[3]}:${parts[4]}` : '';
+}
+const LIVE_DEMO_COURSES = [
+  {
+    id: 'COURSE-LIVE-DEMO-001', name: '声乐名师直播精讲', major: '声乐演唱', teacher: '陈晨', hours: 2, difficulty: '中级', ages: ['青少年', '成人'], price: '398.00',
+    outline: [
+      { name: '第一章：直播精讲', desc: '跟随名师直播，边学边练。', lessons: [
+        { name: '第1讲 · 气息与开嗓', target: '跟随直播完成开嗓训练', duration: 45, kind: '示范', description: '直播实时讲解气息支撑与开嗓方法，可举手连麦。', resources: [], liveStartAt: '2026-11-20 19:30', liveUrl: 'https://live.example.com/room/vocal-live-001' },
+        { name: '第2讲 · 作品处理答疑', target: '在直播中完成作品答疑', duration: 45, kind: '综合', description: '直播答疑与示范，课后可回看。', resources: [], liveStartAt: '2026-11-27 19:30', liveUrl: 'https://live.example.com/room/vocal-live-002' }
+      ] }
+    ]
+  }
 ];
 
 // 课程档案基线：只保留档案字段、教学属性与版本轨，不含运营四字段。
@@ -164,6 +190,25 @@ const COURSE_ARCHIVE_SEED = [
     chapters: course.outline,
     version: 1,
     versions: [archiveVersion(1, '2026-09-21 10:00', '教研管理员', ['建档', '编排结构'], { name: course.name, archive: '完整课程', type: '视频课程', major: course.major, teacher: course.teacher, hours: course.hours, difficulty: course.difficulty, ages: [...course.ages], structure: `${course.outline.length} 个章节 · ${course.outline.reduce((sum, chapter) => sum + chapter.lessons.length, 0)} 个课时`, outline: course.outline })]
+  })),
+  // CR-2026-179：直播课档案进入课程库，供后台课程中心与学员端共用同一份基线。
+  ...LIVE_DEMO_COURSES.map((course) => ({
+    id: `LIB-${course.id}`,
+    sourceCourseId: course.id,
+    source: '后台新增',
+    name: course.name,
+    archive: '完整课程',
+    type: '直播课',
+    major: course.major,
+    teacher: course.teacher,
+    hours: course.hours,
+    status: '已完成',
+    difficulty: course.difficulty,
+    ages: [...course.ages],
+    updatedAt: '2026-11-11 10:00',
+    chapters: course.outline,
+    version: 1,
+    versions: [archiveVersion(1, '2026-11-11 10:00', '教研管理员', ['建档', '编排结构'], { name: course.name, archive: '完整课程', type: '直播课', major: course.major, teacher: course.teacher, hours: course.hours, difficulty: course.difficulty, ages: [...course.ages], structure: `${course.outline.length} 个章节 · ${course.outline.reduce((sum, chapter) => sum + chapter.lessons.length, 0)} 个课时`, outline: course.outline })]
   }))
 ];
 const COURSE_DISPLAY_UNSET = '未配置';
@@ -319,6 +364,10 @@ __classicExports["saleUnitDisplay"] = saleUnitDisplay;
 __classicExports["persistSaleUnitDisplay"] = persistSaleUnitDisplay;
 __classicExports["courseTeachingSummary"] = courseTeachingSummary;
 __classicExports["VIDEO_DEMO_COURSES"] = VIDEO_DEMO_COURSES;
+__classicExports["isValidLiveStart"] = isValidLiveStart;
+__classicExports["normalizeLiveStart"] = normalizeLiveStart;
+__classicExports["liveStartInputValue"] = liveStartInputValue;
+__classicExports["formatLiveStart"] = formatLiveStart;
 __classicExports["COURSE_DISPLAY_UNSET"] = COURSE_DISPLAY_UNSET;
 __classicExports["SALE_UNIT_DISPLAY_KEYS"] = SALE_UNIT_DISPLAY_KEYS;
   __classicModules["shared/js/course-display.js"] = __classicExports;
